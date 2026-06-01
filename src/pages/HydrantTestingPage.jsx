@@ -2425,22 +2425,37 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
   ];
   const sogPdfUrl = "https://dept-app-k85k.onrender.com/documents/horn-lake-sogs.pdf";
   const sogDetailMap = useMemo(() => new Map(fireSogDetails.map((sog) => [sog.code, sog])), [fireSogDetails]);
+  const sogList = useMemo(() => {
+    const indexLoaded = fireSogIndex.length > 1 || !/firebase setup/i.test(fireSogIndex[0]?.title || "");
+    if (indexLoaded) return fireSogIndex;
+    const detailList = fireSogDetails.filter((sog) => sog.code && !/firebase setup/i.test(sog.title || ""));
+    if (!detailList.length) return fireSogIndex;
+    return detailList
+      .map((sog) => ({
+        code: sog.code,
+        title: sog.title || sog.subject || `SOG #${sog.code}`,
+        page: sog.page || sog.sourcePage || "",
+        sourceFile: sog.sourceFile,
+        sourceUrl: sog.sourceUrl
+      }))
+      .sort((a, b) => Number(a.code) - Number(b.code) || String(a.code).localeCompare(String(b.code), undefined, { numeric: true }));
+  }, [fireSogDetails, fireSogIndex]);
   useEffect(() => {
     if (requestedView && requestedView !== view) setView(requestedView);
   }, [requestedView, view]);
   useEffect(() => {
-    const matchingSog = fireSogIndex.find((sog) => sog.code === selectedSog?.code);
+    const matchingSog = sogList.find((sog) => sog.code === selectedSog?.code);
     if (matchingSog && matchingSog !== selectedSog) {
       setSelectedSog(matchingSog);
       return;
     }
-    if (!matchingSog) setSelectedSog(fireSogIndex[0]);
-  }, [fireSogIndex, selectedSog?.code]);
+    if (!matchingSog) setSelectedSog(sogList[0]);
+  }, [selectedSog?.code, sogList]);
   const filteredSogs = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return fireSogIndex;
-    return fireSogIndex.filter((sog) => `${sog.code} ${sog.title} sog ${sog.code}`.toLowerCase().includes(term));
-  }, [query]);
+    if (!term) return sogList;
+    return sogList.filter((sog) => `${sog.code} ${sog.title} sog ${sog.code}`.toLowerCase().includes(term));
+  }, [query, sogList]);
 
   function sogSourceUrl(sog) {
     const detail = sogDetailMap.get(sog.code);
@@ -2519,7 +2534,7 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
             </div>
             <article className="resource-detail">
               <span className="resource-kicker">SOG #{selectedSog.code}</span>
-              <h2>{selectedSog.title}</h2>
+              <h2>{sogDetailMap.get(selectedSog.code)?.title || selectedSog.title}</h2>
               <div className="code-meta-grid">
                 <div><strong>Manual Page</strong><span>{selectedSog.page}</span></div>
                 <div><strong>Source</strong><span>{sogDetailMap.get(selectedSog.code)?.sourceFile || "Horn Lake SOG PDF"}</span></div>
