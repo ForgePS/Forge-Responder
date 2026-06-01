@@ -6,6 +6,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "site": "horn-lake-fire",
     "public": "dist",
     "ignore": [
       "firebase.json",
