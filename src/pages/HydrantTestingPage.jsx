@@ -2371,7 +2371,12 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
     if (requestedView && requestedView !== view) setView(requestedView);
   }, [requestedView, view]);
   useEffect(() => {
-    if (!fireSogIndex.some((sog) => sog.code === selectedSog?.code)) setSelectedSog(fireSogIndex[0]);
+    const matchingSog = fireSogIndex.find((sog) => sog.code === selectedSog?.code);
+    if (matchingSog && matchingSog !== selectedSog) {
+      setSelectedSog(matchingSog);
+      return;
+    }
+    if (!matchingSog) setSelectedSog(fireSogIndex[0]);
   }, [fireSogIndex, selectedSog?.code]);
   const filteredSogs = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -2761,7 +2766,7 @@ function FireCodesPage() {
 
   useEffect(() => {
     const next = findCode(selected?.section || initialSection) || findCode("304") || findCode("101.1") || fireCodeRecords[0];
-    if (next && next.section !== selected?.section) setSelected(next);
+    if (next && next !== selected) setSelected(next);
   }, [fireCodeRecords, selected?.section]);
 
   const filteredIndex = useMemo(() => {
