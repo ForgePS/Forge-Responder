@@ -30,17 +30,30 @@ function firebaseServices() {
 export async function loadFirebaseList(key, fallback = []) {
   const services = firebaseServices();
   if (!services) return fallback;
-  const snap = await getDoc(doc(services.db, "appData", key));
-  if (!snap.exists()) return fallback;
-  const data = snap.data();
-  return Array.isArray(data.items) ? data.items : Array.isArray(data.data) ? data.data : fallback;
+  try {
+    const snap = await getDoc(doc(services.db, "appData", key));
+    if (!snap.exists()) return loadFirebaseCollection(key, fallback);
+    const data = snap.data();
+    if (data.collection) return loadFirebaseCollection(data.collection, fallback);
+    return Array.isArray(data.items) ? data.items : Array.isArray(data.data) ? data.data : fallback;
+  } catch (error) {
+    console.warn(`Firebase appData/${key} unavailable; trying collection fallback`, error);
+    return loadFirebaseCollection(key, fallback);
+  }
 }
 
 export async function loadFirebaseCollection(name, fallback = []) {
   const services = firebaseServices();
   if (!services) return fallback;
-  const snap = await getDocs(collection(services.db, name));
-  return snap.docs.map((item) => ({ id: item.id, ...item.data() }));
+  try {
+    const snap = await getDocs(collection(services.db, name));
+    return snap.docs
+      .map((item) => ({ id: item.id, ...item.data() }))
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  } catch (error) {
+    console.warn(`Firebase collection/${name} unavailable`, error);
+    return fallback;
+  }
 }
 
 export async function saveFirebaseRecord(collectionName, id, data) {

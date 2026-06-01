@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 
 const root = process.cwd();
@@ -35,11 +35,41 @@ for (const [key, relativeFile] of datasets) {
   try {
     const items = JSON.parse(await fs.readFile(file, "utf8"));
     const hydratedItems = await hydrateSourceDocuments(key, items);
-    await db.collection("appData").doc(key).set({ items: hydratedItems, updatedAt: new Date().toISOString() });
+    await seedCollection(key, hydratedItems);
+    await db.collection("appData").doc(key).set({
+      collection: key,
+      count: Array.isArray(hydratedItems) ? hydratedItems.length : 1,
+      updatedAt: new Date().toISOString()
+    });
     console.log(`Seeded ${key}: ${Array.isArray(hydratedItems) ? hydratedItems.length : 1} item(s)`);
   } catch (error) {
     console.warn(`Skipped ${key}: ${error.message}`);
   }
+}
+
+async function seedCollection(collectionName, items) {
+  if (!Array.isArray(items)) return;
+  const batchLimit = 450;
+  for (let index = 0; index < items.length; index += batchLimit) {
+    const batch = db.batch();
+    items.slice(index, index + batchLimit).forEach((item, offset) => {
+      const sortOrder = index + offset;
+      const id = documentIdFor(item, sortOrder);
+      batch.set(db.collection(collectionName).doc(id), { ...item, sortOrder });
+    });
+    await batch.commit();
+  }
+  await db.collection("appData").doc(collectionName).set({ staleItemsRemovedAt: FieldValue.serverTimestamp() }, { merge: true });
+}
+
+function documentIdFor(item, index) {
+  const raw = item.id || item.code || item.section || item.label || String(index);
+  return String(raw)
+    .replaceAll("/", "-")
+    .replaceAll("\\", "-")
+    .replaceAll("#", "-")
+    .trim()
+    .slice(0, 120) || String(index);
 }
 
 async function hydrateSourceDocuments(key, items) {
