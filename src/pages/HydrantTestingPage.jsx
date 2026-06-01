@@ -559,8 +559,36 @@ function applyLocalHydrants(hydrants) {
 }
 
 function saveLocalActivity(activity) {
+  const record = { id: activity.id || `${Date.now()}`, created_at: activity.created_at || new Date().toISOString(), ...activity };
   const current = readLocalJson(localActivityKey, []);
-  writeLocalJson(localActivityKey, [{ id: activity.id || Date.now().toString(), created_at: new Date().toISOString(), ...activity }, ...current]);
+  writeLocalJson(localActivityKey, [record, ...current.filter((item) => item.id !== record.id)]);
+  saveFirebaseRecord("dailyActivity", firebaseDocId(record.id), record).catch(() => {});
+  return record;
+}
+
+function firebaseDocId(...parts) {
+  return parts
+    .filter((part) => part !== undefined && part !== null && String(part).trim())
+    .join("-")
+    .replace(/[\\/#?[\]]/g, "-")
+    .trim()
+    .slice(0, 140) || `${Date.now()}`;
+}
+
+function mergeRecords(...lists) {
+  const records = new Map();
+  lists.flat().filter(Boolean).forEach((item) => {
+    const id = item.id || firebaseDocId(item.type, item.location_id, item.hydrant_id, item.tested_at, item.inspected_at, item.created_at);
+    records.set(id, { ...item, id });
+  });
+  return [...records.values()].sort((a, b) => String(b.created_at || b.tested_at || b.inspected_at || "").localeCompare(String(a.created_at || a.tested_at || a.inspected_at || "")));
+}
+
+function inspectionForFirebase(payload) {
+  return {
+    ...payload,
+    checklist: (payload.checklist || []).map(({ photo_data, ...row }) => row)
+  };
 }
 
 function csvEscape(value) {
@@ -1186,6 +1214,7 @@ function Inspection({ selected, crew, onSaved, onClose }) {
     };
     let data = {};
     try {
+      await saveFirebaseRecord("hydrants", firebaseDocId(payload.location_id, payload.hydrant_id), { ...payload, updated_at: new Date().toISOString() });
       const res = await fetch("/api/hydrants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       data = await res.json();
       if (!res.ok) throw new Error(data.error || "Hydrant save failed");
@@ -1198,16 +1227,18 @@ function Inspection({ selected, crew, onSaved, onClose }) {
   async function save() {
     if (!selected || !sessionReady) return;
     setSaving(true);
-    const payload = { location_id: selected.location_id, hydrant_id: selected.hydrant_id, inspected_at: `${crew.date || today()}T12:00:00.000Z`, tested_by: crew.tested_by, shift: crew.shift, checklist: rows, notes: generalNotes };
+    const inspectedAt = `${crew.date || today()}T12:00:00.000Z`;
+    const payload = { id: firebaseDocId("inspection", selected.location_id, selected.hydrant_id, inspectedAt), location_id: selected.location_id, hydrant_id: selected.hydrant_id, inspected_at: inspectedAt, tested_by: crew.tested_by, shift: crew.shift, checklist: rows, notes: generalNotes, created_at: new Date().toISOString() };
     let data = {};
     try {
+      await saveFirebaseRecord("hydrantInspections", payload.id, inspectionForFirebase(payload));
       const res = await fetch("/api/inspections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       data = await res.json();
       if (!res.ok) throw new Error(data.error || "Inspection save failed");
     } catch {
       data = { hydrant: { ...selected, last_checked: payload.inspected_at.slice(0, 10), checked_year: payload.inspected_at.slice(0, 4), checked_status: "Checked", checked_source: "Inspection", checked_by: crew.tested_by, checked_shift: crew.shift, updated_at: new Date().toISOString() } };
     }
-    saveLocalActivity({ type: "Inspection", ...payload });
+    saveLocalActivity({ type: "Inspection", ...inspectionForFirebase(payload) });
     setSaving(false);
     if (data.hydrant) onSaved(data.hydrant, "Inspection saved");
   }
@@ -1308,6 +1339,7 @@ function FlowTest({ selected, crew, onSaved, onClose }) {
     };
     let data = {};
     try {
+      await saveFirebaseRecord("hydrants", firebaseDocId(payload.location_id, payload.hydrant_id), { ...payload, updated_at: new Date().toISOString() });
       const res = await fetch("/api/hydrants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       data = await res.json();
       if (!res.ok) throw new Error(data.error || "Hydrant save failed");
@@ -1321,9 +1353,11 @@ function FlowTest({ selected, crew, onSaved, onClose }) {
     if (!selected || !sessionReady) return;
     const computedClass = form.status === "Out of Service" ? "Out of Service" : nfpaClassForGpm(calculatedFlow);
     const flowCode = form.status === "Out of Service" ? "OOS" : flowCodeForGpm(calculatedFlow);
-    const test = { ...form, nfpa_class: computedClass, nfpa_color: nfpaColorNameForClass(computedClass), flow_gpm: calculatedFlow, flow_result: flowCode, location_id: selected.location_id, hydrant_id: info.hydrant_id || selected.hydrant_id, district: info.district, tested_at: `${crew.date || today()}T12:00:00.000Z`, tested_by: crew.tested_by, shift: crew.shift };
+    const testedAt = `${crew.date || today()}T12:00:00.000Z`;
+    const test = { ...form, id: firebaseDocId("flow", selected.location_id, info.hydrant_id || selected.hydrant_id, testedAt), nfpa_class: computedClass, nfpa_color: nfpaColorNameForClass(computedClass), flow_gpm: calculatedFlow, flow_result: flowCode, location_id: selected.location_id, hydrant_id: info.hydrant_id || selected.hydrant_id, district: info.district, tested_at: testedAt, tested_by: crew.tested_by, shift: crew.shift, created_at: new Date().toISOString() };
     let data = {};
     try {
+      await saveFirebaseRecord("hydrantFlowTests", test.id, test);
       const res = await fetch("/api/tests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(test) });
       data = await res.json();
       if (!res.ok) throw new Error(data.error || "Flow test save failed");
@@ -1357,6 +1391,7 @@ function FlowTest({ selected, crew, onSaved, onClose }) {
         };
       let infoData = {};
       try {
+        await saveFirebaseRecord("hydrants", firebaseDocId(infoPayload.location_id, infoPayload.hydrant_id), { ...infoPayload, updated_at: new Date().toISOString() });
         const saveInfo = await fetch("/api/hydrants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(infoPayload) });
         infoData = await saveInfo.json();
         if (!saveInfo.ok) throw new Error(infoData.error || "Hydrant save failed");
@@ -1431,10 +1466,21 @@ function Reports({ crew }) {
     setActivityRows(dailyActivityRows(date));
   }, [date]);
   useEffect(() => {
-    const refresh = () => setActivityRows(dailyActivityRows(date));
+    let mounted = true;
+    const refresh = () => {
+      const localRows = dailyActivityRows(date);
+      loadFirebaseCollection("dailyActivity", [])
+        .then((cloudRows) => {
+          if (!mounted) return;
+          setActivityRows(mergeRecords(localRows, cloudRows.filter((row) => activityRowDate(row) === date)));
+        })
+        .catch(() => mounted && setActivityRows(localRows));
+    };
+    refresh();
     window.addEventListener("storage", refresh);
     const timer = setInterval(refresh, 2000);
     return () => {
+      mounted = false;
       window.removeEventListener("storage", refresh);
       clearInterval(timer);
     };
@@ -2083,8 +2129,8 @@ function HoseTestingPage() {
   const [selectedHoses, setSelectedHoses] = useState([]);
   const [setup, setSetup] = useState({ testDate: "", shift: "" });
   const [form, setForm] = useState({ hoseId: "", apparatus: "", diameter: "", length: "50 ft", pressure: "200 psi", result: "Passed", testedBy: "", notes: "" });
-  const inventoryById = useMemo(() => new Map(hoseInventory.map((hose) => [String(hose.hoseId || "").toUpperCase(), hose])), []);
-  const apparatusOptions = useMemo(() => [...new Set(hoseInventory.map((hose) => hose.apparatus).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })), []);
+  const inventoryById = useMemo(() => new Map(hoseInventory.map((hose) => [String(hose.hoseId || "").toUpperCase(), hose])), [hoseInventory]);
+  const apparatusOptions = useMemo(() => [...new Set(hoseInventory.map((hose) => hose.apparatus).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })), [hoseInventory]);
   const visibleInventory = useMemo(() => hoseInventory.filter((hose) => {
     const sizeMatches = hoseSizeFilter === "All" || String(hose.diameter || "").replace(/"/g, "").trim() === hoseSizeFilter;
     const apparatusMatches = apparatusFilter === "All" || hose.apparatus === apparatusFilter;
@@ -2104,7 +2150,7 @@ function HoseTestingPage() {
       });
     }
     return tested;
-  }, [records]);
+  }, [hoseInventory, records]);
   const visibleDueHoses = useMemo(() => visibleInventory.filter((hose) => !currentYearTestedHoseIds.has(String(hose.hoseId || "").toUpperCase())), [currentYearTestedHoseIds, visibleInventory]);
   const hoseOptions = useMemo(() => {
     const options = new Map();
@@ -2156,6 +2202,17 @@ function HoseTestingPage() {
   }, [hoseOptions]);
   const setupReady = Boolean(setup.testDate && setup.shift);
 
+  useEffect(() => {
+    let mounted = true;
+    loadFirebaseCollection("hoseTests", [])
+      .then((cloudRecords) => {
+        if (!mounted) return;
+        setRecords(mergeRecords(readLocalJson("hlfd_hose_tests_v1", []), cloudRecords));
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
   function setField(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
   }
@@ -2203,7 +2260,7 @@ function HoseTestingPage() {
     return [...new Set([...selectedHoses, ...typed])];
   }
 
-  function saveRecord() {
+  async function saveRecord() {
     if (!setupReady) return;
     const hoseIds = hoseIdsForSave();
     if (!hoseIds.length) return;
@@ -2225,6 +2282,7 @@ function HoseTestingPage() {
     const next = [...newRecords, ...records];
     setRecords(next);
     writeLocalJson("hlfd_hose_tests_v1", next);
+    await Promise.all(newRecords.map((record) => saveFirebaseRecord("hoseTests", firebaseDocId(record.id), record).catch(() => null)));
     setSelectedHoses([]);
     setForm({ hoseId: "", apparatus: "", diameter: form.diameter, length: form.length, pressure: form.pressure, result: "Passed", testedBy: form.testedBy, notes: "" });
   }
@@ -3126,15 +3184,21 @@ export default function HydrantTestingPage() {
   const [draftCrew, setDraftCrew] = useState(newBlankCrew);
   async function load() {
     try {
-      const res = await fetch("/api/hydrants");
-      if (!res.ok) throw new Error(`Hydrant API returned ${res.status}`);
-      const data = await res.json();
-      setHydrants(applyLocalHydrants(data.hydrants || []));
+      const baseHydrants = await staticHydrants();
+      const cloudHydrants = await loadFirebaseCollection("hydrants", []);
+      setHydrants(applyLocalHydrants(cloudHydrants.reduce((list, hydrant) => updateList(list, hydrant), baseHydrants)));
     } catch {
       try {
-        setHydrants(applyLocalHydrants(await staticHydrants()));
+        const res = await fetch("/api/hydrants");
+        if (!res.ok) throw new Error(`Hydrant API returned ${res.status}`);
+        const data = await res.json();
+        setHydrants(applyLocalHydrants(data.hydrants || []));
       } catch {
-        setHydrants([]);
+        try {
+          setHydrants(applyLocalHydrants(await staticHydrants()));
+        } catch {
+          setHydrants([]);
+        }
       }
     }
   }
@@ -3182,6 +3246,7 @@ export default function HydrantTestingPage() {
   }
   function saved(hydrant, msg) {
     saveLocalHydrant(hydrant);
+    saveFirebaseRecord("hydrants", firebaseDocId(hydrant.location_id, hydrant.hydrant_id), { ...hydrant, updated_at: hydrant.updated_at || new Date().toISOString() }).catch(() => {});
     setHydrants((list) => updateList(list, hydrant));
     setSelected(hydrant);
     setDetailHydrant(null);

@@ -34,7 +34,27 @@ service cloud.firestore {
     // Pre-fire plan metadata. Keep writes authenticated once department logins are enabled.
     match /preFirePlans/{document} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
+    }
+
+    match /hydrants/{document} {
+      allow read, write: if true;
+    }
+
+    match /hydrantInspections/{document} {
+      allow read, write: if true;
+    }
+
+    match /hydrantFlowTests/{document} {
+      allow read, write: if true;
+    }
+
+    match /dailyActivity/{document} {
+      allow read, write: if true;
+    }
+
+    match /hoseTests/{document} {
+      allow read, write: if true;
     }
   }
 }
