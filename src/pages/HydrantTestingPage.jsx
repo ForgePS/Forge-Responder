@@ -1917,6 +1917,7 @@ function EmsProtocolsPage() {
 }
 
 function PreFirePlansDatabase() {
+  const preFirePlanFormUrl = "https://form.jotform.com/260863576120053";
   const [plans, setPlans] = useState(() => readLocalJson(localPreFirePlansKey, []));
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(blankPreFirePlan);
@@ -2085,7 +2086,7 @@ function PreFirePlansDatabase() {
         </div>
         <div className="resource-actions">
           <button className="primary" onClick={savePlan}><UploadCloud size={16} /> Upload Plan</button>
-          <button className="secondary" onClick={() => { setPlanFile(null); setForm(blankPreFirePlan()); }}>New Plan</button>
+          <button className="secondary" onClick={() => window.open(preFirePlanFormUrl, "_blank", "noopener,noreferrer")?.focus?.()}><ExternalLink size={16} /> New Plan</button>
           {form.id && <button className="secondary" onClick={() => removePlan(form)}>Remove</button>}
         </div>
       </section>
@@ -2632,7 +2633,7 @@ function InspectionDivisionPage({ setTab }) {
           </section>
           <section className="inspection-card-group">
             <strong>Pre-Fire Plans</strong>
-            <button className="inspection-division-card" onClick={() => { window.location.href = "/fire-forms?view=plans"; }}>
+            <button className="inspection-division-card" onClick={() => { window.location.href = "/pre-fire-plans"; }}>
               <ClipboardList size={24} />
               <span><b>Pre-Fire Plans</b><em>Search and upload plans by address</em></span>
             </button>
@@ -3061,6 +3062,7 @@ function FireCodesPage() {
 function tabFromLocation() {
   const path = window.location.pathname.toLowerCase();
   if (path.startsWith("/ems-forms")) return "ems";
+  if (path.startsWith("/pre-fire-plans")) return "fireForms";
   if (path.startsWith("/fire-forms")) return "fireForms";
   if (path.startsWith("/fire-codes")) return "fireCodes";
   if (path.startsWith("/important-numbers")) return "importantNumbers";
@@ -3192,7 +3194,7 @@ export default function HydrantTestingPage() {
   const [detailHydrant, setDetailHydrant] = useState(null);
   const [editorHydrant, setEditorHydrant] = useState(null);
   const [tab, setTab] = useState(tabFromLocation);
-  const [fireFormsView, setFireFormsView] = useState("forms");
+  const [fireFormsView, setFireFormsView] = useState(() => window.location.pathname.toLowerCase().startsWith("/pre-fire-plans") ? "plans" : "forms");
   const [theme, setTheme] = useState("dark");
   const [toast, setToast] = useState("");
   const [crew, setCrew] = useState(newBlankCrew);
