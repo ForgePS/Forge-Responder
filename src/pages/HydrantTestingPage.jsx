@@ -3095,7 +3095,6 @@ function AppHome({ setTab }) {
         <img className="command-logo" src={logoUrl} alt="Horn Lake Fire Department" />
         <div className="command-hero-copy">
           <span>Horn Lake Fire Department</span>
-          <h1>Fire Dept</h1>
           <p>Field operations, hydrants, EMS, fire, inspections, and investigations.</p>
           <div className="command-pills" aria-label="Department tool groups">
             <div><Droplets size={19} /><strong>Hydrants</strong></div>
