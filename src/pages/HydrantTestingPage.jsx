@@ -1753,7 +1753,7 @@ function EmsProtocolsPage() {
   const [selectedId, setSelectedId] = useState(protocolFromUrl);
   const [query, setQuery] = useState("");
   const [popup, setPopup] = useState(null);
-  const emsForms = ["Patient Refusal", "Run Narrative", "Medication Check", "Equipment Check"];
+  const emsForms = ["Multi Patient Refusal"];
   const selectedProtocol = protocols.find((item) => item.number === selectedId) || protocols[0];
   const filteredProtocols = useMemo(() => {
     const term = query.trim().toLowerCase();
