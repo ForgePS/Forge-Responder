@@ -1208,3 +1208,326 @@ button.command-card,
     max-width: none;
   }
 }
+
+@media (max-width: 560px) {
+  body { background: #07111c; }
+
+  .app-shell {
+    display: block;
+    min-height: 100dvh;
+    padding: 0;
+  }
+
+  .main-stage {
+    min-height: 100dvh;
+    border-radius: 0;
+  }
+
+  .topbar {
+    height: auto;
+    min-height: 54px;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .topbar strong {
+    font-size: 16px;
+    line-height: 1.1;
+  }
+
+  .topbar span {
+    font-size: 10px;
+  }
+
+  .topbar-actions {
+    flex: 0 0 auto;
+  }
+
+  .topbar-actions button {
+    min-width: 42px;
+    min-height: 40px;
+    padding: 0 10px;
+  }
+
+  .topbar-actions button svg {
+    margin: 0;
+  }
+
+  .topbar-actions button:not(.icon-only) {
+    font-size: 0;
+    gap: 0;
+  }
+
+  .topbar-actions button:not(.icon-only) svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .ipad-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    background: #0b1826;
+    border-bottom-color: #1f2a37;
+  }
+
+  .ipad-tabs button {
+    min-height: 42px;
+    padding: 0 10px;
+    border-color: #223044;
+    background: #101923;
+    color: #e5edf7;
+    font-size: 12px;
+  }
+
+  .ipad-tabs button svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .page-body {
+    padding: 8px;
+  }
+
+  .module-page {
+    min-height: auto;
+    gap: 10px;
+  }
+
+  .module-card {
+    border-radius: 7px;
+  }
+
+  .module-card-header {
+    padding: 12px;
+  }
+
+  .module-card-header strong {
+    font-size: 16px;
+  }
+
+  .module-card-header span {
+    font-size: 14px;
+    line-height: 1.25;
+  }
+
+  .code-tools,
+  .resource-layout,
+  .code-browser,
+  .resource-tile-grid,
+  .inspection-division-grid,
+  .integration-grid,
+  .med-cheat-grid,
+  .pre-fire-layout {
+    padding: 10px;
+  }
+
+  .resource-layout,
+  .code-browser,
+  .inspection-division-grid,
+  .integration-grid,
+  .med-cheat-grid,
+  .pre-fire-layout,
+  .form-grid,
+  .crew-bar,
+  .check-grid,
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .resource-detail {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .resource-detail h2 {
+    font-size: 22px;
+  }
+
+  .resource-detail p,
+  .resource-tile span,
+  .inspection-division-card em {
+    font-size: 14px;
+  }
+
+  .resource-row,
+  .inspection-division-card,
+  .code-family-toggle,
+  .code-tree-main .resource-row,
+  .code-subsection-row,
+  .pre-fire-row {
+    min-height: 58px;
+    padding: 11px;
+  }
+
+  .inspection-division-card {
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .inspection-division-card svg,
+  .resource-row svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .code-tools,
+  .report-actions,
+  .resource-actions,
+  .inspection-header-actions,
+  .flow-actions,
+  .inspection-actions,
+  .fire-quick-tabs,
+  .hydrant-work-tabs,
+  .hose-size-filter {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .code-search {
+    flex-basis: auto;
+    min-height: 44px;
+  }
+
+  .code-toggle {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .code-tree-main {
+    grid-template-columns: minmax(0, 1fr) 40px;
+  }
+
+  .code-subsections {
+    margin-left: 10px;
+  }
+
+  .code-subsection-row {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .med-category-tabs {
+    padding: 10px 10px 0;
+  }
+
+  .med-category-tabs button {
+    flex: 1 1 145px;
+  }
+
+  .med-cheat-card {
+    padding: 13px;
+  }
+
+  .med-cheat-card header {
+    grid-template-columns: 1fr;
+  }
+
+  .med-cheat-card strong {
+    font-size: 20px;
+  }
+
+  .med-dose-line b {
+    font-size: 20px;
+  }
+
+  .command-hero {
+    min-height: auto;
+    padding: 24px 14px 22px;
+    gap: 12px;
+  }
+
+  .command-logo,
+  .command-hero img {
+    width: 94px;
+  }
+
+  .command-hero-copy span {
+    font-size: 13px;
+    letter-spacing: 2px;
+  }
+
+  .command-hero-copy h1 {
+    font-size: 42px;
+    line-height: .95;
+  }
+
+  .command-hero-copy p {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .command-pills {
+    grid-template-columns: 1fr;
+    margin-top: 14px;
+  }
+
+  .command-pills div {
+    min-height: 50px;
+  }
+
+  .command-tools {
+    width: calc(100% - 18px);
+    padding: 22px 0 36px;
+  }
+
+  .command-section-title {
+    margin-bottom: 14px;
+  }
+
+  .command-section-title span {
+    font-size: 11px;
+    letter-spacing: 3px;
+  }
+
+  .command-section-title strong {
+    font-size: 21px;
+  }
+
+  .command-card {
+    min-height: 132px;
+    grid-template-columns: 48px minmax(0, 1fr) 12px;
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .command-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .command-card strong {
+    font-size: 18px;
+  }
+
+  .command-card span:not(.command-icon):not(.corner-fold) {
+    font-size: 14px;
+    line-height: 1.28;
+  }
+
+  .command-card b {
+    font-size: 22px;
+  }
+
+  .hydrant-modal,
+  .code-popup,
+  .pre-fire-viewer,
+  .inspection-form-popup {
+    width: calc(100vw - 12px);
+    height: calc(100dvh - 12px);
+    max-height: calc(100dvh - 12px);
+    border-radius: 7px;
+  }
+
+  .modal-header {
+    padding: 12px;
+  }
+
+  .modal-header strong {
+    font-size: 17px;
+  }
+}
