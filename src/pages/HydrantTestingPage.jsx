@@ -810,7 +810,7 @@ function HydrantMiniCard({ hydrant, selected, onSelect }) {
         <span>Flow <b>{flowText(hydrant)}</b></span>
         <span>GPM <b>{flowGpmText(hydrant)}</b></span>
         <span>Type <b>{displayValue(hydrant.hydrant_type)}</b></span>
-        <span>Water <b>{displayValue(hydrant.water_assoc || hydrant.provider)}</b></span>
+        <span>Provider <b>{displayValue(hydrant.provider || hydrant.water_assoc)}</b></span>
         {isPrivateHydrant(hydrant) && <span className="private-warning">Private <b>Do Not Test</b></span>}
       </div>
     </button>
@@ -1137,6 +1137,7 @@ function HydrantInfoModal({ hydrant, sessionReady, onClose, onEdit, onFlowTest, 
     ["Hydrant ID", hydrant.hydrant_id],
     ["District", hydrant.district || "Unassigned"],
     ["Provider", hydrant.provider || hydrant.water_assoc],
+    ["Water Association", hydrant.water_assoc || hydrant.provider],
     ["Lat & Long", `${displayValue(hydrant.latitude)} / ${displayValue(hydrant.longitude)}`],
     ["Hydrant Type", hydrant.hydrant_type],
     ["Flow", flowText(hydrant)],
