@@ -648,11 +648,7 @@ const [workOrders, setWorkOrders] = usePersistentState("hlfd-rms-work-orders", i
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [query, setQuery] = useState("");
-  const [personnel, setPersonnel] = usePersistentState("hlfd-rms-personnel", personnelRecords);
-const [certifications] = usePersistentState("hlfd-rms-certifications", initialCertificationRecords);
-const [apparatus] = usePersistentState("hlfd-rms-apparatus", initialApparatus);
-const [workOrders] = usePersistentState("hlfd-rms-work-orders", initialWorkOrders);
-  function navigate(name) { setCurrent(name); setQuery(""); setMobileNav(false); }
+    function navigate(name) { setCurrent(name); setQuery(""); setMobileNav(false); }
   return <main className={`app-shell ${collapsed ? "nav-collapsed" : ""} ${mobileNav ? "mobile-nav-open" : ""}`}>
     <TopBar query={query} setQuery={setQuery} toggleMobileNav={() => setMobileNav(!mobileNav)} />
     <SideNav current={current} collapsed={collapsed} setCollapsed={setCollapsed} onNavigate={navigate} />
