@@ -1,25 +1,19 @@
 {
-  "name": "dept-app-rebuild",
+  "name": "horn-lake-fire-ems-rms-dashboard",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "firebase:seed": "node scripts/firebase-seed-data.mjs",
-    "start": "node server.cjs"
+    "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "express": "latest",
-    "firebase": "^12.14.0",
-    "leaflet": "^1.9.4",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
     "vite": "latest"
   },
-  "devDependencies": {
-    "firebase-admin": "^13.10.0"
-  }
+  "devDependencies": {}
 }

@@ -1,62 +1,34 @@
-# Dept-App Rebuild
+# Horn Lake Fire/EMS Dashboard — Codex Upload Package
 
-This is a clean rebuild of the Horn Lake Fire/EMS hydrant testing app after the original GitHub repository became unavailable.
+This package contains Codex-ready specifications and prompts for building the desktop-first RMS dashboard theme and layout for the Horn Lake Fire/EMS Dashboard.
 
-## Data Sources
+## Files
 
-- Recovered Render app hydrant API data from `hydrants.json`
-- DeSoto County ArcGIS Fire Hydrants layer, filtered to `CITY = 'Horn Lake'`
-- The rebuilt hydrant dataset contains 1,241 hydrants
-- 1,236 hydrants matched the recovered app by coordinate proximity
-- 5 records came from ArcGIS without a coordinate match to the recovered app data
+- `01_THEME_STYLE_SPEC.md` — Full UI/UX theme specification.
+- `02_CODEX_IMPLEMENTATION_PROMPT.md` — Paste this into Codex first.
+- `03_DASHBOARD_LAYOUT_SPEC.md` — Detailed dashboard layout and widgets.
+- `04_MODULE_PRIORITY_SPEC.md` — RMS-side module build priority.
+- `05_ACCEPTANCE_CRITERIA.md` — Build verification checklist.
 
-## Features Included
+## Build Direction
 
-- Hydrant dashboard with full-space map
-- Hydrant icons colored by flow/status
-- Out-of-service hydrants shown in black
-- No hydrant preselected at startup
-- Dashboard-level User, Shift, and Date fields
-- Searchable Tested By/User field
-- Inspection page with autofilled Hydrant ID
-- Removed Weather Conditions, Accessible, Tag Attached/Readable, and Reflective Visible
-- Flow test and inspection save endpoints
-- Hydrant checked-this-year tracking
-- Hydrant CSV export
-- Daily activity CSV export
-- Daily activity email endpoint with SendGrid environment variable support
+Primary focus:
+- Desktop-first command staff RMS
+- Personnel
+- Certifications
+- Scheduling
+- Training
+- Fleet
+- Assets
+- Prevention
+- Analytics
 
-## Run Locally
+Lower priority:
+- Incident reporting
+- EMS/ePCR submission
+- NERIS/NEMSIS compliance bridge
 
-```bash
-npm install
-npm run build
-npm start
-```
-
-Then open:
-
-```text
-http://localhost:3000/hydrant-testing
-```
-
-## Render Deployment
-
-Build command:
-
-```bash
-npm install && npm run build
-```
-
-Start command:
-
-```bash
-npm start
-```
-
-Optional email variables:
-
-```text
-SENDGRID_API_KEY
-DAILY_ACTIVITY_FROM_EMAIL
-```
+Branding:
+- Product name: Horn Lake Fire/EMS Dashboard
+- Theme name: Horn Lake Command
+- Optional footer: Powered by Havoc Calls
