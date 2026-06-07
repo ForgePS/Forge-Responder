@@ -205,15 +205,46 @@ function DataTable({ columns, rows, query }) {
   return <div className="data-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}<th /></tr></thead><tbody>{filtered.map((row) => <tr key={row.join("-")}>{row.map((cell, index) => <td key={`${cell}-${index}`}>{index === row.length - 1 ? <Badge>{cell}</Badge> : cell}</td>)}<td><button className="row-action">Open</button></td></tr>)}</tbody></table>{!filtered.length && <div className="empty-table">No records match the current search.</div>}</div>;
 }
 
-function PersonnelPage({ query }) {
-  const visiblePeople = personnelRecords.filter((person) => Object.values(person).join(" ").toLowerCase().includes(query.toLowerCase()));
-  const [selectedId, setSelectedId] = useState(personnelRecords[0].id);
+function PersonnelPage({ query, records, setRecords }) {
+  const visiblePeople = records.filter((person) =>
+    Object.values(person).join(" ").toLowerCase().includes(query.toLowerCase())
+  );
+
+  const [selectedId, setSelectedId] = useState(records[0]?.id);
   const [editing, setEditing] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
-  const selected = personnelRecords.find((person) => person.id === selectedId) || personnelRecords[0];
+
+  const selected = records.find((person) => person.id === selectedId) || records[0];
   const [draft, setDraft] = useState(selected);
-  function selectPerson(person) { setSelectedId(person.id); setDraft(person); setEditing(false); setSavedMessage(""); }
-  function saveProfile() { setEditing(false); setSavedMessage("Personnel profile saved"); }
+
+  useEffect(() => {
+    setDraft(selected);
+  }, [selected]);
+
+  function selectPerson(person) {
+    setSelectedId(person.id);
+    setDraft(person);
+    setEditing(false);
+    setSavedMessage("");
+  }
+
+  function saveProfile() {
+    const updatedPerson = {
+      ...draft,
+      updated_at: new Date().toISOString()
+    };
+
+    setRecords((current) =>
+      current.map((person) =>
+        person.id === updatedPerson.id ? updatedPerson : person
+      )
+    );
+
+    setEditing(false);
+    setSavedMessage("Personnel profile saved");
+
+    console.log("Updated personnel:", updatedPerson);
+  }
   return <div className="module-page personnel-page">
     <section className="module-heading"><div><span className="module-icon"><Users size={22} /></span><div><h1>Personnel</h1><p>Roster, assignments, contact information, certifications, documents, and employment status.</p></div></div><div className="heading-actions"><button className="secondary-button">Export Roster</button><button className="primary-button">Add Personnel</button></div></section>
     <section className="personnel-summary">{[
