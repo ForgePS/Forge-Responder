@@ -345,7 +345,7 @@ function PersonnelPage({ query, records = [], setRecords }) {
 
     setSelectedId(updatedPerson.id);
     setEditing(false);
-    setSavedMessage("TEST Save");
+    setSavedMessage("Test Save");
 
     console.log("Updated personnel:", updatedPerson);
   }
