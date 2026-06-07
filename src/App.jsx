@@ -158,28 +158,46 @@ function MiniTable({ columns, rows }) {
   return <div className="mini-table"><div className="mini-row mini-head" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>{columns.map((column) => <span key={column}>{column}</span>)}</div>{rows.map((row) => <div className="mini-row" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }} key={row.join("-")}>{row.map((cell, index) => <span key={`${cell}-${index}`} className={index === row.length - 1 ? `cell-${toneFromStatus(cell)}` : ""}>{cell}</span>)}</div>)}</div>;
 }
 
-function Dashboard({ onNavigate }) {
-  return <div className="dashboard">
-    <section className="kpi-grid">{kpis.map(([label, value, note, tone, Icon, target]) => <button key={label} className={`kpi-card tone-${tone}`} onClick={() => onNavigate(target)}><Icon size={27} /><span>{label}</span><strong>{value}</strong><small>{note}</small></button>)}</section>
-    <section className="dashboard-grid">
-      <div className="dashboard-column"><h2>Readiness</h2>
-        <Panel title="Staffing Summary" icon={Users} action={<button className="text-button" onClick={() => onNavigate("Scheduling")}>View All</button>}><MiniTable columns={["Shift", "On Duty", "Assigned", "Deficit", "% of Target"]} rows={[["A Shift (0600-1400)", "15", "18", "3", "83%"], ["B Shift (1400-2200)", "14", "19", "5", "74%"], ["C Shift (2200-0600)", "13", "19", "6", "68%"], ["Total", "42", "56", "14", "75%"]]} /></Panel>
-        <Panel title="Fleet Readiness" icon={Truck} action={<button className="text-button" onClick={() => onNavigate("Apparatus")}>View All</button>}><MiniTable columns={["Status", "Count", "% of Fleet"]} rows={[["● In Service", "12", "67%"], ["● Out of Service", "6", "33%"], ["● In Maintenance", "3", "17%"], ["● In Reserve", "2", "11%"]]} /></Panel>
-        <Panel title="Training Compliance" icon={BookOpen} action={<button className="text-button" onClick={() => onNavigate("Training")}>View Report</button>}><div className="compliance-chart"><div className="donut"><strong>87%</strong><span>Compliant</span></div><div className="chart-legend"><span><i className="legend-success" />Compliant <b>87% (154)</b></span><span><i className="legend-warning" />Due Soon <b>8% (14)</b></span><span><i className="legend-critical" />Overdue <b>5% (9)</b></span><hr /><span>Total Personnel <b>177</b></span></div></div></Panel>
-      </div>
-      <div className="dashboard-column action-column"><h2>Action Center</h2>
-        <Panel title="Items Requiring Review" icon={AlertTriangle} action={<button className="text-button">View All (14)</button>}><MiniTable columns={["Type", "Item", "Details", "Due Date", "Priority"]} rows={[["Inspection", "Annual Inspection", "Horn Lake High School", "06/08/2026", "High"], ["Certification", "CPR - J. Thompson", "Expires 06/12/2026", "06/12/2026", "High"], ["Maintenance", "Engine 2 Pump Test", "Overdue", "06/07/2026", "High"], ["Training", "Hazmat Operations", "2026 Annual", "06/20/2026", "Medium"], ["Occupancy", "New Businesses", "3 Pending Review", "06/22/2026", "Medium"]]} /></Panel>
-        <Panel title="Pending Approvals" icon={FileCheck2} action={<button className="text-button">View All (9)</button>}><MiniTable columns={["Request Type", "Requested By", "Details", "Requested", "Status"]} rows={[["Shift Trade", "R. Williams", "Swap 06/12 (A) with 06/15 (A)", "06/07/2026", "Pending"], ["Time Off", "M. Johnson", "Vacation: Jun 19-23, 2026", "06/06/2026", "Pending"], ["Training", "A. Davis", "Confined Space - Jun 30", "06/05/2026", "Pending"], ["Expense", "J. Baker", "Uniform Allowance", "06/05/2026", "Pending"], ["New Hire", "T. Anderson", "Firefighter Candidate", "06/04/2026", "Pending"]]} /></Panel>
-        <Panel title="Today's Operational Notes" icon={FileText} action={<button className="text-button">Add Note</button>}><div className="operational-notes"><p><time>09:12</time><b>Chief J. Smith</b><span>Engine 2 pump test failed relief valve check. Out of service until repaired.</span></p><p><time>08:45</time><b>BC M. Carter</b><span>Water main break on Goodman Rd. Use caution in that area.</span></p><p><time>07:30</time><b>Capt. D. Lee</b><span>Station 1 turnout gear inspection completed.</span></p></div></Panel>
-      </div>
-      <div className="dashboard-column"><h2>Alerts & Trends</h2>
-        <Panel title="Certification Expirations (Next 30 Days)" icon={FileCheck2} action={<button className="text-button">View All</button>}><MiniTable columns={["Certification", "Personnel", "Expires", "Days"]} rows={[["CPR", "7", "06/12/2026", "5"], ["Hazmat Ops", "5", "06/20/2026", "13"], ["Driver/Operator", "4", "06/25/2026", "18"], ["Fire Instructor I", "2", "07/03/2026", "26"]]} /></Panel>
-        <Panel title="Maintenance Due" icon={Wrench} action={<button className="text-button">View All</button>}><MiniTable columns={["Unit", "Type", "Due Date", "Status"]} rows={[["Engine 2", "Pump Test", "06/07/2026", "Overdue"], ["Ladder 1", "Aerial Test", "06/12/2026", "Due Soon"], ["Rescue 1", "Service", "06/15/2026", "Due Soon"], ["Brush 2", "Service", "06/21/2026", "Upcoming"]]} /></Panel>
-        <Panel title="Inspection Backlog" icon={ClipboardCheck} action={<button className="text-button">View All</button>}><MiniTable columns={["Category", "Overdue", "Due Soon", "Total"]} rows={[["Annual", "12", "15", "27"], ["Re-Inspection", "3", "6", "9"], ["New Occupancy", "1", "2", "3"], ["Total", "16", "23", "39"]]} /></Panel>
-        <Panel title="30-Day Trends" icon={BarChart3} action={<button className="text-button">View Report</button>}><div className="trend-cards">{[["Incidents", "128", "↑ 8%", "info"], ["EMS Calls", "91", "↑ 5%", "success"], ["Inspections", "36", "↓ 10%", "warning"], ["Training Hours", "342", "↑ 12%", "purple"]].map(([label, value, change, tone]) => <div key={label}><span>{label}</span><strong>{value}</strong><b className={`text-${tone}`}>{change}</b><i className={`spark-${tone}`} /></div>)}</div></Panel>
-      </div>
-    </section>
-  </div>;
+function Dashboard({ onNavigate, personnel, certifications, apparatus, workOrders }) {
+  const activePersonnel = personnel.filter((p) => p.status === "Active").length;
+  const onLeave = personnel.filter((p) => p.status === "Leave").length;
+  const paramedics = personnel.filter((p) => p.ems === "Paramedic").length;
+  const driverApproved = personnel.filter((p) => p.driver === "Approved").length;
+
+  const certsExpiring30 = certifications.filter((c) => Number(c.days) <= 30).length;
+
+  const unitsAvailable = apparatus.filter((u) => u.status === "In Service").length;
+  const unitsOos = apparatus.filter((u) => u.status !== "In Service").length;
+
+  const workOrdersDue = workOrders.filter((w) =>
+    ["Overdue", "Due Soon", "Open"].includes(w.status)
+  ).length;
+
+  const liveKpis = [
+    ["Active Personnel", activePersonnel, `${personnel.length} Total`, "info", Users, "Personnel"],
+    ["Personnel On Leave", onLeave, "Current Leave Status", "warning", Users, "Personnel"],
+    ["Paramedics", paramedics, "EMS Qualified", "success", Ambulance, "Personnel"],
+    ["Driver Approved", driverApproved, "Cleared Operators", "info", Truck, "Personnel"],
+    ["Certs Expiring", certsExpiring30, "Next 30 Days", "warning", FileCheck2, "Certifications"],
+    ["Units Available", unitsAvailable, `${apparatus.length} Total Fleet`, "success", Truck, "Apparatus"],
+    ["Units OOS", unitsOos, "Not In Service", unitsOos > 0 ? "critical" : "success", Wrench, "Maintenance"],
+    ["Work Orders Due", workOrdersDue, "Open / Due Soon", "warning", Wrench, "Maintenance"]
+  ];
+
+  return (
+    <div className="dashboard">
+      <section className="kpi-grid">
+        {liveKpis.map(([label, value, note, tone, Icon, target]) => (
+          <button key={label} className={`kpi-card tone-${tone}`} onClick={() => onNavigate(target)}>
+            <Icon size={27} />
+            <span>{label}</span>
+            <strong>{value}</strong>
+            <small>{note}</small>
+          </button>
+        ))}
+      </section>
+    </div>
+  );
 }
 
 function DataTable({ columns, rows, query }) {
