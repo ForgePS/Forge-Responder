@@ -517,7 +517,13 @@ const [workOrders] = usePersistentState("hlfd-rms-work-orders", initialWorkOrder
     apparatus={apparatus}
     workOrders={workOrders}
   />
-) : current === "Personnel" ? <PersonnelPage query={query} /> : current === "Certifications" ? <CertificationsPage query={query} /> : current === "Scheduling" ? <SchedulingPage /> : current === "Shift Trades" ? <ShiftTradesPage /> : current === "Apparatus" ? <ApparatusPage /> : current === "Maintenance" ? <MaintenancePage /> : current === "Assets" ? <AssetsPage query={query} /> : <ModulePage name={current} query={query} />}</section>
+) : current === "Personnel" ? (
+  <PersonnelPage
+    query={query}
+    records={personnel}
+    setRecords={setPersonnel}
+  />
+) : current === "Certifications" ? <CertificationsPage query={query} /> : current === "Scheduling" ? <SchedulingPage /> : current === "Shift Trades" ? <ShiftTradesPage /> : current === "Apparatus" ? <ApparatusPage /> : current === "Maintenance" ? <MaintenancePage /> : current === "Assets" ? <AssetsPage query={query} /> : <ModulePage name={current} query={query} />}</section>
     <footer><span>System Status <i /> All Systems Operational</span><span>Last Data Sync: 11:32 AM</span><span>v2.4.1 <img src={departmentLogo} alt="" /> Horn Lake Fire Department</span></footer>
   </main>;
 }
