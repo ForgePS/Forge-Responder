@@ -469,7 +469,7 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [query, setQuery] = useState("");
-  const [personnel] = usePersistentState("hlfd-rms-personnel", personnelRecords);
+  const [personnel, setPersonnel] = usePersistentState("hlfd-rms-personnel", personnelRecords);
 const [certifications] = usePersistentState("hlfd-rms-certifications", initialCertificationRecords);
 const [apparatus] = usePersistentState("hlfd-rms-apparatus", initialApparatus);
 const [workOrders] = usePersistentState("hlfd-rms-work-orders", initialWorkOrders);
