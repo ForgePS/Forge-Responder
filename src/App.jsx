@@ -641,6 +641,10 @@ function PlaceholderPage({ name }) {
 
 export default function App() {
   const [current, setCurrent] = useState("Dashboard");
+  const [personnel, setPersonnel] = usePersistentState("hlfd-rms-personnel", personnelRecords);
+const [certifications, setCertifications] = usePersistentState("hlfd-rms-certifications", initialCertificationRecords);
+const [apparatus, setApparatus] = usePersistentState("hlfd-rms-apparatus", initialApparatus);
+const [workOrders, setWorkOrders] = usePersistentState("hlfd-rms-work-orders", initialWorkOrders);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [query, setQuery] = useState("");
