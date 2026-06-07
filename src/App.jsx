@@ -300,6 +300,11 @@ function DataTable({ columns, rows, query }) {
 }
 
 function PersonnelPage({ query, records = [], setRecords }) {
+  setRecords((current) =>
+  current.map((person) =>
+    person.id === updatedPerson.id ? updatedPerson : person
+  )
+);
   const safeRecords = Array.isArray(records) ? records : [];
   const visiblePeople = safeRecords.filter((person) =>
     Object.values(person).join(" ").toLowerCase().includes(query.toLowerCase())
