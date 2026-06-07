@@ -345,7 +345,7 @@ function PersonnelPage({ query, records = [], setRecords }) {
 
     setSelectedId(updatedPerson.id);
     setEditing(false);
-    setSavedMessage("Personnel profile saved to Firebase/local cache");
+    setSavedMessage("TEST Save");
 
     console.log("Updated personnel:", updatedPerson);
   }
