@@ -216,7 +216,12 @@ function PersonnelPage({ query }) {
   function saveProfile() { setEditing(false); setSavedMessage("Personnel profile saved"); }
   return <div className="module-page personnel-page">
     <section className="module-heading"><div><span className="module-icon"><Users size={22} /></span><div><h1>Personnel</h1><p>Roster, assignments, contact information, certifications, documents, and employment status.</p></div></div><div className="heading-actions"><button className="secondary-button">Export Roster</button><button className="primary-button">Add Personnel</button></div></section>
-    <section className="personnel-summary">{[["Active Personnel", "55"], ["On Leave", "1"], ["Paramedics", "24"], ["Driver Approved", "43"]].map(([label, value]) => <div key={label}><strong>{value}</strong><span>{label}</span></div>)}</section>
+    <section className="personnel-summary">{[
+    ["Active Personnel", records.filter((p) => p.status === "Active").length],
+  ["On Leave", records.filter((p) => p.status === "Leave").length],
+  ["Paramedics", records.filter((p) => p.ems === "Paramedic").length],
+  ["Driver Approved", records.filter((p) => p.driver === "Approved").length]
+]
     <section className="personnel-workspace">
       <Panel title="Personnel Roster" icon={Users} action={<span className="panel-count">{visiblePeople.length} records</span>}>
         <div className="personnel-list">{visiblePeople.map((person) => <button key={person.id} className={person.id === selected.id ? "person-row selected" : "person-row"} onClick={() => selectPerson(person)}><span className="avatar">{person.initials}</span><span><strong>{person.name}</strong><small>{person.rank} · {person.shift}</small></span><Badge>{person.status}</Badge></button>)}</div>
@@ -464,12 +469,24 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [query, setQuery] = useState("");
+  const [personnel] = usePersistentState("hlfd-rms-personnel", personnelRecords);
+const [certifications] = usePersistentState("hlfd-rms-certifications", initialCertificationRecords);
+const [apparatus] = usePersistentState("hlfd-rms-apparatus", initialApparatus);
+const [workOrders] = usePersistentState("hlfd-rms-work-orders", initialWorkOrders);
   function navigate(name) { setCurrent(name); setQuery(""); setMobileNav(false); }
   return <main className={`app-shell ${collapsed ? "nav-collapsed" : ""} ${mobileNav ? "mobile-nav-open" : ""}`}>
     <TopBar query={query} setQuery={setQuery} toggleMobileNav={() => setMobileNav(!mobileNav)} />
     <SideNav current={current} collapsed={collapsed} setCollapsed={setCollapsed} onNavigate={navigate} />
     {mobileNav && <button className="mobile-scrim" onClick={() => setMobileNav(false)}><X size={20} /></button>}
-    <section className="workspace">{current === "Dashboard" ? <Dashboard onNavigate={navigate} /> : current === "Personnel" ? <PersonnelPage query={query} /> : current === "Certifications" ? <CertificationsPage query={query} /> : current === "Scheduling" ? <SchedulingPage /> : current === "Shift Trades" ? <ShiftTradesPage /> : current === "Apparatus" ? <ApparatusPage /> : current === "Maintenance" ? <MaintenancePage /> : current === "Assets" ? <AssetsPage query={query} /> : <ModulePage name={current} query={query} />}</section>
+    <section className="workspace">{current === "Dashboard" ? (
+  <Dashboard
+    onNavigate={navigate}
+    personnel={personnel}
+    certifications={certifications}
+    apparatus={apparatus}
+    workOrders={workOrders}
+  />
+) : current === "Personnel" ? <PersonnelPage query={query} /> : current === "Certifications" ? <CertificationsPage query={query} /> : current === "Scheduling" ? <SchedulingPage /> : current === "Shift Trades" ? <ShiftTradesPage /> : current === "Apparatus" ? <ApparatusPage /> : current === "Maintenance" ? <MaintenancePage /> : current === "Assets" ? <AssetsPage query={query} /> : <ModulePage name={current} query={query} />}</section>
     <footer><span>System Status <i /> All Systems Operational</span><span>Last Data Sync: 11:32 AM</span><span>v2.4.1 <img src={departmentLogo} alt="" /> Horn Lake Fire Department</span></footer>
   </main>;
 }
