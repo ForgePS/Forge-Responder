@@ -1,0 +1,28 @@
+---
+description: Always build and deploy Firebase hosting after RMS app changes
+alwaysApply: true
+---
+
+# Always Deploy
+
+After any substantive change to this FORGE Public Safety RMS app, always finish by building and deploying to Firebase hosting.
+
+## Deploy steps
+
+From the project root:
+
+```powershell
+npm run build
+firebase deploy --only hosting
+```
+
+## When to deploy
+
+- Deploy after feature work, bug fixes, styling changes, or config updates that affect the live site.
+- Do not skip deploy and leave changes local-only unless the user explicitly asks not to deploy.
+- If build fails, fix the error and retry deploy before considering the task complete.
+
+## Target
+
+- Project: `rms-dashboard-7562e`
+- Live URL: https://rms.forgepublicsafety.com

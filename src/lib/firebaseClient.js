@@ -1,6 +1,8 @@
 import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { deleteDoc, doc, getDoc, getDocs, getFirestore, setDoc, collection } from "firebase/firestore";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,15 +18,35 @@ export const firebaseEnabled = Object.values(firebaseConfig).every(Boolean);
 let app;
 let db;
 let storage;
+let auth;
+let functions;
 
 function firebaseServices() {
   if (!firebaseEnabled) return null;
   if (!app) {
     app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
     db = getFirestore(app);
     storage = getStorage(app);
+    functions = getFunctions(app, "us-central1");
   }
-  return { db, storage };
+  return { app, auth, db, storage, functions };
+}
+
+export function getFirebaseFunctions() {
+  return firebaseServices()?.functions ?? null;
+}
+
+export function getFirebaseAuth() {
+  return firebaseServices()?.auth ?? null;
+}
+
+export function getFirestoreDb() {
+  return firebaseServices()?.db ?? null;
+}
+
+export function getFirebaseStorage() {
+  return firebaseServices()?.storage ?? null;
 }
 
 export async function loadFirebaseList(key, fallback = []) {
@@ -77,4 +99,45 @@ export async function uploadFirebaseFile(storagePath, file) {
   const snapshot = await uploadBytes(fileRef, file, { contentType: file.type || "application/octet-stream" });
   const url = await getDownloadURL(snapshot.ref);
   return { storagePath, downloadUrl: url, contentType: file.type || "application/octet-stream" };
+}
+
+export async function loadTenantList(departmentId, listKey, fallback = []) {
+  const services = firebaseServices();
+  if (!services || !departmentId) return fallback;
+  try {
+    const tenantSnap = await getDoc(doc(services.db, "departments", departmentId, "lists", listKey));
+    if (tenantSnap.exists()) {
+      const data = tenantSnap.data();
+      return Array.isArray(data.items) ? data.items : fallback;
+    }
+    const legacySnap = await getDoc(doc(services.db, "rmsData", listKey));
+    if (legacySnap.exists()) {
+      const data = legacySnap.data();
+      return Array.isArray(data.items) ? data.items : fallback;
+    }
+    return fallback;
+  } catch (error) {
+    console.warn(`Tenant list ${departmentId}/lists/${listKey} unavailable`, error);
+    return fallback;
+  }
+}
+
+export async function saveTenantList(departmentId, listKey, items, options = {}) {
+  const services = firebaseServices();
+  if (!services || !departmentId) return null;
+  const payload = {
+    items,
+    departmentId,
+    updated_at: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    updatedBy: options.userId || "system"
+  };
+  await setDoc(doc(services.db, "departments", departmentId, "lists", listKey), payload, { merge: true });
+  return payload;
+}
+
+export function tenantCollectionRef(departmentId, collectionName) {
+  const services = firebaseServices();
+  if (!services || !departmentId) return null;
+  return collection(services.db, "departments", departmentId, collectionName);
 }

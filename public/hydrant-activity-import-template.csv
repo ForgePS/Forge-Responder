@@ -1,0 +1,5 @@
+record_type,hydrant_id,location_id,district,date,time,tested_by,shift,status,discharge_size,pitot_psi,static_psi,residual_psi,flow_gpm,flow_result,nfpa_class,notes,repair_needed
+"Flow Test","HL 1000","31467975","1","2026-06-15","08:30","Jeremy Powell","A Shift","In Service","2.5","29","82","61","1628","B","Class AA","Annual flow test",""
+"Inspection","HL 1000","31467975","1","2026-06-15","09:15","Jeremy Powell","A Shift","In Service","","","","","","","","Caps present; no leaks; area clear","No"
+"Flow Test","HL 1008","31467974","1","2026-06-16","10:00","Adam Tutor","B Shift","In Service","2.5","22","75","58","985","O","Class B","Good flow",""
+"Inspection","HL 1086","31468052","3","2026-06-16","14:20","Stephen White","C Shift","Needs Repair","","","","","","","","Operating nut stiff; follow-up needed","Yes"

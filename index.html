@@ -3,8 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f172a" />
-    <title>Horn Lake Fire/EMS Dashboard</title>
+    <meta name="theme-color" content="#000000" />
+    <script>
+      document.documentElement.setAttribute("data-theme", "dark");
+      (function () {
+        var path = location.pathname.replace(/\/$/, "") || "/";
+        var isAlert = path === "/alerts" || path.endsWith("/alerts");
+        if (!isAlert) return;
+        document.documentElement.setAttribute("data-theme", "dark");
+        window.__FORGE_ALERT_DASHBOARD__ = true;
+        var lockedPath = location.pathname + location.search;
+        var replaceState = history.replaceState.bind(history);
+        var pushState = history.pushState.bind(history);
+        function guardUrl(url) {
+          if (!url) return lockedPath;
+          var next = String(url);
+          if (next.includes("/alerts")) return url;
+          return lockedPath;
+        }
+        history.replaceState = function (state, title, url) {
+          return replaceState(state, title, guardUrl(url));
+        };
+        history.pushState = function (state, title, url) {
+          return pushState(state, title, guardUrl(url));
+        };
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <title>FORGE Public Safety RMS</title>
   </head>
   <body>
     <div id="root"></div>

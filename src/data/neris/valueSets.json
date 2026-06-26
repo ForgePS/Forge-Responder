@@ -1,0 +1,3304 @@
+{
+  "syncedAt": "2026-06-22T13:40:40.389Z",
+  "source": "NERIS V1 XLSX type files",
+  "valueSetCount": 69,
+  "valueSets": {
+    "type_action_tactic": {
+      "name": "type_action_tactic",
+      "options": [
+        {
+          "value": "EMERGENCY_MEDICAL_CARE: PATIENT_ASSESSMENT",
+          "label": "Emergency Medical Care — Patient Assessment"
+        },
+        {
+          "value": "EMERGENCY_MEDICAL_CARE: PROVIDE_BASIC_LIFE_SUPPORT",
+          "label": "Emergency Medical Care — Provide Basic Life Support"
+        },
+        {
+          "value": "EMERGENCY_MEDICAL_CARE: PROVIDE_ADVANCED_LIFE_SUPPORT",
+          "label": "Emergency Medical Care — Provide Advanced Life Support"
+        },
+        {
+          "value": "EMERGENCY_MEDICAL_CARE: PROVIDE_TRANSPORT",
+          "label": "Emergency Medical Care — Provide Transport"
+        },
+        {
+          "value": "EMERGENCY_MEDICAL_CARE: PATIENT_REFERRAL",
+          "label": "Emergency Medical Care — Patient Referral"
+        },
+        {
+          "value": "COMMAND_AND_CONTROL: ESTABLISH_INCIDENT_COMMAND",
+          "label": "Command And Control — Establish Incident Command"
+        },
+        {
+          "value": "COMMAND_AND_CONTROL: SAFETY_OFFICER_ASSIGNED",
+          "label": "Command And Control — Safety Officer Assigned"
+        },
+        {
+          "value": "COMMAND_AND_CONTROL: PIO_ASSIGNED",
+          "label": "Command And Control — PIO Assigned"
+        },
+        {
+          "value": "COMMAND_AND_CONTROL: NOTIFY_OTHER_AGENCIES",
+          "label": "Command And Control — Notify Other Agencies"
+        },
+        {
+          "value": "COMMAND_AND_CONTROL: INCIDENT_ASSESSMENT_COMPLETED",
+          "label": "Command And Control — Incident Assessment (360 Degree Visualization) Completed"
+        },
+        {
+          "value": "COMMAND_AND_CONTROL: ACCOUNTABILITY_OFFICER_ASSIGNED",
+          "label": "Command And Control — Accountability Officer Assigned"
+        },
+        {
+          "value": "FORCIBLE_ENTRY",
+          "label": "Forcible Entry"
+        },
+        {
+          "value": "INVESTIGATION",
+          "label": "Investigation"
+        },
+        {
+          "value": "SUPPRESSION: STRUCTURAL_FIRE_SUPPRESSION: INTERIOR",
+          "label": "Suppression — Structural Fire Suppression — Inside the Building"
+        },
+        {
+          "value": "SUPPRESSION: STRUCTURAL_FIRE_SUPPRESSION: EXTERIOR",
+          "label": "Suppression — Structural Fire Suppression — Outside the Building (Windows, Walls, Roof, etc.)"
+        },
+        {
+          "value": "SUPPRESSION: STRUCTURAL_FIRE_SUPPRESSION: EXTERIOR_AND_INTERIOR",
+          "label": "Suppression — Structural Fire Suppression — Inside and Outside the Building"
+        },
+        {
+          "value": "SUPPRESSION: OUTSIDE_FIRE_SUPPRESSION: ESTABLISH FIRE LINES",
+          "label": "Suppression — Outside Fire Suppression — Establish Fire Lines"
+        },
+        {
+          "value": "SUPPRESSION: OUTSIDE_FIRE_SUPPRESSION: BACKBURN",
+          "label": "Suppression — Outside Fire Suppression — Backburn"
+        },
+        {
+          "value": "SUPPRESSION: OUTSIDE_FIRE_SUPPRESSION: CONFINEMENT",
+          "label": "Suppression — Outside Fire Suppression — Confinement"
+        },
+        {
+          "value": "SUPPRESSION: OUTSIDE_FIRE_SUPPRESSION: STRUCTURE_PROTECTION",
+          "label": "Suppression — Outside Fire Suppression — Structure Protection"
+        },
+        {
+          "value": "SUPPRESSION: OUTSIDE_FIRE_SUPPRESSION: FIRE_CONTROL_EXTINGUISHMENT",
+          "label": "Suppression — Outside Fire Suppression — Fire Control / Extinguishment"
+        },
+        {
+          "value": "SUPPRESSION: OUTSIDE_FIRE_SUPPRESSION: FIRE_RETARDANT_DROP",
+          "label": "Suppression — Outside Fire Suppression — Fire Retardant Drop From Aircraft"
+        },
+        {
+          "value": "SUPPRESSION: OUTSIDE_FIRE_SUPPRESSION: WATER_DROP",
+          "label": "Suppression — Outside Fire Suppression — Water Drop From Aircraft"
+        },
+        {
+          "value": "CONTAINMENT: OUTSIDE_FIRE_SUPPRESSION: HAND_CREW_FUEL_BREAK",
+          "label": "Containment — Outside Fire Suppression — Hand Crew Fuel Break"
+        },
+        {
+          "value": "CONTAINMENT: OUTSIDE_FIRE_SUPPRESSION: DOZER_FUEL_BREAK",
+          "label": "Containment — Outside Fire Suppression — Dozer Fuel Break"
+        },
+        {
+          "value": "VENTILATION: VERTICAL",
+          "label": "Ventilation — Vertical"
+        },
+        {
+          "value": "VENTILATION: VERTICAL: PRIOR_TO_SUPPRESSION",
+          "label": "Ventilation — Vertical — Prior To Suppression"
+        },
+        {
+          "value": "VENTILATION: VERTICAL: DURING_SUPPRESSION",
+          "label": "Ventilation — Vertical — During Suppression"
+        },
+        {
+          "value": "VENTILATION: VERTICAL: POST_SUPPRESSION",
+          "label": "Ventilation — Vertical — Post Suppression"
+        },
+        {
+          "value": "VENTILATION: HORIZONTAL",
+          "label": "Ventilation — Horizontal"
+        },
+        {
+          "value": "VENTILATION: HORIZONTAL: PRIOR_TO_SUPPRESSION",
+          "label": "Ventilation — Horizontal — Prior To Suppression"
+        },
+        {
+          "value": "VENTILATION: HORIZONTAL: DURING_SUPPRESSION",
+          "label": "Ventilation — Horizontal — During Suppression"
+        },
+        {
+          "value": "VENTILATION: HORIZONTAL: POST_SUPPRESSION",
+          "label": "Ventilation — Horizontal — Post Suppression"
+        },
+        {
+          "value": "VENTILATION: POSITIVE_PRESSURE",
+          "label": "Ventilation — Positive Pressure"
+        },
+        {
+          "value": "VENTILATION: POSITIVE_PRESSURE: PRIOR_TO_SUPPRESSION",
+          "label": "Ventilation — Positive Pressure — Prior To Suppression"
+        },
+        {
+          "value": "VENTILATION: POSITIVE_PRESSURE: DURING_SUPPRESSION",
+          "label": "Ventilation — Positive Pressure — During Suppression"
+        },
+        {
+          "value": "VENTILATION: POSITIVE_PRESSURE: POST_SUPPRESSION",
+          "label": "Ventilation — Positive Pressure — Post Suppression"
+        },
+        {
+          "value": "VENTILATION: HYDRAULIC",
+          "label": "Ventilation — Hydraulic"
+        },
+        {
+          "value": "VENTILATION: HYDRAULIC: PRIOR_TO_SUPPRESSION",
+          "label": "Ventilation — Hydraulic — Prior To Suppression"
+        },
+        {
+          "value": "VENTILATION: HYDRAULIC: DURING_SUPPRESSION",
+          "label": "Ventilation — Hydraulic — During Suppression"
+        },
+        {
+          "value": "VENTILATION: HYDRAULIC: POST_SUPPRESSION",
+          "label": "Ventilation — Hydraulic — Post Suppression"
+        },
+        {
+          "value": "SEARCH_STRUCTURE: DOOR_INITIATED_SEARCH",
+          "label": "Search Structure — Door Initiated Search"
+        },
+        {
+          "value": "SEARCH_STRUCTURE: DOOR_INITIATED_SEARCH: PRIOR_TO_SUPPRESSION",
+          "label": "Search Structure — Door Initiated Search — Prior To Suppression"
+        },
+        {
+          "value": "SEARCH_STRUCTURE: DOOR_INITIATED_SEARCH: DURING_SUPPRESSION",
+          "label": "Search Structure — Door Initiated Search — During Suppression"
+        },
+        {
+          "value": "SEARCH_STRUCTURE: DOOR_INITIATED_SEARCH: POST_SUPPRESSION",
+          "label": "Search Structure — Door Initiated Search — Post Suppression"
+        },
+        {
+          "value": "SEARCH_STRUCTURE: WINDOW_INITIATED_SEARCH",
+          "label": "Search Structure — Window Initiated Search"
+        },
+        {
+          "value": "SEARCH_STRUCTURE: WINDOW_INITIATED_SEARCH: PRIOR_TO_SUPPRESSION",
+          "label": "Search Structure — Window Initiated Search — Prior To Suppression"
+        },
+        {
+          "value": "SEARCH_STRUCTURE: WINDOW_INITIATED_SEARCH: DURING_SUPPRESSION",
+          "label": "Search Structure — Window Initiated Search — During Suppression"
+        },
+        {
+          "value": "SEARCH_STRUCTURE: WINDOW_INITIATED_SEARCH: POST_SUPPRESSION",
+          "label": "Search Structure — Window Initiated Search — Post Suppression"
+        },
+        {
+          "value": "NON_STRUCTURE_SEARCH: SEARCH_AREA_OF_COLLAPSE",
+          "label": "Non Structure Search — Search Area of Collapse"
+        },
+        {
+          "value": "NON_STRUCTURE_SEARCH: SEARCH_UNDERGROUND_INFRASTRUCTURE",
+          "label": "Non Structure Search — Search Underground Infrastructure (Cave / Mine)"
+        },
+        {
+          "value": "NON_STRUCTURE_SEARCH: WIDE_AREA_OUTDOOR_SEARCH",
+          "label": "Non Structure Search — Wide Area / Outdoor Search"
+        },
+        {
+          "value": "NON_STRUCTURE_SEARCH: SEARCH_WATERWAY",
+          "label": "Non Structure Search — Search Waterway"
+        },
+        {
+          "value": "NON_STRUCTURE_SEARCH: BODY_RECOVERY",
+          "label": "Non Structure Search — Body Recovery"
+        },
+        {
+          "value": "NON_STRUCTURE_SEARCH: USAR_K9_SEARCH",
+          "label": "Non Structure Search — USAR K9 Search"
+        },
+        {
+          "value": "SALVAGE_AND_OVERHAUL",
+          "label": "Salvage And Overhaul"
+        },
+        {
+          "value": "PERSONNEL_CONTAMINATION_REDUCTION: ON_SCENE_CONTAMINATION_REDUCTION",
+          "label": "Personnel Contamination Reduction — On-Scene Contamination Reduction"
+        },
+        {
+          "value": "PERSONNEL_CONTAMINATION_REDUCTION: CLEAN_CAB_TRANSPORT",
+          "label": "Personnel Contamination Reduction — Clean Cab Transport"
+        },
+        {
+          "value": "PERSONNEL_CONTAMINATION_REDUCTION: PPE_WASHED_POST_INCIDENT",
+          "label": "Personnel Contamination Reduction — PPE Washed Post-Incident"
+        },
+        {
+          "value": "HAZARDOUS_SITUATION_MITIGATION: TAKE_SAMPLES",
+          "label": "Hazardous Situation Mitigation — Take Samples"
+        },
+        {
+          "value": "HAZARDOUS_SITUATION_MITIGATION: SPILL_CONTROL",
+          "label": "Hazardous Situation Mitigation — Spill Control"
+        },
+        {
+          "value": "HAZARDOUS_SITUATION_MITIGATION: LEAK_STOP",
+          "label": "Hazardous Situation Mitigation — Leak Stop"
+        },
+        {
+          "value": "HAZARDOUS_SITUATION_MITIGATION: REMOVE_HAZARD",
+          "label": "Hazardous Situation Mitigation — Remove Hazard"
+        },
+        {
+          "value": "HAZARDOUS_SITUATION_MITIGATION: DECONTAMINATION",
+          "label": "Hazardous Situation Mitigation — Decontamination"
+        },
+        {
+          "value": "HAZARDOUS_SITUATION_MITIGATION: ATMOSPHERIC_MONITORING_INTERIOR",
+          "label": "Hazardous Situation Mitigation — Atmospheric Monitoring (Interior)"
+        },
+        {
+          "value": "HAZARDOUS_SITUATION_MITIGATION: ATMOSPHERIC_MONITORING_EXTERIOR_FENCELINE",
+          "label": "Hazardous Situation Mitigation — Atmospheric Monitoring (Exterior / Fenceline)"
+        },
+        {
+          "value": "PROVIDE_EVACUATION_SUPPORT: CONNECTED_INTERIOR_SPACES",
+          "label": "Provide Evacuation Support — Connected Interior Spaces"
+        },
+        {
+          "value": "PROVIDE_EVACUATION_SUPPORT: REMOTE_INTERIOR_SPACES",
+          "label": "Provide Evacuation Support — Remote Interior Spaces"
+        },
+        {
+          "value": "PROVIDE_EVACUATION_SUPPORT: NEARBY_BUILDINGS",
+          "label": "Provide Evacuation Support — Nearby Buildings"
+        },
+        {
+          "value": "PROVIDE_EVACUATION_SUPPORT: LARGE_AREA",
+          "label": "Provide Evacuation Support — Large Area"
+        },
+        {
+          "value": "PROVIDE_EQUIPMENT: PROVIDE_SPECIAL_EQUIPMENT",
+          "label": "Provide Equipment — Provide Special Equipment"
+        },
+        {
+          "value": "PROVIDE_EQUIPMENT: PROVIDE_LIGHT",
+          "label": "Provide Equipment — Provide Light"
+        },
+        {
+          "value": "PROVIDE_EQUIPMENT: PROVIDE_ELECTRICAL_POWER",
+          "label": "Provide Equipment — Provide Electrical Power"
+        },
+        {
+          "value": "PROVIDE_EQUIPMENT: PROVIDE_DRONE_VIDEO_EQUIPMENT",
+          "label": "Provide Equipment — Provide Drone / Video Equipment"
+        },
+        {
+          "value": "PROVIDE_SERVICES: RESTORE_SPRINKLER_SYSTEM",
+          "label": "Provide Services — Restore Sprinkler System"
+        },
+        {
+          "value": "PROVIDE_SERVICES: RESTORE_RESET_ALARM_SYSTEM",
+          "label": "Provide Services — Restore/Reset Alarm System"
+        },
+        {
+          "value": "PROVIDE_SERVICES: SHUT_DOWN_ALARM",
+          "label": "Provide Services — Shut Down Alarm"
+        },
+        {
+          "value": "PROVIDE_SERVICES: SHUT_DOWN_SPRINKLER_SYSTEM",
+          "label": "Provide Services — Shut Down Sprinkler System"
+        },
+        {
+          "value": "PROVIDE_SERVICES: SECURE_PROPERTY",
+          "label": "Provide Services — Secure Property"
+        },
+        {
+          "value": "PROVIDE_SERVICES: REMOVE_WATER",
+          "label": "Provide Services — Remove Water"
+        },
+        {
+          "value": "PROVIDE_SERVICES: ASSIST_UNINJURED_PERSON",
+          "label": "Provide Services — Assist Uninjured Person"
+        },
+        {
+          "value": "PROVIDE_SERVICES: ASSIST_ANIMAL",
+          "label": "Provide Services — Assist Animal"
+        },
+        {
+          "value": "PROVIDE_SERVICES: PROVIDE_APPARATUS_WATER",
+          "label": "Provide Services — Provide Apparatus / Water"
+        },
+        {
+          "value": "PROVIDE_SERVICES: CONTROL_CROWD",
+          "label": "Provide Services — Control Crowd"
+        },
+        {
+          "value": "PROVIDE_SERVICES: CONTROL_TRAFFIC",
+          "label": "Provide Services — Control Traffic"
+        },
+        {
+          "value": "PROVIDE_SERVICES: DAMAGE_ASSESSMENT",
+          "label": "Provide Services — Damage Assessment"
+        },
+        {
+          "value": "INFORMATION_ENFORCEMENT: REFER_TO_PROPER_AHJ",
+          "label": "Information Enforcement — Refer To Proper AHJ"
+        },
+        {
+          "value": "INFORMATION_ENFORCEMENT: ENFORCE_CODE_OR_LAW",
+          "label": "Information Enforcement — Enforce Code Or Law"
+        },
+        {
+          "value": "INFORMATION_ENFORCEMENT: PROVIDE_PUBLIC_INFORMATION",
+          "label": "Information Enforcement — Provide Public Information"
+        }
+      ]
+    },
+    "type_aid": {
+      "name": "type_aid",
+      "options": [
+        {
+          "value": "SUPPORT_AID",
+          "label": "SUPPORT AID"
+        },
+        {
+          "value": "IN_LIEU_AID",
+          "label": "IN LIEU AID"
+        },
+        {
+          "value": "ACTING_AS_AID",
+          "label": "ACTING AS AID"
+        }
+      ]
+    },
+    "type_aid_direction": {
+      "name": "type_aid_direction",
+      "options": [
+        {
+          "value": "GIVEN",
+          "label": "GIVEN"
+        },
+        {
+          "value": "RECEIVED",
+          "label": "RECEIVED"
+        }
+      ]
+    },
+    "type_aid_nonfd": {
+      "name": "type_aid_nonfd",
+      "options": [
+        {
+          "value": "LAW_ENFORCEMENT",
+          "label": "LAW ENFORCEMENT"
+        },
+        {
+          "value": "SOCIAL_SERVICES",
+          "label": "SOCIAL SERVICES"
+        },
+        {
+          "value": "ANIMAL_SERVICES",
+          "label": "ANIMAL SERVICES"
+        },
+        {
+          "value": "HOUSING_SERVICES",
+          "label": "HOUSING SERVICES"
+        },
+        {
+          "value": "UTILITIES_PUBLIC_WORKS",
+          "label": "UTILITIES PUBLIC WORKS"
+        },
+        {
+          "value": "REMEDIATION_SERVICES",
+          "label": "REMEDIATION SERVICES"
+        }
+      ]
+    },
+    "type_alarm_failure": {
+      "name": "type_alarm_failure",
+      "options": [
+        {
+          "value": "EXPIRED",
+          "label": "EXPIRED"
+        },
+        {
+          "value": "NO_BATTERY",
+          "label": "NO BATTERY"
+        },
+        {
+          "value": "IMPROPER_INSTALLATION",
+          "label": "IMPROPER INSTALLATION"
+        },
+        {
+          "value": "DEVICE_MALFUNCTION",
+          "label": "DEVICE MALFUNCTION"
+        },
+        {
+          "value": "TAMPER",
+          "label": "TAMPER"
+        },
+        {
+          "value": "OTHER_NON_FUNCTIONAL_CAUSE",
+          "label": "OTHER NON FUNCTIONAL CAUSE"
+        },
+        {
+          "value": "UNABLE_TO_DETERMINE",
+          "label": "UNABLE TO DETERMINE"
+        }
+      ]
+    },
+    "type_alarm_fire": {
+      "name": "type_alarm_fire",
+      "options": [
+        {
+          "value": "MANUAL",
+          "label": "MANUAL"
+        },
+        {
+          "value": "AUTOMATIC",
+          "label": "AUTOMATIC"
+        },
+        {
+          "value": "MANUAL_AND_AUTOMATIC",
+          "label": "MANUAL AND AUTOMATIC"
+        }
+      ]
+    },
+    "type_alarm_operation": {
+      "name": "type_alarm_operation",
+      "options": [
+        {
+          "value": "OPERATED_ALERTED_OCCUPANT",
+          "label": "OPERATED ALERTED OCCUPANT"
+        },
+        {
+          "value": "OPERATED_FAILED_TO_ALERT_OCCUPANT",
+          "label": "OPERATED FAILED TO ALERT OCCUPANT"
+        },
+        {
+          "value": "NO_OCCUPANT_TO_NOTIFY",
+          "label": "NO OCCUPANT TO NOTIFY"
+        },
+        {
+          "value": "FAILED_TO_OPERATE",
+          "label": "FAILED TO OPERATE"
+        },
+        {
+          "value": "INSUFFICIENT_SOURCE",
+          "label": "INSUFFICIENT SOURCE"
+        }
+      ]
+    },
+    "type_alarm_other": {
+      "name": "type_alarm_other",
+      "options": [
+        {
+          "value": "CARBON_MONOXIDE",
+          "label": "CARBON MONOXIDE"
+        },
+        {
+          "value": "NATURAL_GAS",
+          "label": "NATURAL GAS"
+        },
+        {
+          "value": "HEAT_DETECTOR",
+          "label": "HEAT DETECTOR"
+        },
+        {
+          "value": "OTHER_CHEMICAL_DETECTOR",
+          "label": "OTHER CHEMICAL DETECTOR"
+        }
+      ]
+    },
+    "type_alarm_smoke": {
+      "name": "type_alarm_smoke",
+      "options": [
+        {
+          "value": "LONG_LIFE_BATTERY_POWERED",
+          "label": "LONG LIFE BATTERY POWERED"
+        },
+        {
+          "value": "REPLACEABLE_BATTERY_POWERED",
+          "label": "REPLACEABLE BATTERY POWERED"
+        },
+        {
+          "value": "HARDWIRED",
+          "label": "HARDWIRED"
+        },
+        {
+          "value": "INTERCONNECTED",
+          "label": "INTERCONNECTED"
+        },
+        {
+          "value": "HARD_OF_HEARING_WITH_STROBE",
+          "label": "HARD OF HEARING WITH STROBE"
+        },
+        {
+          "value": "BED_SHAKER",
+          "label": "BED SHAKER"
+        },
+        {
+          "value": "COMBINATION",
+          "label": "COMBINATION"
+        },
+        {
+          "value": "UNKNOWN",
+          "label": "UNKNOWN"
+        }
+      ]
+    },
+    "type_casualty": {
+      "name": "type_casualty",
+      "options": [
+        {
+          "value": "UNINJURED",
+          "label": "UNINJURED"
+        },
+        {
+          "value": "INJURED_NONFATAL",
+          "label": "INJURED NONFATAL"
+        },
+        {
+          "value": "INJURED_FATAL",
+          "label": "INJURED FATAL"
+        }
+      ]
+    },
+    "type_casualty_action": {
+      "name": "type_casualty_action",
+      "options": [
+        {
+          "value": "SEARCH_RESCUE",
+          "label": "SEARCH RESCUE"
+        },
+        {
+          "value": "CARRYING_SETTINGUP_EQUIPMENT",
+          "label": "CARRYING SETTINGUP EQUIPMENT"
+        },
+        {
+          "value": "ADVANCING_OPERATING_HOSELINE",
+          "label": "ADVANCING OPERATING HOSELINE"
+        },
+        {
+          "value": "VEHICLE_EXTRICATION",
+          "label": "VEHICLE EXTRICATION"
+        },
+        {
+          "value": "VENTILATION",
+          "label": "VENTILATION"
+        },
+        {
+          "value": "FORCIBLE_ENTRY",
+          "label": "FORCIBLE ENTRY"
+        },
+        {
+          "value": "PUMP_OPERATIONS",
+          "label": "PUMP OPERATIONS"
+        },
+        {
+          "value": "EMS_PATIENT_CARE",
+          "label": "EMS PATIENT CARE"
+        },
+        {
+          "value": "DURING_INCIDENT_RESPONSE",
+          "label": "DURING INCIDENT RESPONSE"
+        },
+        {
+          "value": "SCENE_SAFETY_DIRECTING_TRAFFIC",
+          "label": "SCENE SAFETY DIRECTING TRAFFIC"
+        },
+        {
+          "value": "STANDBY",
+          "label": "STANDBY"
+        },
+        {
+          "value": "INCIDENT_COMMAND",
+          "label": "INCIDENT COMMAND"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        }
+      ]
+    },
+    "type_casualty_cause": {
+      "name": "type_casualty_cause",
+      "options": [
+        {
+          "value": "CAUGHT_TRAPPED_BY_FIRE_EXPLOSION",
+          "label": "CAUGHT TRAPPED BY FIRE EXPLOSION"
+        },
+        {
+          "value": "FALL_JUMP",
+          "label": "FALL JUMP"
+        },
+        {
+          "value": "STRESS_OVEREXERTION",
+          "label": "STRESS OVEREXERTION"
+        },
+        {
+          "value": "COLLAPSE",
+          "label": "COLLAPSE"
+        },
+        {
+          "value": "CAUGHT_TRAPPED_BY_OBJECT",
+          "label": "CAUGHT TRAPPED BY OBJECT"
+        },
+        {
+          "value": "STRUCK_CONTACT_WITH_OBJECT",
+          "label": "STRUCK CONTACT WITH OBJECT"
+        },
+        {
+          "value": "EXPOSURE",
+          "label": "EXPOSURE"
+        },
+        {
+          "value": "VEHICLE_COLLISION",
+          "label": "VEHICLE COLLISION"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        }
+      ]
+    },
+    "type_duty": {
+      "name": "type_duty",
+      "options": [
+        {
+          "value": "RESPONDING_TO_EMERGENCY_INCIDENT",
+          "label": "RESPONDING TO EMERGENCY INCIDENT"
+        },
+        {
+          "value": "WORKING_AT_SCENE_OF_FIRE_INCIDENT",
+          "label": "WORKING AT SCENE OF FIRE INCIDENT"
+        },
+        {
+          "value": "WORKING_AT_SCENE_OF_NONFIRE_INCIDENT",
+          "label": "WORKING AT SCENE OF NONFIRE INCIDENT"
+        },
+        {
+          "value": "RETURNING_FROM_EMERGENCY_INCIDENT",
+          "label": "RETURNING FROM EMERGENCY INCIDENT"
+        },
+        {
+          "value": "TRAINING",
+          "label": "TRAINING"
+        },
+        {
+          "value": "AFTER_INCIDENT",
+          "label": "AFTER INCIDENT"
+        },
+        {
+          "value": "OTHER_ON_DUTY_INCIDENT",
+          "label": "OTHER ON DUTY INCIDENT"
+        }
+      ]
+    },
+    "type_emerghaz_elec": {
+      "name": "type_emerghaz_elec",
+      "options": [
+        {
+          "value": "CONSUMER_PRODUCTS: APPLIANCE_TOOL",
+          "label": "Appliances / Tools — Consumer Products"
+        },
+        {
+          "value": "CONSUMER_PRODUCTS: CELL_PHONE",
+          "label": "Cell Phone — Consumer Products"
+        },
+        {
+          "value": "CONSUMER_PRODUCTS: COMPUTER_TABLET",
+          "label": "Computer / Tablet — Consumer Products"
+        },
+        {
+          "value": "CONSUMER_PRODUCTS: ELECTRONIC_CIGARETTE",
+          "label": "Electronic Cigarette — Consumer Products"
+        },
+        {
+          "value": "CONSUMER_PRODUCTS: POWER_BANK",
+          "label": "Power Bank — Consumer Products"
+        },
+        {
+          "value": "CONSUMER_PRODUCTS: TOY",
+          "label": "Toy — Consumer Products"
+        },
+        {
+          "value": "CONSUMER_PRODUCTS: OTHER",
+          "label": "Other — Consumer Products"
+        },
+        {
+          "value": "ENERGY_STORAGE_SYSTEM: HYDROELECTRIC",
+          "label": "Pumped-Storage Hydroelectric — Energy Storage System"
+        },
+        {
+          "value": "ENERGY_STORAGE_SYSTEM: BATTERY",
+          "label": "Battery (Electro-Chemical) — Energy Storage System"
+        },
+        {
+          "value": "ENERGY_STORAGE_SYSTEM: COMPRESSED_AIR",
+          "label": "Compressed-Air Storage — Energy Storage System"
+        },
+        {
+          "value": "ENERGY_STORAGE_SYSTEM: FLYWHEEL",
+          "label": "Flywheel — Energy Storage System"
+        },
+        {
+          "value": "ENERGY_STORAGE_SYSTEM: OTHER",
+          "label": "Other — Energy Storage System"
+        },
+        {
+          "value": "E_MOBILITY: POWER_ASSISTED_BICYCLE",
+          "label": "Power Assisted Bicycle — E-Mobility"
+        },
+        {
+          "value": "E_MOBILITY: ELECTRIC_SCOOTER_MOPED",
+          "label": "Electric Scooter/Moped — E-Mobility"
+        },
+        {
+          "value": "E_MOBILITY: PERSONAL_MOBILITY_ASSIST",
+          "label": "Personal Mobility Assist — E-Mobility"
+        },
+        {
+          "value": "E_MOBILITY: OTHER",
+          "label": "Other — E-Mobility"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: CAR_RR: FULL_ELECTRIC",
+          "label": "Road Registered Car — Electric Vehicle — Full Electric"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: CAR_RR: PLUG_IN_HYBRID",
+          "label": "Road Registered Car — Electric Vehicle — Plug-In Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: CAR_RR: HYBRID",
+          "label": "Road Registered Car — Electric Vehicle — Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: CAR_RR: FUEL_CELL",
+          "label": "Road Registered Car — Electric Vehicle — Fuel Cell"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: TRUCK_PASSENGER_RR: FULL_ELECTRIC",
+          "label": "Road Registered Passenger Truck — Electric Vehicle — Full Electric"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: TRUCK_PASSENGER_RR: PLUG_IN_HYBRID",
+          "label": "Road Registered Passenger Truck — Electric Vehicle — Plug-In Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: TRUCK_PASSENGER_RR: HYBRID",
+          "label": "Road Registered Passenger Truck — Electric Vehicle — Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: TRUCK_PASSENGER_RR: FUEL_CELL",
+          "label": "Road Registered Passenger Truck — Electric Vehicle — Fuel Cell"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: TRUCK_COMMERCIAL_RR: FULL_ELECTRIC",
+          "label": "Road Registered Commercial Truck — Electric Vehicle — Full Electric"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: TRUCK_COMMERCIAL_RR: PLUG_IN_HYBRID",
+          "label": "Road Registered Commercial Truck — Electric Vehicle — Plug-In Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: TRUCK_COMMERCIAL_RR: HYBRID",
+          "label": "Road Registered Commercial Truck — Electric Vehicle — Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: TRUCK_COMMERCIAL_RR: FUEL_CELL",
+          "label": "Road Registered Commercial Truck — Electric Vehicle — Fuel Cell"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BUS_RR: FULL_ELECTRIC",
+          "label": "Road Registered Bus — Electric Vehicle — Full Electric"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BUS_RR: PLUG_IN_HYBRID",
+          "label": "Road Registered Bus — Electric Vehicle — Plug-In Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BUS_RR: HYBRID",
+          "label": "Road Registered Bus — Electric Vehicle — Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BUS_RR: FUEL_CELL",
+          "label": "Road Registered Bus — Electric Vehicle — Fuel Cell"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BOAT_RECREATIONAL: FULL_ELECTRIC",
+          "label": "Boat Recreational — Electric Vehicle — Full Electric"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BOAT_RECREATIONAL: PLUG_IN_HYBRID",
+          "label": "Boat Recreational — Electric Vehicle — Plug-In Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BOAT_RECREATIONAL: HYBRID",
+          "label": "Boat Recreational — Electric Vehicle — Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BOAT_RECREATIONAL: Fuel_Cell",
+          "label": "Boat Recreational — Electric Vehicle — Fuel Cell"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BOAT_COMMERCIAL: FULL_ELECTRIC",
+          "label": "Boat Commercial — Electric Vehicle — Full Electric"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BOAT_COMMERCIAL: PLUG_IN_HYBRID",
+          "label": "Boat Commercial — Electric Vehicle — Plug-In Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BOAT_COMMERCIAL: HYBRID",
+          "label": "Boat Commercial — Electric Vehicle — Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: BOAT_COMMERCIAL: FUEL_CELL",
+          "label": "Boat Commercial — Electric Vehicle — Fuel Cell"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: LIGHT_EV_NRR: FULL_ELECTRIC",
+          "label": "Non Road Registered Light Vehicle — Electric Vehicle — Full Electric"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: LIGHT_EV_NRR: PLUG_IN_HYBRID",
+          "label": "Non Road Registered Light Vehicle — Electric Vehicle — Plug-In Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: LIGHT_EV_NRR: HYBRID",
+          "label": "Non Road Registered Light Vehicle — Electric Vehicle — Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: LIGHT_EV_NRR: FUEL_CELL",
+          "label": "Non Road Registered Light Vehicle — Electric Vehicle — Fuel Cell"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: OTHER: FULL_ELECTRIC",
+          "label": "Other — Electric Vehicle — Full Electric"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: OTHER: PLUG_IN_HYBRID",
+          "label": "Other — Electric Vehicle — Plug-In Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: OTHER: HYBRID",
+          "label": "Other — Electric Vehicle — Hybrid"
+        },
+        {
+          "value": "ELECTRIC_VEHICLE: OTHER: FUEL_CELL",
+          "label": "Other — Electric Vehicle — Fuel Cell"
+        }
+      ]
+    },
+    "type_emerghaz_powergen": {
+      "name": "type_emerghaz_powergen",
+      "options": [
+        {
+          "value": "PHOTOVOLTAICS",
+          "label": "PHOTOVOLTAICS"
+        },
+        {
+          "value": "WIND_TURBINE",
+          "label": "WIND TURBINE"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        },
+        {
+          "value": "NOT_APPLICABLE",
+          "label": "NOT APPLICABLE"
+        }
+      ]
+    },
+    "type_emerghaz_pv": {
+      "name": "type_emerghaz_pv",
+      "options": [
+        {
+          "value": "PANEL_WATER_HEATING",
+          "label": "PANEL WATER HEATING"
+        },
+        {
+          "value": "PANEL_POWER_GENERATION",
+          "label": "PANEL POWER GENERATION"
+        },
+        {
+          "value": "TILE_POWER_GENERATION",
+          "label": "TILE POWER GENERATION"
+        },
+        {
+          "value": "THIN_FILM_POWER_GENERATION",
+          "label": "THIN FILM POWER GENERATION"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        }
+      ]
+    },
+    "type_emerghaz_pv_ign": {
+      "name": "type_emerghaz_pv_ign",
+      "options": [
+        {
+          "value": "SOURCE",
+          "label": "SOURCE"
+        },
+        {
+          "value": "TARGET",
+          "label": "TARGET"
+        }
+      ]
+    },
+    "type_exposure_item": {
+      "name": "type_exposure_item",
+      "options": [
+        {
+          "value": "STRUCTURE",
+          "label": "STRUCTURE"
+        },
+        {
+          "value": "VEHICLE",
+          "label": "VEHICLE"
+        },
+        {
+          "value": "OUTDOOR_ENVIRONMENT",
+          "label": "OUTDOOR ENVIRONMENT"
+        },
+        {
+          "value": "OBJECT_OTHER",
+          "label": "OBJECT OTHER"
+        }
+      ]
+    },
+    "type_exposure_loc": {
+      "name": "type_exposure_loc",
+      "options": [
+        {
+          "value": "EXTERNAL_EXPOSURE",
+          "label": "EXTERNAL EXPOSURE"
+        },
+        {
+          "value": "INTERNAL_EXPOSURE",
+          "label": "INTERNAL EXPOSURE"
+        }
+      ]
+    },
+    "type_fire_bldg_damage": {
+      "name": "type_fire_bldg_damage",
+      "options": [
+        {
+          "value": "NO_DAMAGE",
+          "label": "NO DAMAGE"
+        },
+        {
+          "value": "MINOR_DAMAGE",
+          "label": "MINOR DAMAGE"
+        },
+        {
+          "value": "MODERATE_DAMAGE",
+          "label": "MODERATE DAMAGE"
+        },
+        {
+          "value": "MAJOR_DAMAGE",
+          "label": "MAJOR DAMAGE"
+        }
+      ]
+    },
+    "type_fire_cause_in": {
+      "name": "type_fire_cause_in",
+      "options": [
+        {
+          "value": "OPERATING_EQUIPMENT",
+          "label": "OPERATING EQUIPMENT"
+        },
+        {
+          "value": "ELECTRICAL",
+          "label": "ELECTRICAL"
+        },
+        {
+          "value": "BATTERY_POWER_STORAGE",
+          "label": "BATTERY POWER STORAGE"
+        },
+        {
+          "value": "HEAT_FROM_ANOTHER_OBJECT",
+          "label": "HEAT FROM ANOTHER OBJECT"
+        },
+        {
+          "value": "EXPLOSIVES_FIREWORKS",
+          "label": "EXPLOSIVES FIREWORKS"
+        },
+        {
+          "value": "SMOKING_MATERIALS_ILLICIT_DRUGS",
+          "label": "SMOKING MATERIALS ILLICIT DRUGS"
+        },
+        {
+          "value": "OPEN_FLAME",
+          "label": "OPEN FLAME"
+        },
+        {
+          "value": "COOKING",
+          "label": "COOKING"
+        },
+        {
+          "value": "CHEMICAL",
+          "label": "CHEMICAL"
+        },
+        {
+          "value": "ACT_OF_NATURE",
+          "label": "ACT OF NATURE"
+        },
+        {
+          "value": "INCENDIARY",
+          "label": "INCENDIARY"
+        },
+        {
+          "value": "OTHER_HEAT_SOURCE",
+          "label": "OTHER HEAT SOURCE"
+        },
+        {
+          "value": "UNABLE_TO_BE_DETERMINED",
+          "label": "UNABLE TO BE DETERMINED"
+        }
+      ]
+    },
+    "type_fire_cause_out": {
+      "name": "type_fire_cause_out",
+      "options": [
+        {
+          "value": "NATURAL",
+          "label": "NATURAL"
+        },
+        {
+          "value": "EQUIPMENT_VEHICLE_USE",
+          "label": "EQUIPMENT VEHICLE USE"
+        },
+        {
+          "value": "SMOKING_MATERIALS_ILLICIT_DRUGS",
+          "label": "SMOKING MATERIALS ILLICIT DRUGS"
+        },
+        {
+          "value": "RECREATION_CEREMONY",
+          "label": "RECREATION CEREMONY"
+        },
+        {
+          "value": "DEBRIS_OPEN_BURNING",
+          "label": "DEBRIS OPEN BURNING"
+        },
+        {
+          "value": "RAILROAD_OPS_MAINTENANCE",
+          "label": "RAILROAD OPS MAINTENANCE"
+        },
+        {
+          "value": "FIREARMS_EXPLOSIVES",
+          "label": "FIREARMS EXPLOSIVES"
+        },
+        {
+          "value": "FIREWORKS",
+          "label": "FIREWORKS"
+        },
+        {
+          "value": "POWER_GEN_TRANS_DIST",
+          "label": "POWER GEN TRANS DIST"
+        },
+        {
+          "value": "STRUCTURE",
+          "label": "STRUCTURE"
+        },
+        {
+          "value": "INCENDIARY",
+          "label": "INCENDIARY"
+        },
+        {
+          "value": "BATTERY_POWER_STORAGE",
+          "label": "BATTERY POWER STORAGE"
+        },
+        {
+          "value": "SPREAD_FROM_CONTROLLED_BURN",
+          "label": "SPREAD FROM CONTROLLED BURN"
+        },
+        {
+          "value": "UNABLE_TO_BE_DETERMINED",
+          "label": "UNABLE TO BE DETERMINED"
+        }
+      ]
+    },
+    "type_fire_condition_arrival": {
+      "name": "type_fire_condition_arrival",
+      "options": [
+        {
+          "value": "NO_SMOKE_FIRE_SHOWING",
+          "label": "NO SMOKE FIRE SHOWING"
+        },
+        {
+          "value": "SMOKE_SHOWING",
+          "label": "SMOKE SHOWING"
+        },
+        {
+          "value": "SMOKE_FIRE_SHOWING",
+          "label": "SMOKE FIRE SHOWING"
+        },
+        {
+          "value": "STRUCTURE_INVOLVED",
+          "label": "STRUCTURE INVOLVED"
+        },
+        {
+          "value": "FIRE_SPREAD_BEYOND_STRUCTURE",
+          "label": "FIRE SPREAD BEYOND STRUCTURE"
+        },
+        {
+          "value": "FIRE_OUT_UPON_ARRIVAL",
+          "label": "FIRE OUT UPON ARRIVAL"
+        }
+      ]
+    },
+    "type_fire_invest": {
+      "name": "type_fire_invest",
+      "options": [
+        {
+          "value": "INVESTIGATED_ON_SCENE_RESOURCE",
+          "label": "INVESTIGATED ON SCENE RESOURCE"
+        },
+        {
+          "value": "INVESTIGATED_BY_ARSON_FIRE_INVESTIGATOR",
+          "label": "INVESTIGATED BY ARSON FIRE INVESTIGATOR"
+        },
+        {
+          "value": "INVESTIGATED_BY_OUTSIDE_AGENCY",
+          "label": "INVESTIGATED BY OUTSIDE AGENCY"
+        },
+        {
+          "value": "INVESTIGATED_BY_STATE_FIRE_MARSHAL",
+          "label": "INVESTIGATED BY STATE FIRE MARSHAL"
+        },
+        {
+          "value": "INVESTIGATED_BY_INSURANCE",
+          "label": "INVESTIGATED BY INSURANCE"
+        },
+        {
+          "value": "INVESTIGATED_BY_NONFIRE_LAW_ENFORCEMENT",
+          "label": "INVESTIGATED BY NONFIRE LAW ENFORCEMENT"
+        },
+        {
+          "value": "INVESTIGATED_BY_OTHER",
+          "label": "INVESTIGATED BY OTHER"
+        }
+      ]
+    },
+    "type_fire_invest_need": {
+      "name": "type_fire_invest_need",
+      "options": [
+        {
+          "value": "YES",
+          "label": "YES"
+        },
+        {
+          "value": "NO",
+          "label": "NO"
+        },
+        {
+          "value": "NOT_EVALUATED",
+          "label": "NOT EVALUATED"
+        },
+        {
+          "value": "NOT_APPLICABLE",
+          "label": "NOT APPLICABLE"
+        },
+        {
+          "value": "NO_CAUSE_OBVIOUS",
+          "label": "NO CAUSE OBVIOUS"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        }
+      ]
+    },
+    "type_full_partial": {
+      "name": "type_full_partial",
+      "options": [
+        {
+          "value": "FULL",
+          "label": "FULL"
+        },
+        {
+          "value": "PARTIAL",
+          "label": "PARTIAL"
+        },
+        {
+          "value": "EXTENT_UNKNOWN",
+          "label": "EXTENT UNKNOWN"
+        }
+      ]
+    },
+    "type_gender": {
+      "name": "type_gender",
+      "options": [
+        {
+          "value": "MALE",
+          "label": "MALE"
+        },
+        {
+          "value": "FEMALE",
+          "label": "FEMALE"
+        },
+        {
+          "value": "TRANSGENDER_MALE_FEMALE_TO_MALE",
+          "label": "TRANSGENDER MALE FEMALE TO MALE"
+        },
+        {
+          "value": "TRANSGENDER_FEMALE_MALE_TO_FEMALE",
+          "label": "TRANSGENDER FEMALE MALE TO FEMALE"
+        },
+        {
+          "value": "OTHER_GENDER_IDENTITY",
+          "label": "OTHER GENDER IDENTITY"
+        },
+        {
+          "value": "UNKNOWN",
+          "label": "UNKNOWN"
+        }
+      ]
+    },
+    "type_hazard_cause": {
+      "name": "type_hazard_cause",
+      "options": [
+        {
+          "value": "INTENTIONAL",
+          "label": "INTENTIONAL"
+        },
+        {
+          "value": "UNINTENTIONAL",
+          "label": "UNINTENTIONAL"
+        },
+        {
+          "value": "CONTAINER_CONTAINMENT_FAILURE",
+          "label": "CONTAINER CONTAINMENT FAILURE"
+        },
+        {
+          "value": "ACT_OF_NATURE",
+          "label": "ACT OF NATURE"
+        },
+        {
+          "value": "CAUSE_UNDER_INVESTIGATION",
+          "label": "CAUSE UNDER INVESTIGATION"
+        }
+      ]
+    },
+    "type_hazard_disposition": {
+      "name": "type_hazard_disposition",
+      "options": [
+        {
+          "value": "COMPLETED_FIRE_SERVICE_ONLY",
+          "label": "COMPLETED FIRE SERVICE ONLY"
+        },
+        {
+          "value": "COMPLETED_WITH_FIRE_SERVICE_PRESENT",
+          "label": "COMPLETED WITH FIRE SERVICE PRESENT"
+        },
+        {
+          "value": "RELEASED_TO_LOCAL_AGENCY",
+          "label": "RELEASED TO LOCAL AGENCY"
+        },
+        {
+          "value": "RELEASED_TO_COUNTY_AGENCY",
+          "label": "RELEASED TO COUNTY AGENCY"
+        },
+        {
+          "value": "RELEASED_TO_STATE_AGENCY",
+          "label": "RELEASED TO STATE AGENCY"
+        },
+        {
+          "value": "RELEASED_TO_FEDERAL_AGENCY",
+          "label": "RELEASED TO FEDERAL AGENCY"
+        },
+        {
+          "value": "RELEASED_TO_PRIVATE_AGENCY",
+          "label": "RELEASED TO PRIVATE AGENCY"
+        },
+        {
+          "value": "RELEASED_TO_PROPERTY_OWNER",
+          "label": "RELEASED TO PROPERTY OWNER"
+        }
+      ]
+    },
+    "type_hazard_dot": {
+      "name": "type_hazard_dot",
+      "options": [
+        {
+          "value": "EXPLOSIVES",
+          "label": "EXPLOSIVES"
+        },
+        {
+          "value": "GASES",
+          "label": "GASES"
+        },
+        {
+          "value": "FLAMMABLE_LIQUIDS",
+          "label": "FLAMMABLE LIQUIDS"
+        },
+        {
+          "value": "FLAMMABLE_SOLIDS",
+          "label": "FLAMMABLE SOLIDS"
+        },
+        {
+          "value": "OXIDIZERS",
+          "label": "OXIDIZERS"
+        },
+        {
+          "value": "POISONS_AND_ETIOLOGIC_MATERIALS",
+          "label": "POISONS AND ETIOLOGIC MATERIALS"
+        },
+        {
+          "value": "RADIOACTIVE_MATERIALS",
+          "label": "RADIOACTIVE MATERIALS"
+        },
+        {
+          "value": "CORROSIVES",
+          "label": "CORROSIVES"
+        },
+        {
+          "value": "MISCELLANEOUS_DANGEROUS_SUBSTANCES",
+          "label": "MISCELLANEOUS DANGEROUS SUBSTANCES"
+        }
+      ]
+    },
+    "type_hazard_physical_state": {
+      "name": "type_hazard_physical_state",
+      "options": [
+        {
+          "value": "SOLID",
+          "label": "SOLID"
+        },
+        {
+          "value": "LIQUID",
+          "label": "LIQUID"
+        },
+        {
+          "value": "GAS",
+          "label": "GAS"
+        },
+        {
+          "value": "RADIOACTIVE",
+          "label": "RADIOACTIVE"
+        },
+        {
+          "value": "UNKNOWN",
+          "label": "UNKNOWN"
+        }
+      ]
+    },
+    "type_hazard_released_into": {
+      "name": "type_hazard_released_into",
+      "options": [
+        {
+          "value": "AIR",
+          "label": "AIR"
+        },
+        {
+          "value": "WATER",
+          "label": "WATER"
+        },
+        {
+          "value": "GROUND",
+          "label": "GROUND"
+        }
+      ]
+    },
+    "type_hazard_unit": {
+      "name": "type_hazard_unit",
+      "options": [
+        {
+          "value": "GAS_CUBIC_FOOT",
+          "label": "GAS CUBIC FOOT"
+        },
+        {
+          "value": "GAS_CUBIC_INCH",
+          "label": "GAS CUBIC INCH"
+        },
+        {
+          "value": "GAS_CUBIC_CENTIMETER",
+          "label": "GAS CUBIC CENTIMETER"
+        },
+        {
+          "value": "GAS_CUBIC_METER",
+          "label": "GAS CUBIC METER"
+        },
+        {
+          "value": "GAS_POUND",
+          "label": "GAS POUND"
+        },
+        {
+          "value": "LIQUID_CUBIC_CENTIMETER",
+          "label": "LIQUID CUBIC CENTIMETER"
+        },
+        {
+          "value": "LIQUID_CUP",
+          "label": "LIQUID CUP"
+        },
+        {
+          "value": "LIQUID_GALLON",
+          "label": "LIQUID GALLON"
+        },
+        {
+          "value": "LIQUID_GRAM",
+          "label": "LIQUID GRAM"
+        },
+        {
+          "value": "LIQUID_KILOGRAM",
+          "label": "LIQUID KILOGRAM"
+        },
+        {
+          "value": "LIQUID_POUND",
+          "label": "LIQUID POUND"
+        },
+        {
+          "value": "LIQUID_LITER",
+          "label": "LIQUID LITER"
+        },
+        {
+          "value": "LIQUID_MILLIGRAM",
+          "label": "LIQUID MILLIGRAM"
+        },
+        {
+          "value": "LIQUID_MILLILITER",
+          "label": "LIQUID MILLILITER"
+        },
+        {
+          "value": "LIQUID_OUNCE",
+          "label": "LIQUID OUNCE"
+        },
+        {
+          "value": "LIQUID_PINT",
+          "label": "LIQUID PINT"
+        },
+        {
+          "value": "LIQUID_QUART",
+          "label": "LIQUID QUART"
+        },
+        {
+          "value": "LIQUID_TABLESPOON",
+          "label": "LIQUID TABLESPOON"
+        },
+        {
+          "value": "LIQUID_TEASPOON",
+          "label": "LIQUID TEASPOON"
+        },
+        {
+          "value": "SOLID_GRAM",
+          "label": "SOLID GRAM"
+        },
+        {
+          "value": "SOLID_KILOGRAM",
+          "label": "SOLID KILOGRAM"
+        },
+        {
+          "value": "SOLID_POUND",
+          "label": "SOLID POUND"
+        },
+        {
+          "value": "SOLID_LITER",
+          "label": "SOLID LITER"
+        },
+        {
+          "value": "SOLID_MILLIGRAM",
+          "label": "SOLID MILLIGRAM"
+        },
+        {
+          "value": "SOLID_OUNCE",
+          "label": "SOLID OUNCE"
+        },
+        {
+          "value": "SOLID_TABLESPOON",
+          "label": "SOLID TABLESPOON"
+        },
+        {
+          "value": "SOLID_TON",
+          "label": "SOLID TON"
+        },
+        {
+          "value": "SOLID_TEASPOON",
+          "label": "SOLID TEASPOON"
+        },
+        {
+          "value": "RADIOACTIVE_CURIE",
+          "label": "RADIOACTIVE CURIE"
+        },
+        {
+          "value": "RADIOACTIVE_MEGABECQUEREL",
+          "label": "RADIOACTIVE MEGABECQUEREL"
+        },
+        {
+          "value": "RADIOACTIVE_MILLICURIE",
+          "label": "RADIOACTIVE MILLICURIE"
+        },
+        {
+          "value": "RADIOACTIVE_TERABECQUEREL",
+          "label": "RADIOACTIVE TERABECQUEREL"
+        },
+        {
+          "value": "RADIOACTIVE_MICROCURIE",
+          "label": "RADIOACTIVE MICROCURIE"
+        }
+      ]
+    },
+    "type_incident": {
+      "name": "type_incident",
+      "options": [
+        {
+          "value": "FIRE: OUTSIDE_FIRE: CONSTRUCTION_WASTE",
+          "label": "Fire — Outside Fire — Construction Waste"
+        },
+        {
+          "value": "FIRE: OUTSIDE_FIRE: OTHER_OUTSIDE_FIRE",
+          "label": "Fire — Outside Fire — Other Outside Fire"
+        },
+        {
+          "value": "FIRE: OUTSIDE_FIRE: OUTSIDE_TANK_FIRE",
+          "label": "Fire — Outside Fire — Outside Tank Fire"
+        },
+        {
+          "value": "FIRE: OUTSIDE_FIRE: TRASH_RUBBISH_FIRE",
+          "label": "Fire — Outside Fire — Trash / Rubbish Fire"
+        },
+        {
+          "value": "FIRE: OUTSIDE_FIRE: VEGETATION_GRASS_FIRE",
+          "label": "Fire — Outside Fire — Vegetation / Grass Fire"
+        },
+        {
+          "value": "FIRE: OUTSIDE_FIRE: WILDFIRE_WILDLAND",
+          "label": "Fire — Outside Fire — Wildfire - Wildland"
+        },
+        {
+          "value": "FIRE: OUTSIDE_FIRE: WILDFIRE_URBAN_INTERFACE",
+          "label": "Fire — Outside Fire — Wildfire - Urban Interface"
+        },
+        {
+          "value": "FIRE: OUTSIDE_FIRE: UTILITY_INFRASTRUCTURE_FIRE",
+          "label": "Fire — Outside Fire — Utility Infrastructure Fire"
+        },
+        {
+          "value": "FIRE: OUTSIDE_FIRE: DUMPSTER_OUTDOOR_CONTAINER_FIRE",
+          "label": "Fire — Outside Fire — Dumpster / Other Outdoor Container Fire"
+        },
+        {
+          "value": "FIRE: SPECIAL_FIRE: ESS_FIRE",
+          "label": "Fire — Special Fire — ESS Fire"
+        },
+        {
+          "value": "FIRE: SPECIAL_FIRE: EXPLOSION",
+          "label": "Fire — Special Fire — Explosion"
+        },
+        {
+          "value": "FIRE: SPECIAL_FIRE: INFRASTRUCTURE_FIRE",
+          "label": "Fire — Special Fire — Infrastructure Fire (Tunnel, Bridge)"
+        },
+        {
+          "value": "FIRE: STRUCTURE_FIRE: STRUCTURAL_INVOLVEMENT_FIRE",
+          "label": "Fire — Structure Fire — Structural Involvement"
+        },
+        {
+          "value": "FIRE: STRUCTURE_FIRE: ROOM_AND_CONTENTS_FIRE",
+          "label": "Fire — Structure Fire — Room and Contents Fire"
+        },
+        {
+          "value": "FIRE: STRUCTURE_FIRE: CONFINED_COOKING_APPLIANCE_FIRE",
+          "label": "Fire — Structure Fire — Confined Cooking / Appliance Fire"
+        },
+        {
+          "value": "FIRE: STRUCTURE_FIRE: CHIMNEY_FIRE",
+          "label": "Fire — Structure Fire — Chimney Fire"
+        },
+        {
+          "value": "FIRE: TRANSPORTATION_FIRE: AIRCRAFT_FIRE",
+          "label": "Fire — Transportation Fire — Aircraft Emergency"
+        },
+        {
+          "value": "FIRE: TRANSPORTATION_FIRE: VEHICLE_FIRE_PASSENGER",
+          "label": "Fire — Transportation Fire — Vehicle Fire - Passenger"
+        },
+        {
+          "value": "FIRE: TRANSPORTATION_FIRE: VEHICLE_FIRE_COMMERCIAL",
+          "label": "Fire — Transportation Fire — Vehicle Fire - Commercial"
+        },
+        {
+          "value": "FIRE: TRANSPORTATION_FIRE: VEHICLE_FIRE_RV",
+          "label": "Fire — Transportation Fire — Vehicle Fire - RV"
+        },
+        {
+          "value": "FIRE: TRANSPORTATION_FIRE: VEHICLE_FIRE_FOOD_TRUCK",
+          "label": "Fire — Transportation Fire — Vehicle Fire - Food Truck"
+        },
+        {
+          "value": "FIRE: TRANSPORTATION_FIRE: BOAT_PERSONAL_WATERCRAFT_BARGE_FIRE",
+          "label": "Fire — Transportation Fire — Boat / Personal Watercraft / Barge Fire"
+        },
+        {
+          "value": "FIRE: TRANSPORTATION_FIRE: POWERED_MOBILITY_DEVICE_FIRE",
+          "label": "Fire — Transportation Fire — Powered Mobility Device Fire"
+        },
+        {
+          "value": "FIRE: TRANSPORTATION_FIRE: TRAIN_RAIL_FIRE",
+          "label": "Fire — Transportation Fire — Train / Rail Fire"
+        },
+        {
+          "value": "HAZSIT: HAZARD_NONCHEM: BOMB_THREAT_RESPONSE_SUSPICIOUS_PACKAGE",
+          "label": "Hazardous Situation — Hazard Non-Chemical — Bomb Threat / Bomb Response / Suspicious Package"
+        },
+        {
+          "value": "HAZSIT: HAZARD_NONCHEM: ELEC_POWER_LINE_DOWN_ARCHING_MALFUNC",
+          "label": "Hazardous Situation — Hazard Non-Chemical — Electrical Power Line Down / Arching / Malfunction"
+        },
+        {
+          "value": "HAZSIT: HAZARD_NONCHEM: ELEC_HAZARD_SHORT_CIRCUIT",
+          "label": "Hazardous Situation — Hazard Non-Chemical — Electrical Hazard / Short Circuit"
+        },
+        {
+          "value": "HAZSIT: HAZARD_NONCHEM: MOTOR_VEHICLE_COLLISION",
+          "label": "Hazardous Situation — Hazard Non-Chemical — Motor Vehicle Collision"
+        },
+        {
+          "value": "HAZSIT: HAZARDOUS_MATERIALS: FUEL_SPILL_ODOR",
+          "label": "Hazardous Situation — Hazardous Materials — Fuel Spill / Fuel Odor"
+        },
+        {
+          "value": "HAZSIT: HAZARDOUS_MATERIALS: GAS_LEAK_ODOR",
+          "label": "Hazardous Situation — Hazardous Materials — Gas Leak / Gas Odor"
+        },
+        {
+          "value": "HAZSIT: HAZARDOUS_MATERIALS: CARBON_MONOXIDE_RELEASE",
+          "label": "Hazardous Situation — Hazardous Materials — Carbon Monoxide Release"
+        },
+        {
+          "value": "HAZSIT: HAZARDOUS_MATERIALS: BIOLOGICAL_RELEASE_INCIDENT",
+          "label": "Hazardous Situation — Hazardous Materials — Biological Release / Incident"
+        },
+        {
+          "value": "HAZSIT: HAZARDOUS_MATERIALS: RADIOACTIVE_RELEASE_INCIDENT",
+          "label": "Hazardous Situation — Hazardous Materials — Radioactive Release / Incident"
+        },
+        {
+          "value": "HAZSIT: HAZARDOUS_MATERIALS: HAZMAT_RELEASE_TRANSPORT",
+          "label": "Hazardous Situation — Hazardous Materials — Hazardous Material Release (Chemical from Transportation)"
+        },
+        {
+          "value": "HAZSIT: HAZARDOUS_MATERIALS: HAZMAT_RELEASE_FACILITY",
+          "label": "Hazardous Situation — Hazardous Materials — Hazardous Material Release (Chemical from Fixed Facility)"
+        },
+        {
+          "value": "HAZSIT: OVERPRESSURE: RUPTURE_WITHOUT_FIRE",
+          "label": "Hazardous Situation — Overpressure — Rupture Without Fire"
+        },
+        {
+          "value": "HAZSIT: OVERPRESSURE: NO_RUPTURE",
+          "label": "Hazardous Situation — Overpressure — No Rupture"
+        },
+        {
+          "value": "HAZSIT: INVESTIGATION: ODOR",
+          "label": "Hazardous Situation — Investigation — Odor"
+        },
+        {
+          "value": "HAZSIT: INVESTIGATION: SMOKE_INVESTIGATION",
+          "label": "Hazardous Situation — Investigation — Smoke Investigation"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: ABDOMINAL_PAIN",
+          "label": "Medical — Illness — Abdominal Pain / Problems"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: ALLERGIC_REACTION_STINGS",
+          "label": "Medical — Illness — Allergic Reaction / Stings"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: BACK_PAIN_NON_TRAUMA",
+          "label": "Medical — Illness — Back Pain (Non-Trauma)"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: BREATHING_PROBLEMS",
+          "label": "Medical — Illness — Breathing Problems"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: CARDIAC_ARREST",
+          "label": "Medical — Illness — Cardiac Arrest"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: CHEST_PAIN_NON_TRAUMA",
+          "label": "Medical — Illness — Chest Pain (Non-Trauma)"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: CONVULSIONS_SEIZURES",
+          "label": "Medical — Illness — Convulsions / Seizures"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: DIABETIC_PROBLEMS",
+          "label": "Medical — Illness — Diabetic Problems"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: HEADACHE",
+          "label": "Medical — Illness — Headache"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: HEART_PROBLEMS",
+          "label": "Medical — Illness — Heart Problems"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: OVERDOSE",
+          "label": "Medical — Illness — Overdose / Poisoning"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: PANDEMIC_EPIDEMIC_OUTBREAK",
+          "label": "Medical — Illness — Pandemic / Epidemic / Outbreak"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: PREGNANCY_CHILDBIRTH",
+          "label": "Medical — Illness — Pregnancy / Childbirth"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: PSYCHOLOGICAL_BEHAVIOR_ISSUES",
+          "label": "Medical — Illness — Psychological Behavior Issues"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: SICK_CASE",
+          "label": "Medical — Illness — Sick Case"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: STROKE_CVA",
+          "label": "Medical — Illness — Stroke / CVA"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: UNCONSCIOUS_VICTIM",
+          "label": "Medical — Illness — Unconscious Victim"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: WELL_PERSON_CHECK",
+          "label": "Medical — Illness — Well Person Check"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: ALTERED_MENTAL_STATUS",
+          "label": "Medical — Illness — Altered Mental Status"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: NAUSEA_VOMITING",
+          "label": "Medical — Illness — Nausea / Vomiting"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: UNKNOWN_PROBLEM",
+          "label": "Medical — Illness — Unknown Problem"
+        },
+        {
+          "value": "MEDICAL: ILLNESS: NO_APPROPRIATE_CHOICE",
+          "label": "Medical — Illness — No Appropriate Choice"
+        },
+        {
+          "value": "MEDICAL: INJURY: ANIMAL_BITES",
+          "label": "Medical — Injury / Trauma — Animal Bites"
+        },
+        {
+          "value": "MEDICAL: INJURY: ASSAULT",
+          "label": "Medical — Injury / Trauma — Assault"
+        },
+        {
+          "value": "MEDICAL: INJURY: BURNS_EXPLOSION",
+          "label": "Medical — Injury / Trauma — Burns / Explosion"
+        },
+        {
+          "value": "MEDICAL: INJURY: CARBON_MONOXIDE_OTHER_INHALATION_INJURY",
+          "label": "Medical — Injury / Trauma — Carbon Monoxide / Other Inhalation Injury"
+        },
+        {
+          "value": "MEDICAL: INJURY: CHOKING",
+          "label": "Medical — Injury / Trauma — Choking"
+        },
+        {
+          "value": "MEDICAL: INJURY: DROWNING_DIVING_SCUBA_ACCIDENT",
+          "label": "Medical — Injury / Trauma — Drowning / Diving / SCUBA Accident"
+        },
+        {
+          "value": "MEDICAL: INJURY: ELECTROCUTION",
+          "label": "Medical — Injury / Trauma — Electrocution"
+        },
+        {
+          "value": "MEDICAL: INJURY: EYE_TRAUMA",
+          "label": "Medical — Injury / Trauma — Eye Trauma"
+        },
+        {
+          "value": "MEDICAL: INJURY: FALL",
+          "label": "Medical — Injury / Trauma — Fall"
+        },
+        {
+          "value": "MEDICAL: INJURY: HEAT_COLD_EXPOSURE",
+          "label": "Medical — Injury / Trauma — Heat / Cold Exposure"
+        },
+        {
+          "value": "MEDICAL: INJURY: MOTOR_VEHICLE_COLLISION",
+          "label": "Medical — Injury / Trauma — Motor Vehicle Collision"
+        },
+        {
+          "value": "MEDICAL: INJURY: INDUSTRIAL_INACCESSIBLE_ENTRAPMENT",
+          "label": "Medical — Injury / Trauma — Industrial Accident/Inaccessible Incident/Other Entrapment (Non-Vehicle)"
+        },
+        {
+          "value": "MEDICAL: INJURY: POISONING",
+          "label": "Medical — Injury / Trauma — Poisoning"
+        },
+        {
+          "value": "MEDICAL: INJURY: GUNSHOT_WOUND",
+          "label": "Medical — Injury / Trauma — Gunshot Wound"
+        },
+        {
+          "value": "MEDICAL: INJURY: HEMORRHAGE_LACERATION",
+          "label": "Medical — Injury / Trauma — Hemorrhage / Laceration"
+        },
+        {
+          "value": "MEDICAL: INJURY: STAB_PENETRATING_TRAUMA",
+          "label": "Medical — Injury / Trauma — Stab / Penetrating Trauma"
+        },
+        {
+          "value": "MEDICAL: INJURY: OTHER_TRAUMATIC_INJURY",
+          "label": "Medical — Injury / Trauma — Other Traumatic Injury"
+        },
+        {
+          "value": "MEDICAL: OTHER: HEALTHCARE_PROFESSIONAL_ADMISSION",
+          "label": "Medical — Other — Healthcare Professional Admission"
+        },
+        {
+          "value": "MEDICAL: OTHER: MEDICAL_ALARM",
+          "label": "Medical — Other — Medical Alarm"
+        },
+        {
+          "value": "MEDICAL: OTHER: STANDBY_REQUEST",
+          "label": "Medical — Other — Standby Request"
+        },
+        {
+          "value": "MEDICAL: OTHER: TRANSFER_INTERFACILITY",
+          "label": "Medical — Other — Transfer / Interfacility"
+        },
+        {
+          "value": "MEDICAL: OTHER: AIRMEDICAL_TRANSPORT",
+          "label": "Medical — Other — Airmedical Transport"
+        },
+        {
+          "value": "MEDICAL: OTHER: INTERCEPT_OTHER_UNIT",
+          "label": "Medical — Other — Intercept Other Unit"
+        },
+        {
+          "value": "MEDICAL: OTHER: COMMUNITY_PUBLIC_HEALTH",
+          "label": "Medical — Other — Community Public Health"
+        },
+        {
+          "value": "PUBSERV: CITIZEN_ASSIST: LOST_PERSON",
+          "label": "Public Service — Citizen Assist — Lost Person"
+        },
+        {
+          "value": "PUBSERV: CITIZEN_ASSIST: PERSON_IN_DISTRESS",
+          "label": "Public Service — Citizen Assist — Person In Distress"
+        },
+        {
+          "value": "PUBSERV: CITIZEN_ASSIST: CITIZEN_ASSIST_SERVICE_CALL",
+          "label": "Public Service — Citizen Assist — Citizen Assist / Service Call"
+        },
+        {
+          "value": "PUBSERV: CITIZEN_ASSIST: LIFT_ASSIST",
+          "label": "Public Service — Citizen Assist — Lift Assist"
+        },
+        {
+          "value": "PUBSERV: ALARMS_NONMED: FIRE_ALARM",
+          "label": "Public Service — Alarms (Non Medical) — Fire / Smoke Alarm"
+        },
+        {
+          "value": "PUBSERV: ALARMS_NONMED: GAS_ALARM",
+          "label": "Public Service — Alarms (Non Medical) — Gas Alarm"
+        },
+        {
+          "value": "PUBSERV: ALARMS_NONMED: CO_ALARM",
+          "label": "Public Service — Alarms (Non Medical) — CO Alarm"
+        },
+        {
+          "value": "PUBSERV: ALARMS_NONMED: OTHER_ALARM",
+          "label": "Public Service — Alarms (Non Medical) — Other Alarm"
+        },
+        {
+          "value": "PUBSERV: DISASTER_WEATHER: DAMAGE_ASSESSMENT",
+          "label": "Public Service — Disaster / Weather — Damage Assessment"
+        },
+        {
+          "value": "PUBSERV: DISASTER_WEATHER: WEATHER_RESPONSE",
+          "label": "Public Service — Disaster / Weather — Weather Response"
+        },
+        {
+          "value": "PUBSERV: OTHER: MOVE_UP",
+          "label": "Public Service — Other — Move-up"
+        },
+        {
+          "value": "PUBSERV: OTHER: STANDBY",
+          "label": "Public Service — Other — Standby"
+        },
+        {
+          "value": "PUBSERV: OTHER: DAMAGED_HYDRANT",
+          "label": "Public Service — Other — Damaged Hydrant"
+        },
+        {
+          "value": "RESCUE: OUTSIDE: BACKOUNTRY_RESCUE",
+          "label": "Rescue — Outside — Backcountry Rescue"
+        },
+        {
+          "value": "RESCUE: OUTSIDE: CONFINED_SPACE_RESCUE",
+          "label": "Rescue — Outside — Confined Space Rescue"
+        },
+        {
+          "value": "RESCUE: OUTSIDE: TRENCH",
+          "label": "Rescue — Outside — Trench"
+        },
+        {
+          "value": "RESCUE: OUTSIDE: EXTRICATION_ENTRAPPED",
+          "label": "Rescue — Outside — Extrication / Entrapped"
+        },
+        {
+          "value": "RESCUE: OUTSIDE: HIGH_ANGLE_RESCUE",
+          "label": "Rescue — Outside — High Angle Rescue"
+        },
+        {
+          "value": "RESCUE: OUTSIDE: LOW_ANGLE_RESCUE",
+          "label": "Rescue — Outside — Low Angle Rescue"
+        },
+        {
+          "value": "RESCUE: OUTSIDE: STEEP_ANGLE_RESCUE",
+          "label": "Rescue — Outside — Steep Angle Rescue"
+        },
+        {
+          "value": "RESCUE: OUTSIDE: LIMITED_NO_ACCESS",
+          "label": "Rescue — Outside — Limited/No Access"
+        },
+        {
+          "value": "RESCUE: STRUCTURE: BUILDING_STRUCTURE_COLLAPSE",
+          "label": "Rescue — Structure — Building Collapse / Structure Collapse"
+        },
+        {
+          "value": "RESCUE: STRUCTURE: CONFINED_SPACE_RESCUE",
+          "label": "Rescue — Structure — Confined Space Rescue"
+        },
+        {
+          "value": "RESCUE: STRUCTURE: ELEVATOR_ESCALATOR_RESCUE",
+          "label": "Rescue — Structure — Elevator / Escalator Rescue"
+        },
+        {
+          "value": "RESCUE: STRUCTURE: EXTRICATION_ENTRAPPED",
+          "label": "Rescue — Structure — Extrication / Entrapped"
+        },
+        {
+          "value": "RESCUE: TRANSPORTATION: MOTOR_VEHICLE_EXTRICATION_ENTRAPPED",
+          "label": "Rescue — Transportation (Land) — Motor Vehicle Collision Extrication / Entrapment"
+        },
+        {
+          "value": "RESCUE: TRANSPORTATION: TRAIN_RAIL_COLLISION_DERAILMENT",
+          "label": "Rescue — Transportation (Land) — Train and Rail Collision / Derailment"
+        },
+        {
+          "value": "RESCUE: TRANSPORTATION: AVIATION_COLLISION_CRASH",
+          "label": "Rescue — Transportation (Land) — Aviation Collision / Crash"
+        },
+        {
+          "value": "RESCUE: TRANSPORTATION: AVIATION_STANDBY",
+          "label": "Rescue — Transportation (Land) — Aviation Standby"
+        },
+        {
+          "value": "RESCUE: WATER: PERSON_IN_WATER_STANDING",
+          "label": "Rescue — Water — Person in Water (Standing Water/Lake)"
+        },
+        {
+          "value": "RESCUE: WATER: PERSON_IN_WATER_SWIFTWATER",
+          "label": "Rescue — Water — Person in Water (Swiftwater/River)"
+        },
+        {
+          "value": "RESCUE: WATER: WATERCRAFT_IN_DISTRESS",
+          "label": "Rescue — Water — Watercraft in Distress"
+        },
+        {
+          "value": "NOEMERG: FALSE_ALARM: INTENTIONAL_FALSE_ALARM",
+          "label": "No Emergency — False Alarm — Intentional False Alarm"
+        },
+        {
+          "value": "NOEMERG: FALSE_ALARM: MALFUNCTIONING_ALARM",
+          "label": "No Emergency — False Alarm — Malfunctioning Alarm"
+        },
+        {
+          "value": "NOEMERG: FALSE_ALARM: ACCIDENTAL_ALARM",
+          "label": "No Emergency — False Alarm — Accidental Alarm"
+        },
+        {
+          "value": "NOEMERG: FALSE_ALARM: OTHER_FALSE_CALL",
+          "label": "No Emergency — False Alarm — Other False Call"
+        },
+        {
+          "value": "NOEMERG: FALSE_ALARM: BOMB_SCARE",
+          "label": "No Emergency — False Alarm — Bomb Scare"
+        },
+        {
+          "value": "NOEMERG: GOOD_INTENT: NO_INCIDENT_FOUND_LOCATION_ERROR",
+          "label": "No Emergency — Good Intent — No Incident Found Upon Arrival / Location Error"
+        },
+        {
+          "value": "NOEMERG: GOOD_INTENT: CONTROLLED_BURNING_AUTHORIZED",
+          "label": "No Emergency — Good Intent — Controlled Burning (Authorized)"
+        },
+        {
+          "value": "NOEMERG: GOOD_INTENT: SMOKE_FROM_NONHOSTILE_SOURCE",
+          "label": "No Emergency — Good Intent — Smoke From Nonhostile Source (Smoke Scare)"
+        },
+        {
+          "value": "NOEMERG: GOOD_INTENT: INVESTIGATE_HAZARDOUS_RELEASE",
+          "label": "No Emergency — Good Intent — Investigate Hazardous Release (Nothing Found)"
+        },
+        {
+          "value": "NOEMERG: CANCELLED",
+          "label": "No Emergency — Cancelled"
+        },
+        {
+          "value": "LAWENFORCE",
+          "label": "Law Enforcement Support"
+        }
+      ]
+    },
+    "type_job_classification": {
+      "name": "type_job_classification",
+      "options": [
+        {
+          "value": "CAREER",
+          "label": "CAREER"
+        },
+        {
+          "value": "PART_TIME",
+          "label": "PART TIME"
+        },
+        {
+          "value": "PAID_ON_CALL",
+          "label": "PAID ON CALL"
+        },
+        {
+          "value": "INDUSTRIAL",
+          "label": "INDUSTRIAL"
+        },
+        {
+          "value": "VOLUNTEER",
+          "label": "VOLUNTEER"
+        },
+        {
+          "value": "WILDLAND_FULL_TIME",
+          "label": "WILDLAND FULL TIME"
+        },
+        {
+          "value": "WILDLAND_PART_TIME",
+          "label": "WILDLAND PART TIME"
+        },
+        {
+          "value": "WILDLAND_CONTRACT",
+          "label": "WILDLAND CONTRACT"
+        }
+      ]
+    },
+    "type_medical_patient_care": {
+      "name": "type_medical_patient_care",
+      "options": [
+        {
+          "value": "PATIENT_EVALUATED_CARE_PROVIDED",
+          "label": "PATIENT EVALUATED CARE PROVIDED"
+        },
+        {
+          "value": "PATIENT_EVALUATED_REFUSED_CARE",
+          "label": "PATIENT EVALUATED REFUSED CARE"
+        },
+        {
+          "value": "PATIENT_EVALUATED_NO_CARE_REQUIRED",
+          "label": "PATIENT EVALUATED NO CARE REQUIRED"
+        },
+        {
+          "value": "PATIENT_REFUSED_EVALUATION_CARE",
+          "label": "PATIENT REFUSED EVALUATION CARE"
+        },
+        {
+          "value": "PATIENT_SUPPORT_SERVICES_PROVIDED",
+          "label": "PATIENT SUPPORT SERVICES PROVIDED"
+        },
+        {
+          "value": "PATIENT_DEAD_ON_ARRIVAL",
+          "label": "PATIENT DEAD ON ARRIVAL"
+        }
+      ]
+    },
+    "type_medical_patient_status": {
+      "name": "type_medical_patient_status",
+      "options": [
+        {
+          "value": "IMPROVED",
+          "label": "IMPROVED"
+        },
+        {
+          "value": "UNCHANGED",
+          "label": "UNCHANGED"
+        },
+        {
+          "value": "WORSE",
+          "label": "WORSE"
+        }
+      ]
+    },
+    "type_medical_transport": {
+      "name": "type_medical_transport",
+      "options": [
+        {
+          "value": "TRANSPORT_BY_EMS_UNIT",
+          "label": "TRANSPORT BY EMS UNIT"
+        },
+        {
+          "value": "OTHER_AGENCY_TRANSPORT",
+          "label": "OTHER AGENCY TRANSPORT"
+        },
+        {
+          "value": "PATIENT_REFUSED_TRANSPORT",
+          "label": "PATIENT REFUSED TRANSPORT"
+        },
+        {
+          "value": "NONPATIENT_TRANSPORT",
+          "label": "NONPATIENT TRANSPORT"
+        },
+        {
+          "value": "NO_TRANSPORT",
+          "label": "NO TRANSPORT"
+        }
+      ]
+    },
+    "type_noaction": {
+      "name": "type_noaction",
+      "options": [
+        {
+          "value": "CANCELLED",
+          "label": "CANCELLED"
+        },
+        {
+          "value": "STAGED_STANDBY",
+          "label": "STAGED STANDBY"
+        },
+        {
+          "value": "NO_INCIDENT_FOUND",
+          "label": "NO INCIDENT FOUND"
+        }
+      ]
+    },
+    "type_occupant_response": {
+      "name": "type_occupant_response",
+      "options": [
+        {
+          "value": "EVACUATED",
+          "label": "EVACUATED"
+        },
+        {
+          "value": "IGNORED_ALARM",
+          "label": "IGNORED ALARM"
+        },
+        {
+          "value": "UNABLE_TO_RESPOND",
+          "label": "UNABLE TO RESPOND"
+        },
+        {
+          "value": "ATTEMPTED_TO_EXTINGUISH",
+          "label": "ATTEMPTED TO EXTINGUISH"
+        },
+        {
+          "value": "ATTEMPTED_TO_RESCUE_OCCUPANTS",
+          "label": "ATTEMPTED TO RESCUE OCCUPANTS"
+        },
+        {
+          "value": "ATTEMPTED_TO_RESCUE_ANIMALS",
+          "label": "ATTEMPTED TO RESCUE ANIMALS"
+        },
+        {
+          "value": "UNKNOWN",
+          "label": "UNKNOWN"
+        }
+      ]
+    },
+    "type_race": {
+      "name": "type_race",
+      "options": [
+        {
+          "value": "AMERICAN_INDIAN_ALASKA_NATIVE",
+          "label": "AMERICAN INDIAN ALASKA NATIVE"
+        },
+        {
+          "value": "ASIAN",
+          "label": "ASIAN"
+        },
+        {
+          "value": "BLACK_AFRICAN_AMERICAN",
+          "label": "BLACK AFRICAN AMERICAN"
+        },
+        {
+          "value": "MIDDLE_EASTERN_NORTH_AFRICAN",
+          "label": "MIDDLE EASTERN NORTH AFRICAN"
+        },
+        {
+          "value": "HISPANIC_LATINO",
+          "label": "HISPANIC LATINO"
+        },
+        {
+          "value": "NATIVE_HAWAIIAN_PACIFIC_ISLANDER",
+          "label": "NATIVE HAWAIIAN PACIFIC ISLANDER"
+        },
+        {
+          "value": "WHITE",
+          "label": "WHITE"
+        }
+      ]
+    },
+    "type_rescue": {
+      "name": "type_rescue",
+      "options": [
+        {
+          "value": "RESCUED_BY_FIREFIGHTER",
+          "label": "RESCUED BY FIREFIGHTER"
+        },
+        {
+          "value": "RESCUED_BY_FF_RIT",
+          "label": "RESCUED BY FF RIT"
+        },
+        {
+          "value": "RESCUED_BY_NONFIREFIGHTER",
+          "label": "RESCUED BY NONFIREFIGHTER"
+        },
+        {
+          "value": "EVAC_ASSISTED_BY_FIREFIGHTER",
+          "label": "EVAC ASSISTED BY FIREFIGHTER"
+        },
+        {
+          "value": "SELF_EVACUATION",
+          "label": "SELF EVACUATION"
+        },
+        {
+          "value": "NO_RESCUE_NEEDED",
+          "label": "NO RESCUE NEEDED"
+        }
+      ]
+    },
+    "type_rescue_action": {
+      "name": "type_rescue_action",
+      "options": [
+        {
+          "value": "VENTILATION",
+          "label": "VENTILATION"
+        },
+        {
+          "value": "HYDRAULIC_TOOL_USE",
+          "label": "HYDRAULIC TOOL USE"
+        },
+        {
+          "value": "UNDERWATER_DIVE",
+          "label": "UNDERWATER DIVE"
+        },
+        {
+          "value": "ROPE_RIGGING",
+          "label": "ROPE RIGGING"
+        },
+        {
+          "value": "BREAK_BREACH_WALL",
+          "label": "BREAK BREACH WALL"
+        },
+        {
+          "value": "BRACE_WALL_INFRASTRUCTURE",
+          "label": "BRACE WALL INFRASTRUCTURE"
+        },
+        {
+          "value": "TRENCH_SHORING",
+          "label": "TRENCH SHORING"
+        },
+        {
+          "value": "SUPPLY_AIR",
+          "label": "SUPPLY AIR"
+        }
+      ]
+    },
+    "type_rescue_impedance": {
+      "name": "type_rescue_impedance",
+      "options": [
+        {
+          "value": "HOARDING_CONDITIONS",
+          "label": "HOARDING CONDITIONS"
+        },
+        {
+          "value": "ACCESS_LIMITATIONS",
+          "label": "ACCESS LIMITATIONS"
+        },
+        {
+          "value": "PHYSICAL_MEDICAL_CONDITIONS_PERSON",
+          "label": "PHYSICAL MEDICAL CONDITIONS PERSON"
+        },
+        {
+          "value": "IMPAIRED_PERSON",
+          "label": "IMPAIRED PERSON"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        },
+        {
+          "value": "NONE",
+          "label": "NONE"
+        }
+      ]
+    },
+    "type_rescue_mode": {
+      "name": "type_rescue_mode",
+      "options": [
+        {
+          "value": "REMOVAL_FROM_STRUCTURE",
+          "label": "REMOVAL FROM STRUCTURE"
+        },
+        {
+          "value": "EXTRICATION",
+          "label": "EXTRICATION"
+        },
+        {
+          "value": "DISENTANGLEMENT",
+          "label": "DISENTANGLEMENT"
+        },
+        {
+          "value": "RECOVERY",
+          "label": "RECOVERY"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        }
+      ]
+    },
+    "type_rescue_path": {
+      "name": "type_rescue_path",
+      "options": [
+        {
+          "value": "REMOVAL_ALONG_PRIMARY_PATH",
+          "label": "REMOVAL ALONG PRIMARY PATH"
+        },
+        {
+          "value": "REMOVAL_ALONG_ALT_PATH",
+          "label": "REMOVAL ALONG ALT PATH"
+        }
+      ]
+    },
+    "type_room": {
+      "name": "type_room",
+      "options": [
+        {
+          "value": "ASSEMBLY",
+          "label": "ASSEMBLY"
+        },
+        {
+          "value": "BATHROOM",
+          "label": "BATHROOM"
+        },
+        {
+          "value": "BEDROOM",
+          "label": "BEDROOM"
+        },
+        {
+          "value": "KITCHEN",
+          "label": "KITCHEN"
+        },
+        {
+          "value": "LIVING_SPACE",
+          "label": "LIVING SPACE"
+        },
+        {
+          "value": "HALLWAY_FOYER",
+          "label": "HALLWAY FOYER"
+        },
+        {
+          "value": "GARAGE",
+          "label": "GARAGE"
+        },
+        {
+          "value": "BALCONY_PORCH_DECK",
+          "label": "BALCONY PORCH DECK"
+        },
+        {
+          "value": "BASEMENT",
+          "label": "BASEMENT"
+        },
+        {
+          "value": "ATTIC",
+          "label": "ATTIC"
+        },
+        {
+          "value": "OFFICE",
+          "label": "OFFICE"
+        },
+        {
+          "value": "UTILITY_ROOM",
+          "label": "UTILITY ROOM"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        },
+        {
+          "value": "UNKNOWN",
+          "label": "UNKNOWN"
+        }
+      ]
+    },
+    "type_rr_presence": {
+      "name": "type_rr_presence",
+      "options": [
+        {
+          "value": "PRESENT",
+          "label": "PRESENT"
+        },
+        {
+          "value": "NOT_PRESENT",
+          "label": "NOT PRESENT"
+        },
+        {
+          "value": "NOT_APPLICABLE",
+          "label": "NOT APPLICABLE"
+        }
+      ]
+    },
+    "type_source_target": {
+      "name": "type_source_target",
+      "options": [
+        {
+          "value": "SOURCE",
+          "label": "SOURCE"
+        },
+        {
+          "value": "TARGET",
+          "label": "TARGET"
+        },
+        {
+          "value": "UNKNOWN",
+          "label": "UNKNOWN"
+        }
+      ]
+    },
+    "type_suppress_cooking": {
+      "name": "type_suppress_cooking",
+      "options": [
+        {
+          "value": "COMMERCIAL_HOOD_SUPPRESSION",
+          "label": "COMMERCIAL HOOD SUPPRESSION"
+        },
+        {
+          "value": "RESIDENTIAL_HOOD_MOUNTED",
+          "label": "RESIDENTIAL HOOD MOUNTED"
+        },
+        {
+          "value": "TEMPERATURE_LIMITING_STOVE",
+          "label": "TEMPERATURE LIMITING STOVE"
+        },
+        {
+          "value": "ELECTRIC_POWER_CUTOFF_DEVICE",
+          "label": "ELECTRIC POWER CUTOFF DEVICE"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        }
+      ]
+    },
+    "type_suppress_fire": {
+      "name": "type_suppress_fire",
+      "options": [
+        {
+          "value": "WET_PIPE_SPRINKLER_SYSTEM",
+          "label": "WET PIPE SPRINKLER SYSTEM"
+        },
+        {
+          "value": "DRY_PIPE_SPRINKLER_SYSTEM",
+          "label": "DRY PIPE SPRINKLER SYSTEM"
+        },
+        {
+          "value": "PRE_ACTION_SYSTEM",
+          "label": "PRE ACTION SYSTEM"
+        },
+        {
+          "value": "DELUGE_SYSTEM",
+          "label": "DELUGE SYSTEM"
+        },
+        {
+          "value": "CLEAN_AGENT_SYSTEM",
+          "label": "CLEAN AGENT SYSTEM"
+        },
+        {
+          "value": "INDUSTRIAL_DRY_CHEM_SYSTEM",
+          "label": "INDUSTRIAL DRY CHEM SYSTEM"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        },
+        {
+          "value": "UNKNOWN",
+          "label": "UNKNOWN"
+        }
+      ]
+    },
+    "type_suppress_operation": {
+      "name": "type_suppress_operation",
+      "options": [
+        {
+          "value": "OPERATED_EFFECTIVE",
+          "label": "OPERATED EFFECTIVE"
+        },
+        {
+          "value": "OPERATED_NOT_EFFECTIVE",
+          "label": "OPERATED NOT EFFECTIVE"
+        },
+        {
+          "value": "NO_OPERATION",
+          "label": "NO OPERATION"
+        }
+      ]
+    },
+    "type_water_supply": {
+      "name": "type_water_supply",
+      "options": [
+        {
+          "value": "HYDRANT_LESS_500",
+          "label": "HYDRANT LESS 500"
+        },
+        {
+          "value": "HYDRANT_GREATER_500",
+          "label": "HYDRANT GREATER 500"
+        },
+        {
+          "value": "TANK_WATER",
+          "label": "TANK WATER"
+        },
+        {
+          "value": "WATER_TENDER_SHUTTLE",
+          "label": "WATER TENDER SHUTTLE"
+        },
+        {
+          "value": "NURSE_OTHER_APPARATUS",
+          "label": "NURSE OTHER APPARATUS"
+        },
+        {
+          "value": "DRAFT_FROM_STATIC_SOURCE",
+          "label": "DRAFT FROM STATIC SOURCE"
+        },
+        {
+          "value": "SUPPLY_FROM_FIRE_BOAT",
+          "label": "SUPPLY FROM FIRE BOAT"
+        },
+        {
+          "value": "FOAM_ADDITIVE",
+          "label": "FOAM ADDITIVE"
+        }
+      ]
+    },
+    "type_loc_sn_direction": {
+      "name": "type_loc_sn_direction",
+      "options": [
+        {
+          "value": "NORTHBOUND",
+          "label": "NORTHBOUND"
+        },
+        {
+          "value": "SOUTHBOUND",
+          "label": "SOUTHBOUND"
+        },
+        {
+          "value": "EASTBOUND",
+          "label": "EASTBOUND"
+        },
+        {
+          "value": "WESTBOUND",
+          "label": "WESTBOUND"
+        }
+      ]
+    },
+    "type_loc_sn_pre_sep": {
+      "name": "type_loc_sn_pre_sep",
+      "options": [
+        {
+          "value": "OF_THE",
+          "label": "OF THE"
+        },
+        {
+          "value": "AT",
+          "label": "AT"
+        },
+        {
+          "value": "DE",
+          "label": "DE"
+        },
+        {
+          "value": "DE_LA",
+          "label": "DE LA"
+        },
+        {
+          "value": "DEL",
+          "label": "DEL"
+        },
+        {
+          "value": "DE_LAS",
+          "label": "DE LAS"
+        },
+        {
+          "value": "DES",
+          "label": "DES"
+        },
+        {
+          "value": "IN_THE",
+          "label": "IN THE"
+        },
+        {
+          "value": "TO_THE",
+          "label": "TO THE"
+        },
+        {
+          "value": "OF",
+          "label": "OF"
+        },
+        {
+          "value": "ON_THE",
+          "label": "ON THE"
+        },
+        {
+          "value": "TO",
+          "label": "TO"
+        }
+      ]
+    },
+    "type_location_use": {
+      "name": "type_location_use",
+      "options": [
+        {
+          "value": "AGRICULTURE_STRUCT: STORAGE_SILO",
+          "label": "Agriculture Structure — Crop or Product Storage / Silo"
+        },
+        {
+          "value": "AGRICULTURE_STRUCT: FARM_BUILDING",
+          "label": "Agriculture Structure — Farm (Building)"
+        },
+        {
+          "value": "AGRICULTURE_STRUCT: AUCTION_FEEDLOT",
+          "label": "Agriculture Structure — Auction / Feedlot"
+        },
+        {
+          "value": "AGRICULTURE_STRUCT: ANIMAL_PROCESSING",
+          "label": "Agriculture Structure — Animal Processing"
+        },
+        {
+          "value": "AGRICULTURE_STRUCT: VETERINARY_LIVESTOCK",
+          "label": "Agriculture Structure — Veterinary (Livestock)"
+        },
+        {
+          "value": "ASSEMBLY: COMMUNITY_CENTER",
+          "label": "Assembly — Community Center"
+        },
+        {
+          "value": "ASSEMBLY: CONVENTION_CENTER",
+          "label": "Assembly — Convention Center"
+        },
+        {
+          "value": "ASSEMBLY: INDOOR_ARENA",
+          "label": "Assembly — Indoor Arena"
+        },
+        {
+          "value": "ASSEMBLY: OUTDOOR_ARENA_AMPHITHEATER_PARK",
+          "label": "Assembly — Outdoor Arena / Amphitheater / Amusement Park"
+        },
+        {
+          "value": "ASSEMBLY: TEMP_OUTDOOR_STRUCT_EVENT",
+          "label": "Assembly — Temporary Outdoor Structure / Event"
+        },
+        {
+          "value": "ASSEMBLY: RELIGIOUS",
+          "label": "Assembly — Religious"
+        },
+        {
+          "value": "ASSEMBLY: MUSEUM_EXHIBIT_HALL_LIBRARY",
+          "label": "Assembly — Museum / Exhibit Hall / Library"
+        },
+        {
+          "value": "COMMERCIAL: ENTERTAINMENT_RECREATION",
+          "label": "Commercial — Entertainment and Recreation"
+        },
+        {
+          "value": "COMMERCIAL: RESTAURANT_CAFE",
+          "label": "Commercial — Restaurant / Cafe"
+        },
+        {
+          "value": "COMMERCIAL: BAR_NIGHTCLUB",
+          "label": "Commercial — Bar / Nightclub"
+        },
+        {
+          "value": "COMMERCIAL: OFFICE_OTHER_TECHNICAL_SERVICES",
+          "label": "Commercial — Office / Other Technical Services"
+        },
+        {
+          "value": "COMMERCIAL: RETAIL_WHOLESALE_TRADE",
+          "label": "Commercial — Retail / Wholesale / Trade"
+        },
+        {
+          "value": "COMMERCIAL: THEATERS_STUDIO",
+          "label": "Commercial — Theaters/Studio"
+        },
+        {
+          "value": "COMMERCIAL: VEHICLE_REPAIR_SERVICES",
+          "label": "Commercial — Vehicle Repair Services"
+        },
+        {
+          "value": "COMMERCIAL: VEHICLE_FUELING_CHARGING_STATION",
+          "label": "Commercial — Vehicle Fueling / Charging Station"
+        },
+        {
+          "value": "COMMERCIAL: VETERINARY_PET",
+          "label": "Commercial — Veterinary (Pet)"
+        },
+        {
+          "value": "EDUCATION: COLLEGES_UNIVERSITIES",
+          "label": "Education — Colleges/Universities"
+        },
+        {
+          "value": "EDUCATION: OTHER_EDUCATIONAL_BUILDINGS",
+          "label": "Education — Other Educational Buildings"
+        },
+        {
+          "value": "EDUCATION: PREK_DAYCARE",
+          "label": "Education — Pre-K / Day Care"
+        },
+        {
+          "value": "EDUCATION: K_12_SCHOOLS",
+          "label": "Education — K - 12 Schools"
+        },
+        {
+          "value": "GOVERNMENT: POLICE_EMERGENCY_STATION",
+          "label": "Government — Police Station / Emergency Response"
+        },
+        {
+          "value": "GOVERNMENT: FIRE_MEDICAL_STATION",
+          "label": "Government — Fire Station / Medical Response Station"
+        },
+        {
+          "value": "GOVERNMENT: JAIL_PRISON_REFORMATORY",
+          "label": "Government — Jail / Prison / Reformatory / Incarceration"
+        },
+        {
+          "value": "GOVERNMENT: GENERAL_SERVICES",
+          "label": "Government — General Services"
+        },
+        {
+          "value": "GOVERNMENT: NON_CIVILIAN_STRUCTURES",
+          "label": "Government — Non-Civilian Structures (Defense, Military)"
+        },
+        {
+          "value": "INDUSTRIAL: CHEMICAL",
+          "label": "Industrial — Chemical"
+        },
+        {
+          "value": "INDUSTRIAL: COLD_STORAGE",
+          "label": "Industrial — Cold Storage"
+        },
+        {
+          "value": "INDUSTRIAL: FOOD_DRUGS",
+          "label": "Industrial — Food / Drugs"
+        },
+        {
+          "value": "INDUSTRIAL: HEAVY",
+          "label": "Industrial — Heavy"
+        },
+        {
+          "value": "INDUSTRIAL: LIGHT",
+          "label": "Industrial — Light"
+        },
+        {
+          "value": "INDUSTRIAL: METALS_MINERALS_PROCESSING",
+          "label": "Industrial — Metals/Minerals Processing"
+        },
+        {
+          "value": "HEALTH_CARE: MEDICAL_OFFICE_CLINIC",
+          "label": "Health Care — Medical Office/Clinic"
+        },
+        {
+          "value": "HEALTH_CARE: HOSPITAL_24_HOUR_MEDICAL_FACILITIES",
+          "label": "Health Care — Hospital / 24-Hour Medical Facilities / Institutional"
+        },
+        {
+          "value": "HEALTH_CARE: NURSING_HOME_ASSISTED_LIVING_RESIDENCE_ONSITE",
+          "label": "Health Care — Nursing Home / Assisted Living / Residence with Onsite care and support"
+        },
+        {
+          "value": "HEALTH_CARE: ALCOHOL_DRUG_REHABILITATION_CENTER",
+          "label": "Health Care — Alcohol / Drug Rehabilitation Center"
+        },
+        {
+          "value": "RESIDENTIAL: CONGREGATE_HOUSING",
+          "label": "Residential — Congregate Housing"
+        },
+        {
+          "value": "RESIDENTIAL: MANUFACTURED_MOBILE_HOME",
+          "label": "Residential — Manufactured/Mobile Home"
+        },
+        {
+          "value": "RESIDENTIAL: DETATCHED_SINGLE_FAMILY_DWELLING",
+          "label": "Residential — Detached Single Family Dwelling"
+        },
+        {
+          "value": "RESIDENTIAL: ATTACHED_SINGLE_FAMILY_DWELLING",
+          "label": "Residential — Attached Single Family Dwelling"
+        },
+        {
+          "value": "RESIDENTIAL: MULTI_FAMILY_LOWRISE_DWELLING",
+          "label": "Residential — Multi-Family Lowrise Dwelling (<=4 Stories)"
+        },
+        {
+          "value": "RESIDENTIAL: MULTI_FAMILY_MIDRISE_DWELLING",
+          "label": "Residential — Multi-Family Midrise Dwelling (5-8 Stories)"
+        },
+        {
+          "value": "RESIDENTIAL: MULTI_FAMILY_HIGHRISE_DWELLING",
+          "label": "Residential — Multi-Family Highrise Dwelling (>= 9 Stories)"
+        },
+        {
+          "value": "RESIDENTIAL: DETATCHED_GARAGE",
+          "label": "Residential — Detached Garage"
+        },
+        {
+          "value": "RESIDENTIAL: UNHOUSED_TEMPORARY_SHELTER",
+          "label": "Residential — Unhoused/Temporary Shelter"
+        },
+        {
+          "value": "RESIDENTIAL: TEMPORARY_LODGING_HOTEL_MOTEL",
+          "label": "Residential — Temporary Lodging / Hotel / Motel"
+        },
+        {
+          "value": "UNCLASSIFIED: UNCLASSIFIED",
+          "label": "Unclassified — Unclassified"
+        },
+        {
+          "value": "UTILITY_MISC: TRANSPORTATION_STATION_HUB_AREA",
+          "label": "Utility and Misc — Transportation Station / Hub / Area (Airport / Bus / Train / Passenger Terminal"
+        },
+        {
+          "value": "UTILITY_MISC: ENERGY_FACILITY_INFRASTRUCTURE",
+          "label": "Utility and Misc — Energy Facility / Infrastructure"
+        },
+        {
+          "value": "UTILITY_MISC: WATER_SANITATION_FACILITY_INFRASTRUCTURE",
+          "label": "Utility and Misc — Water and Sanitation Facility / Infrastructure"
+        },
+        {
+          "value": "UTILITY_MISC: TRASH_RECYCLING_FACILITY",
+          "label": "Utility and Misc — Trash / Recycling Facility"
+        },
+        {
+          "value": "STORAGE: STORAGE_PORTABLE_BUILDING",
+          "label": "Storage — Storage - Portable Building"
+        },
+        {
+          "value": "STORAGE: STORAGE_MULTI_TENANT",
+          "label": "Storage — Storage - Multi-Tenant"
+        },
+        {
+          "value": "STORAGE: STORAGE_SINGLE_TENANT",
+          "label": "Storage — Storage -  Single-Tenant"
+        },
+        {
+          "value": "ROADWAY_ACCESS: SIDEWALK",
+          "label": "Roadway/Access — Sidewalk"
+        },
+        {
+          "value": "ROADWAY_ACCESS: STREET",
+          "label": "Roadway/Access — Street"
+        },
+        {
+          "value": "ROADWAY_ACCESS: HIGHWAY_INTERSTATE",
+          "label": "Roadway/Access — Highway / Interstate"
+        },
+        {
+          "value": "ROADWAY_ACCESS: LIMITED_ACCESS_HIGHWAY_INTERSTATE",
+          "label": "Roadway/Access — Limited Access Highway / Interstate"
+        },
+        {
+          "value": "ROADWAY_ACCESS: BRIDGE",
+          "label": "Roadway/Access — Bridge"
+        },
+        {
+          "value": "ROADWAY_ACCESS: TUNNEL",
+          "label": "Roadway/Access — Tunnel"
+        },
+        {
+          "value": "ROADWAY_ACCESS: RAILROAD_RAILYARD",
+          "label": "Roadway/Access — Railroad or Railroad Yard"
+        },
+        {
+          "value": "ROADWAY_ACCESS: PARKING_LOT_GARAGE",
+          "label": "Roadway/Access — Parking Lot / Parking Garage"
+        },
+        {
+          "value": "OUTDOOR: GROUND_VACANT_LAND",
+          "label": "Outdoor — Ground / Vacant Land"
+        },
+        {
+          "value": "OUTDOOR: CAMP_SITE",
+          "label": "Outdoor — Camp Site"
+        },
+        {
+          "value": "OUTDOOR: PLAYGROUND_PARK_RECREATIONAL_AREA",
+          "label": "Outdoor — Playground / Park / Recreational Area / Monument / Statue"
+        },
+        {
+          "value": "OUTDOOR: HIKING_TRAIL",
+          "label": "Outdoor — Hiking Trail"
+        },
+        {
+          "value": "OUTDOOR: ORCHARD_CROPS_FARMLAND",
+          "label": "Outdoor — Orchard / Crops / Farm (non-building)"
+        },
+        {
+          "value": "OUTDOOR: FOREST_GRASSLANDS_WOODLAND_WILDLAND_AREAS",
+          "label": "Outdoor — Forest / Grasslands / Woodland / Wildland Area"
+        },
+        {
+          "value": "OUTDOOR: WATERFRONT",
+          "label": "Outdoor — Waterfront (Beach / Dock)"
+        },
+        {
+          "value": "OUTDOOR: OPEN_WATER",
+          "label": "Outdoor — Open Water (Lake / River/ Pond / Ocean)"
+        },
+        {
+          "value": "OUTDOOR_INDUSTRIAL: DUMP_LANDFILL",
+          "label": "Outdoor Industrial — Dump / Landfill"
+        },
+        {
+          "value": "OUTDOOR_INDUSTRIAL: INDUSTRIAL_YARD",
+          "label": "Outdoor Industrial — Industrial Yard"
+        },
+        {
+          "value": "OUTDOOR_INDUSTRIAL: MINE",
+          "label": "Outdoor Industrial — Mine (non-building) / Oil Field"
+        },
+        {
+          "value": "OUTDOOR_INDUSTRIAL: CONSTRUCTION_SITE",
+          "label": "Outdoor Industrial — Construction Site"
+        }
+      ]
+    },
+    "type_vacancy": {
+      "name": "type_vacancy",
+      "options": [
+        {
+          "value": "NEW_CONSTRUCTION_REMODEL",
+          "label": "NEW CONSTRUCTION REMODEL"
+        },
+        {
+          "value": "ABANDONED",
+          "label": "ABANDONED"
+        },
+        {
+          "value": "FOR_SALE_LEASE",
+          "label": "FOR SALE LEASE"
+        },
+        {
+          "value": "FORECLOSURE",
+          "label": "FORECLOSURE"
+        },
+        {
+          "value": "DAMAGE_DECAY",
+          "label": "DAMAGE DECAY"
+        },
+        {
+          "value": "SEASONAL_OCCASIONALLY_OCCUPIED",
+          "label": "SEASONAL OCCASIONALLY OCCUPIED"
+        },
+        {
+          "value": "UNKNOWN",
+          "label": "UNKNOWN"
+        }
+      ]
+    },
+    "type_dept": {
+      "name": "type_dept",
+      "options": [
+        {
+          "value": "CAREER",
+          "label": "CAREER"
+        },
+        {
+          "value": "VOLUNTEER",
+          "label": "VOLUNTEER"
+        },
+        {
+          "value": "COMBINATION",
+          "label": "COMBINATION"
+        }
+      ]
+    },
+    "type_disp_proto_fire": {
+      "name": "type_disp_proto_fire",
+      "options": [
+        {
+          "value": "PROQA",
+          "label": "PROQA"
+        },
+        {
+          "value": "IAED",
+          "label": "IAED"
+        },
+        {
+          "value": "APCO",
+          "label": "APCO"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        }
+      ]
+    },
+    "type_disp_proto_med": {
+      "name": "type_disp_proto_med",
+      "options": [
+        {
+          "value": "PROQA",
+          "label": "PROQA"
+        },
+        {
+          "value": "IAED",
+          "label": "IAED"
+        },
+        {
+          "value": "APCO",
+          "label": "APCO"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        }
+      ]
+    },
+    "type_pop_source": {
+      "name": "type_pop_source",
+      "options": [
+        {
+          "value": "DEPARTMENT_ENTERED",
+          "label": "DEPARTMENT ENTERED"
+        },
+        {
+          "value": "CENSUS_DERIVED",
+          "label": "CENSUS DERIVED"
+        }
+      ]
+    },
+    "type_psap": {
+      "name": "type_psap",
+      "options": [
+        {
+          "value": "PRIMARY",
+          "label": "PRIMARY"
+        },
+        {
+          "value": "SECONDARY",
+          "label": "SECONDARY"
+        }
+      ]
+    },
+    "type_psap_capa": {
+      "name": "type_psap_capa",
+      "options": [
+        {
+          "value": "LEGACY",
+          "label": "LEGACY"
+        },
+        {
+          "value": "NG911",
+          "label": "NG911"
+        }
+      ]
+    },
+    "type_psap_disc": {
+      "name": "type_psap_disc",
+      "options": [
+        {
+          "value": "SINGLE",
+          "label": "SINGLE"
+        },
+        {
+          "value": "MULTIPLE",
+          "label": "MULTIPLE"
+        }
+      ]
+    },
+    "type_psap_juris": {
+      "name": "type_psap_juris",
+      "options": [
+        {
+          "value": "SINGLE",
+          "label": "SINGLE"
+        },
+        {
+          "value": "MULTIPLE",
+          "label": "MULTIPLE"
+        }
+      ]
+    },
+    "type_casualty_ppe": {
+      "name": "type_casualty_ppe",
+      "options": [
+        {
+          "value": "TURNOUT_COAT",
+          "label": "TURNOUT COAT"
+        },
+        {
+          "value": "BUNKER_PANTS",
+          "label": "BUNKER PANTS"
+        },
+        {
+          "value": "PROTECTIVE_HOOD",
+          "label": "PROTECTIVE HOOD"
+        },
+        {
+          "value": "GLOVES",
+          "label": "GLOVES"
+        },
+        {
+          "value": "FACE_SHIELD_GOGGLES",
+          "label": "FACE SHIELD GOGGLES"
+        },
+        {
+          "value": "HELMET",
+          "label": "HELMET"
+        },
+        {
+          "value": "SCBA",
+          "label": "SCBA"
+        },
+        {
+          "value": "PASS_DEVICE",
+          "label": "PASS DEVICE"
+        },
+        {
+          "value": "RUBBER_KNEE_BOOTS",
+          "label": "RUBBER KNEE BOOTS"
+        },
+        {
+          "value": "3_4_BOOTS",
+          "label": "3 4 BOOTS"
+        },
+        {
+          "value": "BRUSH_GEAR",
+          "label": "BRUSH GEAR"
+        },
+        {
+          "value": "REFLECTIVE_VEST",
+          "label": "REFLECTIVE VEST"
+        },
+        {
+          "value": "OTHER_SPECIAL_EQUIPMENT",
+          "label": "OTHER SPECIAL EQUIPMENT"
+        }
+      ]
+    },
+    "type_casualty_timeline": {
+      "name": "type_casualty_timeline",
+      "options": [
+        {
+          "value": "RESPONDING",
+          "label": "RESPONDING"
+        },
+        {
+          "value": "INITIAL_RESPONSE",
+          "label": "INITIAL RESPONSE"
+        },
+        {
+          "value": "CONTINUING_OPERATIONS",
+          "label": "CONTINUING OPERATIONS"
+        },
+        {
+          "value": "EXTENDED_OPERATIONS",
+          "label": "EXTENDED OPERATIONS"
+        },
+        {
+          "value": "AFTER_CONCLUSION_OF_INCIDENT",
+          "label": "AFTER CONCLUSION OF INCIDENT"
+        },
+        {
+          "value": "UNKNOWN",
+          "label": "UNKNOWN"
+        }
+      ]
+    },
+    "type_displace_cause": {
+      "name": "type_displace_cause",
+      "options": [
+        {
+          "value": "FIRE",
+          "label": "FIRE"
+        },
+        {
+          "value": "SMOKE",
+          "label": "SMOKE"
+        },
+        {
+          "value": "WATER",
+          "label": "WATER"
+        },
+        {
+          "value": "UTILITIES",
+          "label": "UTILITIES"
+        },
+        {
+          "value": "HAZARDOUS_SITUATION",
+          "label": "HAZARDOUS SITUATION"
+        },
+        {
+          "value": "COLLAPSE",
+          "label": "COLLAPSE"
+        },
+        {
+          "value": "OTHER",
+          "label": "OTHER"
+        }
+      ]
+    },
+    "type_emerghaz_suppression": {
+      "name": "type_emerghaz_suppression",
+      "options": [
+        {
+          "value": "RUN_COURSE",
+          "label": "RUN COURSE"
+        },
+        {
+          "value": "SUPPRESSION_WATER_ONLY",
+          "label": "SUPPRESSION WATER ONLY"
+        },
+        {
+          "value": "SUPPRESSION_WATER_ADDITIVE",
+          "label": "SUPPRESSION WATER ADDITIVE"
+        },
+        {
+          "value": "SUBMERGE_BURY",
+          "label": "SUBMERGE BURY"
+        },
+        {
+          "value": "FIRE_BLANKET",
+          "label": "FIRE BLANKET"
+        },
+        {
+          "value": "BATTERY_PENETRATION",
+          "label": "BATTERY PENETRATION"
+        }
+      ]
+    }
+  }
+}

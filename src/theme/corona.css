@@ -1,0 +1,214 @@
+/* Corona Free Dark Admin theme bridge for Forge RMS shell */
+
+.app-shell {
+  background: var(--rms-bg-body);
+}
+
+.workspace {
+  background: var(--rms-bg-body);
+}
+
+/* ── Top bar (Corona navbar) ───────────────────────────────── */
+.top-bar {
+  min-height: 70px;
+  background: var(--rms-bg-topbar);
+  border-bottom: 1px solid var(--rms-border);
+  box-shadow: var(--rms-shadow-lg);
+}
+
+html[data-theme="dark"] .top-bar {
+  box-shadow: 20px 19px 34px -15px rgba(0, 0, 0, 0.5);
+}
+
+.top-bar-tagline {
+  color: var(--rms-primary);
+  letter-spacing: 0.06em;
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+}
+
+html[data-theme="dark"] .top-bar-tagline {
+  background: var(--rms-tagline-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.global-search {
+  background: var(--rms-bg-input);
+  border: 1px solid var(--rms-border);
+  border-radius: var(--rms-radius-sm);
+}
+
+.global-search:focus-within {
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 2px rgba(0, 144, 231, 0.15);
+}
+
+.command-time {
+  background: var(--rms-bg-input);
+  border-color: var(--rms-border);
+  color: var(--rms-text-body);
+}
+
+/* ── Panels / cards (Corona .card) ──────────────────────────── */
+.panel,
+.kpi-card {
+  border: 1px solid var(--rms-border);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
+  box-shadow: none;
+}
+
+.panel > header {
+  border-bottom: 1px solid var(--rms-border);
+  background: var(--rms-bg-panel-header);
+  min-height: 48px;
+}
+
+.panel > header strong {
+  color: var(--rms-text-strong);
+  font-weight: 500;
+}
+
+.kpi-card:hover {
+  border-color: var(--rms-primary);
+  box-shadow: var(--rms-shadow-sm);
+}
+
+.kpi-card span {
+  color: var(--rms-text-muted);
+}
+
+/* ── Buttons (Corona .btn) ──────────────────────────────────── */
+.primary-button {
+  background: var(--rms-primary-solid);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--rms-radius-sm);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: none;
+}
+
+.primary-button:hover {
+  background: var(--rms-primary-hover);
+}
+
+.secondary-button,
+.filter-button {
+  background: var(--rms-bg-input);
+  border: 1px solid var(--rms-border);
+  color: var(--rms-text-body);
+  border-radius: var(--rms-radius-sm);
+  font-weight: 500;
+  text-transform: none;
+}
+
+html[data-theme="dark"] .secondary-button,
+html[data-theme="dark"] .filter-button {
+  color: var(--rms-text-body);
+}
+
+/* ── Forms ──────────────────────────────────────────────────── */
+input,
+select,
+textarea {
+  background: var(--rms-bg-input);
+  border: 1px solid var(--rms-border);
+  color: var(--rms-text);
+  border-radius: 2px;
+  font-size: 0.875rem;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #6c7293;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 2px rgba(0, 144, 231, 0.12);
+}
+
+/* ── Tables ─────────────────────────────────────────────────── */
+table th {
+  background: var(--rms-table-head);
+  color: var(--rms-text-muted);
+  border-color: var(--rms-border);
+  font-weight: 500;
+  text-transform: none;
+  font-size: 0.875rem;
+}
+
+table td {
+  border-color: var(--rms-border);
+  color: var(--rms-text-body);
+}
+
+html[data-theme="dark"] table tbody tr:hover {
+  background: var(--rms-bg-hover);
+}
+
+/* ── Footer ─────────────────────────────────────────────────── */
+.app-footer {
+  background: var(--rms-bg-footer);
+  border-top: 1px solid var(--rms-border);
+  color: var(--rms-text-muted);
+}
+
+/* ── Auth screens ───────────────────────────────────────────── */
+.auth-screen {
+  background: var(--rms-auth-gradient);
+}
+
+.auth-card {
+  background: var(--rms-bg-auth);
+  border: 1px solid var(--rms-border);
+  border-radius: var(--rms-radius-md);
+  box-shadow: var(--rms-shadow-md);
+}
+
+html[data-theme="dark"] .auth-card h1,
+html[data-theme="dark"] .auth-card strong {
+  color: #ffffff;
+}
+
+/* ── Dropdowns / notifications ──────────────────────────────── */
+.notification-panel,
+.profile-menu {
+  background: var(--rms-bg-elevated);
+  border: 1px solid var(--rms-border);
+  box-shadow: var(--rms-shadow-md);
+}
+
+/* ── Semantic tones ─────────────────────────────────────────── */
+.tone-success { color: #00d25b; }
+.tone-warning { color: #ffab00; }
+.tone-critical { color: #fc424a; }
+.tone-info { color: #8f5fe8; }
+
+/* ── Theme toggle ───────────────────────────────────────────── */
+.theme-toggle,
+.theme-toggle-compact {
+  background: var(--rms-bg-input);
+  border: 1px solid var(--rms-border);
+  color: var(--rms-text-muted);
+}
+
+/* ── Demo banner ────────────────────────────────────────────── */
+.demo-mode-banner {
+  background: #0090e7;
+  color: #fff;
+}
+
+/* ── KPI / dashboard hover ──────────────────────────────────── */
+.dashboard-grid .panel:hover,
+.command-dashboard .kpi-card:hover {
+  transform: none;
+}

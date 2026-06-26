@@ -1,19 +1,36 @@
 {
-  "name": "horn-lake-fire-ems-rms-dashboard",
+  "name": "forge-public-safety-rms",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "migrate:tenant": "node scripts/migrate-horn-lake-to-tenant.mjs",
+    "migrate:tenant:dry-run": "node scripts/migrate-horn-lake-to-tenant.mjs --dry-run",
+    "deploy:rules": "firebase deploy --only firestore:rules,storage",
+    "deploy:firestore-rules": "firebase deploy --only firestore:rules",
+    "seed:user": "node scripts/seed-department-user.mjs",
+    "seed:creator": "node scripts/seed-platform-creator.mjs",
+    "seed:platform-config": "node scripts/seed-platform-config.mjs",
+    "seed:demo": "node scripts/seed-demo-department.mjs",
+    "seed:gateways": "node scripts/seed-rms-gateways.mjs",
+    "sync:neris-schema": "node scripts/sync-neris-schema.mjs",
+    "import:neris-xlsx": "node scripts/import-neris-xlsx.mjs",
+    "push:test-alert": "node functions/scripts/pushTestAlert.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
+    "firebase": "^11.10.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "vite": "latest"
+    "vite": "latest",
+    "xlsx": "^0.18.5"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "firebase-admin": "^13.4.0"
+  }
 }

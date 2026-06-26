@@ -1,0 +1,46 @@
+/** Canonical Firestore list keys (legacy hlfd-rms prefix retained for existing data). */
+export const LIST_KEYS = {
+  personnel: "hlfd-rms-personnel",
+  certifications: "hlfd-rms-certifications",
+  training: "hlfd-rms-training",
+  apparatus: "hlfd-rms-apparatus",
+  workOrders: "hlfd-rms-work-orders",
+  assets: "hlfd-rms-assets",
+  documents: "hlfd-rms-documents",
+  occupancies: "hlfd-rms-occupancies",
+  inspections: "hlfd-rms-inspections",
+  preplans: "hlfd-rms-preplans",
+  hoseTests: "hlfd-rms-hose-tests",
+  scheduleDays: "hlfd-rms-schedule-days",
+  roster: "hlfd-rms-roster",
+  leaveRequests: "hlfd-rms-leave-requests",
+  overtimeOffers: "hlfd-rms-overtime-offers",
+  vacancyPickups: "hlfd-rms-vacancy-pickups",
+  shiftTrades: "hlfd-rms-shift-trades",
+  dailyLogs: "hlfd-rms-daily-logs",
+  timeCards: "hlfd-rms-time-cards",
+};
+
+export const LIST_MODULE_NAMES = {
+  [LIST_KEYS.personnel]: "Personnel",
+  [LIST_KEYS.certifications]: "Certifications",
+  [LIST_KEYS.training]: "Training",
+  [LIST_KEYS.apparatus]: "Apparatus",
+  [LIST_KEYS.workOrders]: "Maintenance",
+  [LIST_KEYS.assets]: "Assets",
+  [LIST_KEYS.documents]: "Documents",
+  [LIST_KEYS.occupancies]: "Occupancies",
+  [LIST_KEYS.inspections]: "Inspections",
+  [LIST_KEYS.preplans]: "Preplans",
+  [LIST_KEYS.hoseTests]: "Hose Testing",
+  [LIST_KEYS.scheduleDays]: "Scheduling",
+  [LIST_KEYS.roster]: "Scheduling",
+  [LIST_KEYS.leaveRequests]: "Scheduling",
+  [LIST_KEYS.overtimeOffers]: "Scheduling",
+  [LIST_KEYS.vacancyPickups]: "Scheduling",
+  [LIST_KEYS.shiftTrades]: "Shift Trades",
+  [LIST_KEYS.dailyLogs]: "Daily Log",
+  [LIST_KEYS.timeCards]: "Scheduling",
+};
+
+export const ALL_LIST_KEYS = Object.values(LIST_KEYS);

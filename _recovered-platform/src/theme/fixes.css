@@ -1,0 +1,101 @@
+/* Theme-specific fixes and toggle UI */
+
+.primary-button,
+.nav-item.active,
+.nav-item.active svg,
+.avatar,
+.segmented-control button.active,
+.notification-button i {
+  color: var(--rms-text-inverse) !important;
+}
+
+.profile-button,
+.global-search input,
+.doc-row {
+  color: var(--rms-text) !important;
+}
+
+html[data-theme="light"] .forge-logo-knockout {
+  mix-blend-mode: multiply;
+  filter: none;
+}
+
+html[data-theme="light"] .auth-screen {
+  background: var(--rms-auth-gradient);
+}
+
+html[data-theme="light"] .app-shell {
+  background: var(--rms-shell-glow-a), var(--rms-shell-glow-b), var(--rms-shell-gradient);
+}
+
+html[data-theme="dark"] .app-shell {
+  background: var(--rms-shell-glow-a), var(--rms-shell-glow-b), var(--rms-shell-gradient);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text-body);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background var(--rms-transition), border-color var(--rms-transition), color var(--rms-transition);
+}
+
+.theme-toggle:hover {
+  border-color: var(--rms-border-strong, var(--rms-accent));
+  background: var(--rms-bg-hover);
+  color: var(--rms-text-strong);
+}
+
+.theme-toggle-compact {
+  min-height: 34px;
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+}
+
+.theme-toggle-compact span {
+  display: none;
+}
+
+.auth-theme-toggle-wrap {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.auth-screen .auth-theme-toggle-wrap {
+  width: min(460px, 100%);
+  margin: 0 auto 0;
+}
+
+.auth-screen-login {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+.auth-screen-login .auth-card-login {
+  width: min(460px, 100%);
+}
+
+.top-bar-utilities .theme-toggle {
+  flex-shrink: 0;
+}
+
+@media (max-width: 980px) {
+  .theme-toggle:not(.theme-toggle-compact) span {
+    display: none;
+  }
+
+  .theme-toggle:not(.theme-toggle-compact) {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+}

@@ -1,0 +1,1185 @@
+/* Horn Lake-style employee time sheet */
+
+.time-card-portal-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.time-card-sheet {
+  display: grid;
+  gap: 14px;
+  padding: 20px 18px;
+  border: 2px solid #111827;
+  border-radius: 2px;
+  background: #fff;
+  color: #111827;
+}
+
+.time-card-header {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.time-card-title {
+  margin: 0;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.time-card-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 2px 0 4px;
+}
+
+.time-card-logo {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+}
+
+.time-card-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px 24px;
+  width: 100%;
+  max-width: none;
+}
+
+.time-card-meta-field {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.time-card-meta-field > span {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.time-card-meta-field strong {
+  border-bottom: 1px solid #111827;
+  min-width: 180px;
+  min-height: 22px;
+  padding-bottom: 2px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.time-card-pay-period-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-card-pay-period-nav strong {
+  min-width: 0;
+  border-bottom: 1px solid #111827;
+}
+
+.time-card-nav-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  background: #f8fafc;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.time-card-save-note {
+  margin: 0;
+  color: #047857;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.time-card-week {
+  display: grid;
+  gap: 0;
+}
+
+.time-card-weekdays,
+.time-card-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(68px, 0.85fr);
+}
+
+.time-card-weekday-total {
+  padding: 6px 4px;
+  border: 1px solid #111827;
+  border-right: 1px solid #111827;
+  border-left: 2px solid #111827;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  background: #f3f4f6;
+  line-height: 1.2;
+}
+
+.time-card-week-total {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  min-height: 96px;
+  padding: 8px 6px;
+  border: 1px solid #111827;
+  border-top: 0;
+  border-left: 2px solid #111827;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.time-card-week-total-line {
+  display: grid;
+  gap: 1px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-card-week-total-hours {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #111827;
+}
+
+.time-card-week-total-label {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #334155;
+}
+
+.time-card-week-total-line.is-leave .time-card-week-total-hours,
+.time-card-week-total-line.is-leave .time-card-week-total-label {
+  color: #dc2626;
+}
+
+.time-card-weekdays span {
+  padding: 6px 4px;
+  border: 1px solid #111827;
+  border-right: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f3f4f6;
+}
+
+.time-card-weekdays span:nth-child(7),
+.time-card-week-grid .time-card-day:nth-child(7) {
+  border-right: 2px solid #111827;
+}
+
+.time-card-weekdays span:last-child,
+.time-card-week-grid .time-card-week-total {
+  border-right: 1px solid #111827;
+}
+
+.time-card-week + .time-card-week,
+.time-card-week-separated {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 2px solid #111827;
+}
+
+.time-card-week-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
+.time-card-calendar {
+  width: 100%;
+  min-width: 0;
+}
+
+.time-card-week-row-separated {
+  border-top: 2px solid #111827;
+}
+
+.time-card-weekdays,
+.time-card-week-grid {
+  width: 100%;
+  min-width: 0;
+}
+
+.time-card-day {
+  position: relative;
+  min-height: 96px;
+  border: 1px solid #111827;
+  border-top: 0;
+  border-right: 0;
+  background: #fff;
+}
+
+.time-card-day-pad {
+  background: #f9fafb;
+}
+
+.time-card-day.is-holiday {
+  background: #fff;
+}
+
+.time-card-day.is-holiday .time-card-day-hours,
+.time-card-day.is-holiday .time-card-day-holiday-label {
+  color: #dc2626;
+}
+
+.time-card-day.is-holiday .time-card-day-hours {
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.time-card-day.is-holiday.is-work .time-card-day-hours {
+  font-size: 20px;
+}
+
+.time-card-day.is-work .time-card-day-hours {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.time-card-day.is-leave:not(.is-sick-leave):not(.is-vacation-leave) .time-card-day-main,
+.time-card-day.is-leave:not(.is-sick-leave):not(.is-vacation-leave) .time-card-day-hours {
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.time-card-day.is-sick-leave .time-card-day-hours,
+.time-card-day.is-vacation-leave .time-card-day-hours {
+  font-size: 20px;
+  font-weight: 800;
+  color: #dc2626;
+}
+
+.time-card-day.is-sick-leave .time-card-day-hours.is-regular-work,
+.time-card-day.is-vacation-leave .time-card-day-hours.is-regular-work,
+.time-card-day.is-leave .time-card-day-hours.is-regular-work {
+  color: #111827;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.time-card-day.is-sick-leave .time-card-day-time,
+.time-card-day.is-vacation-leave .time-card-day-time {
+  font-size: 12px;
+  font-weight: 800;
+  color: #dc2626;
+}
+
+.time-card-extra-box {
+  position: absolute;
+  left: 4px;
+  bottom: 22px;
+  width: 40px;
+  min-width: 40px;
+  max-width: 50%;
+  height: 26px;
+  border: 1px solid #111827;
+  border-radius: 2px;
+  background: #fef3c7;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 2px 4px;
+  box-sizing: border-box;
+  color: #92400e;
+  -moz-appearance: textfield;
+}
+
+.time-card-extra-box::placeholder {
+  color: #b45309;
+  opacity: 0.75;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.time-card-extra-box-static {
+  display: inline-grid;
+  place-items: center;
+  background: #fef3c7;
+  border-color: #92400e;
+}
+
+.time-card-extra-box::-webkit-outer-spin-button,
+.time-card-extra-box::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.time-card-extra-help {
+  margin: 0;
+  font-size: 12px;
+}
+
+.time-card-day.has-extra-hours {
+  background: linear-gradient(180deg, #fff 0%, #fffbeb 100%);
+}
+
+.time-card-medic-box {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  left: auto;
+  width: 36px;
+  min-width: 36px;
+  max-width: 50%;
+  height: 28px;
+  border: 1px solid #111827;
+  border-radius: 2px;
+  background: #fff;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 2px 4px;
+  box-sizing: border-box;
+  color: #111827;
+  -moz-appearance: textfield;
+}
+
+.time-card-medic-box-static {
+  display: inline-grid;
+  place-items: center;
+}
+
+.time-card-medic-box-empty {
+  display: inline-grid;
+  place-items: center;
+  background: #fff;
+  border-color: #111827;
+}
+
+.time-card-medic-box::-webkit-outer-spin-button,
+.time-card-medic-box::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.time-card-day-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 56px;
+  padding: 24px 6px 8px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.time-card-day-times {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.time-card-day-hours {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-card-day-time {
+  display: block;
+  width: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: #111827;
+}
+
+.time-card-day.is-work .time-card-day-time {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.time-card-print-only {
+  display: none;
+}
+
+.time-card-day-holiday-label {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #dc2626;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.time-card-day-overtime-label {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #b45309;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.time-card-week-total-line.is-overtime {
+  color: #b45309;
+}
+
+.time-card-day-date {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  right: auto;
+  min-width: 0;
+  width: auto;
+  height: auto;
+  display: block;
+  border: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: #334155;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.time-card-summary-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.time-card-summary-row-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+
+.time-card-summary-cell {
+  display: grid;
+  gap: 4px;
+  align-content: end;
+}
+
+.time-card-summary-cell > span {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.time-card-summary-cell strong,
+.time-card-summary-cell input {
+  border-bottom: 1px solid #111827;
+  min-height: 22px;
+  padding-bottom: 2px;
+  font-size: 15px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-card-summary-cell input {
+  width: 100%;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+}
+
+.time-card-summary-cell.is-wide strong {
+  min-width: 100%;
+}
+
+.time-card-summary-grand {
+  margin-top: 2px;
+}
+
+.time-card-summary-grand > span,
+.time-card-summary-grand > strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.time-card-certify {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #cbd5e1;
+}
+
+.time-card-certify-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 16px 20px;
+}
+
+.time-card-certify-text {
+  margin: 0;
+  align-self: center;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.time-card-certify-row > label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin-left: 14px;
+}
+
+.time-card-certify-row > label span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.time-card-signatures input,
+.time-card-certify-row input,
+.time-card-signature-line {
+  border: 0;
+  border-bottom: 1px solid #111827;
+  background: transparent;
+  min-height: 28px;
+  font-size: 14px;
+}
+
+.time-card-signature-line {
+  padding-bottom: 2px;
+}
+
+.time-card-overtime-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+.admin-time-card-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-time-card-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.admin-time-card-editor-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.admin-time-card-editor-controls label {
+  display: grid;
+  gap: 4px;
+  min-width: 240px;
+}
+
+.admin-time-card-editor-controls label span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-time-card-editor-controls select {
+  min-width: 240px;
+}
+
+/* Bulk print panel */
+
+.time-card-bulk-print-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.time-card-bulk-print-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.time-card-bulk-print-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.time-card-bulk-print-controls label {
+  display: grid;
+  gap: 4px;
+}
+
+.time-card-bulk-print-controls label span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.time-card-bulk-print-stack {
+  display: grid;
+  gap: 24px;
+}
+
+.time-card-bulk-print-page {
+  break-inside: avoid;
+}
+
+/* Full-width layout inside admin / time sheets panels */
+.time-sheets-page .admin-section-body,
+.admin-time-card-editor,
+.time-card-portal-wrap {
+  width: 100%;
+  max-width: 100%;
+}
+
+.time-sheets-page .time-card-sheet,
+.admin-section-body .time-card-sheet {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+html[data-theme="dark"] .time-card-sheet,
+:root:not([data-theme="light"]) .time-card-sheet {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+html[data-theme="dark"] .time-card-day,
+:root:not([data-theme="light"]) .time-card-day {
+  background: #111827;
+  border-color: #475569;
+}
+
+html[data-theme="dark"] .time-card-day.is-holiday,
+:root:not([data-theme="light"]) .time-card-day.is-holiday {
+  background: #111827;
+}
+
+html[data-theme="dark"] .time-card-day.is-holiday .time-card-day-hours,
+html[data-theme="dark"] .time-card-day.is-holiday .time-card-day-holiday-label,
+:root:not([data-theme="light"]) .time-card-day.is-holiday .time-card-day-hours,
+:root:not([data-theme="light"]) .time-card-day.is-holiday .time-card-day-holiday-label {
+  color: #f87171;
+}
+
+html[data-theme="dark"] .time-card-weekdays span,
+:root:not([data-theme="light"]) .time-card-weekdays span {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+html[data-theme="dark"] .time-card-weekday-total,
+:root:not([data-theme="light"]) .time-card-weekday-total {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+html[data-theme="dark"] .time-card-week-total,
+:root:not([data-theme="light"]) .time-card-week-total {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+html[data-theme="dark"] .time-card-week-total-hours,
+:root:not([data-theme="light"]) .time-card-week-total-hours {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .time-card-week-total-label,
+:root:not([data-theme="light"]) .time-card-week-total-label {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .time-card-week-total-line.is-leave .time-card-week-total-hours,
+html[data-theme="dark"] .time-card-week-total-line.is-leave .time-card-week-total-label,
+:root:not([data-theme="light"]) .time-card-week-total-line.is-leave .time-card-week-total-hours,
+:root:not([data-theme="light"]) .time-card-week-total-line.is-leave .time-card-week-total-label {
+  color: #f87171;
+}
+
+html[data-theme="dark"] .time-card-extra-box,
+:root:not([data-theme="light"]) .time-card-extra-box {
+  background: #422006;
+  color: #fde68a;
+  border-color: #92400e;
+}
+
+html[data-theme="dark"] .time-card-medic-box,
+:root:not([data-theme="light"]) .time-card-medic-box {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: #64748b;
+}
+
+html[data-theme="dark"] .time-card-day-date,
+:root:not([data-theme="light"]) .time-card-day-date {
+  color: #cbd5e1;
+}
+
+@media (max-width: 900px) {
+  .time-card-summary-row-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .time-card-weekdays span {
+    font-size: 9px;
+  }
+
+  .time-card-certify-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .time-card-weekdays,
+  .time-card-week-grid {
+    min-width: 560px;
+  }
+
+  .time-card-meta-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .time-card-meta-field strong {
+    min-width: 0;
+    flex: 1;
+  }
+}
+
+@page {
+  size: landscape;
+  margin: 0.25in;
+}
+
+@media print {
+  html,
+  body {
+    width: 100%;
+    height: auto;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  body.is-printing-time-card > *:not(.time-card-print-root) {
+    display: none !important;
+  }
+
+  body.is-printing-time-card > .time-card-print-root {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  body:not(.is-printing-time-card) * {
+    visibility: hidden;
+  }
+
+  body:not(.is-printing-time-card) .time-card-single-print-target,
+  body:not(.is-printing-time-card) .time-card-single-print-target *,
+  body:not(.is-printing-time-card) .time-card-bulk-print-stack,
+  body:not(.is-printing-time-card) .time-card-bulk-print-stack * {
+    visibility: visible;
+  }
+
+  body:not(.is-printing-time-card) .admin-sections:has(.time-card-single-print-target) .time-card-bulk-print-stack {
+    display: none !important;
+  }
+
+  .time-card-bulk-print-toolbar,
+  .admin-time-card-editor-toolbar,
+  .time-card-save-note,
+  .time-card-extra-help,
+  .time-card-overtime-note,
+  .time-card-edit-only,
+  .time-card-nav-btn {
+    display: none !important;
+  }
+
+  .time-card-print-only {
+    display: inline-grid !important;
+  }
+
+  .time-card-signature-line.time-card-print-only,
+  .time-card-signatures .time-card-signature-line,
+  .time-card-certify-row .time-card-signature-line {
+    display: block !important;
+    width: 100% !important;
+    min-height: 0.22in !important;
+    border: 0 !important;
+    border-bottom: 1px solid #111827 !important;
+    background: transparent !important;
+    color: #111827 !important;
+    font-size: 9pt !important;
+    line-height: 1.2 !important;
+    padding-bottom: 2px !important;
+    box-sizing: border-box !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .time-card-signatures input,
+  .time-card-certify-row input {
+    display: none !important;
+  }
+
+  .time-card-bulk-print-stack {
+    display: block;
+    gap: 0;
+  }
+
+  .time-card-print-root.time-card-single-print-target,
+  .time-card-print-root .time-card-single-print-target {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .time-card-print-root .time-card-bulk-print-page,
+  body:not(.is-printing-time-card) .time-card-bulk-print-page {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    background: #fff !important;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .time-card-print-root .time-card-bulk-print-page:last-child,
+  body:not(.is-printing-time-card) .time-card-bulk-print-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .time-card-print-root .time-card-sheet,
+  body:not(.is-printing-time-card) .time-card-single-print-target .time-card-sheet,
+  body:not(.is-printing-time-card) .time-card-bulk-print-page.time-card-sheet {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0.08in 0.1in 0.1in !important;
+    border: 2px solid #111827 !important;
+    border-radius: 0 !important;
+    gap: 0.08in !important;
+    box-sizing: border-box !important;
+    display: grid !important;
+    grid-template-rows: auto auto auto auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #111827 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .time-card-header {
+    gap: 0.05in;
+  }
+
+  .time-card-title {
+    font-size: 15pt;
+  }
+
+  .time-card-logo {
+    width: 0.9in;
+    height: 0.9in;
+  }
+
+  .time-card-meta-row {
+    justify-content: space-between !important;
+    max-width: none !important;
+    width: 100% !important;
+    gap: 0.2in !important;
+  }
+
+  .time-card-meta-field > span,
+  .time-card-meta-field strong {
+    font-size: 9pt;
+  }
+
+  .time-card-meta-field strong {
+    min-width: 0 !important;
+  }
+
+  .time-card-week-scroll,
+  .time-card-calendar {
+    overflow: visible !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .time-card-weekdays,
+  .time-card-week-grid {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(0, 0.72fr) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .time-card-week-row-separated {
+    border-top: 2px solid #111827;
+  }
+
+  .time-card-weekdays span,
+  .time-card-weekday-total {
+    padding: 0.04in 0.02in;
+    font-size: 7pt;
+    background: #f3f4f6 !important;
+    border-color: #111827 !important;
+    border-left: 2px solid #111827 !important;
+  }
+
+  .time-card-weekdays span:nth-child(7),
+  .time-card-week-grid .time-card-day:nth-child(7) {
+    border-right: 2px solid #111827 !important;
+  }
+
+  .time-card-week-total {
+    min-height: 0.95in;
+    padding: 0.05in 0.03in;
+    gap: 0.04in;
+    background: #f8fafc !important;
+    border-color: #111827 !important;
+    border-left: 2px solid #111827 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .time-card-week-total-line {
+    font-size: 8pt;
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .time-card-week-total-line.is-leave {
+    color: #dc2626 !important;
+  }
+
+  .time-card-day {
+    min-height: 0.95in;
+    border-color: #111827 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  .time-card-day.is-holiday {
+    background: #fff !important;
+  }
+
+  .time-card-day.is-holiday .time-card-day-hours,
+  .time-card-day.is-holiday .time-card-day-holiday-label {
+    color: #dc2626 !important;
+  }
+
+  .time-card-day-main {
+    min-height: 0.68in;
+    padding: 0.14in 0.03in 0.16in;
+  }
+
+  .time-card-day-times {
+    gap: 0;
+    margin-bottom: 0.03in;
+  }
+
+  .time-card-day-hours {
+    font-size: 13pt;
+  }
+
+  .time-card-day.is-work .time-card-day-hours {
+    font-size: 15pt;
+  }
+
+  .time-card-day.is-leave:not(.is-sick-leave):not(.is-vacation-leave) .time-card-day-hours {
+    font-size: 8pt;
+  }
+
+  .time-card-day.is-sick-leave .time-card-day-hours,
+  .time-card-day.is-vacation-leave .time-card-day-hours {
+    font-size: 15pt;
+    color: #dc2626 !important;
+  }
+
+  .time-card-day.is-sick-leave .time-card-day-time,
+  .time-card-day.is-vacation-leave .time-card-day-time {
+    font-size: 8pt;
+    color: #dc2626 !important;
+  }
+
+  .time-card-day-time {
+    font-size: 7pt;
+    color: #111827 !important;
+  }
+
+  .time-card-day.is-work .time-card-day-time {
+    font-size: 8pt;
+  }
+
+  .time-card-day-holiday-label {
+    font-size: 5.5pt;
+    line-height: 1.1;
+    color: #dc2626 !important;
+  }
+
+  .time-card-day-overtime-label {
+    font-size: 5.5pt;
+    line-height: 1.1;
+    color: #b45309 !important;
+  }
+
+  .time-card-week-total-line.is-overtime {
+    color: #b45309 !important;
+  }
+
+  .time-card-day-date {
+    font-size: 8pt;
+    top: 3px;
+    left: 3px;
+    right: auto;
+  }
+
+  .time-card-medic-box {
+    top: 3px;
+    right: 3px;
+    left: auto;
+    width: 0.34in;
+    min-width: 0.34in;
+    height: 0.26in;
+    font-size: 8pt;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .time-card-extra-box {
+    left: 2px;
+    bottom: 14px;
+    width: 0.32in;
+    min-width: 0.32in;
+    height: 0.2in;
+    font-size: 7pt;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .time-card-summary-grid {
+    gap: 0.05in;
+    margin-top: 0;
+  }
+
+  .time-card-summary-row-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 0.05in 0.1in;
+  }
+
+  .time-card-summary-cell > span {
+    font-size: 7.5pt;
+    white-space: nowrap;
+  }
+
+  .time-card-summary-cell strong,
+  .time-card-summary-cell input {
+    font-size: 9pt;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .time-card-summary-grand > span,
+  .time-card-summary-grand > strong {
+    font-size: 10pt;
+    text-align: right;
+  }
+
+  .time-card-certify {
+    margin-top: 0.03in;
+    padding-top: 0.05in;
+    border-top: 1px solid #111827 !important;
+  }
+
+  .time-card-certify-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr) !important;
+    align-items: end !important;
+    gap: 0.08in 0.12in !important;
+  }
+
+  .time-card-certify-text {
+    margin: 0 !important;
+    align-self: center !important;
+    text-align: left !important;
+    font-size: 8.5pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .time-card-certify-row > label span {
+    font-size: 8.5pt;
+  }
+
+  .time-card-certify-row > label {
+    margin-left: 0.12in;
+  }
+}

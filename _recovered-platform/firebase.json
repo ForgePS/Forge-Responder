@@ -1,0 +1,25 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": [
+    {
+      "bucket": "rms-dashboard-7562e.firebasestorage.app",
+      "rules": "storage.rules"
+    }
+  ],
+  "hosting": {
+    "site": "rms-dashboard-7562e",
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "documents/**",
+      "downloads/**"
+    ],
+    "rewrites": [
+      { "source": "**", "destination": "/index.html" }
+    ]
+  }
+}

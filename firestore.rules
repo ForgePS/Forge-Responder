@@ -2,10 +2,83 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // App reference datasets: EMS protocols, SOG indexes/details, fire code indexes, hose inventory.
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isBootstrapPlatformOwner() {
+      return isAuthenticated()
+        && request.auth.token.email != null
+        && request.auth.token.email in [
+          "admin@forgepublicsafety.com",
+          "jpowell@hornlake.org"
+        ];
+    }
+
+    function isPlatformCreator() {
+      return isAuthenticated() && (
+        isBootstrapPlatformOwner()
+        || (
+          exists(/databases/$(database)/documents/platformCreators/$(request.auth.uid))
+          && get(/databases/$(database)/documents/platformCreators/$(request.auth.uid)).data.status == "active"
+        )
+      );
+    }
+
+    function isDepartmentMember(departmentId) {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/departments/$(departmentId)/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/departments/$(departmentId)/users/$(request.auth.uid)).data.status == "active";
+    }
+
+    function isDemoDepartment(departmentId) {
+      return departmentId == "forge-demo";
+    }
+
+    function isHornLakeOrgEmail() {
+      return isAuthenticated()
+        && request.auth.token.email != null
+        && request.auth.token.email.lower().matches('.*@hornlake\\.org$');
+    }
+
+    function canAccessDepartment(departmentId) {
+      return isPlatformCreator()
+        || isDepartmentMember(departmentId)
+        || (isAuthenticated() && isDemoDepartment(departmentId))
+        || (departmentId == "horn-lake-fd" && isHornLakeOrgEmail());
+    }
+
+    function subscriptionFieldUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(["subscription"]);
+    }
+
+    match /platformCreators/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    match /platformDepartments/{departmentId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isPlatformCreator()
+        || (isAuthenticated() && isDemoDepartment(departmentId));
+      allow delete: if false;
+    }
+
+    match /platformConfig/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isPlatformCreator();
+    }
+
+    match /rmsGateways/{gatewayId} {
+      allow read: if true;
+      allow create, update: if isPlatformCreator();
+      allow delete: if false;
+    }
+
+    // Shared reference datasets (not department-owned).
     match /appData/{document} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAuthenticated();
     }
 
     match /{collection}/{document} {
@@ -19,7 +92,7 @@ service cloud.firestore {
         "fireCodeDocxSections",
         "hoseInventory"
       ];
-      allow write: if request.auth != null && collection in [
+      allow write: if isAuthenticated() && collection in [
         "emsProtocolsFull",
         "fireSogsFull",
         "fireSogDetails",
@@ -31,30 +104,104 @@ service cloud.firestore {
       ];
     }
 
-    // Pre-fire plan metadata. Keep writes authenticated once department logins are enabled.
+    match /rmsData/{document} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /integrationSettings/{document} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /academyTrainingSyncLog/{document} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    function isPublicAlertList(listKey) {
+      return listKey in [
+        "hlfd-rms-active911-alerts",
+        "hlfd-rms-alert-dashboard-config",
+        "hlfd-rms-alert-business-directory",
+        "hlfd-rms-dd-displays"
+      ];
+    }
+
+    match /departments/{departmentId} {
+      match /public/{document} {
+        allow read: if document == "alert-dashboard";
+        allow write: if canAccessDepartment(departmentId);
+      }
+      match /profile/{document} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canAccessDepartment(departmentId);
+      }
+      match /settings/{document} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if canAccessDepartment(departmentId);
+        allow update: if canAccessDepartment(departmentId)
+          && (isPlatformCreator() || subscriptionFieldUnchanged());
+      }
+      match /lists/{listKey} {
+        allow read: if isPublicAlertList(listKey) || canAccessDepartment(departmentId);
+        allow write: if canAccessDepartment(departmentId);
+      }
+      match /users/{userId} {
+        allow read: if canAccessDepartment(departmentId) || (isAuthenticated() && request.auth.uid == userId);
+        allow create: if isAuthenticated() && (request.auth.uid == userId || isPlatformCreator());
+        allow update: if canAccessDepartment(departmentId) || (isAuthenticated() && request.auth.uid == userId);
+        allow delete: if canAccessDepartment(departmentId);
+      }
+      match /roles/{roleId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canAccessDepartment(departmentId);
+      }
+      match /dropdowns/{dropdownId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canAccessDepartment(departmentId);
+      }
+      match /auditLogs/{logId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if canAccessDepartment(departmentId);
+        allow update, delete: if false;
+      }
+      match /integrations/{integrationId} {
+        allow read, write: if false;
+      }
+      match /notifications/{notificationId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if canAccessDepartment(departmentId);
+        allow update: if canAccessDepartment(departmentId);
+        allow delete: if false;
+      }
+      match /{collection}/{document} {
+        allow read, write: if canAccessDepartment(departmentId);
+      }
+    }
+
     match /preFirePlans/{document} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAuthenticated();
     }
 
     match /hydrants/{document} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /hydrantInspections/{document} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /hydrantFlowTests/{document} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /dailyActivity/{document} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /hoseTests/{document} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
   }
 }

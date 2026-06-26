@@ -1,0 +1,285 @@
+/* Modern polish — uses theme tokens from tokens.css */
+
+.app-shell {
+  grid-template-rows: 108px minmax(0, 1fr) 52px;
+  background: var(--rms-shell-glow-a), var(--rms-shell-glow-b), var(--rms-shell-gradient);
+}
+
+.app-shell.demo-mode-shell {
+  grid-template-rows: auto 108px minmax(0, 1fr) 52px;
+}
+
+.hydrants-view {
+  grid-template-rows: 108px minmax(0, 1fr);
+}
+
+.workspace {
+  padding: 14px 18px 18px;
+}
+
+.top-bar {
+  padding: 8px 20px 10px;
+  border-bottom: 1px solid var(--rms-border);
+  background: var(--rms-bg-topbar);
+  backdrop-filter: var(--rms-blur);
+  -webkit-backdrop-filter: var(--rms-blur);
+  box-shadow: var(--rms-shadow-sm);
+}
+
+.top-bar-tagline {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  background: var(--rms-tagline-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.top-brand img {
+  height: 60px;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.12));
+}
+
+html[data-theme="dark"] .top-brand img {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.25));
+}
+
+.global-search {
+  min-height: 36px;
+  border-radius: var(--rms-radius-sm);
+  transition: border-color var(--rms-transition), box-shadow var(--rms-transition);
+}
+
+.global-search:focus-within {
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+
+.command-time {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--rms-border);
+  background: var(--rms-bg-input);
+  font-size: 13px;
+  gap: 16px;
+}
+
+.icon-button {
+  border-radius: var(--rms-radius-sm);
+  transition: background var(--rms-transition), color var(--rms-transition);
+}
+
+.icon-button:hover {
+  background: var(--rms-bg-hover);
+  color: var(--rms-text-strong);
+}
+
+.profile-button {
+  border-radius: var(--rms-radius-sm);
+  border: 1px solid transparent;
+  transition: background var(--rms-transition), border-color var(--rms-transition);
+}
+
+.profile-button:hover {
+  background: var(--rms-bg-hover);
+  border-color: var(--rms-border);
+}
+
+.profile-button > span {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: var(--rms-text-inverse);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.side-nav {
+  border-right: 1px solid var(--rms-border);
+  background: var(--rms-bg-nav);
+  backdrop-filter: var(--rms-blur);
+  -webkit-backdrop-filter: var(--rms-blur);
+}
+
+.nav-label {
+  padding: 10px 10px 4px;
+  color: var(--rms-text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nav-item {
+  position: relative;
+  min-height: 34px;
+  padding: 0 10px 0 12px;
+  border-radius: var(--rms-radius-sm);
+  font-weight: 500;
+  transition: background var(--rms-transition), color var(--rms-transition);
+}
+
+.nav-item:hover {
+  background: var(--rms-bg-hover);
+  color: var(--rms-text-strong);
+}
+
+html[data-theme="dark"] .nav-item.active,
+html[data-theme="light"] .nav-item.active {
+  background: var(--rms-nav-active-bg);
+  color: var(--rms-text-strong);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--rms-nav-active-border);
+}
+
+html[data-theme="light"] .nav-item.active {
+  color: var(--rms-primary-solid);
+}
+
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, #60a5fa, #2563eb);
+}
+
+.nav-item.active svg {
+  color: var(--rms-accent);
+}
+
+html[data-theme="dark"] .nav-item.active svg {
+  color: var(--rms-text-inverse);
+}
+
+.panel {
+  border-radius: var(--rms-radius-md);
+  border-color: var(--rms-border);
+  background: var(--rms-bg-panel);
+  box-shadow: var(--rms-shadow-sm);
+}
+
+.panel > header {
+  min-height: 40px;
+  padding: 0 14px;
+  border-bottom-color: var(--rms-border);
+  background: var(--rms-bg-panel-header);
+}
+
+.kpi-card {
+  min-height: 92px;
+  padding: 12px 14px;
+  border-radius: var(--rms-radius-md);
+  box-shadow: var(--rms-shadow-sm);
+  transition: transform var(--rms-transition), border-color var(--rms-transition), box-shadow var(--rms-transition);
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(96, 165, 250, 0.35);
+  box-shadow: var(--rms-shadow-md);
+}
+
+.module-heading h1 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.module-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--rms-radius-sm);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.primary-button, .secondary-button, .filter-button {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: var(--rms-radius-sm);
+  font-weight: 600;
+  transition: background var(--rms-transition), border-color var(--rms-transition), box-shadow var(--rms-transition), transform 0.12s ease;
+}
+
+.primary-button {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.primary-button:hover {
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+}
+
+.segmented-control {
+  gap: 0;
+  padding: 3px;
+  border-radius: var(--rms-radius-sm);
+  border: 1px solid var(--rms-border);
+  background: var(--rms-bg-input);
+}
+
+.segmented-control button {
+  min-height: 30px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.segmented-control button.active {
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+
+.segmented-control button:hover:not(.active) {
+  background: var(--rms-bg-hover);
+  color: var(--rms-text-strong);
+}
+
+.auth-card {
+  padding: 28px;
+  border-radius: var(--rms-radius-lg);
+  border-color: var(--rms-border);
+  background: var(--rms-bg-auth);
+  backdrop-filter: var(--rms-blur);
+  box-shadow: var(--rms-shadow-lg);
+}
+
+.admin-tab-bar {
+  padding: 3px;
+  border-radius: var(--rms-radius-sm);
+  border: 1px solid var(--rms-border);
+  background: var(--rms-bg-input);
+  gap: 2px;
+}
+
+.admin-tab-bar button.active {
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
+:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.65);
+  outline-offset: 2px;
+}
+
+@media (max-width: 980px) {
+  .command-time {
+    display: none;
+  }
+
+  .app-shell,
+  .app-shell.demo-mode-shell {
+    grid-template-rows: auto minmax(0, 1fr) 52px;
+  }
+}
+
+@media (max-width: 700px) {
+  .workspace {
+    padding: 10px;
+  }
+
+  .kpi-card:hover {
+    transform: none;
+  }
+}

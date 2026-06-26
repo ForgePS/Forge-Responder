@@ -1,0 +1,2 @@
+hydrant_id,official_hydrant_id,location_id,district,address,location,latitude,longitude,status,hydrant_type,flow_gpm,flow_result,provider,city,water_assoc,notes
+"FD-1001","FD-1001","1001","1","100 Main Street","100 Main Street","35.123456","-89.987654","In Service","AVK","B","B","City Water Department","Sample City","City Water Department","Sample hydrant record"
