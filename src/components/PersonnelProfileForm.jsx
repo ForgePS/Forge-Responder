@@ -114,6 +114,13 @@ function PersonalDetailsSection({
           <ProfileField flow label="API ID" value={draft.apiId || ""} editing={canEdit} onChange={(value) => updateDraftField("apiId", value)} />
           <ProfileField flow label="Firefighter ID" value={draft.firefighterId || ""} editing={canEdit} onChange={(value) => updateDraftField("firefighterId", value)} />
           <ProfileField flow label="FEMA ID" value={draft.femaId || ""} editing={canEdit} onChange={(value) => updateDraftField("femaId", value)} />
+          <ProfileField
+            flow
+            label="Forge person ID"
+            value={draft.forgePersonId || "—"}
+            editing={false}
+            onChange={() => {}}
+          />
         </FormRow>
 
         <h3 className="personnel-form-section-title">Assignment</h3>

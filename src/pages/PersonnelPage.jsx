@@ -8,6 +8,11 @@ import { resolvePersonnelIdPrefix } from "../data/tenants/index.js";
 import { applyPersonnelBulkEdit } from "../lib/personnelBulkEdit.js";
 import { writeAuditLog } from "../lib/auditService.js";
 import { uploadFirebaseFile } from "../lib/firebaseClient.js";
+import {
+  IdentityReviewRequiredError,
+  resolveForgePersonIdForPersonnel,
+  attachForgePersonIds,
+} from "../lib/forgeHubIdentity.js";
 import PersonnelDetailView from "../components/personnel/PersonnelDetailView.jsx";
 import PersonnelImportModal from "../components/personnel/PersonnelImportModal.jsx";
 import PersonnelListView from "../components/personnel/PersonnelListView.jsx";
@@ -84,12 +89,21 @@ export default function PersonnelPage({
     if (selected) setDraft(normalizePersonnelRecord(selected));
   }
 
-  function saveProfile() {
+  async function saveProfile() {
     if (!draft?.id || !setRecords) return;
 
     try {
+      let forgePersonId = String(selected?.forgePersonId || draft.forgePersonId || "").trim();
+
+      // Never invent a local personId. Resolve via Hub when configured and missing.
+      if (!forgePersonId && departmentId) {
+        const resolved = await resolveForgePersonIdForPersonnel(departmentId, draft);
+        forgePersonId = resolved.forgePersonId || "";
+      }
+
       const updatedPerson = normalizePersonnelRecord({
         ...draft,
+        forgePersonId,
         activityLog: selected?.activityLog || [],
         updated_at: new Date().toISOString(),
       });
@@ -98,19 +112,36 @@ export default function PersonnelPage({
         const exists = current.some((person) => person.id === updatedPerson.id);
         if (exists) {
           return current.map((person) => (
-            person.id === updatedPerson.id ? updatedPerson : person
+            person.id === updatedPerson.id
+              ? {
+                  ...updatedPerson,
+                  // Preserve Hub personId if a concurrent write already set it
+                  forgePersonId: person.forgePersonId || updatedPerson.forgePersonId,
+                }
+              : person
           ));
         }
         return [updatedPerson, ...current];
       });
 
+      setDraft(updatedPerson);
       setSelectedId(updatedPerson.id);
       setEditing(false);
       setIsNewRecord(false);
-      setSavedMessage("Profile saved");
+      setSavedMessage(
+        forgePersonId
+          ? "Profile saved (Forge person ID linked)"
+          : "Profile saved"
+      );
     } catch (error) {
       console.error("Failed to save personnel profile", error);
-      setSavedMessage("Save failed — please try again");
+      if (error instanceof IdentityReviewRequiredError) {
+        setSavedMessage(
+          `Identity review required before save. Review: ${error.review?.id || "pending"} (${error.review?.reason || "duplicate"}).`
+        );
+        return;
+      }
+      setSavedMessage(error instanceof Error ? error.message : "Save failed — please try again");
     }
   }
 
@@ -239,14 +270,29 @@ export default function PersonnelPage({
 
   async function handlePersonnelImport(outcome = {}) {
     if (!setRecords || !outcome.records) return;
-    setRecords(outcome.records);
-    setSavedMessage(`Imported ${outcome.created} new and updated ${outcome.updated} personnel record(s).`);
-    if (departmentId) {
-      await writeAuditLog(departmentId, {
-        action: "import",
-        module: "Personnel",
-        summary: `Imported personnel spreadsheet (${outcome.created} created, ${outcome.updated} updated)`,
-      });
+    try {
+      let records = outcome.records;
+      if (departmentId) {
+        records = await attachForgePersonIds(departmentId, records);
+      }
+      setRecords(records);
+      setSavedMessage(`Imported ${outcome.created} new and updated ${outcome.updated} personnel record(s).`);
+      if (departmentId) {
+        await writeAuditLog(departmentId, {
+          action: "import",
+          module: "Personnel",
+          summary: `Imported personnel spreadsheet (${outcome.created} created, ${outcome.updated} updated)`,
+        });
+      }
+    } catch (error) {
+      console.error("Personnel import identity resolve failed", error);
+      if (error instanceof IdentityReviewRequiredError) {
+        setSavedMessage(
+          `Import blocked: Forge identity review required (${error.review?.id || "pending"}).`
+        );
+        return;
+      }
+      setSavedMessage(error instanceof Error ? error.message : "Import failed during identity resolve.");
     }
   }
 

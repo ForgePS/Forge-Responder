@@ -45,6 +45,8 @@ export const PERSONNEL_FIELD_DEFAULTS = {
   apiId: "",
   firefighterId: "",
   femaId: "",
+  /** Permanent Forge-wide person id from Integration Hub — never Auth UID, never manually edited. */
+  forgePersonId: "",
   payrollId: "",
   ems: "",
   driversLicenseNumber: "",
@@ -182,6 +184,8 @@ export function normalizePersonnelRecord(person = {}) {
   if (!String(next.agencyPersonnelId || "").trim() && next.id) {
     next.agencyPersonnelId = next.id;
   }
+
+  next.forgePersonId = String(next.forgePersonId || "").trim();
 
   const emergency = normalizeAllEmergencyContactFields(next);
   const merged = {

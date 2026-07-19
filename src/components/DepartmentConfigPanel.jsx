@@ -52,6 +52,7 @@ function parseCommaList(value) {
 const DEPARTMENT_CONFIG_SECTIONS = [
   { id: "branding", label: "Branding & Profile" },
   { id: "stations", label: "Stations" },
+  { id: "academy", label: "Forge Academy" },
   { id: "shift-rotation", label: "Shift Rotation" },
   { id: "portal-rules", label: "Employee Portal" },
   { id: "pay-rules", label: "Pay & Overtime" },
@@ -61,6 +62,14 @@ const DEPARTMENT_CONFIG_SECTIONS = [
   { id: "summary", label: "Summary" },
   { id: "subscription", label: "Subscription" },
 ];
+
+const emptyForgeAcademy = {
+  hubEnabled: true,
+  hubBaseUrl: "https://forge-integration-hub-peorxtprba-uc.a.run.app",
+  hubBearerToken: "",
+  hubSecret: "",
+  forgeDepartmentId: "forge-platform",
+};
 
 export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
   const { departmentId, profile, settings, platformConfig, refreshDepartment } = useTenant();
@@ -75,6 +84,7 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
   const [payRules, setPayRules] = useState(normalizePayRules());
   const [schedulingSettings, setSchedulingSettings] = useState(normalizeSchedulingSettings());
   const [stationDetails, setStationDetails] = useState([]);
+  const [forgeAcademy, setForgeAcademy] = useState(emptyForgeAcademy);
   const fleetUnits = useMemo(
     () => (Array.isArray(apparatus) ? apparatus : []).map((unit) => unit?.unit).filter(Boolean),
     [apparatus]
@@ -105,6 +115,10 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
     setPortalRules(normalizeEmployeePortalRules(settings.employeePortalRules));
     setPayRules(normalizePayRules(settings.payRules));
     setSchedulingSettings(normalizeSchedulingSettings(settings.schedulingSettings, fleetUnits));
+    setForgeAcademy({
+      ...emptyForgeAcademy,
+      ...(settings.forgeAcademy || {}),
+    });
   }, [profile, settings, departmentId, fleetUnits]);
 
   const moduleOptions = ADMIN_MODULE_OPTIONS.filter((module) => {
@@ -177,6 +191,13 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
         schedulingSettings: canManageModules
           ? normalizeSchedulingSettings(schedulingSettings, fleetUnits)
           : normalizeSchedulingSettings(settings.schedulingSettings, fleetUnits),
+        forgeAcademy: {
+          hubEnabled: forgeAcademy.hubEnabled !== false,
+          hubBaseUrl: String(forgeAcademy.hubBaseUrl || "").trim().replace(/\/$/, ""),
+          hubBearerToken: String(forgeAcademy.hubBearerToken || "").trim(),
+          hubSecret: String(forgeAcademy.hubSecret || "").trim(),
+          forgeDepartmentId: String(forgeAcademy.forgeDepartmentId || "").trim(),
+        },
         updatedAt: new Date().toISOString()
       };
 
@@ -249,6 +270,57 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
             value={stationDetails}
             onChange={setStationDetails}
           />
+        ) : null}
+
+        {activeSection === "academy" ? (
+          <div className="workflow-form">
+            <p className="hint-text" style={{ gridColumn: "1 / -1" }}>
+              Forge Person Identity is owned by the Integration Hub. Configure Hub access here so
+              personnel saves resolve a permanent <code>forgePersonId</code> (never Auth UID).
+            </p>
+            <label className="wide-field" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <input
+                type="checkbox"
+                checked={forgeAcademy.hubEnabled !== false}
+                onChange={(e) => setForgeAcademy({ ...forgeAcademy, hubEnabled: e.target.checked })}
+              />
+              <span>Route person identity through Integration Hub</span>
+            </label>
+            <label className="wide-field">
+              <span>Hub base URL</span>
+              <input
+                value={forgeAcademy.hubBaseUrl}
+                onChange={(e) => setForgeAcademy({ ...forgeAcademy, hubBaseUrl: e.target.value })}
+                placeholder="https://forge-integration-hub-….run.app"
+              />
+            </label>
+            <label>
+              <span>Forge department ID</span>
+              <input
+                value={forgeAcademy.forgeDepartmentId}
+                onChange={(e) => setForgeAcademy({ ...forgeAcademy, forgeDepartmentId: e.target.value })}
+                placeholder="forge-platform"
+              />
+            </label>
+            <label>
+              <span>Hub Bearer token</span>
+              <input
+                type="password"
+                value={forgeAcademy.hubBearerToken}
+                onChange={(e) => setForgeAcademy({ ...forgeAcademy, hubBearerToken: e.target.value })}
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              <span>Hub shared secret</span>
+              <input
+                type="password"
+                value={forgeAcademy.hubSecret}
+                onChange={(e) => setForgeAcademy({ ...forgeAcademy, hubSecret: e.target.value })}
+                autoComplete="off"
+              />
+            </label>
+          </div>
         ) : null}
 
         {activeSection === "shift-rotation" ? (

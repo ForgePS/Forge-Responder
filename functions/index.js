@@ -599,3 +599,23 @@ exports.syncJotformDamageSubmissions = onCall(
     }
   }
 );
+
+const { resolvePersonIdentityViaHub } = require("./lib/forgeHubIdentity");
+
+/**
+ * Resolve or create permanent forgePersonId via Forge Integration Hub.
+ * RMS must call this before creating people when Hub is configured.
+ */
+exports.resolveForgePersonIdentity = onCall(async (request) => {
+  const departmentId = String(request.data?.departmentId || "").trim();
+  await assertDepartmentAccess(request, departmentId);
+
+  try {
+    return await resolvePersonIdentityViaHub(admin.firestore(), departmentId, request.data?.person || {});
+  } catch (error) {
+    throw new HttpsError(
+      "internal",
+      error instanceof Error ? error.message : "Identity resolve failed."
+    );
+  }
+});
