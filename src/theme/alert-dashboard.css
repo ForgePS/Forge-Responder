@@ -368,6 +368,7 @@
 
 .alert-dashboard-notice {
   background: rgba(30, 64, 175, 0.92);
+  color: #e5e7eb;
 }
 
 .alert-dashboard-error {

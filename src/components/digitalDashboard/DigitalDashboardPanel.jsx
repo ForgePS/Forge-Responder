@@ -3,6 +3,7 @@ import {
   CalendarClock,
   CirclePlus,
   CloudUpload,
+  ExternalLink,
   Film,
   LayoutGrid,
   LayoutTemplate,
@@ -16,10 +17,14 @@ import {
   Wifi,
   X,
 } from "lucide-react";
+import { useTenant } from "../../context/TenantContext.jsx";
+import { buildAlertDashboardUrl } from "../../lib/alertDashboard.js";
 import IntegrationsPanel from "./IntegrationsPanel.jsx";
 import AlertDashboardSettingsPanel from "./AlertDashboardSettingsPanel.jsx";
 import AddMediaModal from "./AddMediaModal.jsx";
 import DigitalDashboardLibraryBar from "./DigitalDashboardLibraryBar.jsx";
+import DisplayAlertUrlField from "./DisplayAlertUrlField.jsx";
+import MvixProvisioningGuide from "./MvixProvisioningGuide.jsx";
 import {
   buildMediaLookup,
   buildPlaylistLookup,
@@ -30,6 +35,8 @@ import {
   defaultMediaForm,
   defaultPlaylistForm,
   defaultScheduleForm,
+  DISPLAY_PLAYER_MODES,
+  displayPlayerModeLabel,
   displayStatusTone,
   filterLibraryRecords,
   formatDisplayStatus,
@@ -162,6 +169,8 @@ export default function DigitalDashboardPanel({
   canEdit = false,
   canManage = false,
 }) {
+  const { gatewayDepartmentId } = useTenant();
+  const gatewaySlug = gatewayDepartmentId || departmentId || "";
   const [view, setView] = useState("overview");
   const [previewDisplay, setPreviewDisplay] = useState(null);
   const [modal, setModal] = useState(null);
@@ -470,6 +479,9 @@ export default function DigitalDashboardPanel({
             onAdd={() => setModal({ type: "display", form: defaultDisplayForm() })}
             canEdit={canEdit}
           />
+          <div className="dd-panel-body dd-mvix-guide-wrap">
+            <MvixProvisioningGuide gatewaySlug={gatewaySlug} displays={displays} />
+          </div>
           <div className="dd-panel-body">
           {filteredDisplays.length ? (
             <div className="dd-table-wrap">
@@ -479,8 +491,10 @@ export default function DigitalDashboardPanel({
                     <th aria-label="Type" className="dd-col-icon" />
                     <th>Name</th>
                     <th>Station</th>
+                    <th>Mode</th>
                     <th>Status</th>
                     <th>Playlist</th>
+                    <th>Alert URL</th>
                     <th>Last sync</th>
                     <th aria-label="Actions" />
                   </tr>
@@ -498,8 +512,22 @@ export default function DigitalDashboardPanel({
                           <span className="dd-table-sub">{display.location}</span>
                         </td>
                         <td>{display.station || "—"}</td>
+                        <td>{displayPlayerModeLabel(display.playerMode || "alert")}</td>
                         <td><StatusPill status={display.status} /></td>
                         <td>{playlist?.name || "—"}</td>
+                        <td>
+                          {gatewaySlug && display.id ? (
+                            <a
+                              href={buildAlertDashboardUrl(gatewaySlug, display.id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="dd-table-link"
+                            >
+                              <ExternalLink size={14} />
+                              Open
+                            </a>
+                          ) : "—"}
+                        </td>
                         <td>{formatLastSync(display.lastSyncAt)}</td>
                         <td className="dd-row-actions">
                           <button type="button" className="dd-icon-button" onClick={() => setPreviewDisplay(display)} aria-label="Preview">
@@ -875,11 +903,24 @@ export default function DigitalDashboardPanel({
             </div>
             <div className="dd-form-row">
               <label>
+                Player mode
+                <select
+                  value={modal.form.playerMode || "alert"}
+                  onChange={(event) => setModal({ ...modal, form: { ...modal.form, playerMode: event.target.value } })}
+                >
+                  {DISPLAY_PLAYER_MODES.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
                 Status
                 <select value={modal.form.status} onChange={(event) => setModal({ ...modal, form: { ...modal.form, status: event.target.value } })}>
                   {DISPLAY_STATUSES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                 </select>
               </label>
+            </div>
+            {(modal.form.playerMode || "alert") === "signage" ? (
               <label>
                 Playlist
                 <select value={modal.form.playlistId} onChange={(event) => setModal({ ...modal, form: { ...modal.form, playlistId: event.target.value } })}>
@@ -887,7 +928,12 @@ export default function DigitalDashboardPanel({
                   {playlists.map((playlist) => <option key={playlist.id} value={playlist.id}>{playlist.name}</option>)}
                 </select>
               </label>
-            </div>
+            ) : (
+              <DisplayAlertUrlField
+                url={modal.form.id && gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, modal.form.id) : ""}
+                label="MVIX / signage stick home URL"
+              />
+            )}
             <label>Notes<textarea rows={3} value={modal.form.notes} onChange={(event) => setModal({ ...modal, form: { ...modal.form, notes: event.target.value } })} /></label>
             <footer className="dd-modal-actions">
               <button type="button" className="dd-action-button" onClick={closeModal}>Cancel</button>

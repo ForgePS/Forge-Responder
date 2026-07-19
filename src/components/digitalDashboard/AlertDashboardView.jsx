@@ -104,7 +104,10 @@ export default function AlertDashboardView({
       try {
         if (publicMode) {
           if (!mapsApiKey) {
-            throw new Error("Google Maps is not configured for this display.");
+            if (!cancelled) {
+              setNotice("Maps not configured — save Google APIs in admin to enable Street View and route maps.");
+            }
+            return;
           }
           await loadGoogleMapsScript(mapsApiKey, "places,geometry");
         } else {
@@ -112,7 +115,7 @@ export default function AlertDashboardView({
         }
         if (!cancelled) setMapsReady(true);
       } catch (err) {
-        if (!cancelled) setError(err.message || "Google Maps is not configured.");
+        if (!cancelled) setNotice(err.message || "Google Maps unavailable for this display.");
       }
     }
     bootstrap();

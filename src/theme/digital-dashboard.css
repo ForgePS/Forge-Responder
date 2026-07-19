@@ -2828,6 +2828,113 @@ html[data-theme="dark"] .digital-dashboard-page .dd-modal > header {
   font: inherit;
 }
 
+.dd-mvix-guide {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--rms-border-subtle);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.dd-mvix-guide h4 {
+  margin: 0;
+}
+
+.dd-mvix-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 6px;
+  font-size: 0.88rem;
+  color: var(--rms-text-muted, #64748b);
+}
+
+.dd-mvix-device-urls ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.dd-mvix-device-urls li {
+  display: grid;
+  gap: 6px;
+}
+
+.dd-display-url-field {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--rms-border-subtle);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.dd-display-url-field.is-compact {
+  padding: 8px 10px;
+}
+
+.dd-display-url-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--rms-text-muted, #64748b);
+}
+
+.dd-display-url-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rms-border-subtle);
+  border-radius: 6px;
+  font: 0.82rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.dd-display-url-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dd-display-url-actions .dd-action-button {
+  width: auto;
+  text-decoration: none;
+}
+
+.dd-display-url-qr {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--rms-text-muted, #64748b);
+}
+
+.dd-display-url-qr span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dd-display-url-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--rms-text-muted, #64748b);
+}
+
+.dd-table-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--rms-accent, #2563eb);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
 .workspace-alert-dashboard {
   padding: 0;
   overflow: hidden;

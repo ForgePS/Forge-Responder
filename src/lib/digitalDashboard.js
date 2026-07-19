@@ -19,6 +19,15 @@ export const TRANSITION_TYPES = [
   { value: "cut", label: "Cut" },
 ];
 
+export const DISPLAY_PLAYER_MODES = [
+  { value: "alert", label: "Alert Dashboard (Active911 takeover)" },
+  { value: "signage", label: "Playlist signage" },
+];
+
+export function displayPlayerModeLabel(mode = "") {
+  return DISPLAY_PLAYER_MODES.find((item) => item.value === mode)?.label || "Alert Dashboard";
+}
+
 export const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function createDigitalDashboardId(prefix = "DD") {
@@ -103,6 +112,7 @@ export function defaultDisplayForm(overrides = {}) {
     resolution: "1920×1080",
     orientation: "landscape",
     status: "offline",
+    playerMode: "alert",
     playlistId: "",
     notes: "",
     lastSyncAt: "",

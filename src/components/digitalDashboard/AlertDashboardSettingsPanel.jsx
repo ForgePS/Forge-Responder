@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, FlaskConical, Save, Upload } from "lucide-react";
+import { FlaskConical, Save, Upload } from "lucide-react";
 import { useTenant } from "../../context/TenantContext.jsx";
 import {
   buildAlertDashboardUrl,
@@ -11,6 +11,8 @@ import {
   BUSINESS_DIRECTORY_CSV_TEMPLATE,
   parseBusinessDirectoryCsv,
 } from "../../lib/alertBusinessDirectory.js";
+import DisplayAlertUrlField from "./DisplayAlertUrlField.jsx";
+import MvixProvisioningGuide from "./MvixProvisioningGuide.jsx";
 
 export default function AlertDashboardSettingsPanel({
   departmentId = "",
@@ -135,36 +137,31 @@ export default function AlertDashboardSettingsPanel({
           </div>
         ) : null}
 
+        <MvixProvisioningGuide gatewaySlug={gatewaySlug} displays={displays} />
+
         <div className="dd-alert-display-links">
           <h4>Display URLs</h4>
           <p className="dd-empty-detail">
-            Open these on station wall PCs while signed in. Each display link routes from that station&apos;s address.
+            Public URLs — no login required. Set each URL as the MVIX / signage stick home page for that screen.
           </p>
           {!gatewaySlug ? (
             <p className="dd-upload-error">Department gateway not resolved — open FORGE from your department portal first.</p>
           ) : null}
           <ul>
             <li>
-              <a href={buildAlertDashboardUrl(gatewaySlug)} target="_blank" rel="noreferrer">
-                <ExternalLink size={14} />
-                {buildAlertDashboardUrl(gatewaySlug)}
-              </a>
-            </li>
-            <li>
-              <a href={buildAlertDashboardUrl("", "")} target="_blank" rel="noreferrer">
-                <ExternalLink size={14} />
-                {buildAlertDashboardUrl("")}
-                <span className="dd-table-sub"> (any department when already signed in)</span>
-              </a>
+              <DisplayAlertUrlField
+                url={gatewaySlug ? buildAlertDashboardUrl(gatewaySlug) : ""}
+                label="Department default"
+                compact
+              />
             </li>
             {displays.map((display) => (
               <li key={display.id}>
-                <a href={buildAlertDashboardUrl(gatewaySlug, display.id)} target="_blank" rel="noreferrer">
-                  <ExternalLink size={14} />
-                  {display.name || display.id}
-                  {" · "}
-                  {buildAlertDashboardUrl(gatewaySlug, display.id)}
-                </a>
+                <DisplayAlertUrlField
+                  url={gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, display.id) : ""}
+                  label={`${display.name || display.id}${display.station ? ` · ${display.station}` : ""}`}
+                  compact
+                />
               </li>
             ))}
           </ul>
