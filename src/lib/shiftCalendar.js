@@ -77,7 +77,7 @@ export function buildScheduleDayRecord(dayId = "", scheduleDays = [], rotation =
   const resolved = resolveShiftRotation(rotation);
   const shift = shiftForDate(date, resolved);
   const defaults = defaultCoverage(shift, resolved);
-  const saved = (Array.isArray(scheduleDays) ? scheduleDays : []).find((day) => day.id === dayId);
+  const saved = (Array.isArray(scheduleDays) ? scheduleDays : []).find((day) => day?.id === dayId);
 
   if (saved) {
     return {
@@ -192,7 +192,9 @@ function defaultCoverage(shift, rotation) {
 export function buildMonthCalendar(year, month, existingDays = [], rotation = defaultShiftRotation) {
   const resolvedRotation = resolveShiftRotation(rotation);
   const existingById = Object.fromEntries(
-    (Array.isArray(existingDays) ? existingDays : []).map((day) => [day.id, day])
+    (Array.isArray(existingDays) ? existingDays : [])
+      .filter((day) => day && day.id)
+      .map((day) => [day.id, day])
   );
   const firstOfMonth = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();

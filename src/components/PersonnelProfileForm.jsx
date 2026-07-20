@@ -1,4 +1,5 @@
 import { FileText } from "lucide-react";
+import { useState } from "react";
 import { getPersonDisplayName } from "../lib/personnelSchema.js";
 import {
   EmergencyContactSection,
@@ -15,6 +16,25 @@ import { resolvePersonEmsLevel } from "../lib/personnelEmsCredentials.js";
 import PersonnelAccrualsEditor from "./personnel/PersonnelAccrualsEditor.jsx";
 import PersonnelActivityLogView from "./personnel/PersonnelActivityLogView.jsx";
 import PersonnelSectionActions from "./personnel/PersonnelSectionActions.jsx";
+import PersonnelAcademyPanel from "./personnel/PersonnelAcademyPanel.jsx";
+import ObjectUploadField from "./ObjectUploadField.jsx";
+import ObjectLifecycleActions from "./ObjectLifecycleActions.jsx";
+import { deleteFirebaseFile } from "../lib/firebaseClient.js";
+import {
+  buildPersonnelDocumentPath,
+  documentDisplayName,
+  documentDownloadUrl,
+} from "../lib/storagePaths.js";
+import {
+  archiveObject,
+  isObjectArchived,
+  isObjectDeleted,
+  isObjectVisibleInActiveList,
+  isObjectVisibleInArchivedList,
+  restoreObject,
+  softDeleteObject,
+  withActiveLifecycle,
+} from "../lib/objectLifecycle.js";
 
 function FormRow({ columns, children }) {
   return (
@@ -225,8 +245,42 @@ export default function PersonnelProfileForm({
   onSave,
   onCancel,
   isNewRecord = false,
+  departmentId = "",
 }) {
   const canEdit = editing && canEditProfile;
+  const [uploadError, setUploadError] = useState("");
+  const [attachmentView, setAttachmentView] = useState("active");
+  const [attachmentBusyId, setAttachmentBusyId] = useState("");
+
+  function asAttachmentRecord(document, index) {
+    if (document && typeof document === "object") return document;
+    return {
+      id: `LEGACY-${index}`,
+      name: String(document || "Document"),
+      lifecycleStatus: "active",
+    };
+  }
+
+  async function runAttachmentLifecycle(index, action) {
+    const docs = [...(draft.documents || [])];
+    const raw = docs[index];
+    const record = asAttachmentRecord(raw, index);
+    setAttachmentBusyId(record.id || String(index));
+    try {
+      let next;
+      if (action === "archive") next = archiveObject(record);
+      else if (action === "restore") next = restoreObject(record);
+      else {
+        if (record.storagePath) await deleteFirebaseFile(record.storagePath);
+        next = softDeleteObject(record);
+      }
+      docs[index] = next;
+      updateDraftField("documents", docs);
+      if (action === "restore") setAttachmentView("active");
+    } finally {
+      setAttachmentBusyId("");
+    }
+  }
 
   switch (activeSection) {
     case "personalDetails":
@@ -302,6 +356,13 @@ export default function PersonnelProfileForm({
           <TrainingEventsSection person={selected} training={training} />
         </div>
       );
+    case "academy":
+      return (
+        <div className="personnel-form-card">
+          <header className="personnel-form-card-header"><strong>Academy</strong></header>
+          <PersonnelAcademyPanel person={selected || draft} />
+        </div>
+      );
     case "accruals":
       return (
         <div className="personnel-form-card">
@@ -359,33 +420,93 @@ export default function PersonnelProfileForm({
           <PersonnelSectionActions canEdit={canEdit} onSave={onSave} onCancel={onCancel} />
         </div>
       );
-    case "attachments":
+    case "attachments": {
+      const normalizedDocs = (draft.documents || []).map((document, index) => asAttachmentRecord(document, index));
+      const visibleDocs = normalizedDocs
+        .map((document, index) => ({ document, index }))
+        .filter(({ document }) => !isObjectDeleted(document))
+        .filter(({ document }) => (
+          attachmentView === "archived"
+            ? isObjectVisibleInArchivedList(document)
+            : isObjectVisibleInActiveList(document)
+        ));
+      const archivedCount = normalizedDocs.filter((document) => isObjectArchived(document)).length;
+
       return (
         <div className="personnel-form-card">
           <header className="personnel-form-card-header"><strong>Attachments</strong></header>
           <div className="personnel-section-card">
-            {canEdit ? (
-              <PersonnelInlineTableEditor
-                columns={["Document"]}
-                value={(draft.documents || []).map((document) => [document])}
-                editing
-                emptyMessage="No attachments uploaded."
-                onChange={(rows) => updateDraftField(
-                  "documents",
-                  rows.map(([document]) => document).filter(Boolean)
-                )}
-              />
-            ) : (
-              <div className="document-list">
-                {(selected.documents || []).length ? (selected.documents || []).map((document) => (
-                  <button key={document} type="button"><FileText size={14} /><span>{document}</span><small>Open</small></button>
-                )) : <div className="personnel-empty-section">No attachments uploaded.</div>}
+            <div className="segmented-control" style={{ marginBottom: 12 }}>
+              <button type="button" className={attachmentView === "active" ? "active" : ""} onClick={() => setAttachmentView("active")}>Active</button>
+              <button type="button" className={attachmentView === "archived" ? "active" : ""} onClick={() => setAttachmentView("archived")}>
+                Archived{archivedCount ? ` (${archivedCount})` : ""}
+              </button>
+            </div>
+            <div className="document-list">
+              {visibleDocs.length ? visibleDocs.map(({ document, index }) => {
+                const name = documentDisplayName(document);
+                const url = documentDownloadUrl(document);
+                const key = document.id || `${name}-${index}`;
+                return (
+                  <div key={key} className="personnel-attachment-row" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                    {url ? (
+                      <a href={url} target="_blank" rel="noreferrer" className="secondary-button" style={{ flex: 1, justifyContent: "flex-start" }}>
+                        <FileText size={14} /><span>{name}</span><small>Open</small>
+                      </a>
+                    ) : (
+                      <button type="button" className="secondary-button" style={{ flex: 1, justifyContent: "flex-start" }} disabled>
+                        <FileText size={14} /><span>{name}</span><small>{isObjectArchived(document) ? "Archived" : "No file"}</small>
+                      </button>
+                    )}
+                    {canEdit ? (
+                      <ObjectLifecycleActions
+                        record={document}
+                        canEdit={canEdit}
+                        busy={attachmentBusyId === (document.id || String(index))}
+                        compact
+                        onArchive={() => runAttachmentLifecycle(index, "archive")}
+                        onRestore={() => runAttachmentLifecycle(index, "restore")}
+                        onDelete={() => runAttachmentLifecycle(index, "delete")}
+                      />
+                    ) : null}
+                  </div>
+                );
+              }) : <div className="personnel-empty-section">No attachments in this view.</div>}
+            </div>
+            {canEdit && attachmentView === "active" ? (
+              <div style={{ marginTop: 12 }}>
+                <ObjectUploadField
+                  label="Upload personnel attachment"
+                  hint="PDF, Word, or image — saved to Firebase Storage"
+                  buttonLabel="Choose file"
+                  disabled={!departmentId || !draft?.id}
+                  buildPath={(file) => buildPersonnelDocumentPath(departmentId, draft.id, file.name)}
+                  onUploaded={(uploaded) => {
+                    setUploadError("");
+                    updateDraftField("documents", [
+                      ...(draft.documents || []),
+                      withActiveLifecycle({
+                        id: `DOC-${Date.now()}`,
+                        name: uploaded.name,
+                        downloadUrl: uploaded.downloadUrl,
+                        storagePath: uploaded.storagePath,
+                        contentType: uploaded.contentType,
+                        uploadedAt: new Date().toISOString(),
+                      }),
+                    ]);
+                  }}
+                />
+                {!departmentId || !draft?.id ? (
+                  <p className="hint-text">Save the personnel record before uploading attachments.</p>
+                ) : null}
+                {uploadError ? <p className="object-upload-error hint-text">{uploadError}</p> : null}
               </div>
-            )}
+            ) : null}
           </div>
           <PersonnelSectionActions canEdit={canEdit} onSave={onSave} onCancel={onCancel} />
         </div>
       );
+    }
     case "immunization":
       return (
         <div className="personnel-form-card">

@@ -20,7 +20,9 @@ export function buildDashboardStaffingRows({
 } = {}) {
   const resolvedRotation = resolveShiftRotation(rotation);
   const savedById = Object.fromEntries(
-    (Array.isArray(scheduleDays) ? scheduleDays : []).map((day) => [day.id, day])
+    (Array.isArray(scheduleDays) ? scheduleDays : [])
+      .filter((day) => day && day.id)
+      .map((day) => [day.id, day])
   );
   const rows = [];
   const cursor = parseDayId(formatDayId(referenceDate));

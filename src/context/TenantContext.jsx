@@ -16,6 +16,11 @@ import {
   resolveAvailableModules,
 } from "../lib/platformInheritance.js";
 import { loadPlatformConfig } from "../lib/platformService.js";
+import {
+  customerSubscriptionToLegacyTerm,
+  getCustomerSubscription,
+  isSubscriptionAccessAllowed,
+} from "../lib/platformSubscriptionService.js";
 import { activateDemoMode, isDemoModeActive } from "../lib/demoMode.js";
 import { demoDepartmentProfile, demoDepartmentSettings, mapDemoDepartmentProfile } from "../data/demoDepartment.js";
 import {
@@ -223,9 +228,12 @@ export function TenantProvider({ children }) {
 
         const profileSnap = await getDoc(doc(firestoreDb, "departments", departmentId, "profile", "main"));
         const settingsSnap = await getDoc(doc(firestoreDb, "departments", departmentId, "settings", "main"));
+        const registrySnap = await getDoc(doc(firestoreDb, "platformDepartments", departmentId));
 
         const profileDefaults = resolveDepartmentProfileDefaults(departmentId);
         const settingsDefaults = resolveDepartmentSettingsDefaults(departmentId);
+        const registryExists = registrySnap.exists() && registrySnap.data()?.status !== "disabled";
+        const isKnownSeed = departmentId === DEFAULT_DEPARTMENT_ID || isDemoDepartment(departmentId);
 
         if (!cancelled && profileSnap.exists()) {
           const remoteProfile = profileSnap.data();
@@ -246,10 +254,13 @@ export function TenantProvider({ children }) {
             logoUrl: gatewayRecord.logoUrl || profileDefaults.logoUrl
           };
           setProfile(applyPlatformToDepartmentProfile(gatewayProfile, platformConfig, departmentId));
-        } else if (!cancelled) {
+        } else if (!cancelled && (registryExists || isKnownSeed)) {
           const seedProfile = { ...profileDefaults, id: departmentId };
           await setDoc(doc(firestoreDb, "departments", departmentId, "profile", "main"), seedProfile, { merge: true });
           setProfile(applyPlatformToDepartmentProfile(seedProfile, platformConfig, departmentId));
+        } else if (!cancelled) {
+          // Unknown gateway path — do not invent a "Fire Department" tenant.
+          setProfile(applyPlatformToDepartmentProfile({ ...profileDefaults, id: departmentId }, platformConfig, departmentId));
         }
 
         if (!cancelled && settingsSnap.exists()) {
@@ -265,11 +276,29 @@ export function TenantProvider({ children }) {
             employeePortalRules: normalizeEmployeePortalRules(settingsSnap.data()?.employeePortalRules),
             payRules: normalizePayRules(settingsSnap.data()?.payRules),
           };
-          setSettings(applyPlatformToDepartmentSettings(
-            mergedSettings,
-            platformConfig,
-            departmentId
-          ));
+
+          try {
+            const saas = await getCustomerSubscription(departmentId);
+            if (saas) {
+              const legacy = customerSubscriptionToLegacyTerm(saas);
+              mergedSettings.subscription = {
+                ...(mergedSettings.subscription || {}),
+                ...legacy,
+              };
+              mergedSettings.subscriptionAccessAllowed = isSubscriptionAccessAllowed(saas);
+              mergedSettings.customerSubscription = saas;
+            }
+          } catch (error) {
+            console.warn("Unable to load SaaS subscription for tenant", error);
+          }
+
+          if (!cancelled) {
+            setSettings(applyPlatformToDepartmentSettings(
+              mergedSettings,
+              platformConfig,
+              departmentId
+            ));
+          }
         } else if (!cancelled) {
           const seedSettings = { ...settingsDefaults, departmentId };
           await setDoc(doc(firestoreDb, "departments", departmentId, "settings", "main"), seedSettings, { merge: true });

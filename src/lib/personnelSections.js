@@ -11,6 +11,7 @@ import {
   Paperclip,
   Syringe,
   TrendingUp,
+  GraduationCap,
 } from "lucide-react";
 
 export const PERSONNEL_SECTIONS = [
@@ -18,6 +19,7 @@ export const PERSONNEL_SECTIONS = [
   { id: "emergencyContact", label: "Emergency Contact", icon: Contact },
   { id: "certifications", label: "Certifications", icon: Award },
   { id: "trainingEvents", label: "Training & Events", icon: CalendarCheck },
+  { id: "academy", label: "Academy", icon: GraduationCap },
   { id: "accruals", label: "Accruals", icon: BarChart3 },
   { id: "activityLog", label: "Leave & Shift History", icon: CalendarDays },
   { id: "payRates", label: "Pay Rates", icon: CircleDollarSign },

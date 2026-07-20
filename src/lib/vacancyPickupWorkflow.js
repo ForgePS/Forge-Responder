@@ -123,7 +123,7 @@ export function resolveEmployeeVacancyDays({
   fromDate = new Date(),
   horizonDays = 42,
 } = {}) {
-  const shift = String(person.shift || "").trim();
+  const shift = String(person?.shift || "").trim();
   if (!shift) return [];
 
   const days = [];
@@ -161,6 +161,7 @@ export function resolveEmployeeVacancyDays({
 }
 
 export function hasExistingPickupRequest(pickups = [], person = {}, vacancy = {}) {
+  if (!person?.id || !vacancy?.id) return false;
   return pickups.some((item) => (
     item.personnelId === person.id
     && item.vacancyId === vacancy.id

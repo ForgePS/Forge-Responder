@@ -41,7 +41,21 @@ export const defaultRoles = [
       manageInternalEmail: true,
       viewDigitalDashboard: true,
       editDigitalDashboard: true,
-      manageDigitalDashboard: true
+      manageDigitalDashboard: true,
+      academyIntegrationsView: true,
+      academyIntegrationsManage: true,
+      academyIntegrationsTest: true,
+      academyPersonSearch: true,
+      academyPersonLink: true,
+      academyPersonUnlink: true,
+      academyPersonResolveConflict: true,
+      academyTranscriptView: true,
+      academyEnrollmentSubmit: true,
+      academyEnrollmentApprove: true,
+      academyPaymentAuthorize: true,
+      academySyncRun: true,
+      academySyncViewErrors: true,
+      academyAuditView: true,
     }
   },
   {
@@ -82,7 +96,21 @@ export const defaultRoles = [
       manageInternalEmail: true,
       viewDigitalDashboard: true,
       editDigitalDashboard: true,
-      manageDigitalDashboard: true
+      manageDigitalDashboard: true,
+      academyIntegrationsView: true,
+      academyIntegrationsManage: true,
+      academyIntegrationsTest: true,
+      academyPersonSearch: true,
+      academyPersonLink: true,
+      academyPersonUnlink: true,
+      academyPersonResolveConflict: true,
+      academyTranscriptView: true,
+      academyEnrollmentSubmit: true,
+      academyEnrollmentApprove: true,
+      academyPaymentAuthorize: true,
+      academySyncRun: true,
+      academySyncViewErrors: true,
+      academyAuditView: true,
     }
   },
   {
@@ -145,7 +173,12 @@ export const defaultRoles = [
       manageInternalEmail: true,
       viewDigitalDashboard: true,
       editDigitalDashboard: true,
-      manageDigitalDashboard: true
+      manageDigitalDashboard: true,
+      academyIntegrationsView: true,
+      academyIntegrationsManage: true,
+      academyIntegrationsTest: true,
+      academyAuditView: true,
+      academySyncViewErrors: true,
     }
   }
 ];

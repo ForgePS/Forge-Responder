@@ -36,7 +36,9 @@ function buildDayCell(date, existingById, rotation, today, { inMonth = true } = 
 export function buildExtendedMonthCells(year, month, existingDays = [], rotation = defaultShiftRotation) {
   const resolvedRotation = resolveShiftRotation(rotation);
   const existingById = Object.fromEntries(
-    (Array.isArray(existingDays) ? existingDays : []).map((day) => [day.id, day])
+    (Array.isArray(existingDays) ? existingDays : [])
+      .filter((day) => day && day.id)
+      .map((day) => [day.id, day])
   );
   const firstOfMonth = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -70,7 +72,9 @@ export function buildWeekCells(referenceDayId = "", existingDays = [], rotation 
   const reference = referenceDayId ? parseDayId(referenceDayId) : new Date();
   const resolvedRotation = resolveShiftRotation(rotation);
   const existingById = Object.fromEntries(
-    (Array.isArray(existingDays) ? existingDays : []).map((day) => [day.id, day])
+    (Array.isArray(existingDays) ? existingDays : [])
+      .filter((day) => day && day.id)
+      .map((day) => [day.id, day])
   );
   const today = new Date();
   const start = new Date(reference);

@@ -107,6 +107,20 @@ export const ADMIN_PERMISSION_LABELS = {
   viewDigitalDashboard: "View digital dashboard",
   editDigitalDashboard: "Edit digital dashboard",
   manageDigitalDashboard: "Manage digital dashboard",
+  academyIntegrationsView: "Academy integrations: view",
+  academyIntegrationsManage: "Academy integrations: manage",
+  academyIntegrationsTest: "Academy integrations: test connection",
+  academyPersonSearch: "Academy person search",
+  academyPersonLink: "Academy person link",
+  academyPersonUnlink: "Academy person unlink",
+  academyPersonResolveConflict: "Academy resolve match conflict",
+  academyTranscriptView: "Academy transcript view",
+  academyEnrollmentSubmit: "Academy enrollment submit",
+  academyEnrollmentApprove: "Academy enrollment approve",
+  academyPaymentAuthorize: "Academy payment authorize",
+  academySyncRun: "Academy sync run",
+  academySyncViewErrors: "Academy sync view errors",
+  academyAuditView: "Academy audit view",
 };
 
 export const ADMIN_PERMISSION_GROUPS = [
@@ -145,6 +159,25 @@ export const ADMIN_PERMISSION_GROUPS = [
   {
     label: "Digital Dashboard",
     keys: ["viewDigitalDashboard", "editDigitalDashboard", "manageDigitalDashboard"]
+  },
+  {
+    label: "Academy integrations",
+    keys: [
+      "academyIntegrationsView",
+      "academyIntegrationsManage",
+      "academyIntegrationsTest",
+      "academyPersonSearch",
+      "academyPersonLink",
+      "academyPersonUnlink",
+      "academyPersonResolveConflict",
+      "academyTranscriptView",
+      "academyEnrollmentSubmit",
+      "academyEnrollmentApprove",
+      "academyPaymentAuthorize",
+      "academySyncRun",
+      "academySyncViewErrors",
+      "academyAuditView",
+    ]
   }
 ];
 

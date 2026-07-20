@@ -233,7 +233,7 @@ export default function DailyLogPage({
 
     return (Array.isArray(personnel) ? personnel : [])
       .filter((person) => String(person.status || "Active").toLowerCase() === "active")
-      .filter((person) => !draft.shift || person.shift === draft.shift)
+      .filter((person) => !draft.shift || person?.shift === draft.shift)
       .sort((left, right) => {
         const leftName = getPersonDisplayName(left);
         const rightName = getPersonDisplayName(right);

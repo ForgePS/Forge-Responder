@@ -80,6 +80,7 @@ export function buildWeekRosterDayBoard({
   personnel = [],
   schedulingSettings = null,
 } = {}) {
+  const snapshot = daySnapshot && typeof daySnapshot === "object" ? daySnapshot : {};
   const unitStationMap = buildUnitStationMap(apparatus);
   const rosterUnits = (Array.isArray(displayUnits) ? displayUnits : [])
     .map(String)
@@ -91,8 +92,8 @@ export function buildWeekRosterDayBoard({
   }));
 
   const stationGroups = groupApparatusByStation(pseudoUnits, stationNames);
-  const timeWindow = formatShiftDutyWindow(daySnapshot.id, shiftChangeTime);
-  const endWeekday = parseDayId(daySnapshot.id);
+  const timeWindow = formatShiftDutyWindow(snapshot.id, shiftChangeTime);
+  const endWeekday = parseDayId(snapshot.id);
   endWeekday.setDate(endWeekday.getDate() + 1);
   const endWeekdayLabel = endWeekday.toLocaleDateString("en-US", { weekday: "short" });
   const startTime = String(shiftChangeTime || "07:00").slice(0, 5);
@@ -104,14 +105,14 @@ export function buildWeekRosterDayBoard({
       .map(({ unit }) => unit)
       .filter((unit) => rosterUnits.includes(unit))
       .map((unit) => {
-        const group = daySnapshot.apparatusGroups?.grouped?.find((entry) => entry.unit === unit);
+        const group = snapshot.apparatusGroups?.grouped?.find((entry) => entry.unit === unit);
         const { rows } = buildApparatusCrewSlotRows({
           unit,
           crew: group?.crew || [],
           personnel,
           apparatus,
           schedulingSettings,
-          dayId: daySnapshot.id,
+          dayId: snapshot.id,
           shiftChangeTime,
           timeWindow,
         });
@@ -152,12 +153,12 @@ export function buildWeekRosterDayBoard({
   );
 
   return {
-    dayId: daySnapshot.id,
-    weekday: daySnapshot.weekday || parseDayId(daySnapshot.id).toLocaleDateString("en-US", { weekday: "long" }),
-    weekdayShort: parseDayId(daySnapshot.id).toLocaleDateString("en-US", { weekday: "short" }),
-    calendarDay: parseDayId(daySnapshot.id).getDate(),
-    dateLabel: daySnapshot.date,
-    shift: daySnapshot.shift,
+    dayId: snapshot.id,
+    weekday: snapshot.weekday || parseDayId(snapshot.id).toLocaleDateString("en-US", { weekday: "long" }),
+    weekdayShort: parseDayId(snapshot.id).toLocaleDateString("en-US", { weekday: "short" }),
+    calendarDay: parseDayId(snapshot.id).getDate(),
+    dateLabel: snapshot.date,
+    shift: snapshot.shift,
     departmentTitle: formatDepartmentRosterTitle(departmentName),
     timeWindow,
     timeStart: startTime,
@@ -177,6 +178,7 @@ export function buildDailyRosterDayBoard({
   personnel = [],
   schedulingSettings = null,
 } = {}) {
+  const snapshot = daySnapshot && typeof daySnapshot === "object" ? daySnapshot : {};
   const unitStationMap = buildUnitStationMap(apparatus);
   const rosterUnits = (Array.isArray(displayUnits) ? displayUnits : [])
     .map(String)
@@ -188,8 +190,8 @@ export function buildDailyRosterDayBoard({
   }));
 
   const stationGroups = groupApparatusByStation(pseudoUnits, stationNames);
-  const timeWindow = formatShiftDutyWindow(daySnapshot.id, shiftChangeTime);
-  const endWeekday = parseDayId(daySnapshot.id);
+  const timeWindow = formatShiftDutyWindow(snapshot.id, shiftChangeTime);
+  const endWeekday = parseDayId(snapshot.id);
   endWeekday.setDate(endWeekday.getDate() + 1);
   const endWeekdayLabel = endWeekday.toLocaleDateString("en-US", { weekday: "short" });
   const startTime = String(shiftChangeTime || "07:00").slice(0, 5);
@@ -201,7 +203,7 @@ export function buildDailyRosterDayBoard({
       .map(({ unit }) => unit)
       .filter((unit) => rosterUnits.includes(unit))
       .map((unit) => {
-        const group = daySnapshot.apparatusGroups?.grouped?.find((entry) => entry.unit === unit);
+        const group = snapshot.apparatusGroups?.grouped?.find((entry) => entry.unit === unit);
         const crew = group?.crew || [];
         const { rows, openCount } = buildApparatusCrewSlotRows({
           unit,
@@ -209,7 +211,7 @@ export function buildDailyRosterDayBoard({
           personnel,
           apparatus,
           schedulingSettings,
-          dayId: daySnapshot.id,
+          dayId: snapshot.id,
           shiftChangeTime,
           timeWindow,
         });
@@ -232,9 +234,9 @@ export function buildDailyRosterDayBoard({
   );
 
   return {
-    dayId: daySnapshot.id,
-    dateLabel: daySnapshot.date,
-    shift: daySnapshot.shift,
+    dayId: snapshot.id,
+    dateLabel: snapshot.date,
+    shift: snapshot.shift,
     timeWindow,
     commandUnits,
     stationGroups: orderedStationGroups,

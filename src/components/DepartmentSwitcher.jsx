@@ -57,7 +57,8 @@ export default function DepartmentSwitcher({ isCreator, onScopeChange }) {
         <option value={PLATFORM_SCOPE_ID}>{platformTitle} (Platform)</option>
         {departments.map((department) => (
           <option key={department.id} value={department.id}>
-            {department.name || department.id}
+            {department.shortName || department.name || department.id}
+            {department.name && department.id !== department.name ? ` · ${department.id}` : ""}
           </option>
         ))}
       </select>

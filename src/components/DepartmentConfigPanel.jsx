@@ -13,6 +13,7 @@ import SchedulingApparatusPanel from "./SchedulingApparatusPanel.jsx";
 import ApparatusCrewSlotsPanel from "./ApparatusCrewSlotsPanel.jsx";
 import DepartmentStationsEditor from "./DepartmentStationsEditor.jsx";
 import DepartmentSubscriptionEditor from "./DepartmentSubscriptionEditor.jsx";
+import ObjectUploadField from "./ObjectUploadField.jsx";
 import { normalizeShiftRotation } from "../data/defaultShiftRotation.js";
 import { normalizePayPeriod } from "../lib/payPeriods.js";
 import { normalizeEmployeePortalRules } from "../lib/employeePortalRules.js";
@@ -20,6 +21,8 @@ import { normalizePayRules } from "../lib/payRules.js";
 import { normalizeSchedulingSettings } from "../lib/schedulingSettings.js";
 import { resolveAvailableModules } from "../lib/platformInheritance.js";
 import { canManageBranchSubscription, canViewBranchSubscription } from "../lib/permissions.js";
+import { resolveDepartmentLogoUrl } from "../lib/brandAssets.js";
+import { buildDepartmentLogoPath } from "../lib/storagePaths.js";
 import {
   buildStationDetailsFromProfile,
   normalizeStationDetails,
@@ -52,7 +55,7 @@ function parseCommaList(value) {
 const DEPARTMENT_CONFIG_SECTIONS = [
   { id: "branding", label: "Branding & Profile" },
   { id: "stations", label: "Stations" },
-  { id: "academy", label: "Forge Academy" },
+  { id: "academy", label: "Person Identity (Hub)" },
   { id: "shift-rotation", label: "Shift Rotation" },
   { id: "portal-rules", label: "Employee Portal" },
   { id: "pay-rules", label: "Pay & Overtime" },
@@ -256,7 +259,30 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
             <label><span>Short Name</span><input value={profileForm.shortName} onChange={(e) => setProfileForm({ ...profileForm, shortName: e.target.value })} /></label>
             <label><span>Theme Name</span><input value={profileForm.themeName} onChange={(e) => setProfileForm({ ...profileForm, themeName: e.target.value })} /></label>
             <label><span>Branch Label</span><input value={profileForm.branchLabel} onChange={(e) => setProfileForm({ ...profileForm, branchLabel: e.target.value })} /></label>
-            <label className="wide-field"><span>Logo Path / URL</span><input value={profileForm.logoUrl} onChange={(e) => setProfileForm({ ...profileForm, logoUrl: e.target.value })} /></label>
+            <div className="wide-field" style={{ display: "grid", gap: "10px" }}>
+              <span>Department logo</span>
+              <ObjectUploadField
+                variant="logo"
+                label="Upload department logo"
+                hint="PNG, JPG, or SVG — used in the top bar and login"
+                previewUrl={resolveDepartmentLogoUrl(profileForm.logoUrl)}
+                previewAlt={profileForm.name || "Department logo"}
+                buildPath={(file) => buildDepartmentLogoPath(departmentId, file.name)}
+                onUploaded={(uploaded) => {
+                  setProfileForm((current) => ({ ...current, logoUrl: uploaded.downloadUrl }));
+                  onMessage?.("Logo uploaded — save branding to apply");
+                }}
+                disabled={!departmentId || saving}
+              />
+              <label className="wide-field" style={{ margin: 0 }}>
+                <span>Logo URL (optional override)</span>
+                <input
+                  value={profileForm.logoUrl}
+                  onChange={(e) => setProfileForm({ ...profileForm, logoUrl: e.target.value })}
+                  placeholder="Upload above or paste a logo URL"
+                />
+              </label>
+            </div>
             <label><span>Contact Email</span><input value={profileForm.contactEmail} onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })} /></label>
             <label><span>Contact Phone</span><input value={profileForm.contactPhone} onChange={(e) => setProfileForm({ ...profileForm, contactPhone: e.target.value })} /></label>
             <label className="wide-field"><span>Address</span><input value={profileForm.address} onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })} /></label>
@@ -275,8 +301,14 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
         {activeSection === "academy" ? (
           <div className="workflow-form">
             <p className="hint-text" style={{ gridColumn: "1 / -1" }}>
-              Forge Person Identity is owned by the Integration Hub. Configure Hub access here so
-              personnel saves resolve a permanent <code>forgePersonId</code> (never Auth UID).
+              Forge Person Identity is owned by the Integration Hub. Prefer configuring academy
+              connections under <strong>System Admin → Integrations → Training Academies</strong>
+              (multi-academy, secret references). Legacy Hub fields below remain for identity resolve
+              until migrated.
+            </p>
+            <p className="hint-text" style={{ gridColumn: "1 / -1" }}>
+              This department is not permanently tied to any single academy project. Hub URL and
+              tokens here only enable <code>forgePersonId</code> resolution for personnel saves.
             </p>
             <label className="wide-field" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <input

@@ -14,6 +14,8 @@ export function normalizeSubscription(subscription = {}) {
   return {
     startDate: String(subscription.startDate || "").slice(0, 10),
     expirationDate: String(subscription.expirationDate || "").slice(0, 10),
+    saasStatus: String(subscription.saasStatus || subscription.status || ""),
+    planId: String(subscription.planId || ""),
   };
 }
 
@@ -42,6 +44,32 @@ export function daysUntilExpiration(expirationDate, referenceDate = new Date()) 
 export function getSubscriptionStatus(subscription = {}, options = {}) {
   const { warningDays = SUBSCRIPTION_WARNING_DAYS, referenceDate = new Date() } = options;
   const normalized = normalizeSubscription(subscription);
+  const saasStatus = normalized.saasStatus.toLowerCase();
+
+  if (saasStatus === "suspended" || saasStatus === "cancelled") {
+    return {
+      ...normalized,
+      level: "critical",
+      daysRemaining: null,
+      title: saasStatus === "suspended" ? "Subscription suspended" : "Subscription cancelled",
+      message: saasStatus === "suspended"
+        ? "This department branch subscription is suspended. Contact FORGE to restore access."
+        : "This department branch subscription is cancelled. Contact FORGE to renew access.",
+      show: true,
+    };
+  }
+
+  if (saasStatus === "past_due") {
+    return {
+      ...normalized,
+      level: "critical",
+      daysRemaining: daysUntilExpiration(normalized.expirationDate, referenceDate),
+      title: "Subscription past due",
+      message: "Billing for this department branch is past due. Contact FORGE to update payment.",
+      show: true,
+    };
+  }
+
   if (!normalized.expirationDate) return null;
 
   const daysRemaining = daysUntilExpiration(normalized.expirationDate, referenceDate);
@@ -63,8 +91,10 @@ export function getSubscriptionStatus(subscription = {}, options = {}) {
       ...normalized,
       level: daysRemaining <= 14 ? "critical" : "warning",
       daysRemaining,
-      title: "Subscription expiring soon",
-      message: `This department branch subscription expires in ${daysRemaining} day(s) on ${formatSubscriptionDate(normalized.expirationDate)}.`,
+      title: saasStatus === "trial" ? "Trial ending soon" : "Subscription expiring soon",
+      message: saasStatus === "trial"
+        ? `This department trial ends in ${daysRemaining} day(s) on ${formatSubscriptionDate(normalized.expirationDate)}.`
+        : `This department branch subscription expires in ${daysRemaining} day(s) on ${formatSubscriptionDate(normalized.expirationDate)}.`,
       show: true,
     };
   }
@@ -73,7 +103,7 @@ export function getSubscriptionStatus(subscription = {}, options = {}) {
     ...normalized,
     level: "active",
     daysRemaining,
-    title: "Subscription active",
+    title: saasStatus === "trial" ? "Trial active" : "Subscription active",
     message: "",
     show: false,
   };

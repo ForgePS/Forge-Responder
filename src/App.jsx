@@ -39,9 +39,10 @@ import {
   parseAppDeepLink
 } from "./lib/gatewayRouting.js";
 import { PLATFORM_SCOPE_ID } from "./lib/tenantPaths.js";
+import { FORGE_ACADEMY_CLASS_SCHEDULE_URL } from "./lib/platformUrls.js";
 import {
   Activity, AlertTriangle, Ambulance, Archive, BarChart3, Bell, BookOpen, CalendarDays, Check,
-  ChevronLeft, ChevronRight, ClipboardCheck, Clock3, Edit3, FileCheck2, FileText, Gauge,
+  ChevronLeft, ChevronRight, ClipboardCheck, Clock3, Edit3, ExternalLink, FileCheck2, FileText, Gauge,
   GraduationCap, HardHat, Home, Lock, Mail, MapPin, Menu, MonitorPlay, PackageSearch, Phone, Save, Search,
   Settings, ShieldCheck, Trash2, Truck, Upload, UploadCloud, UserRound, Users, Wrench, X, CirclePlus
 } from "lucide-react";
@@ -99,7 +100,18 @@ import { defaultPlatformConfig } from "./data/platformBrand.js";
 import { getTenantListFallback } from "./data/tenants/index.js";
 import { LIST_KEYS } from "./lib/tenantListKeys.js";
 import { resolveDepartmentLogoUrl, resolvePlatformLogoUrl } from "./lib/brandAssets.js";
-import { uploadFirebaseFile } from "./lib/firebaseClient.js";
+import { uploadFirebaseFile, deleteFirebaseFile } from "./lib/firebaseClient.js";
+import { buildCertificationDocPath } from "./lib/storagePaths.js";
+import {
+  archiveObject,
+  isObjectArchived,
+  isObjectDeleted,
+  isObjectVisibleInActiveList,
+  isObjectVisibleInArchivedList,
+  restoreObject,
+  softDeleteObject,
+} from "./lib/objectLifecycle.js";
+import ObjectLifecycleActions from "./components/ObjectLifecycleActions.jsx";
 import { listUserNotifications, markNotificationRead } from "./lib/notificationService.js";
 import { vacancyPickupStatusDetail } from "./lib/vacancyPickupWorkflow.js";
 import HydrantTestingPage from "./pages/HydrantTestingPage.jsx";
@@ -118,7 +130,7 @@ import {
 
 const navGroups = [
   { label: "", items: [["Dashboard", Home]] },
-  { label: "RMS", items: [["Personnel", Users], ["Certifications", FileCheck2], ["Training", BookOpen], ["Scheduling", CalendarDays], ["Time Sheets", Clock3], ["Daily Log", ClipboardCheck]] },
+  { label: "RMS", items: [["Personnel", Users], ["Certifications", FileCheck2], ["Training", BookOpen], ["Academy Class Schedule", GraduationCap, FORGE_ACADEMY_CLASS_SCHEDULE_URL], ["Scheduling", CalendarDays], ["Time Sheets", Clock3], ["Daily Log", ClipboardCheck]] },
   { label: "Fleet", items: [["Apparatus", Truck], ["Assets", PackageSearch], ["Maintenance", Wrench], ["Hose Testing", Gauge]] },
   { label: "Prevention", items: [["Occupancies", Archive], ["Inspections", ClipboardCheck], ["Preplans", ShieldCheck], ["Hydrants", Activity]] },
   { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["NERIS Analytics", BarChart3]] },
@@ -163,8 +175,21 @@ function Badge({ children, tone = "neutral" }) {
 }
 
 function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGroups }) {
+  function handleNavClick(name, externalUrl) {
+    const url = typeof externalUrl === "string" ? externalUrl.trim() : "";
+    if (/^https?:\/\//i.test(url)) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (name === "Academy Class Schedule") {
+      window.open(FORGE_ACADEMY_CLASS_SCHEDULE_URL, "_blank", "noopener,noreferrer");
+      return;
+    }
+    onNavigate(name);
+  }
+
   return <aside className={`side-nav ${collapsed ? "collapsed" : ""}`}>
-    <nav>{groups.map((group, index) => <section key={`${group.label}-${index}`}>{!collapsed && group.label && <span className="nav-label">{group.label}</span>}{group.items.map(([name, Icon]) => { const NavIcon = typeof Icon === "function" ? Icon : ShieldCheck; return <button key={name} className={current === name ? "nav-item active" : "nav-item"} onClick={() => onNavigate(name)} title={name}><NavIcon size={15} /><span>{name}</span></button>; })}</section>)}</nav>
+    <nav>{groups.map((group, index) => <section key={`${group.label}-${index}`}>{!collapsed && group.label && <span className="nav-label">{group.label}</span>}{group.items.map(([name, Icon, externalUrl]) => { const NavIcon = typeof Icon === "function" ? Icon : ShieldCheck; const isExternal = (typeof externalUrl === "string" && /^https?:\/\//i.test(externalUrl)) || name === "Academy Class Schedule"; return <button key={name} className={!isExternal && current === name ? "nav-item active" : "nav-item"} onClick={() => handleNavClick(name, externalUrl)} title={isExternal ? `${name} (opens Academy)` : name}><NavIcon size={15} /><span>{name}</span>{isExternal && !collapsed ? <ExternalLink size={12} className="nav-external-icon" aria-hidden /> : null}</button>; })}</section>)}</nav>
     <button className="nav-collapse" onClick={() => setCollapsed(!collapsed)}>{collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}</button>
   </aside>;
 }
@@ -370,41 +395,298 @@ function DataTable({ columns, rows, query }) {
   return <div className="data-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}<th /></tr></thead><tbody>{filtered.map((row) => <tr key={row.join("-")}>{row.map((cell, index) => <td key={`${cell}-${index}`}>{index === row.length - 1 ? <Badge>{cell}</Badge> : cell}</td>)}<td><button className="row-action">Open</button></td></tr>)}</tbody></table>{!filtered.length && <div className="empty-table">No records match the current search.</div>}</div>;
 }
 
-function CertificationsPage({ query, records = [], setRecords, canEdit = false }) {
+function CertificationsPage({ query, records = [], setRecords, canEdit = false, departmentId = "" }) {
   const [filter, setFilter] = useState("All");
+  const [lifecycleView, setLifecycleView] = useState("active");
   const [selected, setSelected] = useState(null);
   const [uploading, setUploading] = useState(null);
+  const [uploadDraft, setUploadDraft] = useState({ issue: "", expires: "", file: null });
   const [message, setMessage] = useState("");
-  const filtered = records.filter((record) => (filter === "All" || record.status === filter || record.category === filter) && Object.values(record).join(" ").toLowerCase().includes(query.toLowerCase()));
+  const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState("");
+
+  const scoped = records.filter((record) => !isObjectDeleted(record)).filter((record) => (
+    lifecycleView === "archived" ? isObjectVisibleInArchivedList(record) : isObjectVisibleInActiveList(record)
+  ));
+  const filtered = scoped.filter((record) => (
+    (filter === "All" || record.status === filter || record.category === filter)
+    && Object.values(record).join(" ").toLowerCase().includes(query.toLowerCase())
+  ));
+  const activeRecords = records.filter((record) => isObjectVisibleInActiveList(record));
+  const archivedCount = records.filter((record) => isObjectArchived(record)).length;
+
+  function openUpload(record) {
+    if (!canEdit || !record || isObjectArchived(record)) return;
+    setUploading(record);
+    setUploadDraft({
+      issue: record.issue || "",
+      expires: record.expires || "",
+      file: null,
+    });
+  }
+
   function updateRenewal(id, renewal) {
     if (!canEdit) return;
     setRecords((current) => current.map((record) => record.id === id ? { ...record, renewal, status: renewal === "Approved" ? "Active" : record.status } : record));
     setMessage(`Renewal status updated to ${renewal}`);
   }
-  function completeUpload() {
-    if (!canEdit) return;
-    setRecords((current) => current.map((record) => record.id === uploading.id ? { ...record, document: `${record.type} Renewal.pdf`, renewal: "Submitted" } : record));
-    setMessage("Certification document uploaded and renewal submitted");
-    setUploading(null);
+
+  async function completeUpload() {
+    if (!canEdit || !uploading || !departmentId) return;
+    if (!uploadDraft.file) {
+      setMessage("Choose a credential file before uploading");
+      return;
+    }
+    setBusy(true);
+    try {
+      const storagePath = buildCertificationDocPath(departmentId, uploading.id, uploadDraft.file.name);
+      const uploaded = await uploadFirebaseFile(storagePath, uploadDraft.file);
+      if (!uploaded?.downloadUrl) throw new Error("Upload failed");
+      const issue = uploadDraft.issue || uploading.issue;
+      const expires = uploadDraft.expires || uploading.expires;
+      const days = expires
+        ? Math.ceil((new Date(`${expires}T12:00:00`) - new Date()) / (1000 * 60 * 60 * 24))
+        : uploading.days;
+      setRecords((current) => current.map((record) => (
+        record.id === uploading.id
+          ? {
+              ...record,
+              issue,
+              expires,
+              days,
+              document: uploadDraft.file.name,
+              documentUrl: uploaded.downloadUrl,
+              documentStoragePath: uploaded.storagePath,
+              renewal: "Submitted",
+              status: days < 0 ? "Expired" : record.status === "Expired" && days >= 0 ? "Active" : record.status,
+            }
+          : record
+      )));
+      setMessage("Certification document uploaded and renewal submitted");
+      setUploading(null);
+      setUploadDraft({ issue: "", expires: "", file: null });
+    } catch (error) {
+      console.error("Certification upload failed", error);
+      setMessage("Certification upload failed — try again");
+    } finally {
+      setBusy(false);
+    }
   }
-  function deleteRecord(record) {
-    if (!canEdit || !setRecords || !record) return;
-    const label = `${record.person} · ${record.type}`;
-    if (!window.confirm(`Delete certification record "${label}"? This cannot be undone.`)) return;
-    setRecords((current) => current.filter((item) => item.id !== record.id));
-    if (selected?.id === record.id) setSelected(null);
-    if (uploading?.id === record.id) setUploading(null);
-    setMessage(`Deleted ${label}`);
+
+  async function runLifecycle(record, action) {
+    if (!canEdit || !record) return;
+    setBusyId(record.id);
+    try {
+      if (action === "archive") {
+        setRecords((current) => current.map((item) => item.id === record.id ? archiveObject(item) : item));
+        if (selected?.id === record.id) setSelected(null);
+        setMessage("Certification archived.");
+      } else if (action === "restore") {
+        setRecords((current) => current.map((item) => item.id === record.id ? restoreObject(item) : item));
+        setLifecycleView("active");
+        setMessage("Certification restored.");
+      } else if (action === "delete") {
+        if (record.documentStoragePath) await deleteFirebaseFile(record.documentStoragePath);
+        setRecords((current) => current.map((item) => item.id === record.id ? softDeleteObject(item) : item));
+        if (selected?.id === record.id) setSelected(null);
+        if (uploading?.id === record.id) setUploading(null);
+        setMessage(`Deleted ${record.person} · ${record.type}`);
+      }
+    } finally {
+      setBusyId("");
+    }
   }
-  return <div className="module-page certifications-page">
-    <section className="module-heading"><div><span className="module-icon"><FileCheck2 size={22} /></span><div><h1>Certifications</h1><p>Expiration alerts, renewal status, uploaded credentials, and compliance review.</p></div></div><div className="heading-actions"><button className="secondary-button">Export Compliance</button>{canEdit ? <button className="primary-button" onClick={() => setUploading(records[0])}><UploadCloud size={14} /> Upload Certification</button> : null}</div></section>
-    <section className="cert-summary">{[["Expired", records.filter((r) => r.status === "Expired").length, "critical"], ["Due in 30 Days", records.filter((r) => r.days >= 0 && r.days <= 30).length, "critical"], ["Due in 60 Days", records.filter((r) => r.days > 30 && r.days <= 60).length, "warning"], ["Due in 90 Days", records.filter((r) => r.days > 60 && r.days <= 90).length, "info"], ["Active", records.filter((r) => r.status === "Active").length, "success"]].map(([label, value, tone]) => <button key={label} className={`cert-stat stat-${tone}`} onClick={() => setFilter(label === "Expired" ? "Expired" : label === "Active" ? "Active" : "All")}><strong>{value}</strong><span>{label}</span></button>)}</section>
-    {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}><X size={13} /></button></div>}
-    <section className="cert-toolbar"><div className="segmented-control">{["All", "EMS", "Fire", "Due Soon", "Expired"].map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}</div><span>{filtered.length} certifications shown</span></section>
-    <Panel title="Certification Compliance Records" icon={FileCheck2} action={<button className="text-button">Configure columns</button>}><div className="cert-table"><div className="cert-row cert-head"><span>Personnel</span><span>Certification</span><span>Category</span><span>Issue Date</span><span>Expiration</span><span>Days</span><span>Renewal</span><span>Status</span><span /></div>{filtered.map((record) => <div className="cert-row" key={record.id}><button className="link-button" onClick={() => setSelected(record)}>{record.person}</button><span>{record.type}</span><span>{record.category}</span><span>{record.issue}</span><span>{record.expires}</span><strong className={`days-${record.days < 0 ? "critical" : record.days <= 30 ? "critical" : record.days <= 90 ? "warning" : "neutral"}`}>{record.days < 0 ? `${Math.abs(record.days)} overdue` : record.days}</strong>{canEdit ? <ManagedSelect dropdownId="certRenewalStatus" value={record.renewal} onChange={(value) => updateRenewal(record.id, value)} /> : <span>{record.renewal}</span>}<Badge>{record.status}</Badge><div className="inline-actions">{canEdit ? <button className="row-action" onClick={() => setUploading(record)}>{record.document ? "Replace" : "Upload"}</button> : null}{canEdit ? <button type="button" className="icon-button danger-button" title="Delete certification" onClick={() => deleteRecord(record)}><Trash2 size={14} /></button> : null}</div></div>)}</div></Panel>
-    {selected && <Modal title={`${selected.person} · ${selected.type}`} onClose={() => setSelected(null)}><div className="cert-detail-grid">{[["Certification ID", selected.id], ["Category", selected.category], ["Issue Date", selected.issue], ["Expiration Date", selected.expires], ["Renewal Status", selected.renewal], ["Document", selected.document || "No document uploaded"]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div><div className="modal-actions"><button className="secondary-button" onClick={() => setSelected(null)}>Close</button>{canEdit ? <button type="button" className="secondary-button danger-button" onClick={() => deleteRecord(selected)}><Trash2 size={14} /> Delete</button> : null}{canEdit ? <button className="primary-button" onClick={() => { setUploading(selected); setSelected(null); }}><UploadCloud size={14} /> Upload Renewal</button> : null}</div></Modal>}
-    {uploading && canEdit && <Modal title="Upload Certification Document" onClose={() => setUploading(null)}><div className="upload-zone"><UploadCloud size={28} /><strong>{uploading.person} · {uploading.type}</strong><span>Drop a PDF or image credential here, or select a file.</span><input type="file" /></div><div className="upload-form"><label><span>Issue Date</span><input type="date" defaultValue="2026-06-07" /></label><label><span>Expiration Date</span><input type="date" defaultValue="2028-06-07" /></label></div><div className="modal-actions"><button className="secondary-button" onClick={() => setUploading(null)}>Cancel</button><button className="primary-button" onClick={completeUpload}><UploadCloud size={14} /> Upload & Submit</button></div></Modal>}
-  </div>;
+
+  return (
+    <div className="module-page certifications-page">
+      <section className="module-heading">
+        <div>
+          <span className="module-icon"><FileCheck2 size={22} /></span>
+          <div>
+            <h1>Certifications</h1>
+            <p>Expiration alerts, renewal status, uploaded credentials, and compliance review.</p>
+          </div>
+        </div>
+        <div className="heading-actions">
+          <button className="secondary-button">Export Compliance</button>
+          {canEdit ? (
+            <button className="primary-button" onClick={() => openUpload(activeRecords[0])} disabled={!activeRecords[0]}>
+              <UploadCloud size={14} /> Upload Certification
+            </button>
+          ) : null}
+        </div>
+      </section>
+      <section className="cert-summary">
+        {[
+          ["Expired", activeRecords.filter((r) => r.status === "Expired").length, "critical"],
+          ["Due in 30 Days", activeRecords.filter((r) => r.days >= 0 && r.days <= 30).length, "critical"],
+          ["Due in 60 Days", activeRecords.filter((r) => r.days > 30 && r.days <= 60).length, "warning"],
+          ["Due in 90 Days", activeRecords.filter((r) => r.days > 60 && r.days <= 90).length, "info"],
+          ["Active", activeRecords.filter((r) => r.status === "Active").length, "success"],
+        ].map(([label, value, tone]) => (
+          <button
+            key={label}
+            className={`cert-stat stat-${tone}`}
+            onClick={() => {
+              setLifecycleView("active");
+              setFilter(label === "Expired" ? "Expired" : label === "Active" ? "Active" : "All");
+            }}
+          >
+            <strong>{value}</strong>
+            <span>{label}</span>
+          </button>
+        ))}
+      </section>
+      {message ? (
+        <div className="success-banner">
+          {message}
+          <button onClick={() => setMessage("")}><X size={13} /></button>
+        </div>
+      ) : null}
+      <section className="cert-toolbar">
+        <div className="segmented-control">
+          <button className={lifecycleView === "active" ? "active" : ""} onClick={() => setLifecycleView("active")}>Active</button>
+          <button className={lifecycleView === "archived" ? "active" : ""} onClick={() => setLifecycleView("archived")}>
+            Archived{archivedCount ? ` (${archivedCount})` : ""}
+          </button>
+        </div>
+        <div className="segmented-control">
+          {["All", "EMS", "Fire", "Due Soon", "Expired"].map((item) => (
+            <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>
+          ))}
+        </div>
+        <span>{filtered.length} certifications shown</span>
+      </section>
+      <Panel title="Certification Compliance Records" icon={FileCheck2} action={<button className="text-button">Configure columns</button>}>
+        <div className="cert-table">
+          <div className="cert-row cert-head">
+            <span>Personnel</span><span>Certification</span><span>Category</span><span>Issue Date</span>
+            <span>Expiration</span><span>Days</span><span>Renewal</span><span>Status</span><span />
+          </div>
+          {filtered.map((record) => (
+            <div className="cert-row" key={record.id}>
+              <button className="link-button" onClick={() => setSelected(record)}>{record.person}</button>
+              <span>{record.type}</span>
+              <span>{record.category}</span>
+              <span>{record.issue}</span>
+              <span>{record.expires}</span>
+              <strong className={`days-${record.days < 0 ? "critical" : record.days <= 30 ? "critical" : record.days <= 90 ? "warning" : "neutral"}`}>
+                {record.days < 0 ? `${Math.abs(record.days)} overdue` : record.days}
+              </strong>
+              {canEdit && !isObjectArchived(record) ? (
+                <ManagedSelect dropdownId="certRenewalStatus" value={record.renewal} onChange={(value) => updateRenewal(record.id, value)} />
+              ) : (
+                <span>{record.renewal}</span>
+              )}
+              <Badge>{isObjectArchived(record) ? "Archived" : record.status}</Badge>
+              <div className="inline-actions">
+                {canEdit && !isObjectArchived(record) ? (
+                  <button className="row-action" onClick={() => openUpload(record)}>
+                    {record.document || record.documentUrl ? "Replace" : "Upload"}
+                  </button>
+                ) : null}
+                <ObjectLifecycleActions
+                  record={record}
+                  canEdit={canEdit}
+                  busy={busyId === record.id}
+                  compact
+                  onArchive={() => runLifecycle(record, "archive")}
+                  onRestore={() => runLifecycle(record, "restore")}
+                  onDelete={() => runLifecycle(record, "delete")}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Panel>
+      {selected ? (
+        <Modal title={`${selected.person} · ${selected.type}`} onClose={() => setSelected(null)}>
+          <div className="cert-detail-grid">
+            {[
+              ["Certification ID", selected.id],
+              ["Category", selected.category],
+              ["Issue Date", selected.issue],
+              ["Expiration Date", selected.expires],
+              ["Renewal Status", selected.renewal],
+              ["Lifecycle", isObjectArchived(selected) ? "Archived" : "Active"],
+              ["Document", selected.document || "No document uploaded"],
+            ].map(([label, value]) => (
+              <div key={label}><span>{label}</span><strong>{value}</strong></div>
+            ))}
+          </div>
+          {selected.documentUrl ? (
+            <a className="primary-button" href={selected.documentUrl} target="_blank" rel="noreferrer" style={{ marginTop: 12, display: "inline-flex" }}>
+              Open Document
+            </a>
+          ) : null}
+          <div className="modal-actions" style={{ flexWrap: "wrap", gap: 8 }}>
+            <button className="secondary-button" onClick={() => setSelected(null)}>Close</button>
+            <ObjectLifecycleActions
+              record={selected}
+              canEdit={canEdit}
+              busy={busyId === selected.id}
+              onArchive={() => runLifecycle(selected, "archive")}
+              onRestore={() => runLifecycle(selected, "restore")}
+              onDelete={() => runLifecycle(selected, "delete")}
+            />
+            {canEdit && !isObjectArchived(selected) ? (
+              <button className="primary-button" onClick={() => { openUpload(selected); setSelected(null); }}>
+                <UploadCloud size={14} /> Upload Renewal
+              </button>
+            ) : null}
+          </div>
+        </Modal>
+      ) : null}
+      {uploading && canEdit ? (
+        <Modal title="Upload Certification Document" onClose={() => !busy && setUploading(null)}>
+          <div className="upload-zone">
+            <UploadCloud size={28} />
+            <strong>{uploading.person} · {uploading.type}</strong>
+            <span>
+              {uploadDraft.file
+                ? `Selected: ${uploadDraft.file.name}`
+                : "Drop a PDF or image credential here, or select a file."}
+            </span>
+            <input
+              type="file"
+              accept="image/*,.pdf,.png,.jpg,.jpeg,.webp"
+              disabled={busy}
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                setUploadDraft((current) => ({ ...current, file }));
+              }}
+            />
+          </div>
+          <div className="upload-form">
+            <label>
+              <span>Issue Date</span>
+              <input
+                type="date"
+                value={uploadDraft.issue}
+                disabled={busy}
+                onChange={(event) => setUploadDraft((current) => ({ ...current, issue: event.target.value }))}
+              />
+            </label>
+            <label>
+              <span>Expiration Date</span>
+              <input
+                type="date"
+                value={uploadDraft.expires}
+                disabled={busy}
+                onChange={(event) => setUploadDraft((current) => ({ ...current, expires: event.target.value }))}
+              />
+            </label>
+          </div>
+          <div className="modal-actions">
+            <button className="secondary-button" disabled={busy} onClick={() => setUploading(null)}>Cancel</button>
+            <button className="primary-button" disabled={busy || !uploadDraft.file || !departmentId} onClick={completeUpload}>
+              <UploadCloud size={14} /> {busy ? "Uploading…" : "Upload & Submit"}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+    </div>
+  );
 }
 
 const ADMIN_SCHEDULE_TABS = [
@@ -478,18 +760,19 @@ function SchedulingPage({
   const selectedDay = useMemo(() => {
     const monthCells = buildMonthCalendar(calendarYear, calendarMonth, days, rotation);
     const now = new Date();
+    const fallback = {
+      id: formatDayId(now),
+      shift: "A Shift",
+      staffed: 21,
+      minimum: 21,
+      leave: 0,
+      status: "Complete",
+      date: now.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    };
     return monthCells.find((cell) => cell.kind === "day" && cell.id === selectedId)
       || monthCells.find((cell) => cell.kind === "day")
-      || days[0]
-      || {
-        id: formatDayId(now),
-        shift: "A Shift",
-        staffed: 21,
-        minimum: 21,
-        leave: 0,
-        status: "Complete",
-        date: now.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      };
+      || (Array.isArray(days) ? days.find(Boolean) : null)
+      || fallback;
   }, [calendarYear, calendarMonth, days, rotation, selectedId]);
 
   const displayUnits = useMemo(
@@ -504,13 +787,13 @@ function SchedulingPage({
     () => buildDayRoster({
       roster,
       personnel,
-      selectedShift: selectedDay.shift,
+      selectedShift: selectedDay?.shift || "",
       selectedDayId: selectedId,
       leaveRequests,
       shiftTrades,
       knownUnits: unitOptions,
     }),
-    [roster, personnel, selectedDay.shift, selectedId, leaveRequests, shiftTrades, unitOptions]
+    [roster, personnel, selectedDay?.shift, selectedId, leaveRequests, shiftTrades, unitOptions]
   );
   const dayCoverage = useMemo(
     () => resolveDayCoverageMetrics({ dayRoster, personnel }),
@@ -528,33 +811,67 @@ function SchedulingPage({
     shiftChangeTime,
   }), [days, rotation, roster, personnel, leaveRequests, shiftTrades, schedulingSettings, apparatus, shiftChangeTime]);
   const selectedDaySnapshot = useMemo(
-    () => buildDayScheduleSnapshot({ ...rosterSnapshotOptions, dayId: selectedId }),
-    [rosterSnapshotOptions, selectedId]
+    () => {
+      try {
+        return buildDayScheduleSnapshot({ ...rosterSnapshotOptions, dayId: selectedId });
+      } catch (error) {
+        console.error("Failed to build day schedule snapshot", error);
+        return {
+          id: selectedId,
+          shift: selectedDay?.shift || "A Shift",
+          weekday: "",
+          date: "",
+          staffed: 0,
+          minimum: 0,
+          leave: 0,
+          status: "Deficit",
+          roster: [],
+          coverage: { staffed: 0, minimum: 0, leave: 0, status: "Deficit", vacancies: 0 },
+          displayUnits: [],
+          apparatusVacancies: [],
+          apparatusGroups: { grouped: [] },
+          openVacancies: [],
+        };
+      }
+    },
+    [rosterSnapshotOptions, selectedId, selectedDay?.shift]
   );
   const weekSnapshots = useMemo(
-    () => buildWeekScheduleSnapshots({ ...rosterSnapshotOptions, referenceDayId: weekRosterStartId }),
+    () => {
+      try {
+        return buildWeekScheduleSnapshots({ ...rosterSnapshotOptions, referenceDayId: weekRosterStartId });
+      } catch (error) {
+        console.error("Failed to build week schedule snapshots", error);
+        return [];
+      }
+    },
     [rosterSnapshotOptions, weekRosterStartId]
   );
   const liveMonthMetrics = useMemo(() => {
     const monthCells = buildMonthCalendar(calendarYear, calendarMonth, days, rotation)
       .filter((cell) => cell.kind === "day");
     return Object.fromEntries(monthCells.map((cell) => {
-      const snapshot = buildDayScheduleSnapshot({ ...rosterSnapshotOptions, dayId: cell.id });
-      return [cell.id, {
-        staffed: snapshot.staffed,
-        minimum: snapshot.minimum,
-        leave: snapshot.leave,
-        status: snapshot.status,
-      }];
+      try {
+        const snapshot = buildDayScheduleSnapshot({ ...rosterSnapshotOptions, dayId: cell.id });
+        return [cell.id, {
+          staffed: snapshot.staffed,
+          minimum: snapshot.minimum,
+          leave: snapshot.leave,
+          status: snapshot.status,
+        }];
+      } catch (error) {
+        console.error("Failed to build month metrics for", cell.id, error);
+        return [cell.id, { staffed: 0, minimum: 0, leave: 0, status: "Deficit" }];
+      }
     }));
   }, [calendarYear, calendarMonth, days, rotation, rosterSnapshotOptions]);
-  const vacancies = selectedDaySnapshot.openVacancies?.length ?? dayCoverage.vacancies ?? 0;
+  const vacancies = selectedDaySnapshot?.openVacancies?.length ?? dayCoverage.vacancies ?? 0;
   const scheduleStats = [
-    { label: "Selected Shift", value: shiftShortLabel(selectedDaySnapshot.shift || selectedDay.shift), tone: "info", icon: CalendarDays },
-    { label: "Staffed Today", value: selectedDaySnapshot.coverage?.staffed ?? dayCoverage.staffed, tone: "success", icon: Users },
-    { label: "Daily Staffing", value: selectedDaySnapshot.coverage?.minimum ?? dayCoverage.minimum, tone: "neutral", icon: ShieldCheck },
+    { label: "Selected Shift", value: shiftShortLabel(selectedDaySnapshot?.shift || selectedDay?.shift || ""), tone: "info", icon: CalendarDays },
+    { label: "Staffed Today", value: selectedDaySnapshot?.coverage?.staffed ?? dayCoverage.staffed, tone: "success", icon: Users },
+    { label: "Daily Staffing", value: selectedDaySnapshot?.coverage?.minimum ?? dayCoverage.minimum, tone: "neutral", icon: ShieldCheck },
     { label: "Open Vacancies", value: vacancies, tone: vacancies > 0 ? "critical" : "success", icon: AlertTriangle },
-    { label: "Leave Today", value: selectedDaySnapshot.coverage?.leave ?? dayCoverage.leave, tone: (selectedDaySnapshot.coverage?.leave ?? dayCoverage.leave) > 0 ? "warning" : "neutral", icon: Clock3 },
+    { label: "Leave Today", value: selectedDaySnapshot?.coverage?.leave ?? dayCoverage.leave, tone: (selectedDaySnapshot?.coverage?.leave ?? dayCoverage.leave) > 0 ? "warning" : "neutral", icon: Clock3 },
   ];
 
   function selectDay(day) {
@@ -1785,6 +2102,7 @@ function AppShell() {
         query={query}
         records={certifications}
         setRecords={setCertifications}
+        departmentId={departmentId}
         canEdit={
           hasPermission(permissions, "editCertifications")
           || hasPermission(permissions, "manageSystemSettings")
@@ -1947,7 +2265,19 @@ function AppShell() {
       />
     ) : <AccessDeniedModule name={current} />
   ) : ["SOGs / Policies", "EMS Protocols", "Forms", "Uploads"].includes(current) ? (
-    hasPermission(permissions, "viewDocuments") ? <DocumentsPage query={query} records={documents} setRecords={setDocuments} navLabel={current} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "viewDocuments") ? (
+      <DocumentsPage
+        query={query}
+        records={documents}
+        setRecords={setDocuments}
+        navLabel={current}
+        departmentId={departmentId}
+        canEdit={
+          hasPermission(permissions, "editDocuments")
+          || hasPermission(permissions, "manageSystemSettings")
+        }
+      />
+    ) : <AccessDeniedModule name={current} />
   ) : current === "Creator Console" ? (
     hasPermission(permissions, "manageDepartments") ? <CreatorConsolePage /> : <AccessDeniedModule name={current} />
   ) : current === "System Admin" ? (

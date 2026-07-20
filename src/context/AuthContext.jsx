@@ -138,7 +138,7 @@ export function AuthProvider({ children }) {
 
     const creator = await loadPlatformCreator(nextUser.uid);
     const creatorActive = String(creator?.status || "").toLowerCase() === "active";
-    const departmentId = creatorActive ? activeDepartmentId : DEFAULT_DEPARTMENT_ID;
+    const departmentId = activeDepartmentId || DEFAULT_DEPARTMENT_ID;
 
     setIsCreator(creatorActive);
     if (creatorActive) {

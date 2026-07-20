@@ -263,6 +263,7 @@ export default function EmployeePortalPage({
     if (!myPerson?.shift) return [];
     const shift = String(myPerson.shift).trim().toLowerCase();
     return personnel
+      .filter(Boolean)
       .filter((person) => (
         person.id !== myPerson.id
         && String(person.shift || "").trim().toLowerCase() === shift
@@ -361,16 +362,19 @@ export default function EmployeePortalPage({
   const canUnlockDailyLog = isCreator || hasPermission(permissions, "manageSystemSettings");
 
   const vacancyDays = useMemo(
-    () => resolveEmployeeVacancyDays({
-      personnel,
-      person: myPerson,
-      rotation,
-      leaveRequests,
-      roster,
-      schedulingSettings,
-      apparatus,
-      scheduleDays,
-    }),
+    () => {
+      if (!myPerson?.shift) return [];
+      return resolveEmployeeVacancyDays({
+        personnel,
+        person: myPerson,
+        rotation,
+        leaveRequests,
+        roster,
+        schedulingSettings,
+        apparatus,
+        scheduleDays,
+      });
+    },
     [personnel, myPerson, rotation, leaveRequests, roster, schedulingSettings, apparatus, scheduleDays]
   );
 

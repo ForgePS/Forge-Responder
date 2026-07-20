@@ -35,6 +35,7 @@ export default function PersonnelDetailView({
   training = [],
   isNewRecord = false,
   onOpenEmployeeProfile,
+  departmentId = "",
 }) {
   const currentSection = PERSONNEL_SECTIONS.find((section) => section.id === activeSection) || PERSONNEL_SECTIONS[0];
   const hideSectionHeading = activeSection === "personalDetails";
@@ -150,6 +151,7 @@ export default function PersonnelDetailView({
             onSave={onSave}
             onCancel={onCancelEdit}
             isNewRecord={isNewRecord}
+            departmentId={departmentId}
           />
         </section>
       </div>

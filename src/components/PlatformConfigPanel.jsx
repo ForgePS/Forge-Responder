@@ -12,7 +12,9 @@ import {
   isForgeLogoUrl,
   resolvePlatformLogoUrl
 } from "../lib/brandAssets.js";
+import { buildPlatformLogoPath } from "../lib/storagePaths.js";
 import PlatformBrandHero from "./PlatformBrandHero.jsx";
+import ObjectUploadField from "./ObjectUploadField.jsx";
 import { resolveAvailableModules } from "../lib/platformInheritance.js";
 
 export default function PlatformConfigPanel({ onMessage }) {
@@ -163,13 +165,10 @@ export default function PlatformConfigPanel({ onMessage }) {
         <section className="platform-config-card">
           <header>
             <strong>Logo</strong>
-            <span>Use the built-in FORGE logo or provide a custom image URL.</span>
+            <span>Use the built-in FORGE logo, upload a custom image, or paste a URL.</span>
           </header>
           <div className="platform-logo-editor">
-            <div className="platform-logo-preview">
-              <img src={resolvePlatformLogoUrl(previewConfig.logoUrl)} alt={form.name} />
-            </div>
-            <div className="platform-logo-actions">
+            <div className="platform-logo-actions" style={{ width: "100%", gap: "12px" }}>
               <button
                 className={`secondary-button ${!useCustomLogo ? "active" : ""}`}
                 type="button"
@@ -182,17 +181,38 @@ export default function PlatformConfigPanel({ onMessage }) {
                 type="button"
                 onClick={() => setUseCustomLogo(true)}
               >
-                <RotateCcw size={14} /> Custom logo URL
+                <RotateCcw size={14} /> Custom logo
               </button>
               {useCustomLogo && (
-                <label className="admin-record-field-wide">
-                  <span>Custom logo URL</span>
-                  <input
-                    value={form.logoUrl}
-                    onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
-                    placeholder="https://example.com/logo.png"
+                <>
+                  <ObjectUploadField
+                    variant="logo"
+                    label="Upload platform logo"
+                    hint="PNG, JPG, or SVG — shown on login and creator surfaces"
+                    previewUrl={resolvePlatformLogoUrl(previewConfig.logoUrl)}
+                    previewAlt={form.name || "Platform logo"}
+                    buildPath={(file) => buildPlatformLogoPath(file.name)}
+                    onUploaded={(uploaded) => {
+                      setUseCustomLogo(true);
+                      setForm((current) => ({ ...current, logoUrl: uploaded.downloadUrl }));
+                      onMessage?.("Platform logo uploaded — save settings to apply");
+                    }}
+                    disabled={saving}
                   />
-                </label>
+                  <label className="admin-record-field-wide">
+                    <span>Custom logo URL (optional override)</span>
+                    <input
+                      value={form.logoUrl}
+                      onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
+                      placeholder="https://example.com/logo.png"
+                    />
+                  </label>
+                </>
+              )}
+              {!useCustomLogo && (
+                <div className="platform-logo-preview">
+                  <img src={resolvePlatformLogoUrl(previewConfig.logoUrl)} alt={form.name} />
+                </div>
               )}
             </div>
           </div>

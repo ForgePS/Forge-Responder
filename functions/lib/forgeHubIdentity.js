@@ -1,7 +1,11 @@
 /**
  * Integration Hub Person Identity client (server-side).
  * Academy and RMS must resolve forgePersonId via Hub before creating people.
+ * Prefers credentials from department academyIntegrations (forge_academy) when present.
  */
+
+const { getPrimaryConnection, listConnections } = require("./academy/academyIntegrationsStore");
+const { loadConnectionSecrets } = require("./academy/academySecrets");
 
 function normalize(value) {
   return String(value ?? "").trim();
@@ -27,7 +31,36 @@ async function loadHubSettings(db, departmentId) {
 
   const dept = deptSnap.exists ? deptSnap.data()?.forgeAcademy || {} : {};
   const platform = platformSnap.exists ? platformSnap.data()?.forgeAcademy || {} : {};
-  const merged = { ...platform, ...dept };
+  let merged = { ...platform, ...dept };
+
+  // Prefer multi-academy forge_academy connection secrets when available.
+  try {
+    if (departmentId) {
+      const primary = await getPrimaryConnection(db, departmentId);
+      const forgeConn = primary?.providerType === "forge_academy"
+        ? primary
+        : (await listConnections(db, departmentId)).find((c) => c.providerType === "forge_academy" && c.enabled);
+      if (forgeConn) {
+        const secrets = await loadConnectionSecrets(
+          db,
+          departmentId,
+          forgeConn.connectionId,
+          forgeConn.secretReference
+        );
+        merged = {
+          ...merged,
+          hubEnabled: forgeConn.enabled !== false,
+          hubBaseUrl: secrets.hubBaseUrl || forgeConn.config?.hubBaseUrl || merged.hubBaseUrl,
+          hubBearerToken: secrets.hubBearerToken || merged.hubBearerToken,
+          hubSecret: secrets.hubSecret || merged.hubSecret,
+          forgeDepartmentId:
+            secrets.forgeDepartmentId || forgeConn.config?.forgeDepartmentId || merged.forgeDepartmentId,
+        };
+      }
+    }
+  } catch {
+    // Fall back to legacy settings/main.forgeAcademy
+  }
 
   return {
     hubEnabled: merged.hubEnabled !== false,

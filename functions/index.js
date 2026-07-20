@@ -601,6 +601,7 @@ exports.syncJotformDamageSubmissions = onCall(
 );
 
 const { resolvePersonIdentityViaHub } = require("./lib/forgeHubIdentity");
+const academyCallables = require("./lib/academy/callables");
 
 /**
  * Resolve or create permanent forgePersonId via Forge Integration Hub.
@@ -608,10 +609,11 @@ const { resolvePersonIdentityViaHub } = require("./lib/forgeHubIdentity");
  */
 exports.resolveForgePersonIdentity = onCall(async (request) => {
   const departmentId = String(request.data?.departmentId || "").trim();
-  await assertDepartmentAccess(request, departmentId);
+  const db = admin.firestore();
+  await assertDepartmentAccess(db, departmentId, request.auth);
 
   try {
-    return await resolvePersonIdentityViaHub(admin.firestore(), departmentId, request.data?.person || {});
+    return await resolvePersonIdentityViaHub(db, departmentId, request.data?.person || {});
   } catch (error) {
     throw new HttpsError(
       "internal",
@@ -619,3 +621,39 @@ exports.resolveForgePersonIdentity = onCall(async (request) => {
     );
   }
 });
+
+function wrapAcademy(handler) {
+  return onCall(async (request) => {
+    try {
+      return await handler(admin.firestore(), request);
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Academy integration error."
+      );
+    }
+  });
+}
+
+exports.listAcademyConnections = wrapAcademy(academyCallables.handleListAcademyConnections);
+exports.upsertAcademyConnection = wrapAcademy(academyCallables.handleUpsertAcademyConnection);
+exports.testAcademyConnection = wrapAcademy(academyCallables.handleTestAcademyConnection);
+exports.setPrimaryAcademyConnection = wrapAcademy(academyCallables.handleSetPrimaryAcademyConnection);
+exports.disableAcademyConnection = wrapAcademy(academyCallables.handleDisableAcademyConnection);
+exports.disconnectAcademyConnection = wrapAcademy(academyCallables.handleDisconnectAcademyConnection);
+exports.listAcademyAuditLogs = wrapAcademy(academyCallables.handleListAcademyAuditLogs);
+exports.migrateLegacyForgeAcademySettings = wrapAcademy(academyCallables.handleMigrateLegacyForgeAcademySettings);
+exports.academyFindStudent = wrapAcademy((db, req) => academyCallables.handleAcademyPersonAction(db, req, "findStudent"));
+exports.academyGetTranscript = wrapAcademy((db, req) => academyCallables.handleAcademyPersonAction(db, req, "getTranscript"));
+exports.academyGetCompletions = wrapAcademy((db, req) => academyCallables.handleAcademyPersonAction(db, req, "getCourseCompletions"));
+exports.academyGetCertificates = wrapAcademy((db, req) => academyCallables.handleAcademyPersonAction(db, req, "getCertificates"));
+exports.academyGetEnrollments = wrapAcademy((db, req) => academyCallables.handleAcademyPersonAction(db, req, "getEnrollments"));
+exports.academySubmitEnrollment = wrapAcademy((db, req) => academyCallables.handleAcademyPersonAction(db, req, "submitEnrollment"));
+exports.academySyncPerson = wrapAcademy((db, req) => academyCallables.handleAcademyPersonAction(db, req, "syncPerson"));
+exports.listAcademyLinks = wrapAcademy(academyCallables.handleListAcademyLinks);
+exports.linkAcademyPerson = wrapAcademy(academyCallables.handleLinkAcademyPerson);
+exports.unlinkAcademyPerson = wrapAcademy(academyCallables.handleUnlinkAcademyPerson);
+exports.resolveAcademyMatchConflict = wrapAcademy(academyCallables.handleResolveAcademyMatchConflict);
+exports.replayAcademyEvent = wrapAcademy(academyCallables.handleReplayAcademyEvent);
+exports.ingestAcademyEvent = wrapAcademy(academyCallables.handleIngestAcademyEvent);

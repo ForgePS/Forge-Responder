@@ -266,7 +266,7 @@ export function buildCallShiftRecord({
     startedByPersonnelId,
     dayId: form.dayId || preview.dayId,
     dateLabel: preview.dateLabel || "",
-    shift: preview.shift || form.shift || "",
+    shift: preview?.shift || form?.shift || "",
     group: formatSelectionLabel(form.groups, form.group || "All"),
     groups: normalizeSelectionList(form.groups),
     position: (normalizeSelectionList(form.qualifiers)[0] || form.position || "Any"),

@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { deleteDoc, doc, getDoc, getDocs, getFirestore, setDoc, collection } from "firebase/firestore";
-import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { deleteObject as deleteStorageObject, getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
@@ -94,11 +94,45 @@ export async function deleteFirebaseRecord(collectionName, id) {
 
 export async function uploadFirebaseFile(storagePath, file) {
   const services = firebaseServices();
-  if (!services || !file) return null;
-  const fileRef = ref(services.storage, storagePath);
-  const snapshot = await uploadBytes(fileRef, file, { contentType: file.type || "application/octet-stream" });
-  const url = await getDownloadURL(snapshot.ref);
-  return { storagePath, downloadUrl: url, contentType: file.type || "application/octet-stream" };
+  if (!services) {
+    throw new Error("Firebase Storage is not configured (check VITE_FIREBASE_* env).");
+  }
+  if (!file) {
+    throw new Error("No file selected.");
+  }
+  if (!storagePath) {
+    throw new Error("Upload path is missing.");
+  }
+  try {
+    const fileRef = ref(services.storage, storagePath);
+    const snapshot = await uploadBytes(fileRef, file, {
+      contentType: file.type || "application/octet-stream",
+    });
+    const url = await getDownloadURL(snapshot.ref);
+    return { storagePath, downloadUrl: url, contentType: file.type || "application/octet-stream" };
+  } catch (error) {
+    const code = error?.code || "storage/unknown";
+    const message = error?.message || "Upload failed";
+    console.error("Firebase Storage upload failed", { storagePath, code, message, error });
+    const enriched = new Error(message);
+    enriched.code = code;
+    enriched.cause = error;
+    throw enriched;
+  }
+}
+
+export async function deleteFirebaseFile(storagePath) {
+  const services = firebaseServices();
+  if (!services || !storagePath) return false;
+  try {
+    await deleteStorageObject(ref(services.storage, storagePath));
+    return true;
+  } catch (error) {
+    // Missing object is fine — metadata can still be soft-deleted.
+    if (error?.code === "storage/object-not-found") return true;
+    console.warn("Firebase Storage delete failed", storagePath, error);
+    return false;
+  }
 }
 
 export async function loadTenantList(departmentId, listKey, fallback = []) {

@@ -113,9 +113,12 @@ export function resolveShiftBattalionChief(personnel = [], shift = "") {
   if (!normalizedShift) return null;
 
   return personnel.find((person) => (
-    normalizeText(person.rank).includes("battalion chief")
+    person
+    && normalizeText(person.rank).includes("battalion chief")
     && normalizeText(person.shift) === normalizedShift
-  )) || personnel.find((person) => normalizeText(person.rank).includes("battalion chief")) || null;
+  )) || personnel.find((person) => (
+    person && normalizeText(person.rank).includes("battalion chief")
+  )) || null;
 }
 
 export function requiresOfficerApprovalForLeave(person = {}, leaveType = "") {

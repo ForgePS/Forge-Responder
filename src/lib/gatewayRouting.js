@@ -16,6 +16,8 @@ function isDemoSessionActive() {
 export const DEMO_ENTRY_PATH = "/demo";
 export const GATEWAY_DEPARTMENT_SESSION_KEY = "rms-gateway-department-id";
 export const GATEWAY_DEPARTMENT_PATH_KEY = "rms-gateway-department-path";
+/** Explicit tenant chosen on the sign-in screen (persists until Change tenant). */
+export const LOGIN_TENANT_KEY = "rms-login-tenant-id";
 
 export const CREATOR_CONSOLE_PATH = "/creator-console";
 export const CREATOR_CONSOLE_VIEW = "creator-console";
@@ -27,7 +29,37 @@ const MODULE_VIEW_SLUGS = {
   "creator console": CREATOR_CONSOLE_MODULE,
   "platform-admin": CREATOR_CONSOLE_MODULE
 };
-export const RESERVED_GATEWAY_PATHS = new Set(["demo", "creator-console", "alerts"]);
+export const RESERVED_GATEWAY_PATHS = new Set([
+  "demo",
+  "creator-console",
+  "alerts",
+  "admin",
+  "api",
+  "assets",
+  "static",
+  "favicon.ico",
+  "robots.txt",
+  "manifest.json",
+  "index.html",
+  "login",
+  "logout",
+  "auth",
+  "health",
+  "status",
+  "null",
+  "undefined",
+]);
+
+/** Accidental / mistyped branch IDs that should be soft-disabled from the creator registry. */
+export const GHOST_DEPARTMENT_IDS = new Set([
+  "admin",
+  "api",
+  "hornlake-fd",
+  "st-charles-fire-dept",
+  "st-charles",
+  "assets",
+  "static",
+]);
 
 function decodeGatewaySegment(value = "") {
   try {
@@ -108,6 +140,43 @@ export function getGatewayDepartmentId() {
   return getPersistedGatewayDepartmentId();
 }
 
+export function readLoginTenantId() {
+  if (typeof window === "undefined") return null;
+  try {
+    const value = normalizeGatewayDepartmentId(window.localStorage.getItem(LOGIN_TENANT_KEY) || "");
+    return value || null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeLoginTenantId(departmentId) {
+  if (typeof window === "undefined") return;
+  const value = normalizeGatewayDepartmentId(departmentId || "");
+  try {
+    if (value) {
+      window.localStorage.setItem(LOGIN_TENANT_KEY, value);
+    } else {
+      window.localStorage.removeItem(LOGIN_TENANT_KEY);
+    }
+  } catch (error) {
+    console.warn("Unable to persist login tenant", error);
+  }
+}
+
+export function clearLoginTenantId() {
+  writeLoginTenantId("");
+}
+
+/** True when the sign-in screen should treat the tenant as selected/locked. */
+export function hasLockedLoginTenant() {
+  if (typeof window === "undefined") return false;
+  if (isHornLakeHydrantHost(window.location.hostname)) return true;
+  if (parseGatewayDepartmentId()) return true;
+  if (readLoginTenantId()) return true;
+  return false;
+}
+
 export function resolveActiveDepartmentId() {
   if (typeof window === "undefined") return DEFAULT_DEPARTMENT_ID;
   if (isHornLakeHydrantHost(window.location.hostname)) return hornLakeDepartmentId();
@@ -116,6 +185,9 @@ export function resolveActiveDepartmentId() {
 
   const pathGatewayId = parseGatewayDepartmentId();
   if (pathGatewayId) return pathGatewayId;
+
+  const loginTenantId = readLoginTenantId();
+  if (loginTenantId) return loginTenantId;
 
   const sessionDepartmentId = getPersistedGatewayDepartmentId();
   if (sessionDepartmentId) return sessionDepartmentId;
@@ -137,7 +209,10 @@ export function shouldSyncGatewayUrl(departmentId) {
   if (isAlertDashboardPath()) return false;
 
   const pathGatewayId = parseGatewayDepartmentId();
-  if (!pathGatewayId) return true;
+  if (!pathGatewayId) {
+    // Only push /{tenant} when the user explicitly selected a login tenant.
+    return Boolean(readLoginTenantId());
+  }
 
   return normalizeGatewayDepartmentId(departmentId) === pathGatewayId;
 }
@@ -153,6 +228,7 @@ export function syncGatewayUrl(departmentId) {
   const normalizedTarget = targetPath.replace(/\/$/, "");
   if (currentPath !== normalizedTarget) {
     window.history.replaceState({}, "", `${normalizedTarget}${search}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   }
 }
 

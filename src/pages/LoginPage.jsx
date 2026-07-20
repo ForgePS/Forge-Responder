@@ -1,15 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { resolveDepartmentLogoUrl } from "../lib/brandAssets.js";
 import { platformBrand } from "../data/platformBrand.js";
-import { buildDepartmentGatewayUrl } from "../lib/gatewayRouting.js";
-import { isCreatorConsolePath } from "../lib/gatewayRouting.js";
+import {
+  buildDepartmentGatewayUrl,
+  clearLoginTenantId,
+  hasLockedLoginTenant,
+  isCreatorConsolePath,
+  isInvalidGatewaySlug,
+  normalizeGatewayDepartmentId,
+  persistGatewayContext,
+  readLoginTenantId,
+  RESERVED_GATEWAY_PATHS,
+  syncGatewayUrl,
+  writeLoginTenantId
+} from "../lib/gatewayRouting.js";
 import {
   FORGE_PUBLIC_WEBSITE_HOST,
   FORGE_PUBLIC_WEBSITE_URL,
   FORGE_RMS_APP_HOST
 } from "../lib/platformUrls.js";
 import { defaultDepartmentProfile } from "../data/defaultDepartment.js";
+import { isHornLakeHydrantHost } from "../lib/hydrantAppRouting.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
@@ -29,8 +41,17 @@ function authErrorMessage(error) {
   return error?.message || "Authentication failed.";
 }
 
+function validateTenantId(value) {
+  const tenantId = normalizeGatewayDepartmentId(value);
+  if (!tenantId) return { ok: false, message: "Enter your tenant ID." };
+  if (isInvalidGatewaySlug(tenantId) || RESERVED_GATEWAY_PATHS.has(tenantId)) {
+    return { ok: false, message: "Enter a valid tenant ID." };
+  }
+  return { ok: true, tenantId };
+}
+
 export default function LoginPage() {
-  const { profile, gatewayDepartmentId } = useTenant();
+  const { profile, gatewayDepartmentId, departmentId, setDepartmentId } = useTenant();
   const { signIn, signUp, setAuthError } = useAuth();
   const [mode, setMode] = useState("signin");
   const [email, setEmail] = useState("");
@@ -38,9 +59,57 @@ export default function LoginPage() {
   const [displayName, setDisplayName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [tenantDraft, setTenantDraft] = useState(() => readLoginTenantId() || "");
+  const [tenantLocked, setTenantLocked] = useState(() => hasLockedLoginTenant());
 
   const creatorConsoleEntry = isCreatorConsolePath();
+  const hydrantHostLocked = isHornLakeHydrantHost();
+  const canChangeTenant = !creatorConsoleEntry && !hydrantHostLocked;
   const departmentLogoUrl = resolveDepartmentLogoUrl(profile.logoUrl || defaultDepartmentProfile.logoUrl);
+  const activeTenantId = readLoginTenantId() || gatewayDepartmentId || departmentId;
+
+  useEffect(() => {
+    if (creatorConsoleEntry || hydrantHostLocked) {
+      setTenantLocked(true);
+      return;
+    }
+    if (gatewayDepartmentId) {
+      writeLoginTenantId(gatewayDepartmentId);
+      setTenantDraft(gatewayDepartmentId);
+      setTenantLocked(true);
+    }
+  }, [creatorConsoleEntry, gatewayDepartmentId, hydrantHostLocked]);
+
+  function handleConfirmTenant(event) {
+    event.preventDefault();
+    setError("");
+    const validation = validateTenantId(tenantDraft);
+    if (!validation.ok) {
+      setError(validation.message);
+      return;
+    }
+
+    writeLoginTenantId(validation.tenantId);
+    persistGatewayContext(validation.tenantId, validation.tenantId);
+    setDepartmentId(validation.tenantId);
+    syncGatewayUrl(validation.tenantId);
+    setTenantDraft(validation.tenantId);
+    setTenantLocked(true);
+  }
+
+  function handleChangeTenant() {
+    if (!canChangeTenant) return;
+    clearLoginTenantId();
+    persistGatewayContext("", "");
+    setTenantDraft("");
+    setTenantLocked(false);
+    setError("");
+    setAuthError("");
+    if (window.location.pathname.replace(/\/$/, "") !== "") {
+      window.history.replaceState({}, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -71,11 +140,17 @@ export default function LoginPage() {
           <img className="forge-logo-knockout" src={platformBrand.logoUrl} alt={platformBrand.name} />
         </div>
 
-        {!creatorConsoleEntry && (
+        {!creatorConsoleEntry && tenantLocked && (
           <div className="auth-department">
             <img src={departmentLogoUrl} alt={profile.name} />
-            <div>
+            <div className="auth-department-copy">
               <strong>{profile.shortName || profile.name}</strong>
+              <span className="auth-tenant-id">{activeTenantId}</span>
+              {canChangeTenant && (
+                <button className="text-button auth-change-tenant" type="button" onClick={handleChangeTenant}>
+                  Change tenant
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -86,38 +161,68 @@ export default function LoginPage() {
             <h1>
               {creatorConsoleEntry
                 ? "Creator Console sign in"
-                : (mode === "signin" ? "Sign in" : "Create account")}
+                : !tenantLocked
+                  ? "Select your tenant"
+                  : (mode === "signin" ? "Sign in" : "Create account")}
             </h1>
             <p className="auth-portal-label">
               {creatorConsoleEntry
                 ? "FORGE RMS · Platform creator access required"
-                : `FORGE RMS · ${gatewayDepartmentId ? buildDepartmentGatewayUrl(gatewayDepartmentId).replace(/^https?:\/\//, "") : FORGE_RMS_APP_HOST}`}
+                : !tenantLocked
+                  ? "Enter your department tenant ID to continue"
+                  : `FORGE RMS · ${gatewayDepartmentId ? buildDepartmentGatewayUrl(gatewayDepartmentId).replace(/^https?:\/\//, "") : FORGE_RMS_APP_HOST}`}
             </p>
           </div>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          {mode === "signup" && (
+        {!creatorConsoleEntry && !tenantLocked ? (
+          <form className="auth-form" onSubmit={handleConfirmTenant}>
             <label>
-              <span>Display name</span>
-              <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Jeremy Powell" />
+              <span>Tenant ID</span>
+              <input
+                value={tenantDraft}
+                onChange={(event) => setTenantDraft(event.target.value)}
+                placeholder="your-department-id"
+                autoComplete="organization"
+                autoFocus
+                required
+              />
             </label>
-          )}
-          <label>
-            <span>Email</span>
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={creatorConsoleEntry ? "admin@forgepublicsafety.com" : "you@hornlake.org"} required />
-          </label>
-          <label>
-            <span>Password</span>
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 6 characters" required />
-          </label>
-          {error && <div className="auth-error">{error}</div>}
-          <button className="primary-button auth-submit" type="submit" disabled={submitting}>
-            {submitting ? "Please wait..." : mode === "signin" ? "Sign In" : "Create Account"}
-          </button>
-        </form>
+            {error && <div className="auth-error">{error}</div>}
+            <button className="primary-button auth-submit" type="submit">
+              Continue
+            </button>
+          </form>
+        ) : (
+          <form className="auth-form" onSubmit={handleSubmit}>
+            {mode === "signup" && (
+              <label>
+                <span>Display name</span>
+                <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Jeremy Powell" />
+              </label>
+            )}
+            <label>
+              <span>Email</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder={creatorConsoleEntry ? "admin@forgepublicsafety.com" : "you@department.org"}
+                required
+              />
+            </label>
+            <label>
+              <span>Password</span>
+              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 6 characters" required />
+            </label>
+            {error && <div className="auth-error">{error}</div>}
+            <button className="primary-button auth-submit" type="submit" disabled={submitting}>
+              {submitting ? "Please wait..." : mode === "signin" ? "Sign In" : "Create Account"}
+            </button>
+          </form>
+        )}
 
-        {!creatorConsoleEntry && (
+        {!creatorConsoleEntry && tenantLocked && (
           <button
             className="text-button auth-toggle"
             type="button"
@@ -135,7 +240,7 @@ export default function LoginPage() {
           <a href={FORGE_PUBLIC_WEBSITE_URL} target="_blank" rel="noreferrer">
             {FORGE_PUBLIC_WEBSITE_HOST}
           </a>
-          {gatewayDepartmentId && (
+          {tenantLocked && gatewayDepartmentId && (
             <>
               {" · "}
               Department portal: <code>{buildDepartmentGatewayUrl(gatewayDepartmentId)}</code>

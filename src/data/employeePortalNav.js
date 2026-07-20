@@ -8,6 +8,7 @@ import {
   Clock3,
   FileCheck2,
   FileText,
+  GraduationCap,
   Home,
   Mail,
   Truck,
@@ -15,6 +16,7 @@ import {
   UserPlus,
   Wrench,
 } from "lucide-react";
+import { FORGE_ACADEMY_CLASS_SCHEDULE_URL } from "../lib/platformUrls.js";
 
 export const employeePortalNavGroups = [
   {
@@ -32,6 +34,7 @@ export const employeePortalNavGroups = [
       ["Daily Log", BookOpen],
       ["My Certifications", FileCheck2],
       ["My Training", Activity],
+      ["Academy Class Schedule", GraduationCap, FORGE_ACADEMY_CLASS_SCHEDULE_URL],
       ["My Documents", FileText],
     ],
   },

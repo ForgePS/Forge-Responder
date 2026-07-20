@@ -8,6 +8,7 @@ import { resolvePersonnelIdPrefix } from "../data/tenants/index.js";
 import { applyPersonnelBulkEdit } from "../lib/personnelBulkEdit.js";
 import { writeAuditLog } from "../lib/auditService.js";
 import { uploadFirebaseFile } from "../lib/firebaseClient.js";
+import { buildPersonnelPhotoPath } from "../lib/storagePaths.js";
 import {
   IdentityReviewRequiredError,
   resolveForgePersonIdForPersonnel,
@@ -173,7 +174,7 @@ export default function PersonnelPage({
     setPhotoUploading(true);
     setSavedMessage("");
     try {
-      const storagePath = `departments/${departmentId}/personnel-photos/${draft.id}/${Date.now()}-profile.jpg`;
+      const storagePath = buildPersonnelPhotoPath(departmentId, draft.id);
       const file = new File([blob], "profile.jpg", { type: "image/jpeg" });
       const uploaded = await uploadFirebaseFile(storagePath, file);
       if (!uploaded?.downloadUrl) throw new Error("Upload failed");
@@ -375,6 +376,7 @@ export default function PersonnelPage({
           training={training}
           isNewRecord={isNewRecord}
           onOpenEmployeeProfile={onOpenEmployeeProfile}
+          departmentId={departmentId}
         />
       ) : null}
     </div>

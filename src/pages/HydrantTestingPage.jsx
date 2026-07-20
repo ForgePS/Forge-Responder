@@ -7,6 +7,7 @@ import "../theme/hydrant-theme-bridge.css";
 import { Activity, BookOpen, CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, ClipboardList, Download, Droplets, Edit3, ExternalLink, FileText, Flame, Gauge, Home, LocateFixed, Mail, MapPin, Save, Search, Settings, ShieldCheck, UploadCloud, Wrench } from "lucide-react";
 import { defaultEmsProtocols, defaultFireCodeDocxSections, defaultFireCodeIndex, defaultFireCodePdfSections, defaultFireCodes, defaultFireSogDetails, defaultFireSogs, defaultHoseInventory } from "../data/defaultAppData";
 import { firebaseEnabled, loadFirebaseList, uploadFirebaseFile } from "../lib/firebaseClient";
+import { buildHydrantInspectionPhotoPath, buildPreFirePlanPath } from "../lib/storagePaths.js";
 import {
   applyHydrantStatusChange,
   buildFlowTestStatusPatch,
@@ -1206,11 +1207,48 @@ function Inspection({ selected, crew, onSaved, onClose }) {
     setRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
   }
 
-  function uploadPhoto(index, file) {
+  async function uploadPhoto(index, file) {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => updateRow(index, { photo_name: file.name, photo_data: reader.result });
-    reader.readAsDataURL(file);
+    const localPatch = { photo_name: file.name, photo_data: "", photo_url: "", photo_storage_path: "" };
+    updateRow(index, { ...localPatch, photo_name: `${file.name} (uploading…)` });
+
+    try {
+      if (firebaseEnabled && hydrantDepartmentId) {
+        const storagePath = buildHydrantInspectionPhotoPath(
+          hydrantDepartmentId,
+          selected?.hydrant_id || selected?.location_id,
+          file.name
+        );
+        const uploaded = await uploadFirebaseFile(storagePath, file);
+        if (uploaded?.downloadUrl) {
+          updateRow(index, {
+            photo_name: file.name,
+            photo_url: uploaded.downloadUrl,
+            photo_storage_path: uploaded.storagePath,
+            photo_data: "",
+          });
+          return;
+        }
+      }
+      const reader = new FileReader();
+      reader.onload = () => updateRow(index, {
+        photo_name: file.name,
+        photo_data: reader.result,
+        photo_url: "",
+        photo_storage_path: "",
+      });
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Hydrant inspection photo upload failed", error);
+      const reader = new FileReader();
+      reader.onload = () => updateRow(index, {
+        photo_name: file.name,
+        photo_data: reader.result,
+        photo_url: "",
+        photo_storage_path: "",
+      });
+      reader.readAsDataURL(file);
+    }
   }
 
   function addNote() {
@@ -1316,7 +1354,7 @@ function Inspection({ selected, crew, onSaved, onClose }) {
               <input value={row.notes} onChange={(e) => updateRow(index, { notes: e.target.value })} />
               <label className="photo-upload">
                 <input type="file" accept="image/*" capture="environment" onChange={(e) => uploadPhoto(index, e.target.files?.[0])} />
-                <span>{row.photo_name ? row.photo_name : "Photo"}</span>
+                <span>{row.photo_name ? row.photo_name : "Photo"}{row.photo_url ? " ✓" : ""}</span>
               </label>
               <select value={row.repair_needed} onChange={(e) => updateRow(index, { repair_needed: e.target.value })}>
                 <option>No</option>
@@ -2103,8 +2141,10 @@ function PreFirePlansDatabase() {
     const id = form.id || Date.now().toString();
     try {
       if (planFile && firebaseEnabled) {
-        const safeName = planFile.name.replace(/[^a-z0-9_.-]/gi, "_");
-        firebaseFile = await uploadFirebaseFile(`pre-fire-plans/${id}/${safeName}`, planFile);
+        firebaseFile = await uploadFirebaseFile(
+          buildPreFirePlanPath(hydrantDepartmentId, id, planFile.name),
+          planFile
+        );
       }
     } catch {}
     const saved = {

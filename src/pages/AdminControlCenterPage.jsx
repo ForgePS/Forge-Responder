@@ -6,6 +6,7 @@ import NerisFieldSettingsPanel from "../components/NerisFieldSettingsPanel.jsx";
 import GoogleApisIntegrationPanel from "../components/digitalDashboard/GoogleApisIntegrationPanel.jsx";
 import Active911IntegrationPanel from "../components/digitalDashboard/Active911IntegrationPanel.jsx";
 import DamageFormJotformIntegrationPanel from "../components/digitalDashboard/DamageFormJotformIntegrationPanel.jsx";
+import TrainingAcademiesPanel from "../components/academy/TrainingAcademiesPanel.jsx";
 import RecordCollectionEditor from "../components/RecordCollectionEditor.jsx";
 import RolePermissionsEditor from "../components/RolePermissionsEditor.jsx";
 import SubscriptionExpiryBanner from "../components/SubscriptionExpiryBanner.jsx";
@@ -53,6 +54,10 @@ export default function AdminControlCenterPage({
     || hasPermission(permissions, "manageSystemSettings")
     || hasPermission(permissions, "accessAdminRms");
   const canConfigureNerisFields = canConfigureDamageForm;
+  const canViewAcademyIntegrations = isCreator
+    || hasPermission(permissions, "academyIntegrationsView");
+  const canManageAcademyIntegrations = isCreator
+    || hasPermission(permissions, "academyIntegrationsManage");
   const [openSections, setOpenSections] = useState(() => new Set());
   const [permissionsView, setPermissionsView] = useState("roles");
   const [message, setMessage] = useState("");
@@ -173,6 +178,11 @@ export default function AdminControlCenterPage({
             <DamageFormJotformIntegrationPanel
               departmentId={departmentId}
               canConfigure={canConfigureDamageForm}
+            />
+            <TrainingAcademiesPanel
+              departmentId={departmentId}
+              canView={canViewAcademyIntegrations}
+              canConfigure={canManageAcademyIntegrations}
             />
           </div>
         </AdminSectionPill>

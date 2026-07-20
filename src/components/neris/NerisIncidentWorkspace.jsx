@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import {
   Sparkles, Wand2, Save, X, CheckCircle2, RefreshCw, PanelRightOpen,
-  Flame, MapPin, Clock, Info, Menu, ChevronDown,
+  Flame, MapPin, Clock, Info, Menu, ChevronDown, ExternalLink, Loader2,
 } from "lucide-react";
 import NerisFieldInput from "./NerisFieldInput.jsx";
 import NerisSearchableSelect from "./NerisSearchableSelect.jsx";
@@ -34,6 +34,18 @@ import {
   adminUnlockReport,
   REVIEW_STAGES,
 } from "../../lib/neris/workflow.js";
+import { uploadFirebaseFile, deleteFirebaseFile } from "../../lib/firebaseClient.js";
+import { buildNerisAttachmentPath } from "../../lib/storagePaths.js";
+import ObjectLifecycleActions from "../ObjectLifecycleActions.jsx";
+import {
+  archiveObject,
+  isObjectDeleted,
+  isObjectVisibleInActiveList,
+  isObjectVisibleInArchivedList,
+  restoreObject,
+  softDeleteObject,
+  withActiveLifecycle,
+} from "../../lib/objectLifecycle.js";
 
 /**
  * @param {{
@@ -49,6 +61,7 @@ import {
  *   onComplete?: () => void,
  *   onClose?: () => void,
  *   nerisFieldConfig?: Record<string, { inputMode?: string, allowToggle?: boolean }>,
+ *   departmentId?: string,
  * }} props
  */
 export default function NerisIncidentWorkspace({
@@ -63,6 +76,7 @@ export default function NerisIncidentWorkspace({
   onComplete,
   onClose,
   nerisFieldConfig = {},
+  departmentId = "",
 }) {
   const applicableSections = useMemo(() => resolveApplicableSections(report), [report]);
   const sidebarItems = useMemo(() => resolveApplicableSidebar(report), [report]);
@@ -74,6 +88,10 @@ export default function NerisIncidentWorkspace({
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
   const [reviewComment, setReviewComment] = useState("");
   const [bulletNotes, setBulletNotes] = useState("");
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const [attachmentError, setAttachmentError] = useState("");
+  const [attachmentView, setAttachmentView] = useState("active");
+  const [attachmentBusyId, setAttachmentBusyId] = useState("");
 
   const activeSidebar = sidebarItems.find((s) => s.id === activeSidebarId) || sidebarItems[0];
   const activeTabs = activeSidebar?.tabs || [];
@@ -501,26 +519,115 @@ export default function NerisIncidentWorkspace({
           </div>
         );
 
-      case "attachments":
+      case "attachments": {
+        const attachments = workspace.attachments || [];
+        const visibleAttachments = attachments
+          .filter((att) => !isObjectDeleted(att))
+          .filter((att) => (
+            attachmentView === "archived"
+              ? isObjectVisibleInArchivedList(att)
+              : isObjectVisibleInActiveList(att)
+          ));
+        const archivedCount = attachments.filter((att) => isObjectVisibleInArchivedList(att)).length;
+
+        async function runAttachmentLifecycle(att, action) {
+          if (!canEdit || locked || !att) return;
+          setAttachmentBusyId(att.id);
+          try {
+            let nextAtt;
+            if (action === "archive") nextAtt = archiveObject(att);
+            else if (action === "restore") {
+              nextAtt = restoreObject(att);
+              setAttachmentView("active");
+            } else {
+              if (att.storagePath) await deleteFirebaseFile(att.storagePath);
+              nextAtt = softDeleteObject(att);
+            }
+            updateWorkspaceArray(
+              "attachments",
+              attachments.map((item) => (item.id === att.id ? nextAtt : item))
+            );
+          } finally {
+            setAttachmentBusyId("");
+          }
+        }
+
         return (
           <div className="neris-attachments">
             <p className="muted">Attach photos, signatures, and supplemental files. Files sync when online.</p>
-            {(workspace.attachments || []).map((att, i) => (
-              <div key={att.id || i} className="neris-attachment-row">{att.name || att.filename}</div>
+            <div className="segmented-control" style={{ marginBottom: 12 }}>
+              <button type="button" className={attachmentView === "active" ? "active" : ""} onClick={() => setAttachmentView("active")}>Active</button>
+              <button type="button" className={attachmentView === "archived" ? "active" : ""} onClick={() => setAttachmentView("archived")}>
+                Archived{archivedCount ? ` (${archivedCount})` : ""}
+              </button>
+            </div>
+            {visibleAttachments.map((att, i) => (
+              <div key={att.id || i} className="neris-attachment-row" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                {att.downloadUrl || att.url ? (
+                  <a href={att.downloadUrl || att.url} target="_blank" rel="noreferrer">
+                    {att.name || att.filename}
+                    <ExternalLink size={12} style={{ marginLeft: 6 }} />
+                  </a>
+                ) : (
+                  <span>{att.name || att.filename}</span>
+                )}
+                {canEdit && !locked ? (
+                  <ObjectLifecycleActions
+                    record={att}
+                    canEdit={canEdit && !locked}
+                    busy={attachmentBusyId === att.id}
+                    compact
+                    onArchive={() => runAttachmentLifecycle(att, "archive")}
+                    onRestore={() => runAttachmentLifecycle(att, "restore")}
+                    onDelete={() => runAttachmentLifecycle(att, "delete")}
+                  />
+                ) : null}
+              </div>
             ))}
-            {canEdit && !locked ? (
-              <label className="secondary-button neris-upload-btn">
-                Add attachment
-                <input type="file" hidden onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const attachments = [...(workspace.attachments || []), { id: `ATT-${Date.now()}`, name: file.name, addedAt: new Date().toISOString() }];
-                  updateWorkspaceArray("attachments", attachments);
-                }} />
+            {!visibleAttachments.length ? <p className="muted">No attachments in this view.</p> : null}
+            {attachmentError ? <p className="object-upload-error hint-text">{attachmentError}</p> : null}
+            {canEdit && !locked && attachmentView === "active" ? (
+              <label className={`secondary-button neris-upload-btn ${attachmentUploading ? "is-disabled" : ""}`}>
+                {attachmentUploading ? <><Loader2 size={14} className="spin" /> Uploading…</> : "Add attachment"}
+                <input
+                  type="file"
+                  hidden
+                  disabled={attachmentUploading || !departmentId}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file || !departmentId || !report?.id) return;
+                    setAttachmentUploading(true);
+                    setAttachmentError("");
+                    try {
+                      const storagePath = buildNerisAttachmentPath(departmentId, report.id, file.name);
+                      const uploaded = await uploadFirebaseFile(storagePath, file);
+                      if (!uploaded?.downloadUrl) throw new Error("Upload failed");
+                      const next = [
+                        ...attachments,
+                        withActiveLifecycle({
+                          id: `ATT-${Date.now()}`,
+                          name: file.name,
+                          downloadUrl: uploaded.downloadUrl,
+                          storagePath: uploaded.storagePath,
+                          contentType: uploaded.contentType,
+                          addedAt: new Date().toISOString(),
+                        }),
+                      ];
+                      updateWorkspaceArray("attachments", next);
+                    } catch (error) {
+                      console.error("NERIS attachment upload failed", error);
+                      setAttachmentError("Attachment upload failed — try again.");
+                    } finally {
+                      setAttachmentUploading(false);
+                    }
+                  }}
+                />
               </label>
             ) : null}
           </div>
         );
+      }
 
       case "review":
         return (

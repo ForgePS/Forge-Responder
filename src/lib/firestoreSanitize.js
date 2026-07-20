@@ -98,7 +98,9 @@ export function sanitizeItemsForFirestore(items = []) {
 }
 
 export function restoreItemsFromFirestore(items = [], listKey = "") {
-  const restored = items.map((item) => restoreFromFirestore(item));
+  const restored = (Array.isArray(items) ? items : [])
+    .map((item) => restoreFromFirestore(item))
+    .filter((item) => item != null && typeof item === "object");
   if (listKey === "hlfd-rms-personnel") {
     return restored.map((item) => normalizePersonnelRecord(item));
   }

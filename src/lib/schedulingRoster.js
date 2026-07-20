@@ -253,18 +253,19 @@ export function buildPartialSlotRosterId(personnelId = "", dayId = "", unit = ""
 
 function rosterEntryToCrewMember(entry = {}, personnelById = {}, dayRosterMember = null, shiftChangeTime = "07:00") {
   const person = personnelById[entry.personnelId] || {};
+  const resolvedShift = entry.shift || person.shift || "";
   return {
     id: entry.id,
     personnelId: entry.personnelId,
     name: entry.name || getPersonDisplayName(person),
     rank: entry.rank || person.rank || "",
-    shift: entry.shift || person.shift,
-    homeShift: entry.shift || person.shift,
+    shift: resolvedShift,
+    homeShift: resolvedShift,
     apparatus: canonicalApparatusUnitName(entry.apparatus),
     position: entry.position || resolvePersonPosition(person),
     status: entry.status === "Leave" ? "Leave" : "On Duty",
     isOvertime: Boolean(entry.isOvertime),
-    overtimeLabel: entry.isOvertime ? `${entry.shift || person.shift || "Other"} Shift OT` : "",
+    overtimeLabel: entry.isOvertime ? `${resolvedShift || "Other"} Shift OT` : "",
     tradeLabel: dayRosterMember?.tradeLabel || "",
     leaveLabel: dayRosterMember?.leaveLabel || "",
     durationHours: resolveMemberDurationHours(entry, shiftChangeTime),
@@ -285,7 +286,9 @@ export function resolveApparatusCrewMembers(
 ) {
   const normalizedUnit = canonicalApparatusUnitName(unit);
   const personnelById = Object.fromEntries(
-    (Array.isArray(personnel) ? personnel : []).map((person) => [person.id, person])
+    (Array.isArray(personnel) ? personnel : [])
+      .filter((person) => person && person.id)
+      .map((person) => [person.id, person])
   );
   const dayRosterByPerson = Object.fromEntries(
     (Array.isArray(dayRoster) ? dayRoster : [])
@@ -672,6 +675,7 @@ function rosterOverrideForPerson(roster = [], personId = "", dayId = "") {
 }
 
 function isActivePerson(person = {}) {
+  if (!person || typeof person !== "object") return false;
   const status = normalizeStatus(person.status);
   if (INACTIVE_STATUSES.has(status)) return false;
   if (!normalizeShift(person.shift)) return false;
@@ -719,6 +723,7 @@ export function buildDayRoster({
   const { excluded, included } = resolveShiftTradeRosterAdjustments(selectedDayId, shiftTrades);
 
   return (personnel || [])
+    .filter(Boolean)
     .filter((person) => {
       if (!isActivePerson(person)) return false;
       if (excluded.has(person.id)) return false;
@@ -789,7 +794,9 @@ export function resolveApprovedLeaveCountForDay({
 
 export function computeDayStaffingMetrics(dayRoster = [], personnel = []) {
   const personnelById = Object.fromEntries(
-    (Array.isArray(personnel) ? personnel : []).map((person) => [person.id, person])
+    (Array.isArray(personnel) ? personnel : [])
+      .filter((person) => person && person.id)
+      .map((person) => [person.id, person])
   );
   const onDuty = dayRoster.filter((member) => member.status !== "Leave");
 
@@ -1162,7 +1169,9 @@ export function buildOvertimeRosterMembers({
 } = {}) {
   const duty = normalizeShift(dutyShift);
   const personnelById = Object.fromEntries(
-    (Array.isArray(personnel) ? personnel : []).map((person) => [person.id, person])
+    (Array.isArray(personnel) ? personnel : [])
+      .filter((person) => person && person.id)
+      .map((person) => [person.id, person])
   );
 
   return resolveOvertimeRosterEntries(roster, selectedDayId)

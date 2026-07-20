@@ -106,4 +106,6 @@ module.exports = {
   assertDepartmentAccessOrPublicGateway,
   assertDepartmentManage,
   assertPlatformSuperAdmin,
+  isPlatformCreator,
+  isDepartmentMember,
 };

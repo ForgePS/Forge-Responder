@@ -3,7 +3,7 @@ import { Building2, CirclePlus, CalendarRange, Layers, Mail, Settings } from "lu
 import CreateDepartmentPanel from "../components/CreateDepartmentPanel.jsx";
 import DepartmentBranchesPanel from "../components/DepartmentBranchesPanel.jsx";
 import CreatorWorkspaceHero from "../components/CreatorWorkspaceHero.jsx";
-import DepartmentSubscriptionPanel from "../components/DepartmentSubscriptionPanel.jsx";
+import PlatformSubscriptionsPanel from "../components/PlatformSubscriptionsPanel.jsx";
 import InternalEmailBoard from "../components/InternalEmailBoard.jsx";
 import DepartmentModulesPanel from "../components/DepartmentModulesPanel.jsx";
 import PlatformConfigPanel from "../components/PlatformConfigPanel.jsx";
@@ -16,6 +16,7 @@ import {
   loadDepartmentProfile,
   loadDepartmentSettings,
   pruneDuplicateHornLakeBranches,
+  pruneGhostDepartmentBranches,
   repairMislabeledDepartmentRegistry
 } from "../lib/platformService.js";
 import { DEFAULT_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isPlatformScope } from "../lib/tenantPaths.js";
@@ -63,6 +64,7 @@ export default function CreatorConsolePage() {
       if (isCreator) {
         await repairMislabeledDepartmentRegistry();
         await pruneDuplicateHornLakeBranches();
+        await pruneGhostDepartmentBranches();
       }
 
       let items = await listPlatformDepartments();
@@ -144,7 +146,7 @@ export default function CreatorConsolePage() {
   function openDepartmentSubscriptions() {
     selectWorkspace(PLATFORM_SCOPE_ID);
     setTab("subscriptions");
-    setMessage("Open a branch below to set its subscription expiration date.");
+    setMessage("Open Subscriptions to manage plans, billing status, and renewals.");
   }
 
   function openPlatformWorkspace() {
@@ -288,8 +290,8 @@ export default function CreatorConsolePage() {
       )}
 
       {tab === "subscriptions" && inPlatformWorkspace && isCreator && (
-        <Panel title="Branch Subscriptions" icon={CalendarRange}>
-          <DepartmentSubscriptionPanel onMessage={setMessage} onOpenDepartment={openDepartment} />
+        <Panel title="Department Subscriptions" icon={CalendarRange}>
+          <PlatformSubscriptionsPanel onMessage={setMessage} onOpenDepartment={openDepartment} />
         </Panel>
       )}
 

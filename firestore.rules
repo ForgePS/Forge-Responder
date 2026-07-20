@@ -69,6 +69,16 @@ service cloud.firestore {
       allow write: if isPlatformCreator();
     }
 
+    match /platformSubscriptionPlans/{planId} {
+      allow read: if isAuthenticated();
+      allow write: if isPlatformCreator();
+    }
+
+    match /platformSubscriptions/{departmentId} {
+      allow read: if isAuthenticated() && (isPlatformCreator() || canAccessDepartment(departmentId));
+      allow write: if isPlatformCreator();
+    }
+
     match /rmsGateways/{gatewayId} {
       allow read: if true;
       allow create, update: if isPlatformCreator();
@@ -167,6 +177,25 @@ service cloud.firestore {
       }
       match /integrations/{integrationId} {
         allow read, write: if false;
+      }
+      // Academy Integration Hub — callable / Admin SDK only (no client writes).
+      match /academyIntegrations/{connectionId} {
+        allow read, write: if false;
+      }
+      match /academyAuditLogs/{logId} {
+        allow read, write: if false;
+      }
+      match /academyEvents/{eventId} {
+        allow read, write: if false;
+      }
+      match /people/{personId} {
+        allow read, write: if false;
+        match /academyLinks/{linkId} {
+          allow read, write: if false;
+        }
+        match /academyCache/{connectionId} {
+          allow read, write: if false;
+        }
       }
       match /notifications/{notificationId} {
         allow read: if canAccessDepartment(departmentId);

@@ -5,13 +5,27 @@ import {
 } from "lucide-react";
 import { documentCategoryMap } from "../data/sprintModuleSeeds.js";
 import FleetRecordEditModal, { ASSET_EDIT_FIELDS } from "../components/FleetRecordEditModal.jsx";
+import ObjectUploadField from "../components/ObjectUploadField.jsx";
+import ObjectLifecycleActions from "../components/ObjectLifecycleActions.jsx";
+import { buildDocumentLibraryPath } from "../lib/storagePaths.js";
+import { deleteFirebaseFile } from "../lib/firebaseClient.js";
+import {
+  archiveObject,
+  isObjectArchived,
+  isObjectDeleted,
+  isObjectVisibleInActiveList,
+  isObjectVisibleInArchivedList,
+  restoreObject,
+  softDeleteObject,
+  withActiveLifecycle,
+} from "../lib/objectLifecycle.js";
 
 function Badge({ children }) {
   const text = String(children).toLowerCase();
   let tone = "neutral";
   if (/active|complete|approved|current|pass|scheduled|in service/.test(text)) tone = "success";
-  if (/overdue|deficit|fail|critical|out of service/.test(text)) tone = "critical";
-  if (/due|pending|pm|review|leave/.test(text)) tone = "warning";
+  if (/overdue|deficit|fail|critical|out of service|deleted/.test(text)) tone = "critical";
+  if (/due|pending|pm|review|leave|archived/.test(text)) tone = "warning";
   if (/progress|submitted|info/.test(text)) tone = "info";
   return <span className={`badge badge-${tone}`}>{children}</span>;
 }
@@ -28,32 +42,238 @@ function FleetSummary({ items }) {
   return <section className="fleet-summary">{items.map(([label, value, tone]) => <div key={label} className={`fleet-stat stat-${tone}`}><strong>{value}</strong><span>{label}</span></div>)}</section>;
 }
 
-export function DocumentsPage({ query, records = [], setRecords, navLabel = "Documents" }) {
+export function DocumentsPage({ query, records = [], setRecords, navLabel = "Documents", departmentId = "", canEdit = true }) {
   const category = documentCategoryMap[navLabel];
   const [filter, setFilter] = useState(category || "All");
-  const [selectedId, setSelectedId] = useState(records[0]?.id || "");
-  const selected = records.find((item) => item.id === selectedId) || records[0];
-  const visible = records.filter((item) => {
+  const [lifecycleView, setLifecycleView] = useState("active");
+  const [selectedId, setSelectedId] = useState("");
+  const [showUpload, setShowUpload] = useState(false);
+  const [busyId, setBusyId] = useState("");
+  const [notice, setNotice] = useState("");
+  const [uploadMeta, setUploadMeta] = useState({ title: "", category: category || "Upload", description: "" });
+
+  const scoped = useMemo(() => (
+    records.filter((item) => !isObjectDeleted(item)).filter((item) => (
+      lifecycleView === "archived" ? isObjectVisibleInArchivedList(item) : isObjectVisibleInActiveList(item)
+    ))
+  ), [records, lifecycleView]);
+
+  const visible = scoped.filter((item) => {
     const matchesCategory = filter === "All" || item.category === filter;
     const haystack = Object.values(item).join(" ").toLowerCase();
     return matchesCategory && haystack.includes(query.toLowerCase());
   });
 
+  const selected = visible.find((item) => item.id === selectedId) || visible[0] || null;
+
+  useEffect(() => {
+    if (!visible.length) {
+      setSelectedId("");
+      return;
+    }
+    if (!visible.some((item) => item.id === selectedId)) {
+      setSelectedId(visible[0].id);
+    }
+  }, [visible, selectedId]);
+
   function acknowledge(id) {
     setRecords((current) => current.map((item) => item.id === id ? { ...item, acknowledgementStatus: "Acknowledged" } : item));
   }
 
+  function patchRecord(id, mapper, successNotice) {
+    setRecords((current) => current.map((item) => (item.id === id ? mapper(item) : item)));
+    if (successNotice) setNotice(successNotice);
+  }
+
+  async function runLifecycle(id, action) {
+    const record = records.find((item) => item.id === id);
+    if (!record || !canEdit) return;
+    setBusyId(id);
+    try {
+      if (action === "archive") {
+        patchRecord(id, (item) => archiveObject(item), "Document archived.");
+      } else if (action === "restore") {
+        patchRecord(id, (item) => restoreObject(item), "Document restored.");
+        setLifecycleView("active");
+      } else if (action === "delete") {
+        if (record.storagePath) await deleteFirebaseFile(record.storagePath);
+        patchRecord(id, (item) => softDeleteObject(item), "Document deleted.");
+        setSelectedId("");
+      }
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  function handleUploaded(uploaded) {
+    const today = new Date().toISOString().slice(0, 10);
+    const ext = String(uploaded.name || "").split(".").pop()?.toUpperCase() || "FILE";
+    const next = withActiveLifecycle({
+      id: `DOC-${Date.now()}`,
+      title: uploadMeta.title.trim() || uploaded.name,
+      category: uploadMeta.category || "Upload",
+      subcategory: "Uploads",
+      version: "1.0",
+      effectiveDate: today,
+      uploadedBy: "Current User",
+      uploadedDate: today,
+      fileType: ext,
+      fileUrl: uploaded.downloadUrl,
+      storagePath: uploaded.storagePath,
+      tags: "upload",
+      requiresAcknowledgement: "No",
+      acknowledgementStatus: "Not Required",
+      description: uploadMeta.description.trim() || `Uploaded file: ${uploaded.name}`,
+    });
+    setRecords((current) => [next, ...current]);
+    setSelectedId(next.id);
+    setLifecycleView("active");
+    setShowUpload(false);
+    setUploadMeta({ title: "", category: category || "Upload", description: "" });
+    setNotice("Document uploaded.");
+  }
+
+  const archivedCount = records.filter((item) => isObjectArchived(item)).length;
+
   return (
     <div className="module-page documents-page">
-      <section className="module-heading"><div><span className="module-icon"><FileText size={22} /></span><div><h1>{navLabel}</h1><p>Department policies, protocols, forms, and uploaded reference documents.</p></div></div></section>
-      <section className="cert-toolbar"><div className="segmented-control">{["All", "SOG", "Policy", "EMS Protocol", "Form", "Upload"].map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}</div><span>{visible.length} documents</span></section>
-      <section className="documents-workspace">
-        <Panel title="Document Library" icon={FileText}><div className="document-library">{visible.map((item) => <button key={item.id} className={item.id === selected?.id ? "doc-row selected" : "doc-row"} onClick={() => setSelectedId(item.id)}><strong>{item.title}</strong><small>{item.category} · v{item.version}</small><Badge>{item.acknowledgementStatus}</Badge></button>)}</div></Panel>
-        {selected && <Panel title="Document Detail" icon={BookOpen} action={selected.acknowledgementStatus === "Pending" ? <button className="text-button" onClick={() => acknowledge(selected.id)}>Acknowledge</button> : null}>
-          <div className="cert-detail-grid">{[["Category", selected.category], ["Version", selected.version], ["Effective", selected.effectiveDate], ["Uploaded By", selected.uploadedBy], ["File Type", selected.fileType], ["Acknowledgement", selected.acknowledgementStatus], ["Tags", selected.tags], ["Description", selected.description]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
-          {selected.fileUrl && <button className="primary-button" style={{ marginTop: 12 }}>Open Document</button>}
-        </Panel>}
+      <section className="module-heading">
+        <div>
+          <span className="module-icon"><FileText size={22} /></span>
+          <div>
+            <h1>{navLabel}</h1>
+            <p>Department policies, protocols, forms, and uploaded reference documents.</p>
+          </div>
+        </div>
+        {canEdit ? (
+          <button className="primary-button" type="button" onClick={() => setShowUpload(true)} disabled={!departmentId}>
+            <Upload size={14} /> Upload Document
+          </button>
+        ) : null}
       </section>
+      {notice ? (
+        <div className="success-banner">
+          {notice}
+          <button type="button" onClick={() => setNotice("")}><X size={13} /></button>
+        </div>
+      ) : null}
+      <section className="cert-toolbar">
+        <div className="segmented-control">
+          <button className={lifecycleView === "active" ? "active" : ""} onClick={() => setLifecycleView("active")}>Active</button>
+          <button className={lifecycleView === "archived" ? "active" : ""} onClick={() => setLifecycleView("archived")}>
+            Archived{archivedCount ? ` (${archivedCount})` : ""}
+          </button>
+        </div>
+        <div className="segmented-control">
+          {["All", "SOG", "Policy", "EMS Protocol", "Form", "Upload"].map((item) => (
+            <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>
+          ))}
+        </div>
+        <span>{visible.length} documents</span>
+      </section>
+      <section className="documents-workspace">
+        <Panel title="Document Library" icon={FileText}>
+          <div className="document-library">
+            {visible.map((item) => (
+              <button
+                key={item.id}
+                className={item.id === selected?.id ? "doc-row selected" : "doc-row"}
+                onClick={() => setSelectedId(item.id)}
+              >
+                <strong>{item.title}</strong>
+                <small>{item.category} · v{item.version}</small>
+                <Badge>{isObjectArchived(item) ? "Archived" : item.acknowledgementStatus}</Badge>
+              </button>
+            ))}
+            {!visible.length ? <div className="empty-table">No documents in this view.</div> : null}
+          </div>
+        </Panel>
+        {selected && (
+          <Panel
+            title="Document Detail"
+            icon={BookOpen}
+            action={selected.acknowledgementStatus === "Pending" && isObjectVisibleInActiveList(selected) ? (
+              <button className="text-button" onClick={() => acknowledge(selected.id)}>Acknowledge</button>
+            ) : null}
+          >
+            <div className="cert-detail-grid">
+              {[
+                ["Category", selected.category],
+                ["Version", selected.version],
+                ["Effective", selected.effectiveDate],
+                ["Uploaded By", selected.uploadedBy],
+                ["File Type", selected.fileType],
+                ["Acknowledgement", selected.acknowledgementStatus],
+                ["Lifecycle", isObjectArchived(selected) ? "Archived" : "Active"],
+                ["Tags", selected.tags],
+                ["Description", selected.description],
+              ].map(([label, value]) => (
+                <div key={label}><span>{label}</span><strong>{value}</strong></div>
+              ))}
+            </div>
+            {selected.fileUrl && selected.fileUrl !== "#" ? (
+              <a className="primary-button" href={selected.fileUrl} target="_blank" rel="noreferrer" style={{ marginTop: 12, display: "inline-flex" }}>
+                Open Document
+              </a>
+            ) : null}
+            {canEdit ? (
+              <div style={{ marginTop: 12 }}>
+                <ObjectLifecycleActions
+                  record={selected}
+                  canEdit={canEdit}
+                  busy={busyId === selected.id}
+                  onArchive={() => runLifecycle(selected.id, "archive")}
+                  onRestore={() => runLifecycle(selected.id, "restore")}
+                  onDelete={() => runLifecycle(selected.id, "delete")}
+                />
+              </div>
+            ) : null}
+          </Panel>
+        )}
+      </section>
+      {showUpload && canEdit ? (
+        <Modal title="Upload Document" onClose={() => setShowUpload(false)}>
+          <div className="upload-form" style={{ marginBottom: 12 }}>
+            <label>
+              <span>Title</span>
+              <input
+                value={uploadMeta.title}
+                onChange={(e) => setUploadMeta((current) => ({ ...current, title: e.target.value }))}
+                placeholder="Document title"
+              />
+            </label>
+            <label>
+              <span>Category</span>
+              <select
+                value={uploadMeta.category}
+                onChange={(e) => setUploadMeta((current) => ({ ...current, category: e.target.value }))}
+              >
+                {["SOG", "Policy", "EMS Protocol", "Form", "Upload"].map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+            <label className="wide-field">
+              <span>Description</span>
+              <input
+                value={uploadMeta.description}
+                onChange={(e) => setUploadMeta((current) => ({ ...current, description: e.target.value }))}
+                placeholder="Optional description"
+              />
+            </label>
+          </div>
+          <ObjectUploadField
+            label="Upload to document library"
+            hint="PDF, Office, or image files up to 12 MB"
+            disabled={!departmentId}
+            buildPath={(file) => buildDocumentLibraryPath(departmentId, file.name)}
+            onUploaded={handleUploaded}
+          />
+          <div className="modal-actions">
+            <button className="secondary-button" type="button" onClick={() => setShowUpload(false)}>Cancel</button>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

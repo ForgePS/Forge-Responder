@@ -88,13 +88,14 @@ export function resolveEmployeePerson(personnel = [], membership = {}, user = nu
 
   if (isPrivileged) {
     const systemUsers = personnel.filter((person) => (
-      person.isSystemUser
-      && !/^inactive|terminated/i.test(String(person.status || ""))
+      person?.isSystemUser
+      && !/^inactive|terminated/i.test(String(person?.status || ""))
     ));
     if (systemUsers.length === 1) return systemUsers[0];
 
     const administrationLead = personnel.find((person) => (
-      normalizeText(person.shift).includes("administration")
+      person
+      && normalizeText(person.shift).includes("administration")
       && /chief|admin/i.test(String(person.rank || ""))
       && !/^inactive|terminated/i.test(String(person.status || ""))
     ));
@@ -178,12 +179,13 @@ export function trainingBelongsToEmployee(record = {}, membership = {}, myPerson
 }
 
 function resolveLegacyEmployeeShiftDay(scheduleDays = [], shift = "", todayId = "") {
-  const sameDay = scheduleDays.find((day) => day.id === todayId);
+  const days = (Array.isArray(scheduleDays) ? scheduleDays : []).filter(Boolean);
+  const sameDay = days.find((day) => day.id === todayId);
   if (sameDay && normalizeText(sameDay.shift) === normalizeText(shift)) {
     return sameDay;
   }
 
-  return scheduleDays.find((day) => normalizeText(day.shift) === normalizeText(shift)) || scheduleDays[0] || null;
+  return days.find((day) => normalizeText(day.shift) === normalizeText(shift)) || days[0] || null;
 }
 
 export function resolveEmployeeScheduleContext(

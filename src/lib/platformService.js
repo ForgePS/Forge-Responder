@@ -22,11 +22,12 @@ import { DEFAULT_DEPARTMENT_ID, DEMO_DEPARTMENT_ID, isDemoDepartment, isPlatform
 import { ensureDefaultRoles } from "./roleService.js";
 import { defaultSubscriptionDates, normalizeSubscription } from "./subscriptionUtils.js";
 import { normalizeDepartmentStateId } from "./departmentBranchUtils.js";
+import { GHOST_DEPARTMENT_IDS, RESERVED_GATEWAY_PATHS } from "./gatewayRouting.js";
 
 function isHornLakeRegistryEntry(department = {}) {
   const keys = [department.docId, department.id, department.name, department.shortName]
     .map((value) => slugifyDepartmentId(String(value || "")));
-  return keys.some((key) => key.includes("horn-lake"));
+  return keys.some((key) => key.includes("horn-lake") || key.includes("hornlake"));
 }
 
 async function resolveDepartmentRegistryProfile(departmentId) {
@@ -199,6 +200,53 @@ export async function pruneDuplicateHornLakeBranches() {
   }
 
   return { pruned, kept: keeper.docId };
+}
+
+/**
+ * Soft-disables accidental ghost branches (e.g. /admin, /api, mistyped Horn Lake IDs)
+ * that were auto-seeded as "Fire Department".
+ */
+export async function pruneGhostDepartmentBranches() {
+  const db = getFirestoreDb();
+  if (!db) return { pruned: [] };
+
+  const snap = await getDocs(collection(db, "platformDepartments"));
+  const now = new Date().toISOString();
+  const keptIds = new Set([DEFAULT_DEPARTMENT_ID, DEMO_DEPARTMENT_ID]);
+  const pruned = [];
+
+  for (const item of snap.docs) {
+    const data = item.data() || {};
+    if (data.status === "disabled") continue;
+    if (keptIds.has(item.id)) continue;
+
+    const isReservedGhost = RESERVED_GATEWAY_PATHS.has(item.id) || GHOST_DEPARTMENT_IDS.has(item.id);
+    const looksDefaultNamed = slugifyDepartmentId(data.name || "") === "fire-department"
+      && slugifyDepartmentId(data.shortName || data.name || "") === "fire-department"
+      && isReservedGhost;
+
+    if (!isReservedGhost && !looksDefaultNamed) continue;
+
+    await setDoc(doc(db, "platformDepartments", item.id), {
+      status: "disabled",
+      disabledReason: "ghost-department-branch",
+      updatedAt: now,
+    }, { merge: true });
+
+    await setDoc(doc(db, "rmsGateways", item.id), {
+      status: "disabled",
+      disabledReason: "ghost-department-branch",
+      updatedAt: now,
+    }, { merge: true }).catch(() => null);
+
+    pruned.push(item.id);
+  }
+
+  if (pruned.length) {
+    notifyDepartmentsChanged();
+  }
+
+  return { pruned };
 }
 
 export async function ensureDepartmentRegistry(departmentId, profile = {}) {
@@ -399,6 +447,21 @@ export async function ensureCreatorDepartmentAccess(user, departmentId) {
   const db = getFirestoreDb();
   if (!db || !user?.uid || !departmentId || isPlatformScope(departmentId)) return null;
 
+  // Never mint registry rows for reserved / ghost URL paths.
+  if (RESERVED_GATEWAY_PATHS.has(departmentId) || GHOST_DEPARTMENT_IDS.has(departmentId)) {
+    return null;
+  }
+
+  const registrySnap = await getDoc(doc(db, "platformDepartments", departmentId));
+  const isKnownSeed = departmentId === DEFAULT_DEPARTMENT_ID || isDemoDepartment(departmentId);
+  if (!registrySnap.exists() && !isKnownSeed) {
+    // Visiting an unknown gateway path as a creator must not invent a "Fire Department" branch.
+    return null;
+  }
+  if (registrySnap.exists() && registrySnap.data()?.status === "disabled") {
+    return null;
+  }
+
   await ensureDefaultRoles(departmentId);
   const registryProfile = await resolveDepartmentRegistryProfile(departmentId);
   await ensureDepartmentRegistry(departmentId, registryProfile);
@@ -493,6 +556,16 @@ export async function registerPlatformDepartment(departmentId, profile = {}, opt
 
   if (user?.uid) {
     await ensureCreatorDepartmentAccess(user, departmentId);
+  }
+
+  try {
+    const { ensureCustomerSubscription } = await import("./platformSubscriptionService.js");
+    await ensureCustomerSubscription(departmentId, user?.uid || "", {
+      billingContactEmail: departmentProfile.contactEmail,
+      legacySubscription: subscription,
+    });
+  } catch (error) {
+    console.warn("Failed to provision department subscription", error);
   }
 
   notifyDepartmentsChanged();

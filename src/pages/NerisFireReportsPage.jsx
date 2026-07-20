@@ -95,7 +95,7 @@ export default function NerisFireReportsPage({
   scheduleDays = [],
   hydrants = [],
 }) {
-  const { settings } = useTenant();
+  const { settings, departmentId } = useTenant();
   const nerisFieldConfig = useMemo(
     () => normalizeNerisFieldConfig(settings?.nerisFieldConfig),
     [settings?.nerisFieldConfig],
@@ -262,6 +262,7 @@ export default function NerisFireReportsPage({
           report={selected}
           allReports={visible}
           canEdit={canEdit}
+          departmentId={departmentId}
           nerisFieldConfig={nerisFieldConfig}
           onUpdate={updateSelected}
           onUpdateModule={updateModuleField}
