@@ -1,5 +1,7 @@
 const { AcademyConnector } = require("./base");
 const { loadHubSettings, resolvePersonIdentityViaHub } = require("../../forgeHubIdentity");
+const { upsertEnrollmentsForPerson } = require("../academyTrainingSync");
+const { upsertAcademyCache } = require("../academyPeopleStore");
 
 /**
  * Native Forge Academy connector.
@@ -14,32 +16,110 @@ class ForgeAcademyConnector extends AcademyConnector {
       hubBearerToken: String(this.secrets.hubBearerToken || ""),
       hubSecret: String(this.secrets.hubSecret || ""),
       forgeDepartmentId: String(this.secrets.forgeDepartmentId || this.connection?.config?.forgeDepartmentId || ""),
+      apiBaseUrl: String(this.secrets.apiBaseUrl || this.connection?.config?.apiBaseUrl || "").replace(/\/$/, ""),
+      apiKey: String(this.secrets.apiKey || ""),
     };
 
-    if (fromSecrets.hubBaseUrl) return fromSecrets;
+    if (fromSecrets.hubBaseUrl || fromSecrets.apiBaseUrl) return fromSecrets;
 
     if (this.db && this.connection?.departmentId) {
-      return loadHubSettings(this.db, this.connection.departmentId);
+      const hub = await loadHubSettings(this.db, this.connection.departmentId);
+      return { ...fromSecrets, ...hub, apiBaseUrl: fromSecrets.apiBaseUrl };
     }
     return fromSecrets;
   }
 
+  academyCommandHeaders(settings) {
+    const headers = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+    const bearer = settings.hubBearerToken || settings.apiKey;
+    const secret = settings.hubSecret || settings.apiKey;
+    if (bearer) headers.Authorization = `Bearer ${bearer}`;
+    if (secret) headers["X-Integration-Secret"] = secret;
+    return headers;
+  }
+
+  /**
+   * Call Academy hubAcademyCommand (direct apiBaseUrl) or Hub academy command proxy.
+   */
+  async callAcademyCommand(type, data = {}) {
+    const settings = await this.resolveHubSettings();
+    const academyBase = settings.apiBaseUrl;
+    const hubBase = settings.hubBaseUrl;
+
+    const body = { type, ...data };
+    const headers = this.academyCommandHeaders(settings);
+
+    if (academyBase) {
+      const response = await fetch(`${academyBase}/hubAcademyCommand`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok || json.ok === false) {
+        throw new Error(json.message || json.error || `Academy command failed (${response.status})`);
+      }
+      return json;
+    }
+
+    if (hubBase) {
+      const response = await fetch(`${hubBase}/api/integrations/v1/academy/command`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok || json.ok === false) {
+        throw new Error(json.message || json.error || `Hub academy command failed (${response.status})`);
+      }
+      return json;
+    }
+
+    throw new Error("Configure Academy API base URL or Hub base URL on this connection.");
+  }
+
   async testConnection() {
     const settings = await this.resolveHubSettings();
-    if (!settings.hubBaseUrl) {
+    if (!settings.hubBaseUrl && !settings.apiBaseUrl) {
       return {
         ok: false,
         status: "authentication_error",
-        message: "Hub base URL is not configured for this Forge Academy connection.",
+        message: "Hub base URL or Academy API base URL is not configured for this Forge Academy connection.",
       };
     }
 
     try {
+      if (settings.apiBaseUrl) {
+        const response = await fetch(`${settings.apiBaseUrl}/hubAcademyCommand`, {
+          method: "POST",
+          headers: this.academyCommandHeaders(settings),
+          body: JSON.stringify({ type: "list_enrollments", forgePersonId: "__connection_probe__" }),
+        });
+        // Auth failures are still "reachable" if we get a structured response.
+        if (response.status >= 500) {
+          return {
+            ok: false,
+            status: "degraded",
+            message: `Academy returned ${response.status}.`,
+            httpStatus: response.status,
+          };
+        }
+        return {
+          ok: true,
+          status: "connected",
+          message: "Forge Academy command endpoint is reachable.",
+          httpStatus: response.status,
+          hubBaseUrlHost: safeHost(settings.apiBaseUrl),
+        };
+      }
+
       const headers = { Accept: "application/json" };
       if (settings.hubBearerToken) headers.Authorization = `Bearer ${settings.hubBearerToken}`;
       if (settings.hubSecret) headers["X-Integration-Secret"] = settings.hubSecret;
 
-      // Unauthenticated probe expects 401; with auth any non-5xx is reachability OK.
       const response = await fetch(`${settings.hubBaseUrl}/api/integrations/v1/sync/status`, {
         method: "GET",
         headers,
@@ -136,8 +216,33 @@ class ForgeAcademyConnector extends AcademyConnector {
     };
   }
 
-  async getEnrollments() {
-    return [];
+  async getEnrollments(personId) {
+    const forgePersonId = String(personId || "").trim();
+    if (!forgePersonId) {
+      return { enrollments: [], message: "forgePersonId is required." };
+    }
+
+    try {
+      const result = await this.callAcademyCommand("list_enrollments", {
+        forgePersonId,
+        personId: forgePersonId,
+      });
+      const enrollments = Array.isArray(result.enrollments) ? result.enrollments : [];
+      return {
+        status: "ok",
+        enrollments,
+        studentId: result.studentId || null,
+        forgePersonId: result.forgePersonId || forgePersonId,
+        connectionId: this.connectionId,
+      };
+    } catch (error) {
+      return {
+        status: "error",
+        enrollments: [],
+        connectionId: this.connectionId,
+        message: error instanceof Error ? error.message : "Failed to list enrollments.",
+      };
+    }
   }
 
   async getCourseCompletions() {
@@ -149,13 +254,23 @@ class ForgeAcademyConnector extends AcademyConnector {
   }
 
   async getTranscript(personId) {
+    const enrollmentsResult = await this.getEnrollments(personId);
+    const enrollments = Array.isArray(enrollmentsResult.enrollments) ? enrollmentsResult.enrollments : [];
     return {
-      status: "not_implemented",
+      status: enrollmentsResult.status || "ok",
       personId,
       connectionId: this.connectionId,
       academyOrganizationId: this.connection.academyOrganizationId,
-      entries: [],
-      message: "Transcript retrieval scaffolding — wire Academy B2B in Phase 2 flesh-out.",
+      entries: enrollments.map((row) => ({
+        type: "enrollment",
+        courseName: row.courseName,
+        courseNumber: row.courseNumber,
+        status: row.status,
+        classStartDate: row.classStartDate,
+        classEndDate: row.classEndDate,
+        registrationId: row.registrationId || row.id,
+      })),
+      message: enrollmentsResult.message || undefined,
     };
   }
 
@@ -167,11 +282,45 @@ class ForgeAcademyConnector extends AcademyConnector {
     };
   }
 
-  async syncPerson(input) {
+  async syncPerson(input = {}) {
+    const forgePersonId = String(input.personId || input.forgePersonId || "").trim();
+    if (!forgePersonId) {
+      return { status: "error", message: "personId (forgePersonId) is required." };
+    }
+
+    const enrollmentsResult = await this.getEnrollments(forgePersonId);
+    const enrollments = Array.isArray(enrollmentsResult.enrollments) ? enrollmentsResult.enrollments : [];
+
+    let upserts = [];
+    if (this.db && this.connection?.departmentId) {
+      upserts = await upsertEnrollmentsForPerson(
+        this.db,
+        this.connection.departmentId,
+        {
+          id: input.personnelId || input.rmsPersonId || null,
+          forgePersonId,
+          name: input.name || input.studentName || "",
+        },
+        enrollments
+      );
+      await upsertAcademyCache(this.db, this.connection.departmentId, forgePersonId, this.connectionId, {
+        academyOrganizationId: this.connection.academyOrganizationId,
+        syncStatus: enrollmentsResult.status === "error" ? "error" : "synced",
+        lastSyncedAt: new Date().toISOString(),
+        activeEnrollments: enrollments.length,
+        completedCourses: upserts.filter((r) => r.record?.status === "Complete").length,
+        lastError: enrollmentsResult.message || null,
+      });
+    }
+
     return {
-      status: "not_implemented",
-      message: "Person sync scaffolding.",
-      personId: input?.personId || null,
+      status: enrollmentsResult.status === "error" ? "error" : "ok",
+      personId: forgePersonId,
+      connectionId: this.connectionId,
+      enrollmentCount: enrollments.length,
+      upserts: upserts.length,
+      message: enrollmentsResult.message || undefined,
+      enrollments,
     };
   }
 }

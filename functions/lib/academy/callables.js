@@ -11,8 +11,10 @@ const {
   setPrimaryConnection,
   disableConnection,
   disconnectConnection,
+  getActiveConnections,
+  getPrimaryConnection,
 } = require("./academyIntegrationsStore");
-const { saveConnectionSecrets, clearConnectionSecrets } = require("./academySecrets");
+const { saveConnectionSecrets, clearConnectionSecrets, loadConnectionSecrets } = require("./academySecrets");
 const { writeAcademyAudit, listAcademyAuditLogs } = require("./academyAudit");
 const { routeAcademyAction, loadUserPermissions, assertPermission } = require("./academyConnectorRouter");
 const { ACADEMY_PERMISSIONS, PROVIDER_TYPES, defaultCapabilitiesFor } = require("./types");
@@ -26,6 +28,12 @@ const {
   upsertAcademyCache,
 } = require("./academyPeopleStore");
 const { replayAcademyEvent, ingestAcademyEvent } = require("./academyEventProcessor");
+const { createAcademyConnector } = require("./academyConnectorFactory");
+const {
+  mapEnrollmentToPortalRow,
+  upsertEnrollmentsForPerson,
+} = require("./academyTrainingSync");
+const { loadPersonnelItems } = require("../personnel");
 
 function requireDept(data) {
   const departmentId = String(data?.departmentId || "").trim();
@@ -268,6 +276,100 @@ async function handleIngestAcademyEvent(db, request) {
   return { ok: true, result };
 }
 
+/**
+ * Employee-safe: list Academy enrollments for the caller's linked personnel record
+ * and upsert them into My Training.
+ */
+async function handleListMyAcademyTraining(db, request) {
+  const departmentId = requireDept(request.data);
+  await assertDepartmentAccess(db, departmentId, request.auth);
+
+  const userSnap = await db.doc(`departments/${departmentId}/users/${request.auth.uid}`).get();
+  if (!userSnap.exists) {
+    throw new HttpsError("permission-denied", "Department membership required.");
+  }
+  const membership = userSnap.data() || {};
+  const personnelId = String(request.data?.personnelId || membership.personnelId || "").trim();
+  const personnel = await loadPersonnelItems(db, departmentId);
+  let person = personnel.find((row) => String(row.id || "").trim() === personnelId) || null;
+
+  if (!person) {
+    const email = String(membership.email || request.auth.token?.email || "")
+      .trim()
+      .toLowerCase();
+    if (email) {
+      person = personnel.find((row) => String(row.email || "").trim().toLowerCase() === email) || null;
+    }
+  }
+
+  const forgePersonId = String(person?.forgePersonId || request.data?.forgePersonId || "").trim();
+  if (!forgePersonId) {
+    return { ok: true, training: [], enrollments: [], message: "No forgePersonId linked to this employee." };
+  }
+
+  const links = await listAcademyLinks(db, departmentId, forgePersonId);
+  const activeLinks = links.filter((l) => l.status === "linked");
+  if (!activeLinks.length) {
+    return { ok: true, training: [], enrollments: [], message: "No Academy link for this employee." };
+  }
+
+  const connections = await getActiveConnections(db, departmentId);
+  const forgeConnections = connections.filter((c) => c.providerType === "forge_academy" && c.enabled !== false);
+  const primary = (await getPrimaryConnection(db, departmentId)) || forgeConnections[0] || null;
+  const connection =
+    forgeConnections.find((c) => activeLinks.some((l) => l.connectionId === c.connectionId)) ||
+    primary;
+
+  if (!connection) {
+    return { ok: true, training: [], enrollments: [], message: "No Forge Academy connection configured." };
+  }
+
+  const secrets = await loadConnectionSecrets(
+    db,
+    departmentId,
+    connection.connectionId,
+    connection.secretReference
+  );
+  const connector = createAcademyConnector(
+    { ...connection, departmentId },
+    { db, secrets }
+  );
+  const result = await connector.getEnrollments(forgePersonId);
+  const enrollments = Array.isArray(result.enrollments) ? result.enrollments : [];
+
+  if (enrollments.length) {
+    await upsertEnrollmentsForPerson(
+      db,
+      departmentId,
+      {
+        id: person?.id || personnelId,
+        forgePersonId,
+        name: person?.name || membership.displayName || "",
+      },
+      enrollments
+    );
+  }
+
+  const training = enrollments
+    .filter((row) => !["cancelled", "denied"].includes(String(row.status || "").toLowerCase()))
+    .map((row) =>
+      mapEnrollmentToPortalRow(row, {
+        id: person?.id || personnelId,
+        forgePersonId,
+        name: person?.name || membership.displayName || "",
+      })
+    );
+
+  return {
+    ok: true,
+    training,
+    enrollments,
+    forgePersonId,
+    connectionId: connection.connectionId,
+    message: result.message || undefined,
+  };
+}
+
 module.exports = {
   handleListAcademyConnections,
   handleUpsertAcademyConnection,
@@ -284,4 +386,5 @@ module.exports = {
   handleResolveAcademyMatchConflict,
   handleReplayAcademyEvent,
   handleIngestAcademyEvent,
+  handleListMyAcademyTraining,
 };

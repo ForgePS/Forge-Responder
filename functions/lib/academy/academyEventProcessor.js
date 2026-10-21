@@ -5,6 +5,7 @@
 
 const { FORGE_ACADEMY_EVENT_TYPES } = require("./types");
 const { writeAcademyAudit } = require("./academyAudit");
+const { upsertAcademyEnrollment, upsertAcademyCompletion } = require("./academyTrainingSync");
 
 function eventsCol(db, departmentId) {
   return db.collection(`departments/${departmentId}/academyEvents`);
@@ -44,6 +45,28 @@ async function ingestAcademyEvent(db, departmentId, event = {}) {
   return { status: "accepted", eventId, processingStatus: "pending" };
 }
 
+async function applyEventSideEffects(db, departmentId, event) {
+  const payload = {
+    ...(event.payload || {}),
+    departmentId,
+    forgePersonId: event.personId || event.payload?.forgePersonId || null,
+  };
+  const type = String(event.eventType || "").trim();
+
+  if (type === "course.enrolled" || type === "course.unenrolled" || type === "enrollment.updated") {
+    if (type === "course.unenrolled") {
+      payload.enrollmentStatus = payload.enrollmentStatus || "cancelled";
+    }
+    return upsertAcademyEnrollment(db, payload);
+  }
+
+  if (type === "course.completed" || type === "certificate.issued") {
+    return upsertAcademyCompletion(db, payload);
+  }
+
+  return { skipped: true, reason: `No side effects for ${type || "unknown"}` };
+}
+
 async function processAcademyEvent(db, departmentId, eventId) {
   const ref = eventsCol(db, departmentId).doc(eventId);
   const snap = await ref.get();
@@ -56,13 +79,14 @@ async function processAcademyEvent(db, departmentId, eventId) {
 
   const attemptCount = Number(event.attemptCount || 0) + 1;
   try {
-    // Scaffolding: mark processed without side effects.
+    const sideEffects = await applyEventSideEffects(db, departmentId, event);
     await ref.set(
       {
         processingStatus: "processed",
         attemptCount,
         processedAt: new Date().toISOString(),
         lastError: null,
+        sideEffects,
         updatedAt: new Date().toISOString(),
       },
       { merge: true }
@@ -77,7 +101,7 @@ async function processAcademyEvent(db, departmentId, eventId) {
       result: "ok",
       meta: { eventId, eventType: event.eventType },
     });
-    return { status: "processed", eventId };
+    return { status: "processed", eventId, sideEffects };
   } catch (error) {
     const deadLetter = attemptCount >= 5;
     await ref.set(

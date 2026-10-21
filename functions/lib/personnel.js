@@ -36,4 +36,5 @@ async function resolvePersonnelPhones(db, departmentId, personnelIds = []) {
 
 module.exports = {
   resolvePersonnelPhones,
+  loadPersonnelItems,
 };
