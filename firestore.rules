@@ -190,10 +190,11 @@ service cloud.firestore {
       ];
     }
 
-    // Horn Lake's legacy lists (personnel, roster, schedule...). Was world-readable.
+    // Retired archive of Horn Lake's pre-multi-tenant lists. Horn Lake's data now
+    // lives in departments/horn-lake-fd; nothing in the app reads this. Closed to
+    // all clients (still readable with the Admin SDK / Firebase console).
     match /rmsData/{document} {
-      allow read: if canReadLegacyHornLakeData();
-      allow write: if isPlatformCreator();
+      allow read, write: if false;
     }
 
     // Unused.

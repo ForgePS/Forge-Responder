@@ -269,8 +269,13 @@ describe("legacy top-level collections", () => {
     await assertFails(getDoc(doc(memberA().firestore(), "rmsData/hlfd-rms-personnel")));
   });
 
-  it("Horn Lake members and creators can still read Horn Lake legacy data", async () => {
-    await assertSucceeds(getDoc(doc(hornLakeMember().firestore(), "rmsData/hlfd-rms-personnel")));
+  it("rmsData is closed to every client, including Horn Lake and creators", async () => {
+    await assertFails(getDoc(doc(hornLakeMember().firestore(), "rmsData/hlfd-rms-personnel")));
+    await assertFails(getDoc(doc(creator().firestore(), "rmsData/hlfd-rms-personnel")));
+    await assertFails(setDoc(doc(creator().firestore(), "rmsData/x"), { items: [] }));
+  });
+
+  it("Horn Lake members and creators can still read other Horn Lake legacy data", async () => {
     await assertSucceeds(getDoc(doc(hornLakeMember().firestore(), "hydrants/h1")));
     await assertSucceeds(getDoc(doc(hornLakeMember().firestore(), "fireSogsFull/s1")));
     await assertSucceeds(getDoc(doc(creator().firestore(), "preFirePlans/p1")));
