@@ -25,7 +25,9 @@ const ALLOWED_APP_HOSTS = new Set([
 ]);
 // Departments are served at https://<department>.<TENANT_ROOT_DOMAIN>.
 const TENANT_ROOT_DOMAIN = String(process.env.TENANT_ROOT_DOMAIN || "forgeresponder.com").toLowerCase();
-const DEFAULT_APP_ORIGIN = String(process.env.RMS_APP_ORIGIN || "https://rms-dashboard-7562e.web.app").replace(/\/$/, "");
+// Fallback when the caller's page address isn't trusted: the platform host, so
+// invite links become https://<department>.forgeresponder.com/?invite=...
+const DEFAULT_APP_ORIGIN = String(process.env.RMS_APP_ORIGIN || `https://app.${TENANT_ROOT_DOMAIN}`).replace(/\/$/, "");
 
 function isTenantDomainHost(hostname = "") {
   const host = String(hostname).toLowerCase();

@@ -88,6 +88,14 @@ describe("createInvite", () => {
     const result = await invites.createInvite(db, req(ADMIN, {
       departmentId: A, email: "new@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://evil.example.com",
     }));
+    // Untrusted origin falls back to the platform host, i.e. the department subdomain.
+    assert.match(result.inviteUrl, /^https:\/\/dept-a\.forgeresponder\.com\/\?invite=/);
+  });
+
+  it("keeps path-style links when created from web.app", async () => {
+    const result = await invites.createInvite(db, req(ADMIN, {
+      departmentId: A, email: "web@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://rms-dashboard-7562e.web.app",
+    }));
     assert.match(result.inviteUrl, /^https:\/\/rms-dashboard-7562e\.web\.app\/dept-a\?invite=/);
   });
 
@@ -99,7 +107,9 @@ describe("createInvite", () => {
     const lookAlike = await invites.createInvite(db, req(ADMIN, {
       departmentId: A, email: "sub2@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://forgeresponder.com.evil.com",
     }));
-    assert.match(lookAlike.inviteUrl, /^https:\/\/rms-dashboard-7562e\.web\.app\//);
+    // A look-alike host is not trusted: the link goes to the real department subdomain.
+    assert.match(lookAlike.inviteUrl, /^https:\/\/dept-a\.forgeresponder\.com\/\?invite=/);
+    assert.doesNotMatch(lookAlike.inviteUrl, /evil/);
   });
 
   it("refuses the creator role and unknown roles", async () => {

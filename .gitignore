@@ -9,6 +9,7 @@ _tmp_ifc_extract.txt
 scripts/ifc/out/
 !.env.example
 !.env.staging
+!.env.production
 
 # Local scratch / tokens / deploy logs
 tmp-*
