@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Database, Flame, KeyRound, LayoutGrid, Settings, ShieldCheck, X } from "lucide-react";
+import { ChevronDown, Database, Flame, KeyRound, LayoutGrid, Settings, ShieldCheck, Wand2, X } from "lucide-react";
 import DataEditorPanel from "../components/DataEditorPanel.jsx";
 import DepartmentConfigPanel from "../components/DepartmentConfigPanel.jsx";
 import NerisFieldSettingsPanel from "../components/NerisFieldSettingsPanel.jsx";
@@ -115,6 +115,13 @@ export default function AdminControlCenterPage({
             <p>Department settings, module data, users, roles, and permissions. Open a section below to manage it.</p>
           </div>
         </div>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => window.dispatchEvent(new CustomEvent("forge:open-setup-wizard"))}
+        >
+          <Wand2 size={14} /> Run setup wizard
+        </button>
       </section>
 
       {message && (

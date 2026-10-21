@@ -105,6 +105,7 @@ import { normalizeEmployeePortalRules } from "./lib/employeePortalRules.js";
 import { normalizePayRules } from "./lib/payRules.js";
 import { normalizeDailyLogSettings } from "./lib/dailyLogSettings.js";
 import CreatorConsolePage from "./pages/CreatorConsolePage.jsx";
+import DepartmentSetupWizard from "./components/onboarding/DepartmentSetupWizard.jsx";
 import ManagedSelect from "./components/ManagedSelect.jsx";
 import FleetRecordEditModal, { APPARATUS_EDIT_FIELDS } from "./components/FleetRecordEditModal.jsx";
 import { useDropdowns } from "./context/DropdownContext.jsx";
@@ -2247,6 +2248,32 @@ function AppShell() {
   }, [membershipLoading, isCreator, membership?.isPlatformCreator, permissions, setDepartmentId]);
 
   const [personnel, setPersonnel] = useTenantPersistentState(departmentId, LIST_KEYS.personnel, getTenantListFallback(departmentId, LIST_KEYS.personnel));
+
+  // New-department setup wizard: opens for admins of a department flagged
+  // onboardingRequired until it's finished ("Finish later" hides it for this
+  // session). System Admin can also open it on demand.
+  const [setupWizardOpen, setSetupWizardOpen] = useState(false);
+  const [setupWizardDismissed, setSetupWizardDismissed] = useState(false);
+  const setupWizardNeeded = Boolean(
+    !inPlatformScope
+    && departmentId
+    && settings?.onboardingRequired
+    && !settings?.onboardingCompletedAt
+    && canAccessSystemAdmin(permissions, isCreator)
+  );
+  useEffect(() => {
+    if (setupWizardNeeded && !setupWizardDismissed) setSetupWizardOpen(true);
+  }, [setupWizardNeeded, setupWizardDismissed]);
+  useEffect(() => {
+    const open = () => setSetupWizardOpen(true);
+    window.addEventListener("forge:open-setup-wizard", open);
+    return () => window.removeEventListener("forge:open-setup-wizard", open);
+  }, []);
+  useEffect(() => {
+    // Switching departments resets the "finish later" choice.
+    setSetupWizardDismissed(false);
+    setSetupWizardOpen(false);
+  }, [departmentId]);
   const [certifications, setCertifications] = useTenantPersistentState(departmentId, LIST_KEYS.certifications, getTenantListFallback(departmentId, LIST_KEYS.certifications));
   const [training, setTraining] = useTenantPersistentState(departmentId, LIST_KEYS.training, getTenantListFallback(departmentId, LIST_KEYS.training));
   const [apparatus, setApparatus] = useTenantPersistentState(departmentId, LIST_KEYS.apparatus, getTenantListFallback(departmentId, LIST_KEYS.apparatus));
@@ -3078,6 +3105,22 @@ function AppShell() {
 
   return <main className={`app-shell ${collapsed ? "nav-collapsed" : ""} ${mobileNav ? "mobile-nav-open" : ""} ${isHydrantsView ? "hydrants-view" : ""} ${isDemoModeActive() ? "demo-mode-shell" : ""}`}>
     {isDemoModeActive() && <DemoModeBanner />}
+    {setupWizardOpen && !inPlatformScope && departmentId && (
+      <DepartmentSetupWizard
+        key={departmentId}
+        departmentId={departmentId}
+        profile={profile}
+        settings={settings}
+        personnel={personnel}
+        setPersonnel={setPersonnel}
+        refreshDepartment={refreshDepartment}
+        user={user}
+        onClose={({ completed } = {}) => {
+          setSetupWizardOpen(false);
+          if (!completed) setSetupWizardDismissed(true);
+        }}
+      />
+    )}
     <TopBar
           query={query}
           setQuery={setQuery}

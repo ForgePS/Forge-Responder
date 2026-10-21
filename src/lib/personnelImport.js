@@ -62,16 +62,19 @@ function personMatchKey(firstName = "", lastName = "") {
   return `${normalizeText(lastName)}|${normalizeText(firstName)}`;
 }
 
-export function nextPersonnelIds(existingRecords = [], count = 1) {
+/** Next personnel IDs like "CA-101", using the department's prefix (see resolvePersonnelIdPrefix). */
+export function nextPersonnelIds(existingRecords = [], count = 1, prefix = "P") {
+  const safePrefix = String(prefix || "P").toUpperCase().replace(/[^A-Z0-9]/g, "") || "P";
+  const pattern = new RegExp(`^${safePrefix}-(\\d+)$`, "i");
   const numbers = (Array.isArray(existingRecords) ? existingRecords : [])
-    .map((person) => person?.id)
-    .filter((id) => /^HL-\d+$/i.test(String(id)))
-    .map((id) => parseInt(String(id).split("-")[1], 10));
+    .map((person) => String(person?.id || "").match(pattern))
+    .filter(Boolean)
+    .map((match) => parseInt(match[1], 10));
   let max = numbers.length ? Math.max(...numbers) : 100;
 
   return Array.from({ length: count }, () => {
     max += 1;
-    return `HL-${String(max).padStart(3, "0")}`;
+    return `${safePrefix}-${String(max).padStart(3, "0")}`;
   });
 }
 
@@ -185,14 +188,14 @@ export function buildPersonnelImportPreview(importRows = [], existingRecords = [
   });
 }
 
-export function buildPersonnelRecordsFromImport(previewRows = [], existingRecords = []) {
+export function buildPersonnelRecordsFromImport(previewRows = [], existingRecords = [], { idPrefix = "P" } = {}) {
   const records = Array.isArray(existingRecords) ? [...existingRecords] : [];
   const existingByKey = new Map(
     records.map((person) => [personMatchKey(person.firstName, person.lastName), person])
   );
 
   const createCount = previewRows.filter((row) => row.action === "create").length;
-  const newIds = nextPersonnelIds(records, createCount);
+  const newIds = nextPersonnelIds(records, createCount, idPrefix);
   let newIdIndex = 0;
   const now = new Date().toISOString();
   let created = 0;

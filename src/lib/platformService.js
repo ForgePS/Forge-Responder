@@ -442,6 +442,8 @@ export async function registerPlatformDepartment(departmentId, profile = {}, opt
   }, { merge: true });
   batch.set(doc(db, "departments", departmentId, "settings", "main"), {
     ...departmentSettings,
+    // New departments get the setup wizard on their admin's first sign-in.
+    onboardingRequired: true,
     createdAt: now,
     updatedAt: now
   }, { merge: true });

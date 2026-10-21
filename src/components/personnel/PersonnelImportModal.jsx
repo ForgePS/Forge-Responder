@@ -29,6 +29,7 @@ export default function PersonnelImportModal({
   onClose,
   existingRecords = [],
   onImport,
+  idPrefix = "P",
 }) {
   const fileInputRef = useRef(null);
   const [fileName, setFileName] = useState("");
@@ -79,7 +80,7 @@ export default function PersonnelImportModal({
     if (!previewRows.length) return;
     setImporting(true);
     try {
-      const outcome = buildPersonnelRecordsFromImport(previewRows, existingRecords);
+      const outcome = buildPersonnelRecordsFromImport(previewRows, existingRecords, { idPrefix });
       onImport?.(outcome);
       setResultMessage(`Imported ${outcome.created} new and updated ${outcome.updated} personnel record(s).`);
       setPreviewRows([]);

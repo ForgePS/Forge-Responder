@@ -315,6 +315,7 @@ export default function PersonnelPage({
           onClose={() => setShowImport(false)}
           existingRecords={safeRecords}
           onImport={handlePersonnelImport}
+          idPrefix={resolvePersonnelIdPrefix(departmentId)}
         />
       </div>
     );
@@ -348,6 +349,7 @@ export default function PersonnelPage({
             onClose={() => setShowImport(false)}
             existingRecords={safeRecords}
             onImport={handlePersonnelImport}
+          idPrefix={resolvePersonnelIdPrefix(departmentId)}
           />
         </>
       ) : view === "detail" ? (
