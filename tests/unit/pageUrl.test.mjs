@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildPageIndex,
+  depthFromHistoryState,
   pageFromLocation,
   pageHistoryState,
   pageSlug,
@@ -31,6 +32,13 @@ describe("page addresses", () => {
     assert.equal(urlWithPage("https://camden.forgeresponder.com/?x=1#top", "personnel"), "/?x=1&page=personnel#top");
     assert.equal(urlWithPage("https://rms.web.app/camden?page=personnel", "fleet-tests"), "/camden?page=fleet-tests");
     assert.equal(urlWithPage("https://rms.web.app/camden?page=personnel&x=1", ""), "/camden?x=1");
+  });
+
+  it("tracks how many in-app pages deep an entry is", () => {
+    assert.equal(depthFromHistoryState(pageHistoryState("personnel", 3)), 3);
+    assert.equal(depthFromHistoryState(pageHistoryState("personnel")), 0);
+    assert.equal(depthFromHistoryState({}), 0);
+    assert.equal(depthFromHistoryState(null), 0);
   });
 
   it("recognises only history entries the app created", () => {

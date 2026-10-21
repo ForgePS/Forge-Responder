@@ -31,13 +31,13 @@ button { border: 0; cursor: pointer; }
 .app-shell.nav-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
 .top-bar { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 14px; padding: 10px 18px 12px; border-bottom: 1px solid var(--rms-border-divider); background: var(--rms-bg-topbar); overflow: visible; }
 .top-bar .mobile-menu { align-self: center; margin-top: 4px; }
-.top-bar-lead { display: grid; gap: 6px; flex: 1 1 auto; min-width: 0; max-width: 900px; }
-.top-bar-lead-row { display: flex; align-items: center; gap: 14px; flex-wrap: nowrap; width: 100%; }
+.top-bar-lead { display: grid; gap: 6px; flex: 1 1 0; min-width: 0; max-width: 900px; } /* takes the space left by the utilities, wrapping inside it */
+.top-bar-lead-row { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; width: 100%; } /* wraps instead of overlapping the date/search when crowded */
 .top-bar-tagline { margin: 0; padding: 0; width: 100%; color: var(--rms-brand); font-size: 18px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top-brand-logo-wrap { flex: 0 0 auto; height: 72px; overflow: hidden; display: flex; align-items: flex-start; }
 .top-brand-wide .top-brand-logo-wrap { height: 76px; }
 .top-brand-wide .top-brand-logo-wrap img { height: 104px; max-width: 380px; object-fit: contain; object-position: top left; }
-.top-bar-utilities { display: flex; align-items: center; gap: 12px; flex: 1 1 auto; min-width: 0; margin-left: auto; align-self: center; padding-top: 2px; }
+.top-bar-utilities { display: flex; align-items: center; gap: 12px; flex: 0 1 auto; min-width: 0; margin-left: auto; align-self: center; padding-top: 2px; }
 .top-bar-utilities .global-search { margin-left: 0; }
 .top-brand { flex: 0 0 auto; min-width: 0; max-width: 460px; display: flex; align-items: center; gap: 14px; }
 .top-brand img { height: 72px; width: auto; max-width: 240px; object-fit: contain; flex: 0 0 auto; }
@@ -180,7 +180,7 @@ section.has-active > .nav-section-toggle {
 .workspace { grid-column: 2; grid-row: 2; min-width: 0; overflow: auto; padding: 10px 12px 14px; }
 .app-shell.demo-mode-shell .side-nav { grid-row: 3; }
 .app-shell.demo-mode-shell .workspace { grid-row: 3; }
-footer, .app-footer { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 26px; border-top: 1px solid var(--rms-border-divider); background: var(--rms-bg-footer); color: var(--rms-text-muted); font-size: 14px; }
+footer, .app-footer { grid-column: 1 / -1; display: flex; flex-wrap: wrap; row-gap: 6px; align-items: center; justify-content: space-between; gap: 20px; padding: 0 26px; border-top: 1px solid var(--rms-border-divider); background: var(--rms-bg-footer); color: var(--rms-text-muted); font-size: 14px; }
 footer span, .app-footer span { display: flex; align-items: center; gap: 8px; }
 footer i, .app-footer i { width: 9px; height: 9px; border-radius: 50%; background: #22c55e; }
 .footer-powered-by { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
@@ -723,11 +723,11 @@ footer i, .app-footer i { width: 9px; height: 9px; border-radius: 50%; backgroun
 .badge { min-height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: 999px; font-size: 14px; font-weight: 800; white-space: nowrap; }
 .badge-success { color: #86efac; background: rgba(69,179,105,.14); }.badge-critical { color: #fca5a5; background: rgba(239,74,0,.14); }.badge-warning { color: #fcd34d; background: rgba(255,159,41,.14); }.badge-info { color: #66cbbf; background: rgba(37,161,148,.14); }.badge-neutral { color: var(--rms-text-body); background: rgba(148,163,184,.13); }
 .module-page { display: grid; gap: 12px; padding: 6px; }
-.module-heading { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.module-heading { min-height: 62px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
 .module-heading > div:first-child { display: flex; align-items: center; gap: 12px; }
 .module-heading h1 { margin: 0 0 4px; font-size: 22px; }.module-heading p { margin: 0; color: var(--rms-text-muted); font-size: 14px; }
 .module-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 7px; background: var(--rms-primary-solid); }
-.heading-actions { display: flex; gap: 7px; }
+.heading-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .primary-button, .secondary-button, .filter-button { min-height: 33px; padding: 0 11px; border-radius: 5px; font-size: 14px; font-weight: 800; }
 .primary-button { background: var(--rms-primary-solid); color: var(--rms-text-strong); }.secondary-button, .filter-button { border: 1px solid var(--rms-border); background: var(--rms-bg-surface-3); color: var(--rms-text-body); }
 .module-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--rms-border); border-radius: 7px; background: var(--rms-bg-surface-2); }
@@ -3612,3 +3612,9 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
 .page-loading-spinner { width: 18px; height: 18px; border: 2px solid var(--rms-border); border-top-color: var(--rms-primary); border-radius: 50%; animation: page-loading-spin .8s linear infinite; }
 @keyframes page-loading-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .page-loading-spinner { animation: none; } }
+
+/* In-app Back button (top of the page area) */
+.page-back-bar { display: flex; margin: 0 0 8px; }
+.page-back-button { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 4px 12px 4px 8px; border: 1px solid var(--rms-border); border-radius: 999px; background: var(--rms-bg-surface); color: var(--rms-text-body); font-size: 14px; font-weight: 600; cursor: pointer; }
+.page-back-button:hover { background: var(--rms-bg-hover); color: var(--rms-text-strong); }
+.page-back-button:focus-visible { outline: 2px solid var(--rms-primary); outline-offset: 2px; }

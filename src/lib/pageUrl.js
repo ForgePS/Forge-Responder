@@ -48,9 +48,20 @@ export function urlWithPage(href, slug) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-/** History state written with each page entry, so back/forward can tell our entries apart. */
-export function pageHistoryState(slug) {
-  return { [HISTORY_KEY]: slug || "" };
+const DEPTH_KEY = "forgeDepth";
+
+/**
+ * History state written with each page entry, so back/forward can tell our
+ * entries apart. `depth` counts in-app page changes (0 = first page), which
+ * decides whether the in-app Back button has somewhere to go.
+ */
+export function pageHistoryState(slug, depth = 0) {
+  return { [HISTORY_KEY]: slug || "", [DEPTH_KEY]: Math.max(0, Number(depth) || 0) };
+}
+
+/** In-app depth of a history entry (0 when unknown or the first page). */
+export function depthFromHistoryState(state) {
+  return state && typeof state === "object" ? Math.max(0, Number(state[DEPTH_KEY]) || 0) : 0;
 }
 
 /** The page slug stored on a history entry we created, or null for other entries. */

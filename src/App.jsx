@@ -65,7 +65,7 @@ import {
   navNodeLabel,
 } from "./data/preventionNav.js";
 import { groupContainsRoute, groupHasNavTree, groupNavLeavesAsItems } from "./lib/navTree.js";
-import { buildPageIndex, pageFromLocation, pageHistoryState, pageSlug, slugFromHistoryState, urlWithPage } from "./lib/pageUrl.js";
+import { buildPageIndex, depthFromHistoryState, pageFromLocation, pageHistoryState, pageSlug, slugFromHistoryState, urlWithPage } from "./lib/pageUrl.js";
 import { employeePortalNavGroups, filterEmployeePortalNav } from "./data/employeePortalNav.js";
 import CommandDashboard from "./components/CommandDashboard.jsx";
 const DailyLogPage = lazyPage(() => import("./pages/DailyLogPage.jsx"));
@@ -2213,6 +2213,10 @@ function AppShell() {
   // history entry; later page changes add entries.
   const pageUrlSyncedRef = useRef(false);
   const pageFromHistoryRef = useRef(false);
+  // In-app Back button: shown once there's an earlier in-app page to return to.
+  const [canGoBack, setCanGoBack] = useState(() => (
+    typeof window !== "undefined" && depthFromHistoryState(window.history.state) > 0
+  ));
   useEffect(() => {
     if (typeof window === "undefined" || effectiveAppView !== "admin") return;
     if (current === CREATOR_CONSOLE_MODULE || isCreatorConsolePath()) return; // has its own /creator-console path
@@ -2221,10 +2225,16 @@ function AppShell() {
     const replace = !pageUrlSyncedRef.current || pageFromHistoryRef.current;
     pageUrlSyncedRef.current = true;
     pageFromHistoryRef.current = false;
+    const depth = depthFromHistoryState(window.history.state);
     if (sameUrl && slugFromHistoryState(window.history.state) === slug) return;
     const nextUrl = urlWithPage(window.location.href, slug);
-    if (replace || sameUrl) window.history.replaceState(pageHistoryState(slug), "", nextUrl);
-    else window.history.pushState(pageHistoryState(slug), "", nextUrl);
+    if (replace || sameUrl) {
+      window.history.replaceState(pageHistoryState(slug, depth), "", nextUrl);
+      setCanGoBack(depth > 0);
+    } else {
+      window.history.pushState(pageHistoryState(slug, depth + 1), "", nextUrl);
+      setCanGoBack(true);
+    }
   }, [current, effectiveAppView]);
 
   useEffect(() => {
@@ -2235,6 +2245,7 @@ function AppShell() {
       const name = slug ? PAGE_INDEX.get(slug) : "Dashboard";
       if (!name) return;
       pageFromHistoryRef.current = true;
+      setCanGoBack(depthFromHistoryState(window.history.state) > 0);
       setCurrent((existing) => (existing === name ? existing : name));
       setMobileNav(false);
     }
@@ -3224,6 +3235,13 @@ function AppShell() {
         )}
         {mobileNav && <button className="mobile-scrim" onClick={() => setMobileNav(false)}><X size={20} /></button>}
     <section className={`workspace ${isHydrantsView ? "workspace-hydrants" : ""}`}>
+      {canGoBack && effectiveAppView === "admin" && (
+        <div className="page-back-bar">
+          <button type="button" className="page-back-button" onClick={() => window.history.back()} title="Go back to the previous page">
+            <ChevronLeft size={16} aria-hidden="true" /> Back
+          </button>
+        </div>
+      )}
       {/* Module pages load on demand (see lazyPage). */}
       <Suspense fallback={<PageLoading />}>{pageContent}</Suspense>
     </section>
