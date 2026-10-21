@@ -96,6 +96,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Platform-level audit trail (creator console actions). Append-only.
+    match /platformAuditLogs/{logId} {
+      allow read, create: if isPlatformCreator();
+      allow update, delete: if false;
+    }
+
     // Billing reminders / past-due / renewal log written by the daily
     // billingLifecycleDaily function. Creators only.
     match /platformBillingEvents/{eventId} {

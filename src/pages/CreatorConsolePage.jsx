@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Building2, CirclePlus, CalendarRange, Layers, Mail, Settings } from "lucide-react";
+import { BarChart3, Building2, CirclePlus, CalendarRange, Layers, Mail, ScrollText, Settings } from "lucide-react";
+import PlatformUsagePanel from "../components/platform/PlatformUsagePanel.jsx";
+import PlatformAuditLogPanel from "../components/platform/PlatformAuditLogPanel.jsx";
 import CreateDepartmentPanel from "../components/CreateDepartmentPanel.jsx";
 import DepartmentBranchesPanel from "../components/DepartmentBranchesPanel.jsx";
 import CreatorWorkspaceHero from "../components/CreatorWorkspaceHero.jsx";
@@ -38,6 +40,8 @@ const PLATFORM_TABS = [
   ["modules", "Department Modules", Layers],
   ["departments", "Departments", Building2],
   ["subscriptions", "Subscriptions", CalendarRange],
+  ["usage", "Usage", BarChart3],
+  ["audit", "Audit Log", ScrollText],
   ["internalEmail", "Messages", Mail]
 ];
 
@@ -152,8 +156,8 @@ export default function CreatorConsolePage() {
     : (activeDepartment?.shortName || activeDepartment?.name || workspaceId);
   const visibleTabs = (inPlatformWorkspace
     ? PLATFORM_TABS.filter(([id]) => id !== "internalEmail")
-    : PLATFORM_TABS.filter(([id]) => !["platform", "subscriptions"].includes(id))
-  ).filter(([id]) => isCreator || id !== "subscriptions");
+    : PLATFORM_TABS.filter(([id]) => !["platform", "subscriptions", "usage", "audit"].includes(id))
+  ).filter(([id]) => isCreator || !["subscriptions", "usage", "audit"].includes(id));
 
   return (
     <div className="module-page platform-admin-page">
@@ -283,6 +287,18 @@ export default function CreatorConsolePage() {
       {tab === "subscriptions" && inPlatformWorkspace && isCreator && (
         <Panel title="Department Subscriptions" icon={CalendarRange}>
           <PlatformSubscriptionsPanel onMessage={setMessage} onOpenDepartment={openDepartment} />
+        </Panel>
+      )}
+
+      {tab === "usage" && inPlatformWorkspace && isCreator && (
+        <Panel title="Department Usage" icon={BarChart3}>
+          <PlatformUsagePanel onMessage={setMessage} />
+        </Panel>
+      )}
+
+      {tab === "audit" && inPlatformWorkspace && isCreator && (
+        <Panel title="Audit Log" icon={ScrollText}>
+          <PlatformAuditLogPanel />
         </Panel>
       )}
 

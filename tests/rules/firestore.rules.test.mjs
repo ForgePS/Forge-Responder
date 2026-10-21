@@ -314,6 +314,15 @@ describe("billing events", () => {
     await assertFails(setDoc(doc(creator().firestore(), "platformBillingEvents/e2"), { kind: "x" }));
   });
 
+  it("platform audit log: creators append and read; nobody edits; others can't see it", async () => {
+    await assertSucceeds(setDoc(doc(creator().firestore(), "platformAuditLogs/l1"), { action: "x" }));
+    await assertSucceeds(getDoc(doc(creator().firestore(), "platformAuditLogs/l1")));
+    await assertFails(updateDoc(doc(creator().firestore(), "platformAuditLogs/l1"), { action: "tampered" }));
+    await assertFails(deleteDoc(doc(creator().firestore(), "platformAuditLogs/l1")));
+    await assertFails(getDoc(doc(adminA().firestore(), "platformAuditLogs/l1")));
+    await assertFails(setDoc(doc(adminA().firestore(), "platformAuditLogs/l2"), { action: "x" }));
+  });
+
   it("department admins cannot mark their own subscription paid", async () => {
     await assertFails(setDoc(doc(adminA().firestore(), `platformSubscriptions/${A}`), { status: "active", renewalDate: "2099-01-01" }));
   });

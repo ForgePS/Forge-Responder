@@ -983,3 +983,14 @@ exports.previewBillingLifecycle = onCall(async (request) =>
 const { sendTestEmail } = require("./lib/emailTest");
 exports.sendTestEmail = onCall({ secrets: EMAIL_SECRETS }, async (request) =>
   sendTestEmail(admin.firestore(), request));
+
+// ---------------------------------------------------------------------------
+// Creator Console: per-department usage and data export (creator only).
+// ---------------------------------------------------------------------------
+const platformConsole = require("./lib/platformConsole");
+
+exports.departmentUsage = onCall({ memory: "512MiB", timeoutSeconds: 120 }, async (request) =>
+  platformConsole.departmentUsage(admin.firestore(), admin.storage().bucket(), request));
+
+exports.exportDepartmentData = onCall({ memory: "1GiB", timeoutSeconds: 540 }, async (request) =>
+  platformConsole.exportDepartmentData(admin.firestore(), admin.storage().bucket(), request));
