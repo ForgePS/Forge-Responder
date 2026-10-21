@@ -944,3 +944,14 @@ exports.acceptDepartmentInvite = onCall(async (request) =>
 
 exports.previewDepartmentInvite = onCall({ invoker: "public" }, async (request) =>
   invites.previewInvite(admin.firestore(), request));
+
+// ---------------------------------------------------------------------------
+// Department subdomains (<department>.forgeresponder.com) on Firebase Hosting.
+// ---------------------------------------------------------------------------
+const departmentDomains = require("./lib/departmentDomains");
+
+exports.registerDepartmentDomain = onCall(async (request) =>
+  departmentDomains.registerDepartmentDomain(admin.firestore(), request));
+
+exports.departmentDomainStatus = onCall(async (request) =>
+  departmentDomains.departmentDomainStatus(admin.firestore(), request));

@@ -26,6 +26,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 import { clearPendingInviteToken, inviteErrorMessage, previewInvite, readPendingInviteToken } from "../lib/inviteService.js";
+import { parseTenantSubdomain, platformOrigin, tenantOrigin, useTenantSubdomains } from "../lib/tenantDomains.js";
 
 const INVITE_REASON_TEXT = {
   not_found: "This invite link is not valid.",
@@ -125,6 +126,12 @@ export default function LoginPage() {
       return;
     }
 
+    // On forgeresponder.com each department has its own subdomain: go there.
+    if (useTenantSubdomains()) {
+      window.location.assign(tenantOrigin(validation.tenantId));
+      return;
+    }
+
     writeLoginTenantId(validation.tenantId);
     persistGatewayContext(validation.tenantId, validation.tenantId);
     setDepartmentId(validation.tenantId);
@@ -135,6 +142,11 @@ export default function LoginPage() {
 
   function handleChangeTenant() {
     if (!canChangeTenant) return;
+    // On a department subdomain, the tenant picker lives on the platform host.
+    if (parseTenantSubdomain()) {
+      window.location.assign(platformOrigin());
+      return;
+    }
     clearLoginTenantId();
     persistGatewayContext("", "");
     setTenantDraft("");

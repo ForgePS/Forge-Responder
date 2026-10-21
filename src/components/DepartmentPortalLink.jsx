@@ -1,14 +1,10 @@
 import { memo } from "react";
-import { normalizeGatewayDepartmentId } from "../lib/gatewayRouting.js";
-import { FORGE_RMS_APP_HOST, FORGE_RMS_APP_URL } from "../lib/rmsAppUrl.js";
+import { buildDepartmentGatewayUrl, normalizeGatewayDepartmentId } from "../lib/gatewayRouting.js";
 import { isPlatformScope } from "../lib/tenantPaths.js";
 
 function buildPortal(departmentId) {
-  const normalized = normalizeGatewayDepartmentId(departmentId);
-  return {
-    href: `${FORGE_RMS_APP_URL}/${encodeURIComponent(normalized)}`,
-    label: `${FORGE_RMS_APP_HOST}/${normalized}`
-  };
+  const href = buildDepartmentGatewayUrl(normalizeGatewayDepartmentId(departmentId));
+  return { href, label: href.replace(/^https?:\/\//, "") };
 }
 
 function DepartmentPortalLink({ departmentId }) {

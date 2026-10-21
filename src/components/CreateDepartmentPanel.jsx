@@ -9,6 +9,7 @@ import {
 import { isValidUsZipCode } from "../lib/departmentBranchUtils.js";
 import { registerPlatformDepartment } from "../lib/platformService.js";
 import { createInvite, inviteErrorMessage } from "../lib/inviteService.js";
+import { describeDomainStatus, registerDepartmentDomain } from "../lib/departmentDomainService.js";
 import { defaultSubscriptionDates } from "../lib/subscriptionUtils.js";
 import DepartmentStateSelect from "./DepartmentStateSelect.jsx";
 
@@ -37,6 +38,7 @@ export default function CreateDepartmentPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [firstAdminInvite, setFirstAdminInvite] = useState(null);
+  const [domainNotice, setDomainNotice] = useState("");
 
   const existingIds = useMemo(
     () => departments.map((item) => item.id),
@@ -111,6 +113,14 @@ export default function CreateDepartmentPanel({
           expirationDate: form.expirationDate,
         },
       }, { user });
+
+      // Register <department>.forgeresponder.com (best effort; can be retried).
+      setDomainNotice("");
+      registerDepartmentDomain(idCheck.id)
+        .then((status) => setDomainNotice(describeDomainStatus(status)))
+        .catch((domainError) => setDomainNotice(
+          `Department created, but its subdomain could not be registered yet: ${domainError?.message || "unknown error"}`
+        ));
 
       // Invite the department's first administrator (Fire Chief role).
       const firstAdminEmail = form.firstAdminEmail.trim();
@@ -268,6 +278,8 @@ export default function CreateDepartmentPanel({
       )}
 
       {error && <p className="create-department-error">{error}</p>}
+
+      {domainNotice && <p className="auth-help" role="status">{domainNotice}</p>}
 
       {firstAdminInvite?.error && (
         <p className="create-department-error">

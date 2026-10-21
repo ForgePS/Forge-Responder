@@ -88,7 +88,18 @@ describe("createInvite", () => {
     const result = await invites.createInvite(db, req(ADMIN, {
       departmentId: A, email: "new@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://evil.example.com",
     }));
-    assert.match(result.inviteUrl, /^https:\/\/rms\.forgepublicsafety\.com\//);
+    assert.match(result.inviteUrl, /^https:\/\/rms-dashboard-7562e\.web\.app\/dept-a\?invite=/);
+  });
+
+  it("uses the department's subdomain when created from forgeresponder.com", async () => {
+    const fromPlatform = await invites.createInvite(db, req(ADMIN, {
+      departmentId: A, email: "sub@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://app.forgeresponder.com",
+    }));
+    assert.match(fromPlatform.inviteUrl, /^https:\/\/dept-a\.forgeresponder\.com\/\?invite=/);
+    const lookAlike = await invites.createInvite(db, req(ADMIN, {
+      departmentId: A, email: "sub2@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://forgeresponder.com.evil.com",
+    }));
+    assert.match(lookAlike.inviteUrl, /^https:\/\/rms-dashboard-7562e\.web\.app\//);
   });
 
   it("refuses the creator role and unknown roles", async () => {

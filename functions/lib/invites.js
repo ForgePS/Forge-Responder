@@ -23,7 +23,14 @@ const ALLOWED_APP_HOSTS = new Set([
   "forge-rms-staging.web.app",
   "forge-rms-staging.firebaseapp.com",
 ]);
-const DEFAULT_APP_ORIGIN = "https://rms.forgepublicsafety.com";
+// Departments are served at https://<department>.<TENANT_ROOT_DOMAIN>.
+const TENANT_ROOT_DOMAIN = String(process.env.TENANT_ROOT_DOMAIN || "forgeresponder.com").toLowerCase();
+const DEFAULT_APP_ORIGIN = String(process.env.RMS_APP_ORIGIN || "https://rms-dashboard-7562e.web.app").replace(/\/$/, "");
+
+function isTenantDomainHost(hostname = "") {
+  const host = String(hostname).toLowerCase();
+  return host === TENANT_ROOT_DOMAIN || host.endsWith(`.${TENANT_ROOT_DOMAIN}`);
+}
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function normalizeEmail(value = "") {
@@ -49,15 +56,24 @@ function safeAppOrigin(origin) {
   try {
     const url = new URL(String(origin || ""));
     if (!["https:", "http:"].includes(url.protocol)) return DEFAULT_APP_ORIGIN;
-    if (!ALLOWED_APP_HOSTS.has(url.hostname)) return DEFAULT_APP_ORIGIN;
+    if (!ALLOWED_APP_HOSTS.has(url.hostname) && !isTenantDomainHost(url.hostname)) return DEFAULT_APP_ORIGIN;
     return url.origin;
   } catch {
-    return String(process.env.RMS_APP_ORIGIN || DEFAULT_APP_ORIGIN).replace(/\/$/, "");
+    return DEFAULT_APP_ORIGIN;
   }
 }
 
+/**
+ * Invite link for a department. From a forgeresponder.com page it points at the
+ * department's own subdomain; elsewhere (web.app, localhost) at /<department>.
+ */
 function buildInviteUrl(origin, departmentId, token) {
-  return `${safeAppOrigin(origin)}/${encodeURIComponent(departmentId)}?invite=${encodeURIComponent(token)}`;
+  const base = safeAppOrigin(origin);
+  const invite = `invite=${encodeURIComponent(token)}`;
+  if (isTenantDomainHost(new URL(base).hostname)) {
+    return `https://${encodeURIComponent(departmentId)}.${TENANT_ROOT_DOMAIN}/?${invite}`;
+  }
+  return `${base}/${encodeURIComponent(departmentId)}?${invite}`;
 }
 
 function isAdminMembership(data = {}) {

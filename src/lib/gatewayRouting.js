@@ -2,6 +2,7 @@ import { readStoredWorkspaceId } from "./creatorConsoleWorkspace.js";
 import { resolveRmsAppUrl } from "./rmsAppUrl.js";
 import { DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isPlatformScope } from "./tenantPaths.js";
 import { isHydrantAppPath, isBrandedHydrantHost, brandedHostDepartmentId } from "./hydrantAppRouting.js";
+import { parseTenantSubdomain, tenantOrigin, useTenantSubdomains } from "./tenantDomains.js";
 
 const DEMO_MODE_SESSION_KEY = "rms-demo-mode";
 
@@ -87,6 +88,10 @@ export function normalizeGatewayDepartmentId(value = "") {
 }
 
 export function parseGatewayDepartmentId(pathname = window.location.pathname) {
+  // <department>.forgeresponder.com names the department in the hostname.
+  const subdomainId = parseTenantSubdomain();
+  if (subdomainId) return subdomainId;
+
   if (isHydrantAppPath(pathname)) return null;
 
   const normalized = pathname.replace(/\/$/, "") || "/";
@@ -103,11 +108,14 @@ export function parseGatewayDepartmentId(pathname = window.location.pathname) {
 
 export function buildDepartmentGatewayPath(departmentId) {
   if (!departmentId) return "/";
+  // On a department subdomain the department is in the hostname, not the path.
+  if (parseTenantSubdomain()) return "/";
   return `/${encodeURIComponent(normalizeGatewayDepartmentId(departmentId))}`;
 }
 
 export function buildDepartmentGatewayUrl(departmentId) {
   if (!departmentId) return resolveRmsAppUrl();
+  if (useTenantSubdomains()) return tenantOrigin(normalizeGatewayDepartmentId(departmentId));
   return `${resolveRmsAppUrl()}${buildDepartmentGatewayPath(departmentId)}`;
 }
 
@@ -172,6 +180,7 @@ export function clearLoginTenantId() {
 /** True when the sign-in screen should treat the tenant as selected/locked. */
 export function hasLockedLoginTenant() {
   if (typeof window === "undefined") return false;
+  if (parseTenantSubdomain()) return true;
   if (isBrandedHydrantHost(window.location.hostname)) return true;
   if (parseGatewayDepartmentId()) return true;
   if (readLoginTenantId()) return true;
@@ -209,6 +218,7 @@ export function resolveActiveDepartmentId() {
 
 export function shouldSyncGatewayUrl(departmentId) {
   if (!departmentId || typeof window === "undefined") return false;
+  if (parseTenantSubdomain()) return false;
   if (isBrandedHydrantHost(window.location.hostname)) return false;
   if (isHydrantAppPath(window.location.pathname)) return false;
   if (isCreatorConsolePath()) return false;
@@ -279,6 +289,9 @@ export function isAlertDashboardPath(pathname = typeof window !== "undefined" ? 
 
 export function parseAlertDashboardGatewaySlug(pathname = typeof window !== "undefined" ? window.location.pathname : "/") {
   const normalized = String(pathname || "/").replace(/\/$/, "") || "/";
+  // camden.forgeresponder.com/alerts: the department is in the hostname.
+  const subdomainId = parseTenantSubdomain();
+  if (subdomainId) return normalized.endsWith(ALERT_DASHBOARD_PATH_SUFFIX) ? subdomainId : null;
   // A bare /alerts has no department: require /{department}/alerts.
   if (normalized === ALERT_DASHBOARD_PATH_SUFFIX) return null;
   if (!normalized.endsWith(ALERT_DASHBOARD_PATH_SUFFIX)) return null;
@@ -290,7 +303,7 @@ export function parseAlertDashboardGatewaySlug(pathname = typeof window !== "und
 }
 
 export function buildAlertDashboardPath(departmentId = "") {
-  if (!departmentId) return ALERT_DASHBOARD_PATH_SUFFIX;
+  if (!departmentId || parseTenantSubdomain()) return ALERT_DASHBOARD_PATH_SUFFIX;
   return `${buildDepartmentGatewayPath(departmentId)}${ALERT_DASHBOARD_PATH_SUFFIX}`;
 }
 

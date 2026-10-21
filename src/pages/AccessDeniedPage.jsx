@@ -15,6 +15,7 @@ import { canSelfRestoreMembership } from "../lib/membershipRecovery.js";
 import { loadPlatformCreator } from "../lib/platformService.js";
 import { isPlatformScope } from "../lib/tenantPaths.js";
 import { FORGE_CREATOR_CONSOLE_URL } from "../lib/platformUrls.js";
+import { parseTenantSubdomain, platformOrigin } from "../lib/tenantDomains.js";
 
 export default function AccessDeniedPage({ userId = "" }) {
   const { profile, departmentId, gatewayDepartmentId, setDepartmentId } = useTenant();
@@ -74,6 +75,8 @@ export default function AccessDeniedPage({ userId = "" }) {
     } finally {
       setChangingTenant(false);
     }
+    // On a department subdomain, pick another department on the platform host.
+    if (parseTenantSubdomain()) window.location.assign(platformOrigin());
   }
 
   return (
