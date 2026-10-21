@@ -331,7 +331,9 @@ export function TenantProvider({ children }) {
               departmentId
             ));
           }
-        } else if (!cancelled && !profileReadDenied) {
+        } else if (!cancelled && !profileReadDenied && (registryExists || isKnownSeed)) {
+          // Only seed settings for a registered department, so a stale URL or
+          // remembered workspace can't recreate a deleted/unknown department.
           const seedSettings = { ...settingsDefaults, departmentId };
           await setDoc(doc(firestoreDb, "departments", departmentId, "settings", "main"), seedSettings, { merge: true });
           setSettings(applyPlatformToDepartmentSettings(seedSettings, platformConfig, departmentId));

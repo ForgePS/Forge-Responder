@@ -42,7 +42,7 @@ import {
   syncGatewayUrl,
   writeLoginTenantId
 } from "../lib/gatewayRouting.js";
-import { DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isDemoDepartment } from "../lib/tenantPaths.js";
+import { DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isDemoDepartment, isPlatformScope } from "../lib/tenantPaths.js";
 import {
   acceptInvite,
   captureInviteTokenFromUrl,
@@ -130,6 +130,13 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // The platform workspace has no department roles in Firestore; use the built-in
+  // creator role instead of seeding role documents under a fake department.
+  async function rolesForWorkspace(departmentId) {
+    if (!departmentId || isPlatformScope(departmentId)) return buildBootstrapRolesMap();
+    return loadRolesMap(departmentId);
+  }
+
   async function hydrateAccess(nextUser) {
     if (isDemoModeActive()) {
       const [nextMembership, nextRoles] = await Promise.all([
@@ -183,18 +190,30 @@ export function AuthProvider({ children }) {
 
     setIsCreator(creatorActive);
     if (creatorActive) {
-      const [nextMembership, nextRoles] = await Promise.all([
-        ensureCreatorDepartmentAccess(nextUser, departmentId),
-        loadRolesMap(departmentId),
-        ensurePlatformConfig()
-      ]);
-      await applyMembership(nextUser, departmentId, nextMembership, nextRoles, creatorActive);
+      // Creator status comes only from platformCreators. Loading a department
+      // workspace is secondary: if it fails, the creator keeps platform access.
+      try {
+        const [nextMembership] = await Promise.all([
+          ensureCreatorDepartmentAccess(nextUser, departmentId),
+          ensurePlatformConfig()
+        ]);
+        // Unregistered/deleted department or platform scope: no Firestore role
+        // seeding (it would recreate the department), use the creator role.
+        const nextRoles = nextMembership
+          ? await rolesForWorkspace(departmentId)
+          : buildBootstrapRolesMap();
+        await applyMembership(nextUser, departmentId, nextMembership, nextRoles, creatorActive);
+      } catch (error) {
+        console.warn(`Creator workspace ${departmentId} could not be loaded; using platform access`, error);
+        setMembership(null);
+        setRolesById(buildBootstrapRolesMap());
+      }
       return;
     }
 
     const [nextMembership, nextRoles] = await Promise.all([
       ensureMembershipForUser(nextUser, departmentId),
-      loadRolesMap(departmentId)
+      rolesForWorkspace(departmentId)
     ]);
     await applyMembership(nextUser, departmentId, nextMembership, nextRoles, creatorActive);
   }
@@ -293,18 +312,29 @@ export function AuthProvider({ children }) {
           setRolesById(buildBootstrapRolesMap());
           return;
         }
+        let creatorActive = false;
         try {
           const creator = await loadPlatformCreator(nextUser.uid);
-          if (String(creator?.status || "").toLowerCase() === "active") {
-            setIsCreator(true);
+          creatorActive = String(creator?.status || "").toLowerCase() === "active";
+        } catch (lookupError) {
+          console.error("Creator lookup failed", lookupError);
+        }
+        if (creatorActive) {
+          // Never drop creator status just because a department failed to load.
+          setIsCreator(true);
+          try {
             const recovered = await ensureCreatorDepartmentAccess(nextUser, getActiveDepartmentId());
-            const recoveredRoles = await loadRolesMap(getActiveDepartmentId());
+            const recoveredRoles = recovered
+              ? await rolesForWorkspace(getActiveDepartmentId())
+              : buildBootstrapRolesMap();
             setMembership(recovered);
             setRolesById(recoveredRoles);
-            return;
+          } catch (recoveryError) {
+            console.error("Creator workspace recovery failed; using platform access", recoveryError);
+            setMembership(null);
+            setRolesById(buildBootstrapRolesMap());
           }
-        } catch (recoveryError) {
-          console.error("Creator access recovery failed", recoveryError);
+          return;
         }
         setMembership(null);
         setRolesById({});

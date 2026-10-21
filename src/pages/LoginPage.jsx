@@ -25,7 +25,7 @@ import { isBrandedHydrantHost } from "../lib/hydrantAppRouting.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
-import { inviteErrorMessage, previewInvite, readPendingInviteToken } from "../lib/inviteService.js";
+import { clearPendingInviteToken, inviteErrorMessage, previewInvite, readPendingInviteToken } from "../lib/inviteService.js";
 
 const INVITE_REASON_TEXT = {
   not_found: "This invite link is not valid.",
@@ -46,6 +46,8 @@ function useInvitePreview(setMode) {
         if (cancelled) return;
         setInvite(result);
         if (result?.valid) setMode("signup");
+        // A dead link (not found / expired / used / cancelled) is shown once, then forgotten.
+        else clearPendingInviteToken();
       })
       .catch((error) => !cancelled && setInvite({ valid: false, error: inviteErrorMessage(error) }));
     return () => { cancelled = true; };

@@ -2360,8 +2360,9 @@ export default function App() {
   }
 
   if (!authRequired) return <AppShell />;
-  const onCreatorConsole = typeof window !== "undefined" && isCreatorConsolePath();
-  if (authLoading || (!onCreatorConsole && membershipLoading) || !ready) {
+  // Wait for access to resolve everywhere, including the creator console: creator
+  // status comes from the server-side platformCreators record, which loads async.
+  if (authLoading || membershipLoading || !ready) {
     return <LoadingScreen message="Loading department access..." />;
   }
   if (gatewayDepartmentId && gatewayError && !(typeof window !== "undefined" && isAlertDashboardPath(window.location.pathname))) {
