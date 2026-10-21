@@ -31,21 +31,26 @@
     "test:functions": "firebase emulators:exec --only firestore --project demo-forge-rms \"node --test --test-concurrency=1 tests/functions/invites.test.mjs tests/functions/billing.test.mjs\"",
     "inventory:legacy": "node scripts/inventory-legacy-data.mjs",
     "cleanup:phase2": "node scripts/phase2-cleanup.mjs",
-    "test:unit": "node --test \"tests/unit/*.test.mjs\""
+    "test:unit": "node --test \"tests/unit/*.test.mjs\"",
+    "test": "npm run test:unit && npm run test:rules && npm run test:functions"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
     "firebase": "^11.10.0",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
-    "lucide-react": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "vite": "latest",
+    "lucide-react": "1.17.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "4.0.1",
-    "firebase-admin": "^13.4.0"
+    "@vitejs/plugin-react": "6.0.2",
+    "firebase-admin": "^13.4.0",
+    "firebase-tools": "15.22.4",
+    "vite": "8.0.16"
+  },
+  "engines": {
+    "node": ">=22 <23"
   }
 }
