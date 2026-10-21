@@ -245,6 +245,57 @@ describe("subscription enforcement", () => {
   });
 });
 
+describe("legacy top-level collections", () => {
+  const HL = "horn-lake-fd";
+  const hornLakeMember = () => as("hl-member", { email: "ff@hornlake.org", email_verified: true });
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `departments/${HL}/users/hl-member`), membership("hl-member", HL));
+      await setDoc(doc(db, "rmsData/hlfd-rms-personnel"), { items: [{ name: "Secret" }] });
+      await setDoc(doc(db, "hydrants/h1"), { id: "h1" });
+      await setDoc(doc(db, "preFirePlans/p1"), { id: "p1" });
+      await setDoc(doc(db, "fireCodesFull/c1"), { text: "code" });
+      await setDoc(doc(db, "fireSogsFull/s1"), { text: "sog" });
+      await setDoc(doc(db, "appData/x"), { collection: "fireCodesFull" });
+      await setDoc(doc(db, "integrationSettings/x"), { secret: "s" });
+    });
+  });
+
+  it("rmsData is not readable by the public or other departments", async () => {
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "rmsData/hlfd-rms-personnel")));
+    await assertFails(getDoc(doc(stranger().firestore(), "rmsData/hlfd-rms-personnel")));
+    await assertFails(getDoc(doc(memberA().firestore(), "rmsData/hlfd-rms-personnel")));
+  });
+
+  it("Horn Lake members and creators can still read Horn Lake legacy data", async () => {
+    await assertSucceeds(getDoc(doc(hornLakeMember().firestore(), "rmsData/hlfd-rms-personnel")));
+    await assertSucceeds(getDoc(doc(hornLakeMember().firestore(), "hydrants/h1")));
+    await assertSucceeds(getDoc(doc(hornLakeMember().firestore(), "fireSogsFull/s1")));
+    await assertSucceeds(getDoc(doc(creator().firestore(), "preFirePlans/p1")));
+  });
+
+  it("legacy collections are not writable by members", async () => {
+    await assertFails(setDoc(doc(hornLakeMember().firestore(), "rmsData/hlfd-rms-personnel"), { items: [] }));
+    await assertFails(setDoc(doc(hornLakeMember().firestore(), "hydrants/h2"), { id: "h2" }));
+    await assertFails(setDoc(doc(memberA().firestore(), "appData/y"), { x: 1 }));
+    await assertFails(setDoc(doc(memberA().firestore(), "fireCodesFull/c2"), { text: "x" }));
+  });
+
+  it("shared reference libraries need sign-in, and other departments cannot read Horn Lake SOGs", async () => {
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "fireCodesFull/c1")));
+    await assertSucceeds(getDoc(doc(memberA().firestore(), "fireCodesFull/c1")));
+    await assertFails(getDoc(doc(memberA().firestore(), "fireSogsFull/s1")));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "preFirePlans/p1")));
+  });
+
+  it("unused collections are closed", async () => {
+    await assertFails(getDoc(doc(creator().firestore(), "integrationSettings/x")));
+    await assertFails(setDoc(doc(memberA().firestore(), "integrationSettings/y"), { a: 1 }));
+  });
+});
+
 describe("invites", () => {
   beforeEach(async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {

@@ -150,24 +150,35 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Shared reference datasets (not department-owned).
+    // ---- Legacy top-level collections (pre-multi-tenant) -------------------
+    // Horn Lake's original data lived at the top level. Until it is moved under
+    // departments/horn-lake-fd (Phase 2), only Horn Lake members and platform
+    // creators may read it, and only creators may write it.
+    function canReadLegacyHornLakeData() {
+      return canAccessDepartment("horn-lake-fd");
+    }
+
+    // Shared reference pointer docs (seeded by scripts with the Admin SDK).
     match /appData/{document} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isPlatformCreator();
     }
 
+    // Shared reference libraries used by every department.
     match /{collection}/{document} {
-      allow read: if collection in [
+      allow read: if isAuthenticated() && collection in [
         "emsProtocolsFull",
-        "fireSogsFull",
-        "fireSogDetails",
         "fireCodesFull",
         "fireCodeIndexFull",
         "fireCodePdfSections",
-        "fireCodeDocxSections",
+        "fireCodeDocxSections"
+      ];
+      allow read: if canReadLegacyHornLakeData() && collection in [
+        "fireSogsFull",
+        "fireSogDetails",
         "hoseInventory"
       ];
-      allow write: if isAuthenticated() && collection in [
+      allow write: if isPlatformCreator() && collection in [
         "emsProtocolsFull",
         "fireSogsFull",
         "fireSogDetails",
@@ -179,18 +190,19 @@ service cloud.firestore {
       ];
     }
 
+    // Horn Lake's legacy lists (personnel, roster, schedule...). Was world-readable.
     match /rmsData/{document} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if canReadLegacyHornLakeData();
+      allow write: if isPlatformCreator();
     }
 
+    // Unused.
     match /integrationSettings/{document} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if false;
     }
 
     match /academyTrainingSyncLog/{document} {
-      allow read: if isAuthenticated();
-      allow write: if false;
+      allow read, write: if false;
     }
 
     function isPublicAlertList(listKey) {
@@ -905,29 +917,37 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Legacy Horn Lake prototype collections. The app now uses
+    // departments/{id}/<same name>; these are kept read-only for Horn Lake
+    // until their data is moved (Phase 2), then they will be closed.
     match /preFirePlans/{document} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read: if canReadLegacyHornLakeData();
+      allow write: if isPlatformCreator();
     }
 
     match /hydrants/{document} {
-      allow read, write: if isAuthenticated();
+      allow read: if canReadLegacyHornLakeData();
+      allow write: if isPlatformCreator();
     }
 
     match /hydrantInspections/{document} {
-      allow read, write: if isAuthenticated();
+      allow read: if canReadLegacyHornLakeData();
+      allow write: if isPlatformCreator();
     }
 
     match /hydrantFlowTests/{document} {
-      allow read, write: if isAuthenticated();
+      allow read: if canReadLegacyHornLakeData();
+      allow write: if isPlatformCreator();
     }
 
     match /dailyActivity/{document} {
-      allow read, write: if isAuthenticated();
+      allow read: if canReadLegacyHornLakeData();
+      allow write: if isPlatformCreator();
     }
 
     match /hoseTests/{document} {
-      allow read, write: if isAuthenticated();
+      allow read: if canReadLegacyHornLakeData();
+      allow write: if isPlatformCreator();
     }
   }
 }
