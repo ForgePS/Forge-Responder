@@ -8,6 +8,7 @@ import {
 } from "../lib/departmentProvisioning.js";
 import { isValidUsZipCode } from "../lib/departmentBranchUtils.js";
 import { registerPlatformDepartment } from "../lib/platformService.js";
+import { createInvite, inviteErrorMessage } from "../lib/inviteService.js";
 import { defaultSubscriptionDates } from "../lib/subscriptionUtils.js";
 import DepartmentStateSelect from "./DepartmentStateSelect.jsx";
 
@@ -17,6 +18,7 @@ const EMPTY_FORM = {
   shortName: "",
   stateId: "",
   contactEmail: "",
+  firstAdminEmail: "",
   address: "",
   city: "",
   zip: "",
@@ -34,6 +36,7 @@ export default function CreateDepartmentPanel({
   const [idTouched, setIdTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [firstAdminInvite, setFirstAdminInvite] = useState(null);
 
   const existingIds = useMemo(
     () => departments.map((item) => item.id),
@@ -109,6 +112,23 @@ export default function CreateDepartmentPanel({
         },
       }, { user });
 
+      // Invite the department's first administrator (Fire Chief role).
+      const firstAdminEmail = form.firstAdminEmail.trim();
+      setFirstAdminInvite(null);
+      if (firstAdminEmail) {
+        try {
+          const invite = await createInvite({
+            departmentId: idCheck.id,
+            email: firstAdminEmail,
+            roleIds: ["fireChief"],
+            sendEmail: true,
+          });
+          setFirstAdminInvite({ ...invite, email: firstAdminEmail, departmentName: profile.name });
+        } catch (inviteError) {
+          setFirstAdminInvite({ error: inviteErrorMessage(inviteError), email: firstAdminEmail });
+        }
+      }
+
       setIdTouched(false);
       setForm({ ...EMPTY_FORM, ...defaultSubscriptionDates() });
       onCreated?.(idCheck.id, profile);
@@ -177,6 +197,15 @@ export default function CreateDepartmentPanel({
             placeholder="admin@agency.org"
           />
         </label>
+        <label>
+          <span>First administrator email (optional)</span>
+          <input
+            type="email"
+            value={form.firstAdminEmail}
+            onChange={(event) => updateField("firstAdminEmail", event.target.value)}
+            placeholder="chief@agency.org"
+          />
+        </label>
         <label className="create-department-wide">
           <span>Street address (optional)</span>
           <input
@@ -240,6 +269,35 @@ export default function CreateDepartmentPanel({
 
       {error && <p className="create-department-error">{error}</p>}
 
+      {firstAdminInvite?.error && (
+        <p className="create-department-error">
+          Department created, but the administrator invite for {firstAdminInvite.email} failed: {firstAdminInvite.error}
+          {" "}You can invite them from User Permissions in that department.
+        </p>
+      )}
+      {firstAdminInvite?.inviteUrl && (
+        <div className="department-invite-result" role="status">
+          <p className="auth-help">
+            Administrator invite for <strong>{firstAdminInvite.email}</strong>
+            {firstAdminInvite.emailStatus === "sent" ? " was emailed." : " is ready — send them this link:"}
+            {" "}It is shown only once.
+          </p>
+          <div className="department-invite-link">
+            <code>{firstAdminInvite.inviteUrl}</code>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(firstAdminInvite.inviteUrl).then(
+                () => onMessage?.("Invite link copied"),
+                () => window.prompt("Copy this invite link:", firstAdminInvite.inviteUrl)
+              )}
+            >
+              Copy link
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="platform-config-actions">
         <button className="primary-button" type="button" onClick={handleCreate} disabled={saving}>
           <CirclePlus size={14} /> {saving ? "Creating..." : "Create department platform"}
@@ -247,7 +305,7 @@ export default function CreateDepartmentPanel({
       </div>
 
       <p className="auth-help">
-        Sets up Firestore profile, settings, default roles, gateway route, registry entry, and creator access for your account.
+        Sets up the profile, settings, default roles, portal URL and registry entry in one step, adds creator access for your account, and invites the first administrator if you entered one.
       </p>
     </section>
   );

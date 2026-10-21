@@ -1,10 +1,10 @@
 import { defaultRoles } from "../data/defaultRoles.js";
 import { DEFAULT_DEPARTMENT_ID } from "./tenantPaths.js";
 
-export const PLATFORM_BOOTSTRAP_EMAILS = new Set([
-  "admin@forgepublicsafety.com",
-  "jpowell@hornlake.org"
-]);
+// Retired: platform creators are identified only by platformCreators/{uid}
+// (server-written), matching firestore.rules. Kept empty so existing callers of
+// isPlatformBootstrapEmail() fall through to the creator-record checks.
+export const PLATFORM_BOOTSTRAP_EMAILS = new Set();
 
 export function isPlatformBootstrapEmail(email = "") {
   return PLATFORM_BOOTSTRAP_EMAILS.has(String(email).trim().toLowerCase());

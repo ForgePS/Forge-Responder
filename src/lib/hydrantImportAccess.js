@@ -15,7 +15,7 @@ export function isHornLakeOrgEmail(email = "") {
 function permissionError(departmentId) {
   return new Error(
     departmentId === HORN_LAKE_DEPARTMENT_ID
-      ? "Missing permission to import hydrants. Sign in with your @hornlake.org account, or ask an admin to add you under User Permissions."
+      ? "Missing permission to import hydrants. Ask a department admin to invite you or add you under User Permissions."
       : "Missing permission to import hydrants for this department. Ask an admin to add your account under User Permissions."
   );
 }
@@ -44,13 +44,6 @@ export async function ensureHydrantImportAccess(departmentId) {
   if (isPlatformBootstrapEmail(user.email)) {
     const recovered = await recoverMembershipAccess(user, departmentId);
     if (recovered?.status === "active") return recovered;
-  }
-
-  // Legacy: firestore.rules still let verified @hornlake.org accounts into horn-lake-fd
-  // until the membership back-fill is done. Nothing is written here; users can no longer
-  // create their own (admin) membership.
-  if (departmentId === HORN_LAKE_DEPARTMENT_ID && isHornLakeOrgEmail(user.email) && user.emailVerified) {
-    return { id: user.uid, uid: user.uid, email: user.email, status: "active", departmentId, roleIds: [] };
   }
 
   const recovered = await recoverMembershipAccess(user, departmentId);

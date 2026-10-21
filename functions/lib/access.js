@@ -1,24 +1,22 @@
 const { HttpsError } = require("firebase-functions/v2/https");
 
-const BOOTSTRAP_PLATFORM_EMAILS = new Set([
-  "admin@forgepublicsafety.com",
-  "jpowell@hornlake.org",
-  "jeremyepowell@hotmail.com",
-]);
-
+// Platform creators are listed in platformCreators/{uid} (no email allowlists).
 async function isPlatformCreator(db, auth) {
   if (!auth?.uid) return false;
-  // Email allowlist only counts for verified emails; otherwise anyone could sign up with it.
-  if (
-    auth.token?.email
-    && auth.token.email_verified === true
-    && BOOTSTRAP_PLATFORM_EMAILS.has(String(auth.token.email).toLowerCase())
-  ) {
-    return true;
-  }
-
   const creatorSnap = await db.doc(`platformCreators/${auth.uid}`).get();
   return creatorSnap.exists && creatorSnap.data()?.status === "active";
+}
+
+// Mirrors firestore.rules isDepartmentActive(): suspended/cancelled subscriptions
+// and disabled/archived departments lose access (platform creators excepted).
+async function isDepartmentActive(db, departmentId) {
+  const [subscription, registry] = await Promise.all([
+    db.doc(`platformSubscriptions/${departmentId}`).get(),
+    db.doc(`platformDepartments/${departmentId}`).get(),
+  ]);
+  if (["suspended", "cancelled"].includes(subscription.data()?.status)) return false;
+  if (["disabled", "archived"].includes(registry.data()?.status)) return false;
+  return true;
 }
 
 async function isDepartmentMember(db, departmentId, uid) {
@@ -35,11 +33,13 @@ async function assertDepartmentAccess(db, departmentId, auth) {
     throw new HttpsError("invalid-argument", "departmentId is required.");
   }
 
-  const allowed = await isPlatformCreator(db, auth)
-    || await isDepartmentMember(db, departmentId, auth.uid);
+  if (await isPlatformCreator(db, auth)) return;
 
-  if (!allowed) {
+  if (!(await isDepartmentMember(db, departmentId, auth.uid))) {
     throw new HttpsError("permission-denied", "You do not have access to this department.");
+  }
+  if (!(await isDepartmentActive(db, departmentId))) {
+    throw new HttpsError("failed-precondition", "This department's subscription is not active.");
   }
 }
 
@@ -113,5 +113,6 @@ module.exports = {
   assertDepartmentManage,
   assertPlatformSuperAdmin,
   isPlatformCreator,
+  isDepartmentActive,
   isDepartmentMember,
 };

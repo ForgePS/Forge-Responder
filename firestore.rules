@@ -6,30 +6,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function hasVerifiedEmail() {
-      return isAuthenticated()
-        && request.auth.token.email != null
-        && request.auth.token.email_verified == true;
-    }
-
-    // TODO(Phase 1): replace this email allowlist with a platformRole custom claim.
-    function isBootstrapPlatformOwner() {
-      return hasVerifiedEmail()
-        && request.auth.token.email.lower() in [
-          "admin@forgepublicsafety.com",
-          "jpowell@hornlake.org",
-          "jeremyepowell@hotmail.com"
-        ];
-    }
-
+    // Platform creators are listed in platformCreators/{uid}, which only the
+    // server/console can write. No email allowlists.
     function isPlatformCreator() {
-      return isAuthenticated() && (
-        isBootstrapPlatformOwner()
-        || (
-          exists(/databases/$(database)/documents/platformCreators/$(request.auth.uid))
-          && get(/databases/$(database)/documents/platformCreators/$(request.auth.uid)).data.status == "active"
-        )
-      );
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/platformCreators/$(request.auth.uid))
+        && get(/databases/$(database)/documents/platformCreators/$(request.auth.uid)).data.status == "active";
     }
 
     function isDepartmentMember(departmentId) {
@@ -42,22 +24,30 @@ service cloud.firestore {
       return departmentId == "forge-demo";
     }
 
-    // Legacy: grants horn-lake-fd access by verified email domain. Remove once every
-    // Horn Lake user has a membership doc (see scripts/backfill-memberships.mjs).
-    function isHornLakeOrgEmail() {
-      return hasVerifiedEmail()
-        && request.auth.token.email.lower().matches('.*@hornlake\\.org$');
+    // A department is usable unless its subscription is suspended/cancelled or the
+    // registry marks it disabled/archived. Both docs are creator-only writes.
+    function isDepartmentActive(departmentId) {
+      return (
+          !exists(/databases/$(database)/documents/platformSubscriptions/$(departmentId))
+          || !(get(/databases/$(database)/documents/platformSubscriptions/$(departmentId)).data.get("status", "") in ["suspended", "cancelled"])
+        )
+        && (
+          !exists(/databases/$(database)/documents/platformDepartments/$(departmentId))
+          || !(get(/databases/$(database)/documents/platformDepartments/$(departmentId)).data.get("status", "") in ["disabled", "archived"])
+        );
     }
 
     function membershipData(departmentId) {
       return get(/databases/$(database)/documents/departments/$(departmentId)/users/$(request.auth.uid)).data;
     }
 
-    // Department admin = active member holding an admin role. Custom roles that grant
-    // manageUsers are not recognised here yet (Phase 1 moves this to custom claims).
+    // Department admin = active member of an active department holding an admin role
+    // (same definition as functions/lib/invites.js). Custom roles that grant
+    // manageUsers are not recognised here.
     function isDepartmentAdmin(departmentId) {
       return isPlatformCreator() || (
         isDepartmentMember(departmentId)
+        && isDepartmentActive(departmentId)
         && (
           membershipData(departmentId).get("role", "") in ["department_admin"]
           || membershipData(departmentId).get("roleIds", []).hasAny(["fireChief", "itAdmin"])
@@ -93,9 +83,8 @@ service cloud.firestore {
 
     function canAccessDepartment(departmentId) {
       return isPlatformCreator()
-        || isDepartmentMember(departmentId)
-        || (isAuthenticated() && isDemoDepartment(departmentId))
-        || (departmentId == "horn-lake-fd" && isHornLakeOrgEmail());
+        || (isDepartmentMember(departmentId) && isDepartmentActive(departmentId))
+        || (isAuthenticated() && isDemoDepartment(departmentId));
     }
 
     function subscriptionFieldUnchanged() {
@@ -104,6 +93,13 @@ service cloud.firestore {
 
     match /platformCreators/{userId} {
       allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    // Department invites: created/revoked/accepted only by Cloud Functions
+    // (functions/lib/invites.js). Department admins can list their own.
+    match /invites/{inviteId} {
+      allow read: if isAuthenticated() && isDepartmentAdmin(resource.data.departmentId);
       allow write: if false;
     }
 
@@ -259,7 +255,9 @@ service cloud.firestore {
         allow write: if canAccessDepartment(departmentId);
       }
       match /profile/{document} {
-        allow read: if canAccessDepartment(departmentId);
+        // Members of a suspended department may still read the profile so the app
+        // can show them a "subscription inactive" message.
+        allow read: if canAccessDepartment(departmentId) || isDepartmentMember(departmentId);
         allow write: if canAccessDepartment(departmentId);
       }
       match /settings/{document} {

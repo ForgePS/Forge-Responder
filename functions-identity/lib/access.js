@@ -1,20 +1,8 @@
 ﻿const { HttpsError } = require("firebase-functions/v2/https");
 
-const BOOTSTRAP_PLATFORM_EMAILS = new Set([
-  "admin@forgepublicsafety.com",
-  "jpowell@hornlake.org",
-  "jeremyepowell@hotmail.com",
-]);
-
+// Platform creators are listed in platformCreators/{uid} (no email allowlists).
 async function isPlatformCreator(db, auth) {
   if (!auth?.uid) return false;
-  if (
-    auth.token?.email
-    && auth.token.email_verified === true
-    && BOOTSTRAP_PLATFORM_EMAILS.has(String(auth.token.email).toLowerCase())
-  ) {
-    return true;
-  }
   const creatorSnap = await db.doc(`platformCreators/${auth.uid}`).get();
   return creatorSnap.exists && creatorSnap.data()?.status === "active";
 }

@@ -35,6 +35,15 @@ const {
 const { fetchJotformSubmissionPdf, resolveReportId, buildPublicPdfUrls } = require("./lib/jotformDamagePdf");
 const { generateDamageFormPdfBuffer } = require("./lib/damageFormPdfGenerator");
 const { syncFormSubmissions } = require("./lib/jotformSubmissionApi");
+const {
+  generateHydrantDamagePdfBuffer,
+  sendWithSendGrid,
+} = require("./lib/hydrantDamageEmail");
+const {
+  issueHydrantDamageAckToken,
+  viewAckPortal,
+  submitAckPortal,
+} = require("./lib/hydrantDamageAckPortal");
 
 admin.initializeApp();
 
@@ -609,11 +618,10 @@ const academyCallables = require("./lib/academy/callables");
  */
 exports.resolveForgePersonIdentity = onCall(async (request) => {
   const departmentId = String(request.data?.departmentId || "").trim();
-  const db = admin.firestore();
-  await assertDepartmentAccess(db, departmentId, request.auth);
+  await assertDepartmentAccess(request, departmentId);
 
   try {
-    return await resolvePersonIdentityViaHub(db, departmentId, request.data?.person || {});
+    return await resolvePersonIdentityViaHub(admin.firestore(), departmentId, request.data?.person || {});
   } catch (error) {
     throw new HttpsError(
       "internal",
@@ -657,3 +665,282 @@ exports.unlinkAcademyPerson = wrapAcademy(academyCallables.handleUnlinkAcademyPe
 exports.resolveAcademyMatchConflict = wrapAcademy(academyCallables.handleResolveAcademyMatchConflict);
 exports.replayAcademyEvent = wrapAcademy(academyCallables.handleReplayAcademyEvent);
 exports.ingestAcademyEvent = wrapAcademy(academyCallables.handleIngestAcademyEvent);
+exports.listMyAcademyTraining = wrapAcademy(academyCallables.handleListMyAcademyTraining);
+
+const {
+  upsertAcademyEnrollment,
+  upsertAcademyCompletion,
+} = require("./lib/academy/academyTrainingSync");
+
+function readIntegrationSecret(req) {
+  return String(req.get("x-integration-secret") || req.get("X-Integration-Secret") || "").trim();
+}
+
+async function assertAcademyWebhookSecret(db, secretHeader, body = {}) {
+  const expectedCandidates = [];
+  const platformSnap = await db.doc("platformConfig/main").get().catch(() => ({ exists: false }));
+  if (platformSnap.exists) {
+    const fa = platformSnap.data()?.forgeAcademy || {};
+    if (fa.webhookSecret) expectedCandidates.push(String(fa.webhookSecret).trim());
+    if (fa.hubSecret) expectedCandidates.push(String(fa.hubSecret).trim());
+    if (fa.outboundSecret) expectedCandidates.push(String(fa.outboundSecret).trim());
+  }
+
+  const departmentId = String(body.departmentId || body.forgeDepartmentId || "").trim();
+  if (departmentId && departmentId !== "forge-platform") {
+    const deptSnap = await db.doc(`departments/${departmentId}/settings/main`).get().catch(() => ({ exists: false }));
+    if (deptSnap.exists) {
+      const fa = deptSnap.data()?.forgeAcademy || {};
+      if (fa.webhookSecret) expectedCandidates.push(String(fa.webhookSecret).trim());
+      if (fa.hubSecret) expectedCandidates.push(String(fa.hubSecret).trim());
+      if (fa.outboundSecret) expectedCandidates.push(String(fa.outboundSecret).trim());
+    }
+  }
+
+  const expected = expectedCandidates.filter(Boolean);
+  if (!expected.length) return true;
+  return expected.includes(String(secretHeader || "").trim());
+}
+
+/** Academy → RMS: student registered in a course (My Training). */
+exports.trainingRegisteredWebhook = onRequest({ invoker: "public" }, async (req, res) => {
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed." });
+    return;
+  }
+  try {
+    const db = admin.firestore();
+    const body = normalizeWebhookBody(req);
+    const allowed = await assertAcademyWebhookSecret(db, readIntegrationSecret(req), body);
+    if (!allowed) {
+      res.status(401).json({ error: "Invalid integration secret." });
+      return;
+    }
+    const result = await upsertAcademyEnrollment(db, body);
+    res.status(result.ok ? 200 : 422).json(result);
+  } catch (error) {
+    console.error("trainingRegisteredWebhook failed", error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Enrollment webhook failed.",
+    });
+  }
+});
+
+/** Academy → RMS: course completed / certificate released. */
+exports.trainingCompletedWebhook = onRequest({ invoker: "public" }, async (req, res) => {
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed." });
+    return;
+  }
+  try {
+    const db = admin.firestore();
+    const body = normalizeWebhookBody(req);
+    const allowed = await assertAcademyWebhookSecret(db, readIntegrationSecret(req), body);
+    if (!allowed) {
+      res.status(401).json({ error: "Invalid integration secret." });
+      return;
+    }
+    const result = await upsertAcademyCompletion(db, body);
+    res.status(result.ok ? 200 : 422).json(result);
+  } catch (error) {
+    console.error("trainingCompletedWebhook failed", error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Training completed webhook failed.",
+    });
+  }
+});
+
+/**
+ * Send a hydrant damage report email with PDF attachment via SendGrid.
+ * Never claims success unless the provider accepts (HTTP 202).
+ */
+exports.sendHydrantDamageReport = onCall(
+  {
+    region: "us-central1",
+  },
+  async (request) => {
+    const db = admin.firestore();
+    const {
+      departmentId = "",
+      reportId = "",
+      attemptId = "",
+      idempotencyKey = "",
+      departmentName = "",
+      subject = "",
+      bodyText = "",
+    } = request.data || {};
+
+    await assertDepartmentAccess(db, departmentId, request.auth);
+    if (!reportId) {
+      throw new HttpsError("invalid-argument", "reportId is required.");
+    }
+
+    const reportRef = db.doc(`departments/${departmentId}/hydrantDamageReports/${reportId}`);
+    const reportSnap = await reportRef.get();
+    if (!reportSnap.exists) {
+      throw new HttpsError("not-found", "Damage report not found.");
+    }
+    const report = { id: reportSnap.id, ...reportSnap.data() };
+
+    if (idempotencyKey && report.lastSendIdempotencyKey === idempotencyKey && report.providerMessageId) {
+      return {
+        accepted: true,
+        emailStatus: report.emailStatus || "accepted",
+        providerMessageId: report.providerMessageId,
+        providerStatus: "idempotent",
+        duplicate: true,
+      };
+    }
+
+    const recipients = Array.isArray(report.recipientSnapshot)
+      ? report.recipientSnapshot.map((row) => String(row.email || "").trim()).filter(Boolean)
+      : [];
+    if (!recipients.length) {
+      throw new HttpsError("failed-precondition", "Report has no recipient emails.");
+    }
+    if (!String(report.description || "").trim()) {
+      throw new HttpsError("failed-precondition", "Report description is required.");
+    }
+
+    const apiKey = String(process.env.SENDGRID_API_KEY || "").trim();
+    const fromEmail = String(
+      process.env.SENDGRID_FROM_EMAIL
+      || process.env.DAILY_ACTIVITY_FROM_EMAIL
+      || ""
+    ).trim();
+
+    if (!apiKey || !fromEmail) {
+      return {
+        accepted: false,
+        error: "SendGrid is not configured. Set SENDGRID_API_KEY and SENDGRID_FROM_EMAIL on Cloud Functions.",
+        providerStatus: "not_configured",
+      };
+    }
+
+    const pdfBuffer = await generateHydrantDamagePdfBuffer(report, {
+      departmentName: departmentName || "Fire Department",
+    });
+
+    const origin = String(
+      request.data?.origin
+      || process.env.RMS_APP_ORIGIN
+      || "https://rms.forgepublicsafety.com"
+    ).replace(/\/$/, "");
+    const ackToken = await issueHydrantDamageAckToken(db, {
+      departmentId,
+      reportId,
+      origin,
+    });
+    const bodyWithAck = `${bodyText || "A hydrant damage report PDF is attached."}
+
+Secure acknowledgment link (expires ${ackToken.expiresAt}):
+${ackToken.url}
+
+Do not forward this link outside your utility. Internal fire-department notes are never included.`;
+
+    const sendResult = await sendWithSendGrid({
+      apiKey,
+      fromEmail,
+      fromName: departmentName || "FORGE RMS Hydrants",
+      to: recipients,
+      subject: subject || `Hydrant Damage Report ${report.reportNumber || reportId}`,
+      text: bodyWithAck,
+      pdfBuffer,
+      filename: `${report.reportNumber || reportId}.pdf`,
+    });
+
+    if (attemptId) {
+      await db.doc(`departments/${departmentId}/hydrantDamageEmailAttempts/${attemptId}`).set({
+        status: sendResult.ok ? "accepted" : "failed",
+        providerStatus: String(sendResult.status || ""),
+        providerMessageId: sendResult.providerMessageId || "",
+        error: sendResult.ok ? "" : (sendResult.errorText || "SendGrid rejected the request."),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+
+    if (!sendResult.ok) {
+      return {
+        accepted: false,
+        error: sendResult.errorText || `SendGrid returned HTTP ${sendResult.status}`,
+        providerStatus: String(sendResult.status || ""),
+        providerMessageId: sendResult.providerMessageId || "",
+      };
+    }
+
+    await reportRef.set({
+      lastSendIdempotencyKey: idempotencyKey || "",
+      providerMessageId: sendResult.providerMessageId || "",
+      emailStatus: "accepted",
+      acknowledgmentPortalUrl: ackToken.url,
+      acknowledgmentTokenExpiresAt: ackToken.expiresAt,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    return {
+      accepted: true,
+      emailStatus: "accepted",
+      providerStatus: String(sendResult.status || "202"),
+      providerMessageId: sendResult.providerMessageId || "",
+      acknowledgmentPortalUrl: ackToken.url,
+    };
+  }
+);
+
+/**
+ * Public utility acknowledgment portal — view report snapshot (no internal notes).
+ */
+exports.hydrantDamageAckPortalView = onCall(
+  {
+    region: "us-central1",
+    invoker: "public",
+  },
+  async (request) => {
+    const db = admin.firestore();
+    try {
+      return await viewAckPortal(db, request.data?.token || "");
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      console.error("hydrantDamageAckPortalView failed", error);
+      throw new HttpsError("internal", error?.message || "Unable to open acknowledgment portal.");
+    }
+  }
+);
+
+/**
+ * Public utility acknowledgment portal — submit ack / repair update.
+ */
+exports.hydrantDamageAckPortalSubmit = onCall(
+  {
+    region: "us-central1",
+    invoker: "public",
+  },
+  async (request) => {
+    const db = admin.firestore();
+    try {
+      return await submitAckPortal(db, request.data?.token || "", request.data || {});
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      console.error("hydrantDamageAckPortalSubmit failed", error);
+      throw new HttpsError("internal", error?.message || "Unable to submit acknowledgment.");
+    }
+  }
+);
+
+
+// ---------------------------------------------------------------------------
+// Department user invites (Phase 1). Memberships are created server-side only.
+// ---------------------------------------------------------------------------
+const invites = require("./lib/invites");
+
+exports.createDepartmentInvite = onCall(async (request) =>
+  invites.createInvite(admin.firestore(), request));
+
+exports.revokeDepartmentInvite = onCall(async (request) =>
+  invites.revokeInvite(admin.firestore(), request));
+
+exports.acceptDepartmentInvite = onCall(async (request) =>
+  invites.acceptInvite(admin.firestore(), request));
+
+exports.previewDepartmentInvite = onCall({ invoker: "public" }, async (request) =>
+  invites.previewInvite(admin.firestore(), request));

@@ -27,7 +27,8 @@
     "build:staging": "vite build --mode staging",
     "deploy:staging:rules": "firebase deploy --only firestore:rules,storage --project staging",
     "backfill:memberships": "node scripts/backfill-memberships.mjs",
-    "backfill:memberships:apply": "node scripts/backfill-memberships.mjs --apply"
+    "backfill:memberships:apply": "node scripts/backfill-memberships.mjs --apply",
+    "test:functions": "firebase emulators:exec --only firestore --project demo-forge-rms \"node --test tests/functions/invites.test.mjs\""
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

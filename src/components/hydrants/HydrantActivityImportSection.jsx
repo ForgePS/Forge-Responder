@@ -85,7 +85,7 @@ export default function HydrantActivityImportSection({
       const text = String(error?.message || "");
       if (code === "permission-denied" || /insufficient permissions/i.test(text)) {
         setMessage(
-          "Missing permission to import activity. Sign in with your @hornlake.org account, or ask an admin to add you under User Permissions."
+          "Missing permission to import activity. Ask a department admin to invite you or add you under User Permissions."
         );
       } else {
         setMessage(text || "Activity import failed.");

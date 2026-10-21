@@ -1,4 +1,5 @@
-import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, writeBatch } from "firebase/firestore";
+import { defaultRoles } from "../data/defaultRoles.js";
 import {
   hornLakeDepartmentProfile,
   resolveDepartmentProfileDefaults,
@@ -520,18 +521,27 @@ export async function registerPlatformDepartment(departmentId, profile = {}, opt
   );
   const gatewayRecord = buildDepartmentGatewayRecord(departmentId, departmentProfile);
 
-  await Promise.all([
-    setDoc(doc(db, "departments", departmentId, "profile", "main"), {
-      ...departmentProfile,
+  // One atomic batch: either the whole tenant shell (profile, settings, registry,
+  // gateway, default roles) is created, or nothing is — no half-built departments.
+  const batch = writeBatch(db);
+  batch.set(doc(db, "departments", departmentId, "profile", "main"), {
+    ...departmentProfile,
+    createdAt: now,
+    updatedAt: now
+  }, { merge: true });
+  batch.set(doc(db, "departments", departmentId, "settings", "main"), {
+    ...departmentSettings,
+    createdAt: now,
+    updatedAt: now
+  }, { merge: true });
+  for (const role of defaultRoles) {
+    batch.set(doc(db, "departments", departmentId, "roles", role.id), {
+      ...role,
       createdAt: now,
       updatedAt: now
-    }, { merge: true }),
-    setDoc(doc(db, "departments", departmentId, "settings", "main"), {
-      ...departmentSettings,
-      createdAt: now,
-      updatedAt: now
-    }, { merge: true }),
-    setDoc(doc(db, "platformDepartments", departmentId), {
+    }, { merge: true });
+  }
+  batch.set(doc(db, "platformDepartments", departmentId), {
       id: departmentId,
       name: departmentProfile.name,
       shortName: departmentProfile.shortName,
@@ -544,15 +554,13 @@ export async function registerPlatformDepartment(departmentId, profile = {}, opt
       subscription: departmentSettings.subscription,
       createdAt: now,
       updatedAt: now
-    }, { merge: true }),
-    setDoc(doc(db, "rmsGateways", departmentId), {
-      ...gatewayRecord,
-      createdAt: now,
-      updatedAt: now
-    }, { merge: true })
-  ]);
-
-  await ensureDefaultRoles(departmentId);
+    }, { merge: true });
+  batch.set(doc(db, "rmsGateways", departmentId), {
+    ...gatewayRecord,
+    createdAt: now,
+    updatedAt: now
+  }, { merge: true });
+  await batch.commit();
 
   if (user?.uid) {
     await ensureCreatorDepartmentAccess(user, departmentId);

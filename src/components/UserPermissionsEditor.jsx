@@ -3,6 +3,7 @@ import { buildDepartmentGatewayUrl } from "../lib/gatewayRouting.js";
 import { Check, RotateCcw } from "lucide-react";
 import PermissionGroupGrid from "./PermissionGroupGrid.jsx";
 import PersonnelLinkField from "./PersonnelLinkField.jsx";
+import DepartmentInvitesPanel from "./DepartmentInvitesPanel.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { CREATOR_PERMISSIONS } from "../data/creatorPermissions.js";
@@ -222,12 +223,22 @@ export default function UserPermissionsEditor({
     return <p className="auth-help">Loading users...</p>;
   }
 
+  const invitesPanel = (
+    <DepartmentInvitesPanel departmentId={departmentId} roles={roles} onMessage={onMessage} />
+  );
+
   if (!users.length) {
-    return <p className="auth-help">No users found. Add users under System Records first.</p>;
+    return (
+      <section className="user-permissions-editor">
+        {invitesPanel}
+        <p className="auth-help">No users yet. Invite someone above.</p>
+      </section>
+    );
   }
 
   return (
     <section className="user-permissions-editor">
+      {invitesPanel}
       <div className="user-permissions-toolbar">
         <label>
           <span>Select user</span>

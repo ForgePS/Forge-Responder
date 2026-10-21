@@ -35,8 +35,25 @@ import {
 import { loadRolesMap } from "../lib/roleService.js";
 import { isDemoModeActive } from "../lib/demoMode.js";
 import { ensureDemoAccess } from "../lib/demoService.js";
-import { resolveActiveDepartmentId, shouldSyncGatewayUrl, syncGatewayUrl } from "../lib/gatewayRouting.js";
+import {
+  persistGatewayContext,
+  resolveActiveDepartmentId,
+  shouldSyncGatewayUrl,
+  syncGatewayUrl,
+  writeLoginTenantId
+} from "../lib/gatewayRouting.js";
 import { DEFAULT_DEPARTMENT_ID, DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isDemoDepartment } from "../lib/tenantPaths.js";
+import {
+  acceptInvite,
+  captureInviteTokenFromUrl,
+  clearPendingInviteToken,
+  inviteErrorMessage,
+  isTerminalInviteError,
+  readPendingInviteToken
+} from "../lib/inviteService.js";
+
+// Pick up ?invite=TOKEN before anything else rewrites the URL.
+captureInviteTokenFromUrl();
 
 const AuthContext = createContext(null);
 
@@ -48,6 +65,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [membership, setMembership] = useState(null);
   const [rolesById, setRolesById] = useState({});
+  const [inviteNotice, setInviteNotice] = useState("");
+  const [inviteError, setInviteError] = useState("");
   const [authLoading, setAuthLoading] = useState(firebaseEnabled);
   const [membershipLoading, setMembershipLoading] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -87,6 +106,28 @@ export function AuthProvider({ children }) {
     }
 
     return membershipRecord;
+  }
+
+  // If the user arrived through an invite link, redeem it (server creates the
+  // membership) and point the app at that department before loading access.
+  async function redeemPendingInvite(nextUser) {
+    const token = readPendingInviteToken();
+    if (!token || !nextUser?.uid) return;
+    try {
+      const result = await acceptInvite(token);
+      clearPendingInviteToken();
+      if (result?.departmentId) {
+        writeLoginTenantId(result.departmentId);
+        persistGatewayContext(result.departmentId, result.departmentId);
+      }
+      setInviteError("");
+      setInviteNotice(result?.departmentName ? `Welcome to ${result.departmentName}.` : "Invite accepted.");
+    } catch (error) {
+      console.warn("Invite could not be accepted", error);
+      // Keep the token for a wrong-account error so they can sign in with the right email.
+      if (isTerminalInviteError(error)) clearPendingInviteToken();
+      setInviteError(inviteErrorMessage(error));
+    }
   }
 
   async function hydrateAccess(nextUser) {
@@ -226,6 +267,7 @@ export function AuthProvider({ children }) {
       }
 
       setMembershipLoading(true);
+      await redeemPendingInvite(nextUser);
       try {
         await hydrateAccess(nextUser);
       } catch (error) {
@@ -375,9 +417,12 @@ export function AuthProvider({ children }) {
       recoverAccess,
       recoveryLoading,
       patchMembership,
+      inviteNotice,
+      inviteError,
+      dismissInviteNotice: () => setInviteNotice(""),
       authRequired: firebaseEnabled
     }),
-    [user, membership, permissions, rolesById, isCreator, authLoading, membershipLoading, authError, recoveryLoading, patchMembership]
+    [user, membership, permissions, rolesById, isCreator, authLoading, membershipLoading, authError, recoveryLoading, patchMembership, inviteNotice, inviteError]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

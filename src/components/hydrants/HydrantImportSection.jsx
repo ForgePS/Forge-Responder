@@ -90,7 +90,7 @@ export default function HydrantImportSection({
       const text = String(error?.message || "");
       if (code === "permission-denied" || /insufficient permissions/i.test(text)) {
         setMessage(
-          "Missing permission to import hydrants. Sign in with your @hornlake.org account, or ask an admin to add you under User Permissions."
+          "Missing permission to import hydrants. Ask a department admin to invite you or add you under User Permissions."
         );
       } else {
         setMessage(text || "Hydrant import failed.");

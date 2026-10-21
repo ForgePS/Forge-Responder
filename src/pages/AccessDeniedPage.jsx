@@ -1,23 +1,52 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 import { resolveDepartmentLogoUrl } from "../lib/brandAssets.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
-import { isCreatorConsolePath } from "../lib/gatewayRouting.js";
-import { buildDepartmentGatewayUrl } from "../lib/gatewayRouting.js";
+import {
+  buildDepartmentGatewayUrl,
+  clearLoginTenantId,
+  isCreatorConsolePath,
+  persistGatewayContext,
+} from "../lib/gatewayRouting.js";
+import { isHornLakeHydrantHost } from "../lib/hydrantAppRouting.js";
 import { canSelfRestoreMembership } from "../lib/membershipRecovery.js";
+import { loadPlatformCreator } from "../lib/platformService.js";
 import { isPlatformScope } from "../lib/tenantPaths.js";
 import { FORGE_CREATOR_CONSOLE_URL } from "../lib/platformUrls.js";
 
 export default function AccessDeniedPage({ userId = "" }) {
-  const { profile, departmentId, gatewayDepartmentId } = useTenant();
-  const { user, signOut, recoverAccess, recoveryLoading } = useAuth();
+  const { profile, departmentId, gatewayDepartmentId, setDepartmentId } = useTenant();
+  const { user, signOut, recoverAccess, recoveryLoading, inviteError } = useAuth();
   const [recoveryMessage, setRecoveryMessage] = useState("");
+  const [platformCreatorRecoverable, setPlatformCreatorRecoverable] = useState(false);
+  const [changingTenant, setChangingTenant] = useState(false);
   const authUid = userId || user?.uid || "";
   const creatorConsoleEntry = isCreatorConsolePath();
+  const hydrantHostLocked = isHornLakeHydrantHost();
+  const canChangeTenant = !creatorConsoleEntry && !hydrantHostLocked;
   const portalDepartmentId = gatewayDepartmentId || (isPlatformScope(departmentId) ? null : departmentId);
-  const canRecover = canSelfRestoreMembership(user || {});
+  const canRecover = canSelfRestoreMembership(user || {}) || platformCreatorRecoverable;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkPlatformCreator() {
+      if (!user?.uid || canSelfRestoreMembership(user)) return;
+      try {
+        const creator = await loadPlatformCreator(user.uid);
+        if (!cancelled && String(creator?.status || "").toLowerCase() === "active") {
+          setPlatformCreatorRecoverable(true);
+        }
+      } catch {
+        // Ignore lookup failures; Change tenant / Sign out remain available.
+      }
+    }
+    checkPlatformCreator();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   async function handleRecoverAccess() {
     setRecoveryMessage("");
@@ -26,7 +55,25 @@ export default function AccessDeniedPage({ userId = "" }) {
       setRecoveryMessage("Admin access restored. Loading your workspace...");
       return;
     }
-    setRecoveryMessage("Could not restore access automatically. Use Firebase Console or contact your platform owner.");
+    setRecoveryMessage("Could not restore access automatically. Use Change tenant, or contact your platform owner.");
+  }
+
+  async function handleChangeTenant() {
+    if (!canChangeTenant || changingTenant) return;
+    setChangingTenant(true);
+    setRecoveryMessage("");
+    clearLoginTenantId();
+    persistGatewayContext("", "");
+    setDepartmentId("");
+    if (window.location.pathname.replace(/\/$/, "") !== "") {
+      window.history.replaceState({}, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+    try {
+      await signOut();
+    } finally {
+      setChangingTenant(false);
+    }
   }
 
   return (
@@ -54,10 +101,14 @@ export default function AccessDeniedPage({ userId = "" }) {
           </div>
         </div>
 
+        {inviteError && <div className="auth-error" role="alert">{inviteError}</div>}
+
         <p className="auth-help">
           {creatorConsoleEntry
             ? "Click Restore admin access below, or add your Account ID to platformCreators in Firebase Console."
-            : "Contact your department administrator or platform owner to request access, then sign in again."}
+            : canChangeTenant
+              ? "If you selected the wrong tenant, use Change tenant below. Otherwise ask your department administrator to send you an invite link."
+              : "Ask your department administrator to send you an invite link, then open it and sign in again."}
         </p>
         {creatorConsoleEntry && (
           <p className="auth-help auth-help-muted">
@@ -80,15 +131,31 @@ export default function AccessDeniedPage({ userId = "" }) {
             className="primary-button auth-submit"
             type="button"
             onClick={handleRecoverAccess}
-            disabled={recoveryLoading}
+            disabled={recoveryLoading || changingTenant}
           >
             {recoveryLoading ? "Restoring access..." : "Restore admin access"}
           </button>
         )}
 
+        {canChangeTenant && (
+          <button
+            className={`${canRecover ? "secondary-button" : "primary-button"} auth-submit`}
+            type="button"
+            onClick={handleChangeTenant}
+            disabled={changingTenant || recoveryLoading}
+          >
+            {changingTenant ? "Switching tenant..." : "Change tenant"}
+          </button>
+        )}
+
         {recoveryMessage && <p className="auth-help">{recoveryMessage}</p>}
 
-        <button className="secondary-button auth-submit" type="button" onClick={signOut}>
+        <button
+          className="secondary-button auth-submit"
+          type="button"
+          onClick={signOut}
+          disabled={changingTenant}
+        >
           Sign out
         </button>
       </section>

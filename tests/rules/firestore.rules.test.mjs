@@ -181,26 +181,90 @@ describe("explicit rules are no longer overridden by the catch-all", () => {
   });
 });
 
-describe("email-based access requires a verified email", () => {
-  it("unverified bootstrap owner email gets no platform access", async () => {
-    const db = as("imposter", { email: "admin@forgepublicsafety.com", email_verified: false }).firestore();
+describe("no email-based access", () => {
+  it("owner email without a platformCreators record gets no access, even verified", async () => {
+    const db = as("imposter", { email: "admin@forgepublicsafety.com", email_verified: true }).firestore();
     await assertFails(getDoc(doc(db, `departments/${A}/incidents/i1`)));
     await assertFails(setDoc(doc(db, `departments/${A}/users/imposter`), membership("imposter", A)));
   });
 
-  it("verified bootstrap owner keeps access", async () => {
-    const db = as("owner", { email: "admin@forgepublicsafety.com", email_verified: true }).firestore();
-    await assertSucceeds(getDoc(doc(db, `departments/${A}/incidents/i1`)));
-  });
-
-  it("unverified @hornlake.org account cannot read horn-lake-fd", async () => {
-    const db = as("hl-imposter", { email: "x@hornlake.org", email_verified: false }).firestore();
+  it("@hornlake.org email without a membership cannot read horn-lake-fd", async () => {
+    const db = as("hl-user", { email: "ff@hornlake.org", email_verified: true }).firestore();
     await assertFails(getDoc(doc(db, "departments/horn-lake-fd/incidents/i1")));
   });
+});
 
-  it("verified @hornlake.org account can read horn-lake-fd (legacy, until back-fill)", async () => {
-    const db = as("hl-user", { email: "ff@hornlake.org", email_verified: true }).firestore();
-    await assertSucceeds(getDoc(doc(db, "departments/horn-lake-fd/incidents/i1")));
+describe("subscription enforcement", () => {
+  async function setSubscription(departmentId, status) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `platformSubscriptions/${departmentId}`), { status, planId: "pilot" });
+    });
+  }
+
+  it("members of an active or trial department keep access", async () => {
+    await setSubscription(A, "trial");
+    await assertSucceeds(getDoc(doc(memberA().firestore(), `departments/${A}/incidents/i1`)));
+    await setSubscription(A, "past_due");
+    await assertSucceeds(getDoc(doc(memberA().firestore(), `departments/${A}/incidents/i1`)));
+  });
+
+  it("members of a suspended department lose data access", async () => {
+    await setSubscription(A, "suspended");
+    await assertFails(getDoc(doc(memberA().firestore(), `departments/${A}/incidents/i1`)));
+    await assertFails(setDoc(doc(memberA().firestore(), `departments/${A}/incidents/i2`), { summary: "x" }));
+  });
+
+  it("admins of a cancelled department cannot manage users", async () => {
+    await setSubscription(A, "cancelled");
+    await assertFails(setDoc(doc(adminA().firestore(), `departments/${A}/users/new-user`), membership("new-user", A)));
+  });
+
+  it("suspended members can still read the profile and their own membership", async () => {
+    await setSubscription(A, "suspended");
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `departments/${A}/profile/main`), { name: "Dept A" });
+    });
+    await assertSucceeds(getDoc(doc(memberA().firestore(), `departments/${A}/profile/main`)));
+    await assertSucceeds(getDoc(doc(memberA().firestore(), `departments/${A}/users/member-a`)));
+  });
+
+  it("disabled or archived departments lose access", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `platformDepartments/${A}`), { status: "archived" });
+    });
+    await assertFails(getDoc(doc(memberA().firestore(), `departments/${A}/incidents/i1`)));
+  });
+
+  it("platform creators keep access to suspended departments", async () => {
+    await setSubscription(A, "suspended");
+    await assertSucceeds(getDoc(doc(creator().firestore(), `departments/${A}/incidents/i1`)));
+  });
+
+  it("members cannot change their department's subscription", async () => {
+    await assertFails(setDoc(doc(adminA().firestore(), `platformSubscriptions/${A}`), { status: "active" }));
+  });
+});
+
+describe("invites", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "invites/inv-a"), { departmentId: A, email: "new@a.gov", status: "pending" });
+    });
+  });
+
+  it("department admins can read their own invites", async () => {
+    await assertSucceeds(getDoc(doc(adminA().firestore(), "invites/inv-a")));
+  });
+
+  it("members, other departments and strangers cannot read invites", async () => {
+    await assertFails(getDoc(doc(memberA().firestore(), "invites/inv-a")));
+    await assertFails(getDoc(doc(memberB().firestore(), "invites/inv-a")));
+    await assertFails(getDoc(doc(stranger().firestore(), "invites/inv-a")));
+  });
+
+  it("nobody can create or edit invites from the client", async () => {
+    await assertFails(setDoc(doc(adminA().firestore(), "invites/forged"), { departmentId: A, email: "x@x.com", status: "pending" }));
+    await assertFails(updateDoc(doc(adminA().firestore(), "invites/inv-a"), { status: "accepted" }));
   });
 });
 

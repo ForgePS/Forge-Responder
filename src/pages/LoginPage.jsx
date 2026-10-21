@@ -25,6 +25,33 @@ import { isHornLakeHydrantHost } from "../lib/hydrantAppRouting.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
+import { inviteErrorMessage, previewInvite, readPendingInviteToken } from "../lib/inviteService.js";
+
+const INVITE_REASON_TEXT = {
+  not_found: "This invite link is not valid.",
+  expired: "This invite has expired. Ask your administrator for a new one.",
+  accepted: "This invite has already been used. Sign in to continue.",
+  revoked: "This invite was cancelled. Ask your administrator for a new one.",
+};
+
+/** Shows who the invite link is for, and nudges new users to create an account. */
+function useInvitePreview(setMode) {
+  const [invite, setInvite] = useState(null);
+  useEffect(() => {
+    const token = readPendingInviteToken();
+    if (!token) return undefined;
+    let cancelled = false;
+    previewInvite(token)
+      .then((result) => {
+        if (cancelled) return;
+        setInvite(result);
+        if (result?.valid) setMode("signup");
+      })
+      .catch((error) => !cancelled && setInvite({ valid: false, error: inviteErrorMessage(error) }));
+    return () => { cancelled = true; };
+  }, [setMode]);
+  return invite;
+}
 
 function authErrorMessage(error) {
   const code = error?.code || "";
@@ -51,9 +78,10 @@ function validateTenantId(value) {
 }
 
 export default function LoginPage() {
-  const { profile, gatewayDepartmentId, departmentId, setDepartmentId } = useTenant();
-  const { signIn, signUp, setAuthError } = useAuth();
+  const { profile, gatewayDepartmentId, gatewayRecord, departmentId, setDepartmentId } = useTenant();
+  const { signIn, signUp, setAuthError, inviteError } = useAuth();
   const [mode, setMode] = useState("signin");
+  const invite = useInvitePreview(setMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -65,8 +93,14 @@ export default function LoginPage() {
   const creatorConsoleEntry = isCreatorConsolePath();
   const hydrantHostLocked = isHornLakeHydrantHost();
   const canChangeTenant = !creatorConsoleEntry && !hydrantHostLocked;
-  const departmentLogoUrl = resolveDepartmentLogoUrl(profile.logoUrl || defaultDepartmentProfile.logoUrl);
   const activeTenantId = readLoginTenantId() || gatewayDepartmentId || departmentId;
+  const displayNameLabel = gatewayRecord?.departmentShortName
+    || gatewayRecord?.departmentName
+    || profile.shortName
+    || profile.name;
+  const displayLogoUrl = resolveDepartmentLogoUrl(
+    gatewayRecord?.logoUrl || profile.logoUrl || defaultDepartmentProfile.logoUrl
+  );
 
   useEffect(() => {
     if (creatorConsoleEntry || hydrantHostLocked) {
@@ -142,9 +176,9 @@ export default function LoginPage() {
 
         {!creatorConsoleEntry && tenantLocked && (
           <div className="auth-department">
-            <img src={departmentLogoUrl} alt={profile.name} />
+            <img src={displayLogoUrl} alt={displayNameLabel} />
             <div className="auth-department-copy">
-              <strong>{profile.shortName || profile.name}</strong>
+              <strong>{displayNameLabel}</strong>
               <span className="auth-tenant-id">{activeTenantId}</span>
               {canChangeTenant && (
                 <button className="text-button auth-change-tenant" type="button" onClick={handleChangeTenant}>
@@ -174,6 +208,19 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
+
+        {invite?.valid && (
+          <div className="auth-help auth-invite-banner" role="status">
+            You've been invited to <strong>{invite.departmentName}</strong>. Create an account
+            (or sign in) with <strong>{invite.emailHint}</strong> to accept.
+          </div>
+        )}
+        {invite && !invite.valid && (
+          <div className="auth-error" role="alert">
+            {invite.error || INVITE_REASON_TEXT[invite.reason] || INVITE_REASON_TEXT.not_found}
+          </div>
+        )}
+        {inviteError && <div className="auth-error" role="alert">{inviteError}</div>}
 
         {!creatorConsoleEntry && !tenantLocked ? (
           <form className="auth-form" onSubmit={handleConfirmTenant}>

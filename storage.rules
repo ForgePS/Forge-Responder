@@ -10,30 +10,11 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function hasVerifiedEmail() {
-      return isAuthenticated()
-        && request.auth.token.email != null
-        && request.auth.token.email_verified == true;
-    }
-
-    // TODO(Phase 1): replace with a platformRole custom claim (keep in sync with firestore.rules).
-    function isBootstrapPlatformOwner() {
-      return hasVerifiedEmail()
-        && request.auth.token.email.lower() in [
-          "admin@forgepublicsafety.com",
-          "jpowell@hornlake.org",
-          "jeremyepowell@hotmail.com"
-        ];
-    }
-
+    // Same source of truth as firestore.rules: platformCreators/{uid} (server-written).
     function isPlatformCreator() {
-      return isAuthenticated() && (
-        isBootstrapPlatformOwner()
-        || (
-          firestore.exists(/databases/(default)/documents/platformCreators/$(request.auth.uid))
-          && firestore.get(/databases/(default)/documents/platformCreators/$(request.auth.uid)).data.status == "active"
-        )
-      );
+      return isAuthenticated()
+        && firestore.exists(/databases/(default)/documents/platformCreators/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/platformCreators/$(request.auth.uid)).data.status == "active";
     }
 
     function isDepartmentMember(departmentId) {
@@ -45,11 +26,7 @@ service firebase.storage {
     function canAccessDepartment(departmentId) {
       return isPlatformCreator()
         || isDepartmentMember(departmentId)
-        || (isAuthenticated() && departmentId == "forge-demo")
-        // Legacy, matches firestore.rules; remove after membership back-fill.
-        || (departmentId == "horn-lake-fd"
-            && hasVerifiedEmail()
-            && request.auth.token.email.lower().matches('.*@hornlake\\.org$'));
+        || (isAuthenticated() && departmentId == "forge-demo");
     }
 
     // Uploads: max 100 MB (pre-fire plan PDFs, dashboard media).
