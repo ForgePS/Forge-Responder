@@ -323,6 +323,15 @@ describe("billing events", () => {
     await assertFails(setDoc(doc(adminA().firestore(), "platformAuditLogs/l2"), { action: "x" }));
   });
 
+  it("department admins can save settings like the shift rotation, but not the subscription term", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `departments/${A}/settings/main`), { subscription: { saasStatus: "trial", expirationDate: "2027-01-19" } });
+    });
+    const db = adminA().firestore();
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/settings/main`), { shiftRotation: { preset: "24/48-abc" }, updatedAt: "now" }, { merge: true }));
+    await assertFails(setDoc(doc(db, `departments/${A}/settings/main`), { subscription: { saasStatus: "active", expirationDate: "2099-01-01" } }, { merge: true }));
+  });
+
   it("department admins cannot mark their own subscription paid", async () => {
     await assertFails(setDoc(doc(adminA().firestore(), `platformSubscriptions/${A}`), { status: "active", renewalDate: "2099-01-01" }));
   });

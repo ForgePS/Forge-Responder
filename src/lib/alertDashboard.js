@@ -226,7 +226,7 @@ export function buildTestAlert(overrides = {}) {
     id: `forge-test-${Date.now()}`,
     cadCode: "603",
     description: "TEST — Structure Fire",
-    address: "6530 Hise Parkway",
+    address: "100 Station Rd",
     city: "Test City",
     state: "MS",
     units: "UNIT1 613C 614C",

@@ -88,7 +88,7 @@ export default function LocalSourcePanel({ localConfig, onConfigChange, onApply,
               type="text"
               value={config.trafficRegion}
               onChange={(event) => updateConfig({ trafficRegion: event.target.value })}
-              placeholder="I-55 @ Goodman Rd"
+              placeholder="I-55 @ Main St"
             />
           </label>
         ) : null}

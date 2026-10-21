@@ -39,23 +39,23 @@ export const initialDocuments = [
 ];
 
 export const initialOccupancies = [
-  { id: "OCC-101", name: "Horn Lake High School", address: "4710 Horn Lake Rd", type: "Educational", hazard: "Moderate", occupancyLoad: "1,200", lastInspection: "Jun 12, 2025", inspectionDue: "Jun 12, 2026", inspector: "J. Mitchell", status: "Active" },
+  { id: "OCC-101", name: "Riverside High School", address: "4710 Riverside Rd", type: "Educational", hazard: "Moderate", occupancyLoad: "1,200", lastInspection: "Jun 12, 2025", inspectionDue: "Jun 12, 2026", inspector: "J. Mitchell", status: "Active" },
   { id: "OCC-102", name: "Logan's Roadhouse", address: "7188 Airways Blvd", type: "Assembly", hazard: "High", occupancyLoad: "180", lastInspection: "Dec 8, 2025", inspectionDue: "Jun 8, 2026", inspector: "J. Mitchell", status: "Reinspection Due" },
   { id: "OCC-103", name: "Amazon Distribution", address: "2600 Spahn Rd", type: "Warehouse", hazard: "High", occupancyLoad: "450", lastInspection: "Jun 21, 2025", inspectionDue: "Jun 21, 2026", inspector: "J. Wade", status: "Active" },
   { id: "OCC-104", name: "Comfort Inn", address: "6888 Airways Blvd", type: "Lodging", hazard: "Moderate", occupancyLoad: "96", lastInspection: "Jan 15, 2026", inspectionDue: "Jun 15, 2026", inspector: "J. Wade", status: "Pending Review" },
-  { id: "OCC-105", name: "Horn Lake City Hall", address: "3101 Goodman Rd W", type: "Business", hazard: "Low", occupancyLoad: "75", lastInspection: "Mar 4, 2026", inspectionDue: "Mar 4, 2027", inspector: "J. Mitchell", status: "Active" }
+  { id: "OCC-105", name: "Riverside City Hall", address: "3101 Main St", type: "Business", hazard: "Low", occupancyLoad: "75", lastInspection: "Mar 4, 2026", inspectionDue: "Mar 4, 2027", inspector: "J. Mitchell", status: "Active" }
 ];
 
 export const initialInspections = [
-  { id: "INS-201", occupancy: "Horn Lake High School", occupancyId: "OCC-101", type: "Annual", due: "Jun 12, 2026", inspector: "J. Mitchell", violations: 0, status: "Scheduled" },
+  { id: "INS-201", occupancy: "Riverside High School", occupancyId: "OCC-101", type: "Annual", due: "Jun 12, 2026", inspector: "J. Mitchell", violations: 0, status: "Scheduled" },
   { id: "INS-202", occupancy: "Logan's Roadhouse", occupancyId: "OCC-102", type: "Reinspection", due: "Jun 8, 2026", inspector: "J. Mitchell", violations: 3, status: "Overdue" },
   { id: "INS-203", occupancy: "Amazon Distribution", occupancyId: "OCC-103", type: "Annual", due: "Jun 21, 2026", inspector: "J. Wade", violations: 0, status: "Scheduled" },
   { id: "INS-204", occupancy: "Comfort Inn", occupancyId: "OCC-104", type: "Reinspection", due: "Jun 15, 2026", inspector: "J. Wade", violations: 1, status: "Pending Review" },
-  { id: "INS-205", occupancy: "Horn Lake City Hall", occupancyId: "OCC-105", type: "Annual", due: "Mar 4, 2027", inspector: "J. Mitchell", violations: 0, status: "Complete" }
+  { id: "INS-205", occupancy: "Riverside City Hall", occupancyId: "OCC-105", type: "Annual", due: "Mar 4, 2027", inspector: "J. Mitchell", violations: 0, status: "Complete" }
 ];
 
 export const initialPreplans = [
-  { id: "PP-301", occupancy: "Horn Lake High School", occupancyId: "OCC-101", hazards: "Sprinkler, Knox box, AED locations", access: "Main entrance - Gate C for apparatus", waterSupply: "Hydrants HL-1042, HL-1178", lastUpdated: "Apr 12, 2026", status: "Current" },
+  { id: "PP-301", occupancy: "Riverside High School", occupancyId: "OCC-101", hazards: "Sprinkler, Knox box, AED locations", access: "Main entrance - Gate C for apparatus", waterSupply: "Hydrants HL-1042, HL-1178", lastUpdated: "Apr 12, 2026", status: "Current" },
   { id: "PP-302", occupancy: "Amazon Distribution", occupancyId: "OCC-103", hazards: "High-piled storage, loading docks", access: "Dock 4 - east gate", waterSupply: "Private loop + HL-1281", lastUpdated: "May 2, 2026", status: "Current" },
   { id: "PP-303", occupancy: "Comfort Inn", occupancyId: "OCC-104", hazards: "Multi-story guest rooms, pool chemical storage", access: "Front circle - south stairwell", waterSupply: "HL-1307P private", lastUpdated: "Feb 18, 2026", status: "Review Due" }
 ];

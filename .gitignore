@@ -28,3 +28,4 @@ subscriptions*.txt
 
 # Firebase deploy cache
 .firebase/
+demo-rename*.txt

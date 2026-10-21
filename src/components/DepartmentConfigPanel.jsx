@@ -20,7 +20,7 @@ import { normalizeEmployeePortalRules } from "../lib/employeePortalRules.js";
 import { normalizePayRules } from "../lib/payRules.js";
 import { normalizeSchedulingSettings } from "../lib/schedulingSettings.js";
 import { resolveAvailableModules } from "../lib/platformInheritance.js";
-import { canManageBranchSubscription, canViewBranchSubscription } from "../lib/permissions.js";
+import { canManageBranchSubscription, canViewBranchSubscription, hasPermission } from "../lib/permissions.js";
 import { resolveDepartmentLogoUrl } from "../lib/brandAssets.js";
 import { buildDepartmentLogoPath } from "../lib/storagePaths.js";
 import {
@@ -131,6 +131,13 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
   const canManageSubscription = canManageBranchSubscription(isCreator);
   const canViewSubscription = canViewBranchSubscription(permissions, isCreator);
   const canManageModules = canManageSubscription;
+  // Department admins run their own shifts and scheduling; turning modules on/off
+  // stays creator-only because it follows the subscription plan.
+  const canManageOperations = Boolean(
+    isCreator
+    || hasPermission(permissions, "manageSystemSettings")
+    || hasPermission(permissions, "manageDepartments")
+  );
 
   const visibleSections = useMemo(
     () => DEPARTMENT_CONFIG_SECTIONS.filter((section) => (
@@ -179,19 +186,28 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
         updatedAt: new Date().toISOString()
       };
 
+      // Never write display-only/merged subscription values back from this
+      // screen: subscriptions are managed in the Creator Console, and the rules
+      // reject non-creators changing settings.subscription.
+      const {
+        subscription: _subscription,
+        customerSubscription: _customerSubscription,
+        subscriptionAccessAllowed: _subscriptionAccessAllowed,
+        ...storedSettings
+      } = settings || {};
       const settingsPayload = {
-        ...settings,
+        ...storedSettings,
         departmentId,
         enabledModules: canManageModules
           ? enabledModules
           : (settings.enabledModules || []),
-        shiftRotation: canManageModules
+        shiftRotation: canManageOperations
           ? normalizeShiftRotation(shiftRotation, profilePayload.shifts)
           : normalizeShiftRotation(settings.shiftRotation, profilePayload.shifts),
         payPeriod: normalizePayPeriod(payPeriod),
         employeePortalRules: normalizeEmployeePortalRules(portalRules),
         payRules: normalizePayRules(payRules),
-        schedulingSettings: canManageModules
+        schedulingSettings: canManageOperations
           ? normalizeSchedulingSettings(schedulingSettings, fleetUnits)
           : normalizeSchedulingSettings(settings.schedulingSettings, fleetUnits),
         forgeAcademy: {
@@ -360,7 +376,7 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
             rotation={shiftRotation}
             profileShifts={profileShifts}
             onChange={setShiftRotation}
-            readOnly={!canManageModules}
+            readOnly={!canManageOperations}
           />
         ) : null}
 
@@ -385,7 +401,7 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
             value={schedulingSettings}
             onChange={setSchedulingSettings}
             availableUnits={fleetUnits}
-            readOnly={!canManageModules}
+            readOnly={!canManageOperations}
           />
         ) : null}
 
@@ -395,7 +411,7 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
             onChange={setSchedulingSettings}
             availableUnits={fleetUnits}
             apparatus={apparatus}
-            readOnly={!canManageModules}
+            readOnly={!canManageOperations}
           />
         ) : null}
 
