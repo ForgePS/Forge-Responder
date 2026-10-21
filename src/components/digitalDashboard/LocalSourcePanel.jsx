@@ -57,7 +57,7 @@ export default function LocalSourcePanel({ localConfig, onConfigChange, onApply,
                   value={config.location}
                   disabled={config.autoLocation}
                   onChange={(event) => updateConfig({ location: event.target.value })}
-                  placeholder="Horn Lake, MS"
+                  placeholder="Your City, ST"
                 />
               </label>
               <label className="dd-toggle-row dd-local-auto-toggle">

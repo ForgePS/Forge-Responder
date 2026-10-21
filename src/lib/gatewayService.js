@@ -1,21 +1,13 @@
 import { doc, getDoc } from "firebase/firestore";
-import { defaultDepartmentProfile } from "../data/defaultDepartment.js";
 import { demoDepartmentProfile } from "../data/demoDepartment.js";
 import { resolveDepartmentLogoUrl } from "./brandAssets.js";
 import { getFirestoreDb } from "./firebaseClient.js";
-import { DEFAULT_DEPARTMENT_ID, DEMO_DEPARTMENT_ID } from "./tenantPaths.js";
+import { DEMO_DEPARTMENT_ID } from "./tenantPaths.js";
 import { normalizeGatewayDepartmentId } from "./gatewayRouting.js";
 
+// Real departments resolve from rmsGateways / platformDepartments in Firestore.
+// Only the demo tenant has a built-in gateway.
 const STATIC_GATEWAYS = {
-  [DEFAULT_DEPARTMENT_ID]: {
-    gatewayId: DEFAULT_DEPARTMENT_ID,
-    departmentId: DEFAULT_DEPARTMENT_ID,
-    label: defaultDepartmentProfile.name,
-    departmentName: defaultDepartmentProfile.name,
-    departmentShortName: defaultDepartmentProfile.shortName,
-    logoUrl: defaultDepartmentProfile.logoUrl,
-    status: "active"
-  },
   [DEMO_DEPARTMENT_ID]: {
     gatewayId: DEMO_DEPARTMENT_ID,
     departmentId: DEMO_DEPARTMENT_ID,
@@ -67,6 +59,7 @@ export async function resolveGatewayDepartmentId(gatewayDepartmentId) {
       departmentId: gatewayId,
       departmentName: dept.name || gatewayId,
       departmentShortName: dept.shortName || dept.name || gatewayId,
+      logoUrl: dept.logoUrl || "",
       status: dept.status || "active"
     });
   }

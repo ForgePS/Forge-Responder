@@ -21,7 +21,7 @@ import {
   FORGE_RMS_APP_HOST
 } from "../lib/platformUrls.js";
 import { defaultDepartmentProfile } from "../data/defaultDepartment.js";
-import { isHornLakeHydrantHost } from "../lib/hydrantAppRouting.js";
+import { isBrandedHydrantHost } from "../lib/hydrantAppRouting.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
@@ -91,8 +91,8 @@ export default function LoginPage() {
   const [tenantLocked, setTenantLocked] = useState(() => hasLockedLoginTenant());
 
   const creatorConsoleEntry = isCreatorConsolePath();
-  const hydrantHostLocked = isHornLakeHydrantHost();
-  const canChangeTenant = !creatorConsoleEntry && !hydrantHostLocked;
+  const brandedHostLocked = isBrandedHydrantHost();
+  const canChangeTenant = !creatorConsoleEntry && !brandedHostLocked;
   const activeTenantId = readLoginTenantId() || gatewayDepartmentId || departmentId;
   const displayNameLabel = gatewayRecord?.departmentShortName
     || gatewayRecord?.departmentName
@@ -103,7 +103,7 @@ export default function LoginPage() {
   );
 
   useEffect(() => {
-    if (creatorConsoleEntry || hydrantHostLocked) {
+    if (creatorConsoleEntry || brandedHostLocked) {
       setTenantLocked(true);
       return;
     }
@@ -112,7 +112,7 @@ export default function LoginPage() {
       setTenantDraft(gatewayDepartmentId);
       setTenantLocked(true);
     }
-  }, [creatorConsoleEntry, gatewayDepartmentId, hydrantHostLocked]);
+  }, [creatorConsoleEntry, gatewayDepartmentId, brandedHostLocked]);
 
   function handleConfirmTenant(event) {
     event.preventDefault();

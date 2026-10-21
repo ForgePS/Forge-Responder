@@ -1,7 +1,6 @@
 import { collection, doc, getDoc, getDocs, setDoc, writeBatch } from "firebase/firestore";
 import { defaultRoles } from "../data/defaultRoles.js";
 import {
-  hornLakeDepartmentProfile,
   resolveDepartmentProfileDefaults,
   resolveDepartmentSettingsDefaults,
 } from "../data/tenants/index.js";
@@ -19,22 +18,13 @@ import {
   applyPlatformToDepartmentSettings,
   normalizePlatformConfig,
 } from "./platformInheritance.js";
-import { DEFAULT_DEPARTMENT_ID, DEMO_DEPARTMENT_ID, isDemoDepartment, isPlatformScope } from "./tenantPaths.js";
+import { DEMO_DEPARTMENT_ID, isDemoDepartment, isPlatformScope } from "./tenantPaths.js";
 import { ensureDefaultRoles } from "./roleService.js";
 import { defaultSubscriptionDates, normalizeSubscription } from "./subscriptionUtils.js";
 import { normalizeDepartmentStateId } from "./departmentBranchUtils.js";
 import { GHOST_DEPARTMENT_IDS, RESERVED_GATEWAY_PATHS } from "./gatewayRouting.js";
 
-function isHornLakeRegistryEntry(department = {}) {
-  const keys = [department.docId, department.id, department.name, department.shortName]
-    .map((value) => slugifyDepartmentId(String(value || "")));
-  return keys.some((key) => key.includes("horn-lake") || key.includes("hornlake"));
-}
-
 async function resolveDepartmentRegistryProfile(departmentId) {
-  if (departmentId === DEFAULT_DEPARTMENT_ID) {
-    return hornLakeDepartmentProfile;
-  }
   if (isDemoDepartment(departmentId)) {
     return demoDepartmentProfile;
   }
@@ -92,13 +82,9 @@ export async function loadPlatformCreator(uid) {
   }
 }
 
+// No built-in customer: an empty or unreadable registry is just empty.
 function defaultDepartmentRegistry() {
-  return [{
-    id: DEFAULT_DEPARTMENT_ID,
-    name: hornLakeDepartmentProfile.name,
-    shortName: hornLakeDepartmentProfile.shortName,
-    status: "active"
-  }];
+  return [];
 }
 
 export async function listPlatformDepartments() {
@@ -128,81 +114,6 @@ export async function listPlatformDepartments() {
   }
 }
 
-/** Ensures the default Horn Lake branch appears in the creator registry. */
-export async function bootstrapDefaultDepartmentRegistry() {
-  return ensureDepartmentRegistry(DEFAULT_DEPARTMENT_ID, hornLakeDepartmentProfile);
-}
-
-/** Restores demo/other branches that were mislabeled with Horn Lake names. */
-export async function repairMislabeledDepartmentRegistry() {
-  const db = getFirestoreDb();
-  if (!db) return { repaired: [] };
-
-  const repaired = [];
-  const checks = [
-    [DEMO_DEPARTMENT_ID, demoDepartmentProfile],
-    [DEFAULT_DEPARTMENT_ID, hornLakeDepartmentProfile]
-  ];
-
-  for (const [departmentId, expectedProfile] of checks) {
-    const snap = await getDoc(doc(db, "platformDepartments", departmentId));
-    if (!snap.exists()) continue;
-
-    const data = snap.data();
-    const wrongDemoLabel = departmentId === DEMO_DEPARTMENT_ID
-      && slugifyDepartmentId(data.name || "").includes("horn-lake");
-    const wrongDefaultLabel = departmentId === DEFAULT_DEPARTMENT_ID
-      && !slugifyDepartmentId(data.name || "").includes("horn-lake");
-
-    if (wrongDemoLabel || wrongDefaultLabel) {
-      await ensureDepartmentRegistry(departmentId, expectedProfile);
-      repaired.push(departmentId);
-    }
-  }
-
-  if (repaired.length) {
-    notifyDepartmentsChanged();
-  }
-
-  return { repaired };
-}
-
-/** Disables extra Horn Lake registry rows that share the same agency label. */
-export async function pruneDuplicateHornLakeBranches() {
-  const db = getFirestoreDb();
-  if (!db) return { pruned: [], kept: DEFAULT_DEPARTMENT_ID };
-
-  const snap = await getDocs(collection(db, "platformDepartments"));
-  const departments = snap.docs.map((item) => ({ docId: item.id, ...item.data() }));
-  const hornLakeMatches = departments.filter((item) => item.status !== "disabled" && isHornLakeRegistryEntry(item));
-
-  if (hornLakeMatches.length <= 1) {
-    return { pruned: [], kept: hornLakeMatches[0]?.docId || DEFAULT_DEPARTMENT_ID };
-  }
-
-  const keeper = hornLakeMatches.find((item) => item.docId === DEFAULT_DEPARTMENT_ID)
-    || hornLakeMatches.sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")))[0];
-  const pruned = [];
-  const now = new Date().toISOString();
-
-  for (const branch of hornLakeMatches) {
-    if (branch.docId === keeper.docId) continue;
-    await setDoc(doc(db, "platformDepartments", branch.docId), {
-      status: "disabled",
-      disabledReason: "duplicate-horn-lake-branch",
-      mergedInto: keeper.docId,
-      updatedAt: now
-    }, { merge: true });
-    pruned.push(branch.docId);
-  }
-
-  if (pruned.length) {
-    notifyDepartmentsChanged();
-  }
-
-  return { pruned, kept: keeper.docId };
-}
-
 /**
  * Soft-disables accidental ghost branches (e.g. /admin, /api, mistyped Horn Lake IDs)
  * that were auto-seeded as "Fire Department".
@@ -213,7 +124,7 @@ export async function pruneGhostDepartmentBranches() {
 
   const snap = await getDocs(collection(db, "platformDepartments"));
   const now = new Date().toISOString();
-  const keptIds = new Set([DEFAULT_DEPARTMENT_ID, DEMO_DEPARTMENT_ID]);
+  const keptIds = new Set([DEMO_DEPARTMENT_ID]);
   const pruned = [];
 
   for (const item of snap.docs) {
@@ -454,7 +365,7 @@ export async function ensureCreatorDepartmentAccess(user, departmentId) {
   }
 
   const registrySnap = await getDoc(doc(db, "platformDepartments", departmentId));
-  const isKnownSeed = departmentId === DEFAULT_DEPARTMENT_ID || isDemoDepartment(departmentId);
+  const isKnownSeed = isDemoDepartment(departmentId);
   if (!registrySnap.exists() && !isKnownSeed) {
     // Visiting an unknown gateway path as a creator must not invent a "Fire Department" branch.
     return null;

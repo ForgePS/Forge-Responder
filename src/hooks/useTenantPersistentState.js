@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getFirestoreDb, firebaseEnabled } from "../lib/firebaseClient.js";
-import { departmentListPath, departmentListSegments, isPlatformScope, legacyRmsDataPath } from "../lib/tenantPaths.js";
+import { departmentListPath, departmentListSegments, isPlatformScope } from "../lib/tenantPaths.js";
 import { writeAuditLog } from "../lib/auditService.js";
 import { restoreItemsFromFirestore, sanitizeItemsForFirestore } from "../lib/firestoreSanitize.js";
 import { loadTenantListFromFirestore, resolveTenantListItems } from "../lib/tenantListLoader.js";
@@ -58,35 +58,12 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
     let cancelled = false;
     let unsubscribe = () => {};
 
-    async function loadLegacyItems() {
-      const firestoreDb = getFirestoreDb();
-      if (!firestoreDb) return [];
-
-      try {
-        const legacySnap = await getDoc(doc(firestoreDb, "rmsData", listKey));
-        if (legacySnap.exists()) {
-          return normalizeDataset(legacySnap.data()?.items, []);
-        }
-      } catch (error) {
-        console.error(`Legacy Firebase load failed for ${listKey}`, error);
-      }
-      return [];
-    }
-
+    // Only this department's own data is ever loaded. (The old fallback to the
+    // top-level rmsData collection copied Horn Lake's lists into other tenants.)
     async function resolveRemoteSnapshot(tenantSnap) {
       if (tenantSnap?.exists()) {
         const remoteItems = Array.isArray(tenantSnap.data()?.items) ? tenantSnap.data().items : [];
         return restoreItemsFromFirestore(remoteItems, listKey);
-      }
-
-      const legacyItems = await loadLegacyItems();
-      if (legacyItems.length) {
-        return resolveTenantListItems({
-          legacyItems,
-          currentItems: itemsRef.current,
-          fallbackItems: fallbackRef.current,
-          listKey,
-        });
       }
 
       const loaded = await loadTenantListFromFirestore(storageDepartmentId, listKey);
@@ -96,7 +73,6 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
 
       return resolveTenantListItems({
         remoteItems: [],
-        legacyItems,
         currentItems: itemsRef.current,
         fallbackItems: fallbackRef.current,
         listKey,

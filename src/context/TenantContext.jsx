@@ -33,8 +33,8 @@ import {
 } from "../lib/gatewayRouting.js";
 import { resolveGatewayDepartmentId } from "../lib/gatewayService.js";
 import { writeStoredWorkspaceId } from "../lib/creatorConsoleWorkspace.js";
-import { DEFAULT_DEPARTMENT_ID, DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isDemoDepartment, isPlatformScope } from "../lib/tenantPaths.js";
-import { isHornLakeHydrantHost, hornLakeDepartmentId } from "../lib/hydrantAppRouting.js";
+import { DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isDemoDepartment, isPlatformScope } from "../lib/tenantPaths.js";
+import { isBrandedHydrantHost, brandedHostDepartmentId } from "../lib/hydrantAppRouting.js";
 
 function mapPlatformProfile(config = defaultPlatformConfig) {
   return {
@@ -61,7 +61,7 @@ export function TenantProvider({ children }) {
   const [gatewayReady, setGatewayReady] = useState(true);
   const [gatewayError, setGatewayError] = useState(false);
   const [departmentId, setDepartmentId] = useState(() => {
-    if (typeof window === "undefined") return DEFAULT_DEPARTMENT_ID;
+    if (typeof window === "undefined") return PLATFORM_SCOPE_ID;
     return resolveActiveDepartmentId();
   });
 
@@ -89,13 +89,13 @@ export function TenantProvider({ children }) {
         return;
       }
 
-      if (isHornLakeHydrantHost(window.location.hostname)) {
+      if (isBrandedHydrantHost(window.location.hostname)) {
         setGatewayDepartmentId(null);
         setGatewayRecord(null);
         setGatewayError(false);
-        setDepartmentId(hornLakeDepartmentId());
+        setDepartmentId(brandedHostDepartmentId());
         setGatewayReady(true);
-        persistGatewayContext("", hornLakeDepartmentId());
+        persistGatewayContext("", brandedHostDepartmentId());
         return;
       }
 
@@ -147,8 +147,14 @@ export function TenantProvider({ children }) {
     };
   }, []);
 
-  const [profile, setProfile] = useState(() => resolveDepartmentProfileDefaults(DEFAULT_DEPARTMENT_ID));
-  const [settings, setSettings] = useState(() => resolveDepartmentSettingsDefaults(DEFAULT_DEPARTMENT_ID));
+  const [profile, setProfile] = useState(() => {
+    const initialId = typeof window !== "undefined" ? resolveActiveDepartmentId() : PLATFORM_SCOPE_ID;
+    return resolveDepartmentProfileDefaults(initialId);
+  });
+  const [settings, setSettings] = useState(() => {
+    const initialId = typeof window !== "undefined" ? resolveActiveDepartmentId() : PLATFORM_SCOPE_ID;
+    return resolveDepartmentSettingsDefaults(initialId);
+  });
   const [platformConfig, setPlatformConfig] = useState(defaultPlatformConfig);
   const [ready, setReady] = useState(false);
   const [platformRefreshKey, setPlatformRefreshKey] = useState(0);
@@ -194,21 +200,43 @@ export function TenantProvider({ children }) {
   }, [inPlatformScope, platformConfig]);
 
   useEffect(() => {
+    // Only re-apply platform inheritance when platform config changes — not on every
+    // departmentId change (that was keeping Horn Lake branding while swapping ids).
     if (inPlatformScope || !departmentId) return;
-    setProfile((current) => applyPlatformToDepartmentProfile(current, platformConfig, departmentId));
+    setProfile((current) => {
+      if (current?.id && current.id !== departmentId) return current;
+      return applyPlatformToDepartmentProfile(current, platformConfig, departmentId);
+    });
     setSettings((current) => applyPlatformToDepartmentSettings(current, platformConfig, departmentId));
-  }, [platformConfig, departmentId, inPlatformScope]);
+  }, [platformConfig, inPlatformScope, departmentId]);
 
   useEffect(() => {
     let cancelled = false;
+
+    function buildGatewayFallbackProfile(profileDefaults) {
+      if (!gatewayRecord?.departmentId || gatewayRecord.departmentId !== departmentId) {
+        return null;
+      }
+      return {
+        ...profileDefaults,
+        id: departmentId,
+        name: gatewayRecord.departmentName || profileDefaults.name,
+        shortName: gatewayRecord.departmentShortName || gatewayRecord.departmentName || profileDefaults.shortName,
+        displayTitle: gatewayRecord.departmentName || profileDefaults.displayTitle,
+        logoUrl: resolveDepartmentLogoUrl(gatewayRecord.logoUrl || profileDefaults.logoUrl),
+      };
+    }
 
     async function loadTenant() {
       const firestoreDb = getFirestoreDb();
 
       try {
-        if (inPlatformScope || !firebaseEnabled || !firestoreDb) {
+        if (inPlatformScope || !firebaseEnabled || !firestoreDb || !departmentId) {
           return;
         }
+
+        const profileDefaults = resolveDepartmentProfileDefaults(departmentId);
+        const settingsDefaults = resolveDepartmentSettingsDefaults(departmentId);
 
         if (isDemoDepartment(departmentId)) {
           const profileSnap = await getDoc(doc(firestoreDb, "departments", departmentId, "profile", "main"));
@@ -226,16 +254,27 @@ export function TenantProvider({ children }) {
           return;
         }
 
-        const profileSnap = await getDoc(doc(firestoreDb, "departments", departmentId, "profile", "main"));
-        const settingsSnap = await getDoc(doc(firestoreDb, "departments", departmentId, "settings", "main"));
-        const registrySnap = await getDoc(doc(firestoreDb, "platformDepartments", departmentId));
+        let profileSnap = null;
+        let settingsSnap = null;
+        let registrySnap = null;
+        let profileReadDenied = false;
 
-        const profileDefaults = resolveDepartmentProfileDefaults(departmentId);
-        const settingsDefaults = resolveDepartmentSettingsDefaults(departmentId);
-        const registryExists = registrySnap.exists() && registrySnap.data()?.status !== "disabled";
-        const isKnownSeed = departmentId === DEFAULT_DEPARTMENT_ID || isDemoDepartment(departmentId);
+        try {
+          [profileSnap, settingsSnap, registrySnap] = await Promise.all([
+            getDoc(doc(firestoreDb, "departments", departmentId, "profile", "main")),
+            getDoc(doc(firestoreDb, "departments", departmentId, "settings", "main")),
+            getDoc(doc(firestoreDb, "platformDepartments", departmentId)),
+          ]);
+        } catch (error) {
+          profileReadDenied = error?.code === "permission-denied";
+          if (!profileReadDenied) throw error;
+        }
 
-        if (!cancelled && profileSnap.exists()) {
+        const registryExists = registrySnap?.exists() && registrySnap.data()?.status !== "disabled";
+        const isKnownSeed = isDemoDepartment(departmentId);
+        const gatewayFallback = buildGatewayFallbackProfile(profileDefaults);
+
+        if (!cancelled && profileSnap?.exists()) {
           const remoteProfile = profileSnap.data();
           const loadedProfile = {
             ...profileDefaults,
@@ -244,27 +283,20 @@ export function TenantProvider({ children }) {
             logoUrl: resolveDepartmentLogoUrl(remoteProfile.logoUrl || profileDefaults.logoUrl)
           };
           setProfile(applyPlatformToDepartmentProfile(loadedProfile, platformConfig, departmentId));
-        } else if (!cancelled && gatewayRecord?.departmentId === departmentId) {
-          const gatewayProfile = {
-            ...profileDefaults,
-            id: departmentId,
-            name: gatewayRecord.departmentName || profileDefaults.name,
-            shortName: gatewayRecord.departmentShortName || gatewayRecord.departmentName || profileDefaults.shortName,
-            displayTitle: gatewayRecord.departmentName || profileDefaults.displayTitle,
-            logoUrl: gatewayRecord.logoUrl || profileDefaults.logoUrl
-          };
-          setProfile(applyPlatformToDepartmentProfile(gatewayProfile, platformConfig, departmentId));
-        } else if (!cancelled && (registryExists || isKnownSeed)) {
+        } else if (!cancelled && gatewayFallback) {
+          // Signed-out login (and other limited readers) cannot load department profile;
+          // use the public gateway record so branding matches the tenant ID.
+          setProfile(applyPlatformToDepartmentProfile(gatewayFallback, platformConfig, departmentId));
+        } else if (!cancelled && (registryExists || isKnownSeed) && !profileReadDenied) {
           const seedProfile = { ...profileDefaults, id: departmentId };
           await setDoc(doc(firestoreDb, "departments", departmentId, "profile", "main"), seedProfile, { merge: true });
           setProfile(applyPlatformToDepartmentProfile(seedProfile, platformConfig, departmentId));
         } else if (!cancelled) {
-          // Unknown gateway path — do not invent a "Fire Department" tenant.
           setProfile(applyPlatformToDepartmentProfile({ ...profileDefaults, id: departmentId }, platformConfig, departmentId));
         }
 
-        if (!cancelled && settingsSnap.exists()) {
-          const profileShifts = profileSnap.exists()
+        if (!cancelled && settingsSnap?.exists()) {
+          const profileShifts = profileSnap?.exists()
             ? profileSnap.data()?.shifts
             : profileDefaults.shifts;
           const mergedSettings = {
@@ -299,13 +331,22 @@ export function TenantProvider({ children }) {
               departmentId
             ));
           }
-        } else if (!cancelled) {
+        } else if (!cancelled && !profileReadDenied) {
           const seedSettings = { ...settingsDefaults, departmentId };
           await setDoc(doc(firestoreDb, "departments", departmentId, "settings", "main"), seedSettings, { merge: true });
           setSettings(applyPlatformToDepartmentSettings(seedSettings, platformConfig, departmentId));
+        } else if (!cancelled) {
+          setSettings(applyPlatformToDepartmentSettings({ ...settingsDefaults, departmentId }, platformConfig, departmentId));
         }
       } catch (error) {
         console.error("Failed to load tenant context", error);
+        if (!cancelled && gatewayRecord?.departmentId === departmentId) {
+          const profileDefaults = resolveDepartmentProfileDefaults(departmentId);
+          const gatewayFallback = buildGatewayFallbackProfile(profileDefaults);
+          if (gatewayFallback) {
+            setProfile(applyPlatformToDepartmentProfile(gatewayFallback, platformConfig, departmentId));
+          }
+        }
       } finally {
         if (!cancelled) {
           setReady(true);

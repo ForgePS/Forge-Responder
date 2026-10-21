@@ -37,4 +37,4 @@ export function parseBusinessDirectoryCsv(text = "") {
 }
 
 export const BUSINESS_DIRECTORY_CSV_TEMPLATE = `address,business_name,critical_info,latitude,longitude
-6530 Hise Parkway,Horn Lake Fire Station,Critical infrastructure notes,34.955,-90.042`;
+123 Main St,Station 1,Critical infrastructure notes,34.955,-90.042`;

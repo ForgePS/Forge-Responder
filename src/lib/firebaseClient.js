@@ -1,5 +1,10 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import {
+  initializeAppCheck,
+  ReCaptchaV3Provider,
+  ReCaptchaEnterpriseProvider,
+} from "firebase/app-check";
 import { deleteDoc, doc, getDoc, getDocs, getFirestore, setDoc, collection } from "firebase/firestore";
 import { deleteObject as deleteStorageObject, getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
@@ -13,13 +18,44 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
+/** Optional App Check (Phase 15 hardening). Set VITE_FIREBASE_APPCHECK_SITE_KEY to enable. */
+const appCheckSiteKey = String(import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY || "").trim();
+const appCheckProvider = String(import.meta.env.VITE_FIREBASE_APPCHECK_PROVIDER || "recaptcha-v3").trim();
+const appCheckDebugToken = String(import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN || "").trim();
+
 export const firebaseEnabled = Object.values(firebaseConfig).every(Boolean);
+export const appCheckConfigured = Boolean(appCheckSiteKey);
 
 let app;
 let db;
 let storage;
 let auth;
 let functions;
+let appCheck;
+let appCheckInitError = "";
+
+function initAppCheck(firebaseApp) {
+  if (!firebaseApp || !appCheckSiteKey || typeof window === "undefined") return null;
+  try {
+    if (appCheckDebugToken) {
+      // eslint-disable-next-line no-undef
+      self.FIREBASE_APPCHECK_DEBUG_TOKEN = appCheckDebugToken === "true" ? true : appCheckDebugToken;
+    }
+    const provider = appCheckProvider === "recaptcha-enterprise"
+      ? new ReCaptchaEnterpriseProvider(appCheckSiteKey)
+      : new ReCaptchaV3Provider(appCheckSiteKey);
+    appCheck = initializeAppCheck(firebaseApp, {
+      provider,
+      isTokenAutoRefreshEnabled: true,
+    });
+    appCheckInitError = "";
+    return appCheck;
+  } catch (error) {
+    appCheckInitError = error?.message || "App Check failed to initialize";
+    console.warn("Firebase App Check unavailable", error);
+    return null;
+  }
+}
 
 function firebaseServices() {
   if (!firebaseEnabled) return null;
@@ -29,8 +65,26 @@ function firebaseServices() {
     db = getFirestore(app);
     storage = getStorage(app);
     functions = getFunctions(app, "us-central1");
+    initAppCheck(app);
   }
-  return { app, auth, db, storage, functions };
+  return { app, auth, db, storage, functions, appCheck };
+}
+
+/**
+ * App Check status for hardening / ops UI.
+ */
+export function getAppCheckStatus() {
+  return {
+    configured: appCheckConfigured,
+    active: Boolean(appCheck),
+    provider: appCheckConfigured ? appCheckProvider : "",
+    debugTokenEnabled: Boolean(appCheckDebugToken),
+    error: appCheckInitError,
+  };
+}
+
+export function getFirebaseAppCheck() {
+  return firebaseServices()?.appCheck ?? null;
 }
 
 export function getFirebaseFunctions() {
@@ -142,11 +196,6 @@ export async function loadTenantList(departmentId, listKey, fallback = []) {
     const tenantSnap = await getDoc(doc(services.db, "departments", departmentId, "lists", listKey));
     if (tenantSnap.exists()) {
       const data = tenantSnap.data();
-      return Array.isArray(data.items) ? data.items : fallback;
-    }
-    const legacySnap = await getDoc(doc(services.db, "rmsData", listKey));
-    if (legacySnap.exists()) {
-      const data = legacySnap.data();
       return Array.isArray(data.items) ? data.items : fallback;
     }
     return fallback;

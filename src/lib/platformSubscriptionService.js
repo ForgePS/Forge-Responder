@@ -16,7 +16,7 @@ import { getFirestoreDb } from "./firebaseClient.js";
 import { slugifyDepartmentId } from "./departmentProvisioning.js";
 import { listPlatformDepartments, loadDepartmentSettings } from "./platformService.js";
 import { notifyDepartmentsChanged } from "./departmentProvisioning.js";
-import { DEFAULT_DEPARTMENT_ID, isPlatformScope } from "./tenantPaths.js";
+import { PLATFORM_SCOPE_ID, isPlatformScope } from "./tenantPaths.js";
 import { normalizeSubscription } from "./subscriptionUtils.js";
 
 /**
@@ -216,7 +216,7 @@ export async function saveSubscriptionPlan(input, userId) {
     updatedBy: userId,
   };
   await setDoc(doc(plansCollection(db), planId), payload, { merge: true });
-  await writeAuditLog(DEFAULT_DEPARTMENT_ID, {
+  await writeAuditLog(PLATFORM_SCOPE_ID, {
     action: "update",
     module: "Subscriptions",
     recordId: planId,
@@ -336,7 +336,7 @@ export async function saveCustomerSubscription(departmentId, input, userId) {
 
   notifyDepartmentsChanged();
 
-  await writeAuditLog(DEFAULT_DEPARTMENT_ID, {
+  await writeAuditLog(PLATFORM_SCOPE_ID, {
     action: "update",
     module: "Subscriptions",
     recordId: departmentId,
@@ -360,7 +360,9 @@ export async function ensureCustomerSubscription(departmentId, userId = "", opti
     options.legacySubscription || settings?.subscription || department?.subscription || {}
   );
   const today = todayIso();
-  const isDefault = departmentId === DEFAULT_DEPARTMENT_ID;
+  // Complimentary (no trial) only when the creator asks for it explicitly;
+  // no customer is special-cased by id.
+  const isDefault = Boolean(options.complimentary);
   const periodStart = legacy.startDate || today;
   const periodEnd = legacy.expirationDate || addDaysIso(today, isDefault ? 365 : 30);
 

@@ -4,7 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "../hydrant-testing.css";
 import "../theme/hydrant-theme-bridge.css";
-import { Activity, BookOpen, CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, ClipboardList, Download, Droplets, Edit3, ExternalLink, FileText, Flame, Gauge, Home, LocateFixed, Mail, MapPin, Save, Search, Settings, ShieldCheck, UploadCloud, Wrench } from "lucide-react";
+import { Activity, AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, ClipboardList, Download, Droplets, Edit3, ExternalLink, FileText, Flame, Gauge, Home, LocateFixed, Mail, MapPin, Save, Search, Settings, ShieldCheck, UploadCloud, Wrench } from "lucide-react";
 import { defaultEmsProtocols, defaultFireCodeDocxSections, defaultFireCodeIndex, defaultFireCodePdfSections, defaultFireCodes, defaultFireSogDetails, defaultFireSogs, defaultHoseInventory } from "../data/defaultAppData";
 import { firebaseEnabled, loadFirebaseList, uploadFirebaseFile } from "../lib/firebaseClient";
 import { buildHydrantInspectionPhotoPath, buildPreFirePlanPath } from "../lib/storagePaths.js";
@@ -48,22 +48,41 @@ import {
 } from "../lib/hydrantTenantService.js";
 import HydrantImportSection from "../components/hydrants/HydrantImportSection.jsx";
 import HydrantActivityImportSection from "../components/hydrants/HydrantActivityImportSection.jsx";
+import {
+  buildHydrantDetailExportFilename,
+  collectHydrantExportFilterOptions,
+  downloadHydrantDetailCsv,
+  filterHydrantDetailExportRows,
+  HYDRANT_DETAIL_EXPORT_COLUMNS,
+  loadHydrantDetailExportRows,
+  openHydrantDetailPrintReport,
+} from "../lib/hydrantActivityExport.js";
 import HydrantImportTemplatesPanel from "../components/hydrants/HydrantImportTemplatesPanel.jsx";
-import { HORN_LAKE_DEPARTMENT_ID } from "../lib/tenantPaths.js";
+import { HYDRANT_DAMAGE_PRESELECT_KEY } from "../lib/hydrantDamage/paths.js";
 import {
   hydrantPathForTab,
   resolveInitialHydrantTab,
 } from "../lib/hydrantAppRouting.js";
 
-const defaultHornLakeCrewOptions = [
-  "Adam Tutor", "Billy White", "Blake Turnmire", "Brandon Jefferies", "Clay Willingham", "Cole Casey", "Cory Hill", "Gregory Scruggs", "Jay Mitchell", "Jay Wade", "Jeff Tidwell", "Jeremy Johnson", "Jeremy Powell", "John Paul Lavender", "Joseph Gardner", "Justin Correro", "Lee Chillis", "Mike Mallett", "Paul Destefanis", "Shane Headley", "Stephen White", "Steven Whitten", "Timothy Jones", "Troy Vest", "Tyler Lee", "William Sigurdson", "William Sisk"
-];
-let hydrantDepartmentId = HORN_LAKE_DEPARTMENT_ID;
+// Crew options come from the department's own personnel list (no bundled names).
+let hydrantDepartmentId = "";
 let hydrantProfile = {};
 let hydrantPersonnel = [];
 
+/**
+ * Department-specific fire resources (SOG manual link, forms) come from the
+ * department profile: profile.fireResources = { sogPdfUrl, forms: [{ label, url }] }.
+ */
+function departmentFireResources() {
+  const resources = hydrantProfile?.fireResources || {};
+  return {
+    sogPdfUrl: String(resources.sogPdfUrl || "").trim(),
+    forms: Array.isArray(resources.forms) ? resources.forms.filter((form) => form?.label && form?.url) : [],
+  };
+}
+
 function syncHydrantTenant(departmentId, profile, personnel) {
-  hydrantDepartmentId = departmentId || HORN_LAKE_DEPARTMENT_ID;
+  hydrantDepartmentId = departmentId || "";
   hydrantProfile = profile || {};
   hydrantPersonnel = Array.isArray(personnel) ? personnel : [];
 }
@@ -375,6 +394,36 @@ const fireCodeSectionNotes = {
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function isoDateOffset(days = 0, base = new Date()) {
+  const date = new Date(base);
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfWeekIso(base = new Date()) {
+  const date = new Date(base);
+  date.setHours(12, 0, 0, 0);
+  const day = date.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + mondayOffset);
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfMonthIso(base = new Date()) {
+  const date = new Date(base);
+  date.setHours(12, 0, 0, 0);
+  date.setDate(1);
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfYearIso(base = new Date()) {
+  const date = new Date(base);
+  date.setHours(12, 0, 0, 0);
+  date.setMonth(0, 1);
+  return date.toISOString().slice(0, 10);
 }
 
 function hydrantKey(h) {
@@ -726,6 +775,15 @@ function CrewSessionPanel({ crew, draftCrew, setDraftCrew, setCrewSession, clear
   );
 }
 
+const hydrantMapViewStore = { center: null, zoom: null };
+
+function rememberHydrantMapView(map) {
+  if (!map) return;
+  const center = map.getCenter();
+  hydrantMapViewStore.center = [center.lat, center.lng];
+  hydrantMapViewStore.zoom = map.getZoom();
+}
+
 function HydrantMap({ hydrants, selected, onSelect, mapBounds = cityBoundsDefault }) {
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -744,9 +802,26 @@ function HydrantMap({ hydrants, selected, onSelect, mapBounds = cityBoundsDefaul
       maxZoom: 19,
       attribution: "Tiles &copy; Esri"
     }).addTo(map);
-    map.fitBounds(mapBounds, { padding: [24, 24] });
+    const savedCenter = hydrantMapViewStore.center;
+    const savedZoom = hydrantMapViewStore.zoom;
+    if (Array.isArray(savedCenter) && Number.isFinite(savedCenter[0]) && Number.isFinite(savedCenter[1]) && Number.isFinite(savedZoom)) {
+      map.setView(savedCenter, savedZoom, { animate: false });
+    } else {
+      map.fitBounds(mapBounds, { padding: [24, 24] });
+      rememberHydrantMapView(map);
+    }
+    map.on("moveend", () => rememberHydrantMapView(map));
+    map.on("zoomend", () => rememberHydrantMapView(map));
     mapRef.current = map;
-    setTimeout(() => map.invalidateSize(), 200);
+    const refreshSize = () => map.invalidateSize();
+    setTimeout(refreshSize, 50);
+    setTimeout(refreshSize, 250);
+    setTimeout(refreshSize, 600);
+    return () => {
+      rememberHydrantMapView(map);
+      map.off("moveend");
+      map.off("zoomend");
+    };
   }, []);
 
   useEffect(() => {
@@ -920,7 +995,33 @@ function Dashboard({ hydrants, selected, onSelect, crew, draftCrew, setDraftCrew
     return hydrants.filter((h) => districtMatches(h, crew.district)).filter((h) => hydrantMatchesSearch(h, term));
   }, [hydrants, crew.district, query]);
   const stats = useMemo(() => ({ total: hydrants.length, privateCount: hydrants.filter(isPrivateHydrant).length }), [hydrants]);
-  return <div className="dashboard-grid dashboard-no-list"><aside className="left-stack"><CrewSessionPanel crew={crew} draftCrew={draftCrew} setDraftCrew={setDraftCrew} setCrewSession={setCrewSession} clearCrewSession={clearCrewSession} shiftOptions={shiftOptions} districtOptions={districtOptions} /><div className="search-box hydrant-dashboard-search"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search hydrants" /></div></aside><section className="dashboard-main"><div className="metrics"><Metric icon={Droplets} label="Hydrants" value={visibleHydrants.length} /><Metric icon={ClipboardList} label="Due This Year" value={visibleHydrants.filter(isDueThisYear).length} /><Metric icon={Activity} label="Out of Service" value={visibleHydrants.filter((h) => flowColor(h) === "#050505").length} /><Metric icon={Settings} label="Private" value={visibleHydrants.filter(isPrivateHydrant).length || stats.privateCount} /></div><HydrantMap hydrants={visibleHydrants} selected={selected} onSelect={onSelect} mapBounds={mapBounds} /><NfpaStandards /></section></div>;
+  return (
+    <div className="dashboard-grid dashboard-full-map">
+      <CrewSessionPanel
+        crew={crew}
+        draftCrew={draftCrew}
+        setDraftCrew={setDraftCrew}
+        setCrewSession={setCrewSession}
+        clearCrewSession={clearCrewSession}
+        shiftOptions={shiftOptions}
+        districtOptions={districtOptions}
+      />
+      <section className="dashboard-main">
+        <div className="metrics">
+          <Metric icon={Droplets} label="Hydrants" value={visibleHydrants.length} />
+          <Metric icon={ClipboardList} label="Due This Year" value={visibleHydrants.filter(isDueThisYear).length} />
+          <Metric icon={Activity} label="Out of Service" value={visibleHydrants.filter((h) => flowColor(h) === "#050505").length} />
+          <Metric icon={Settings} label="Private" value={visibleHydrants.filter(isPrivateHydrant).length || stats.privateCount} />
+        </div>
+        <div className="search-box hydrant-dashboard-search">
+          <Search size={17} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search hydrants" />
+        </div>
+        <HydrantMap hydrants={visibleHydrants} selected={selected} onSelect={onSelect} mapBounds={mapBounds} />
+        <NfpaStandards />
+      </section>
+    </div>
+  );
 }
 
 function NfpaStandards() {
@@ -1102,7 +1203,7 @@ function HydrantEditorModal({ hydrant, crew, onClose, onSaved }) {
               <span>{hydrant.address || hydrant.location || "Hydrant details"}</span>
             </div>
           </div>
-          <button className="secondary small" onClick={onClose}>Close</button>
+          <button className="secondary small" onClick={onClose}><ArrowLeft size={16} /> Back</button>
         </div>
         {isPrivateHydrant(hydrant) && <div className="private-banner">Private Hydrant (Do Not Test)</div>}
         {!sessionReady && <div className="private-banner shift-lock-banner">Shift session must be set to continue.</div>}
@@ -1148,7 +1249,7 @@ function HydrantEditorModal({ hydrant, crew, onClose, onSaved }) {
   );
 }
 
-function HydrantInfoModal({ hydrant, sessionReady, onClose, onEdit, onFlowTest, onInspection }) {
+function HydrantInfoModal({ hydrant, sessionReady, onClose, onEdit, onFlowTest, onInspection, onReportDamage }) {
   if (!hydrant) return null;
   const details = [
     ["Hydrant ID", hydrant.hydrant_id],
@@ -1183,6 +1284,11 @@ function HydrantInfoModal({ hydrant, sessionReady, onClose, onEdit, onFlowTest, 
         </div>
         <div className="info-card-actions">
           <button className="secondary" onClick={onClose}>Close</button>
+          {onReportDamage ? (
+            <button className="secondary" onClick={() => onReportDamage(hydrant)}>
+              <AlertTriangle size={16} /> Report Damage
+            </button>
+          ) : null}
           <button className="secondary" disabled={!sessionReady} onClick={onInspection}><ClipboardCheck size={16} /> Inspection</button>
           <button className="secondary" disabled={!sessionReady} onClick={onFlowTest}><Gauge size={16} /> Flow Test</button>
           <button className="primary" disabled={!sessionReady} onClick={onEdit}><Edit3 size={16} /> Edit</button>
@@ -1338,7 +1444,7 @@ function Inspection({ selected, crew, onSaved, onClose }) {
           </div>
           <div className="inspection-header-actions">
             <button className="secondary small" onClick={() => setRows((current) => current.map((row) => ({ ...row, expanded: !row.expanded })))}>Expand All</button>
-            <button className="secondary small" onClick={onClose}>Close</button>
+            <button className="secondary small" onClick={onClose}><ArrowLeft size={16} /> Back</button>
           </div>
         </div>
         <div className="inspection-table">
@@ -1567,7 +1673,7 @@ function FlowTest({ selected, crew, onSaved, onClose }) {
           <strong>Hydrant Flow Test</strong>
           <span>{selected ? `${selected.hydrant_id || selected.location_id} | District ${displayValue(selected.district)}` : "Select a hydrant before recording a flow test."}</span>
         </div>
-        <button className="secondary small" onClick={onClose}>Close</button>
+        <button className="secondary small" onClick={onClose}><ArrowLeft size={16} /> Back</button>
       </section>
       <section className="form-panel hydrant-info-panel">
         <h2>Hydrant Info</h2>
@@ -1613,7 +1719,13 @@ function FlowTest({ selected, crew, onSaved, onClose }) {
   );
 }
 
-function Reports({ crew, departmentName = "Department" }) {
+function Reports({
+  crew,
+  departmentName = "Department",
+  hydrants = [],
+  shiftOptions = [""],
+  districtOptions = ["All Districts", "Unassigned"],
+}) {
   const reportEmailRecipients = hydrantProfile.contactEmail ? [hydrantProfile.contactEmail] : [];
   const [emails, setEmails] = useState("");
   const [selectedRecipient, setSelectedRecipient] = useState(reportEmailRecipients[0] || "");
@@ -1621,6 +1733,26 @@ function Reports({ crew, departmentName = "Department" }) {
   const [reportDate, setReportDate] = useState(crew.date || today());
   const [activityRows, setActivityRows] = useState(() => dailyActivityRows(crew.date || today()));
   const date = reportDate || today();
+
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailRows, setDetailRows] = useState([]);
+  const [includeInspections, setIncludeInspections] = useState(true);
+  const [includeFlowTests, setIncludeFlowTests] = useState(true);
+  const [waterDepartment, setWaterDepartment] = useState("All");
+  const [district, setDistrict] = useState("All Districts");
+  const [shift, setShift] = useState("");
+  const [user, setUser] = useState("");
+  const [dateFrom, setDateFrom] = useState(crew.date || today());
+  const [dateTo, setDateTo] = useState(crew.date || today());
+  const [selectedColumns, setSelectedColumns] = useState(
+    () => HYDRANT_DETAIL_EXPORT_COLUMNS.filter((column) => column.default).map((column) => column.id)
+  );
+
+  function applyDateRange(from, to) {
+    setDateFrom(from);
+    setDateTo(to);
+  }
+
   useEffect(() => {
     setReportDate(crew.date || today());
   }, [crew.date]);
@@ -1647,6 +1779,34 @@ function Reports({ crew, departmentName = "Department" }) {
       clearInterval(timer);
     };
   }, [date]);
+
+  useEffect(() => {
+    let mounted = true;
+    setDetailLoading(true);
+    loadHydrantDetailExportRows({
+      departmentId: hydrantDepartmentId,
+      hydrants,
+      localInspections: readLocalJson("hydrantInspections", []),
+      localFlowTests: readLocalJson("hydrantFlowTests", []),
+      localActivity: readLocalJson("activity", []),
+      includeDailyActivity: true,
+    })
+      .then((rows) => {
+        if (mounted) setDetailRows(rows);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (mounted) {
+          setDetailRows([]);
+          setMessage(error?.message || "Unable to load inspection and flow-test records.");
+        }
+      })
+      .finally(() => {
+        if (mounted) setDetailLoading(false);
+      });
+    return () => { mounted = false; };
+  }, [hydrants]);
+
   const reportRows = useMemo(() => summarizedDailyActivityRows(activityRows), [activityRows]);
   const activityCounts = useMemo(() => ({
     total: reportRows.length,
@@ -1654,6 +1814,57 @@ function Reports({ crew, departmentName = "Department" }) {
     flowTests: reportRows.filter((row) => row.type.toLowerCase().includes("flow")).length,
     hydrants: reportRows.filter((row) => row.hydrant !== "N/A").length
   }), [reportRows]);
+
+  const filterOptions = useMemo(
+    () => collectHydrantExportFilterOptions(detailRows, hydrants),
+    [detailRows, hydrants]
+  );
+  const userOptions = useMemo(() => {
+    const fromCrew = resolveCrewUserOptions(hydrantPersonnel, filterOptions.users);
+    return ["", ...fromCrew.filter(Boolean)];
+  }, [filterOptions.users]);
+  const waterDeptOptions = useMemo(
+    () => ["All", ...filterOptions.waterDepartments],
+    [filterOptions.waterDepartments]
+  );
+  const exportDistrictOptions = useMemo(() => {
+    const merged = new Set([
+      ...districtOptions.filter((value) => value && value !== "All Districts"),
+      ...filterOptions.districts,
+    ]);
+    return ["All Districts", ...[...merged].filter((value) => value !== "Unassigned").sort((a, b) => a.localeCompare(b, undefined, { numeric: true })), "Unassigned"];
+  }, [districtOptions, filterOptions.districts]);
+  const exportShiftOptions = useMemo(() => {
+    const merged = new Set([
+      ...shiftOptions.filter(Boolean),
+      ...filterOptions.shifts,
+    ]);
+    return ["", ...[...merged].sort((a, b) => a.localeCompare(b))];
+  }, [shiftOptions, filterOptions.shifts]);
+
+  const recordTypes = useMemo(() => {
+    const types = [];
+    if (includeInspections) types.push("Inspection");
+    if (includeFlowTests) types.push("Flow Test");
+    return types;
+  }, [includeInspections, includeFlowTests]);
+
+  const filteredDetailRows = useMemo(() => filterHydrantDetailExportRows(detailRows, {
+    waterDepartment,
+    district,
+    shift,
+    user,
+    dateFrom,
+    dateTo,
+    recordTypes,
+  }), [detailRows, waterDepartment, district, shift, user, dateFrom, dateTo, recordTypes]);
+
+  const detailCounts = useMemo(() => ({
+    total: filteredDetailRows.length,
+    inspections: filteredDetailRows.filter((row) => /inspection/i.test(row.record_type)).length,
+    flowTests: filteredDetailRows.filter((row) => /flow/i.test(row.record_type)).length,
+  }), [filteredDetailRows]);
+
   function addRecipient() {
     const parts = emails.split(/[;,\n]/).map((x) => x.trim()).filter(Boolean);
     if (!selectedRecipient || parts.some((email) => email.toLowerCase() === selectedRecipient.toLowerCase())) return;
@@ -1684,9 +1895,231 @@ function Reports({ crew, departmentName = "Department" }) {
     downloadCsv("hydrants.csv", readLocalJson("overrides", []));
     setMessage("Exported locally edited hydrant records.");
   }
+  function toggleColumn(columnId) {
+    setSelectedColumns((current) => (
+      current.includes(columnId)
+        ? current.filter((id) => id !== columnId)
+        : [...current, columnId]
+    ));
+  }
+  function exportDetailCsv() {
+    if (!recordTypes.length) {
+      setMessage("Select at least one record type (Inspections and/or Flow Tests).");
+      return;
+    }
+    if (!selectedColumns.length) {
+      setMessage("Select at least one export column.");
+      return;
+    }
+    const filename = buildHydrantDetailExportFilename({
+      dateFrom,
+      dateTo,
+      district,
+      shift,
+    });
+    downloadHydrantDetailCsv(filename, filteredDetailRows, selectedColumns);
+    setMessage(filteredDetailRows.length
+      ? `Downloaded ${filteredDetailRows.length} detailed inspection/flow-test record(s).`
+      : "No matching detailed records for the selected filters.");
+  }
+  function printDetailReport() {
+    if (!recordTypes.length) {
+      setMessage("Select at least one record type (Inspections and/or Flow Tests).");
+      return;
+    }
+    try {
+      openHydrantDetailPrintReport({
+        rows: filteredDetailRows,
+        filters: {
+          waterDepartment,
+          district,
+          shift,
+          user,
+          dateFrom,
+          dateTo,
+          recordTypes,
+        },
+        departmentName,
+        columnIds: selectedColumns,
+      });
+      setMessage(filteredDetailRows.length
+        ? `Opened print preview for ${filteredDetailRows.length} record(s).`
+        : "Opened print preview (no matching records).");
+    } catch (error) {
+      setMessage(error?.message || "Unable to open print preview.");
+    }
+  }
+
   return (
     <section className="form-panel reports">
       <h2>Reports</h2>
+
+      <div className="detail-export-panel">
+        <div className="daily-report-head">
+          <div>
+            <strong>Inspection & Flow Test Detail Export</strong>
+            <span>Full checklist and flow metrics, filterable by water department, district, shift, and user.</span>
+          </div>
+        </div>
+
+        <div className="detail-export-filters">
+          <Field label="Water department">
+            <select value={waterDepartment} onChange={(event) => setWaterDepartment(event.target.value)}>
+              {waterDeptOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </Field>
+          <Field label="District">
+            <select value={district} onChange={(event) => setDistrict(event.target.value)}>
+              {exportDistrictOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </Field>
+          <Field label="Shift">
+            <select value={shift} onChange={(event) => setShift(event.target.value)}>
+              {exportShiftOptions.map((option) => (
+                <option key={option || "all-shifts"} value={option}>{option || "All shifts"}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="User">
+            <select value={user} onChange={(event) => setUser(event.target.value)}>
+              {userOptions.map((option) => (
+                <option key={option || "all-users"} value={option}>{option || "All users"}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <div className="detail-export-date-range" aria-label="Date range">
+          <div className="detail-export-date-range-head">
+            <strong>Date range</strong>
+            <span>Choose a preset or set From / To dates.</span>
+          </div>
+          <div className="detail-export-date-presets" role="group" aria-label="Date range presets">
+            <button type="button" className="button button-secondary" onClick={() => applyDateRange(today(), today())}>Today</button>
+            <button type="button" className="button button-secondary" onClick={() => applyDateRange(startOfWeekIso(), today())}>This week</button>
+            <button type="button" className="button button-secondary" onClick={() => applyDateRange(startOfMonthIso(), today())}>This month</button>
+            <button type="button" className="button button-secondary" onClick={() => applyDateRange(startOfYearIso(), today())}>Year to date</button>
+            <button type="button" className="button button-secondary" onClick={() => applyDateRange("", "")}>All dates</button>
+          </div>
+          <div className="detail-export-date-fields">
+            <Field label="From date">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  if (dateTo && next && next > dateTo) {
+                    setDateFrom(dateTo);
+                    setDateTo(next);
+                    return;
+                  }
+                  setDateFrom(next);
+                }}
+              />
+            </Field>
+            <Field label="To date">
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  if (dateFrom && next && next < dateFrom) {
+                    setDateTo(dateFrom);
+                    setDateFrom(next);
+                    return;
+                  }
+                  setDateTo(next);
+                }}
+              />
+            </Field>
+          </div>
+        </div>
+
+        <div className="detail-export-toggles" aria-label="Record types">
+          <label className="detail-export-check">
+            <input
+              type="checkbox"
+              checked={includeInspections}
+              onChange={(event) => setIncludeInspections(event.target.checked)}
+            />
+            Include inspections
+          </label>
+          <label className="detail-export-check">
+            <input
+              type="checkbox"
+              checked={includeFlowTests}
+              onChange={(event) => setIncludeFlowTests(event.target.checked)}
+            />
+            Include flow tests
+          </label>
+        </div>
+
+        <details className="detail-export-columns">
+          <summary>Customize columns ({selectedColumns.length} selected)</summary>
+          <div className="detail-export-column-grid">
+            {HYDRANT_DETAIL_EXPORT_COLUMNS.map((column) => (
+              <label key={column.id} className="detail-export-check">
+                <input
+                  type="checkbox"
+                  checked={selectedColumns.includes(column.id)}
+                  onChange={() => toggleColumn(column.id)}
+                />
+                {column.label}
+              </label>
+            ))}
+          </div>
+        </details>
+
+        <div className="daily-report-stats" aria-label="Detail export counts">
+          <div><span>Matching</span><strong>{detailLoading ? "…" : detailCounts.total}</strong></div>
+          <div><span>Inspections</span><strong>{detailLoading ? "…" : detailCounts.inspections}</strong></div>
+          <div><span>Flow Tests</span><strong>{detailLoading ? "…" : detailCounts.flowTests}</strong></div>
+        </div>
+
+        <div className="report-actions">
+          <button className="button" type="button" onClick={exportDetailCsv} disabled={detailLoading}>
+            <Download size={16} /> Export Detail CSV
+          </button>
+          <button className="button" type="button" onClick={printDetailReport} disabled={detailLoading}>
+            <FileText size={16} /> Print / PDF Report
+          </button>
+        </div>
+
+        <div className="daily-report-table detail-export-preview" role="table" aria-label="Detail export preview">
+          <div className="daily-report-row table-head" role="row">
+            <span>Date</span>
+            <span>Type</span>
+            <span>Hydrant</span>
+            <span>Water dept</span>
+            <span>District</span>
+            <span>User</span>
+            <span>Shift</span>
+            <span>Result</span>
+          </div>
+          {detailLoading ? (
+            <div className="daily-report-empty">Loading inspection and flow-test records…</div>
+          ) : filteredDetailRows.length ? filteredDetailRows.slice(0, 50).map((row) => (
+            <div className="daily-report-row" role="row" key={row.id || `${row.record_type}-${row.hydrant_id}-${row.date}-${row.time}`}>
+              <span>{row.date || "—"}</span>
+              <span>{row.record_type}</span>
+              <span>{row.hydrant_id || "—"}</span>
+              <span>{row.water_department || "—"}</span>
+              <span>{row.district || "—"}</span>
+              <span>{row.tested_by || "—"}</span>
+              <span>{row.shift || "—"}</span>
+              <span>{row.flow_result || row.nfpa_class || row.inspection_summary || row.status || "—"}</span>
+            </div>
+          )) : (
+            <div className="daily-report-empty">No matching inspection or flow-test records for these filters.</div>
+          )}
+          {!detailLoading && filteredDetailRows.length > 50 ? (
+            <div className="daily-report-empty">Showing first 50 of {filteredDetailRows.length} matching records. Export CSV for the full set.</div>
+          ) : null}
+        </div>
+      </div>
+
+      <hr className="detail-export-divider" />
+
       <div className="report-actions">
         <a className="button" href="/api/hydrants/export"><Download size={16} /> Hydrants CSV</a>
         <button className="button" onClick={exportDailyActivity}><Download size={16} /> Download Daily Activity</button>
@@ -2588,11 +3021,7 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
   const [query, setQuery] = useState("");
   const [selectedSog, setSelectedSog] = useState(defaultFireSogs[0]);
   const [sogPopup, setSogPopup] = useState(null);
-  const fireForms = [
-    { label: "Liability Release Form", url: "https://form.jotform.com/260756661469065" },
-    { label: "Pre Fire Plan Form", url: "https://form.jotform.com/260863576120053" }
-  ];
-  const sogPdfUrl = "https://dept-app-k85k.onrender.com/documents/horn-lake-sogs.pdf";
+  const { forms: fireForms, sogPdfUrl } = departmentFireResources();
   const sogDetailMap = useMemo(() => new Map(fireSogDetails.map((sog) => [sog.code, sog])), [fireSogDetails]);
   const sogList = useMemo(() => {
     const indexLoaded = fireSogIndex.length > 1 || !/firebase setup/i.test(fireSogIndex[0]?.title || "");
@@ -2635,6 +3064,7 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
       return new URL(`${import.meta.env.BASE_URL}documents/sogs/${encodeURIComponent(detail.sourceFile)}`, window.location.origin).toString();
     }
     const sourcePage = detail?.sourcePage || detail?.page || sog.page;
+    if (!sogPdfUrl) return undefined;
     const source = new URL(sogPdfUrl);
     source.hash = `page=${sourcePage}`;
     return source.toString();
@@ -2646,7 +3076,7 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
 
   function sogNotes(sog) {
     const details = sogDetailMap.get(sog.code)?.details;
-    return details?.length ? details : [`SOG #{sog.code} starts on page ${sog.page} of the Horn Lake SOG manual.`];
+    return details?.length ? details : [`SOG #{sog.code} starts on page ${sog.page} of the department SOG manual.`];
   }
 
   function sogFullBlocks(sog) {
@@ -2680,6 +3110,7 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
         </div>
         {view === "forms" && (
           <div className="inspection-division-grid fire-form-grid">
+            {!fireForms.length && <p className="auth-help">No forms are set up for this department yet.</p>}
             {fireForms.map((form) => (
               <button key={form.label} className="inspection-division-card" onClick={() => setActiveForm(form)}>
                 <FileText size={24} />
@@ -2706,7 +3137,7 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
               <h2>{sogDetailMap.get(selectedSog.code)?.title || selectedSog.title}</h2>
               <div className="code-meta-grid">
                 <div><strong>Manual Page</strong><span>{selectedSog.page}</span></div>
-                <div><strong>Source</strong><span>{sogDetailMap.get(selectedSog.code)?.sourceFile || "Horn Lake SOG PDF"}</span></div>
+                <div><strong>Source</strong><span>{sogDetailMap.get(selectedSog.code)?.sourceFile || "Department SOG manual"}</span></div>
               </div>
               <section className="inline-sog-full">
                 <strong>Full SOG Information</strong>
@@ -2752,11 +3183,11 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
             </div>
             <div className="code-popup-body">
               <h2 id="fire-sog-popup-title">{sogPopup.title}</h2>
-              <p>{sogDetailMap.get(sogPopup.code)?.chapter || "Horn Lake Fire Department SOG manual"}</p>
+              <p>{sogDetailMap.get(sogPopup.code)?.chapter || "Department SOG manual"}</p>
               <div className="code-popup-facts">
                 <div><strong>SOG</strong><span>#{sogPopup.code}</span></div>
                 <div><strong>Manual Pages</strong><span>{sogPopup.page}{sogDetailMap.get(sogPopup.code)?.endPage > sogPopup.page ? `-${sogDetailMap.get(sogPopup.code).endPage}` : ""}</span></div>
-                <div><strong>Source</strong><span>{sogDetailMap.get(sogPopup.code)?.sourceFile || "Horn Lake SOG PDF"}</span></div>
+                <div><strong>Source</strong><span>{sogDetailMap.get(sogPopup.code)?.sourceFile || "Department SOG manual"}</span></div>
               </div>
               <section className="code-popup-section">
                 <strong>SOG Details</strong>
@@ -3357,17 +3788,30 @@ export default function HydrantTestingPage({
   departmentId = "",
   profile = {},
   personnel = [],
+  onNavigate = null,
 } = {}) {
   syncHydrantTenant(departmentId, profile, personnel);
 
-  const effectiveDepartmentId = departmentId || HORN_LAKE_DEPARTMENT_ID;
+  function handleReportDamage(hydrant) {
+    const key = hydrant?.location_id || hydrant?.hydrant_id || hydrant?.id || "";
+    if (!key) return;
+    try {
+      sessionStorage.setItem(HYDRANT_DAMAGE_PRESELECT_KEY, key);
+    } catch {
+      /* ignore */
+    }
+    if (typeof onNavigate === "function") {
+      onNavigate("Damage Reports");
+      return;
+    }
+    window.location.hash = "#damage-reports";
+  }
+
+  const effectiveDepartmentId = departmentId || "";
   const departmentName = resolveDepartmentDisplayName(profile);
   const logoUrl = resolveDepartmentLogoUrl(profile);
   const crewUserOptions = useMemo(
-    () => resolveCrewUserOptions(
-      personnel,
-      hydrantDepartmentId === HORN_LAKE_DEPARTMENT_ID ? defaultHornLakeCrewOptions : []
-    ),
+    () => resolveCrewUserOptions(personnel, []),
     [personnel, departmentId]
   );
   const [hydrants, setHydrants] = useState([]);
@@ -3486,7 +3930,15 @@ export default function HydrantTestingPage({
       {tab === "hydrants" && <HydrantsPage hydrants={hydrants} selected={selected} onSelect={chooseHydrant} />}
       {tab === "inspection" && <Inspection selected={selected} crew={crew} onSaved={saved} onClose={() => selectHydrantTab("dashboard")} />}
       {tab === "flow" && <FlowTest selected={selected} crew={crew} onSaved={saved} onClose={() => selectHydrantTab("dashboard")} />}
-      {tab === "reports" && <Reports crew={crew} departmentName={departmentName} />}
+      {tab === "reports" && (
+        <Reports
+          crew={crew}
+          departmentName={departmentName}
+          hydrants={hydrants}
+          shiftOptions={shiftOptions}
+          districtOptions={districtOptions}
+        />
+      )}
       {tab === "sync" && (
         <SyncImportPage
           departmentId={effectiveDepartmentId}
@@ -3509,7 +3961,7 @@ export default function HydrantTestingPage({
           ))}
         </nav>
         <section className="page-body">{hydrantPageBody}</section>
-        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
+        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={handleReportDamage} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
         {editorHydrant && <HydrantEditorModal hydrant={editorHydrant} crew={crew} onClose={() => setEditorHydrant(null)} onSaved={saved} />}
       </div>
     );
@@ -3566,7 +4018,7 @@ export default function HydrantTestingPage({
         )}
         <section className="page-body">{hydrantPageBody}{tab === "ems" && <EmsProtocolsPage />}{tab === "fireForms" && <FireFormsPage requestedView={fireFormsView} setTab={setTab} setFireFormsView={setFireFormsView} />}{tab === "inspectionDivision" && <InspectionDivisionPage setTab={setTab} />}{tab === "investigations" && <InvestigationsPage />}{tab === "importantNumbers" && <ImportantNumbersPage />}{tab === "fireCodes" && <FireCodesPage />}{tab === "settings" && <SettingsPage />}</section>
       </section>
-      {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
+      {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={handleReportDamage} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
       {editorHydrant && <HydrantEditorModal hydrant={editorHydrant} crew={crew} onClose={() => setEditorHydrant(null)} onSaved={saved} />}
     </main>
   );

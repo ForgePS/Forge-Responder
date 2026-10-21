@@ -2,7 +2,6 @@ import { collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore"
 import { getFirestoreDb } from "./firebaseClient.js";
 import { sanitizeForFirestore } from "./firestoreSanitize.js";
 import { reconcileHydrantStatus } from "./hydrantStatusSync.js";
-import { HORN_LAKE_DEPARTMENT_ID } from "./tenantPaths.js";
 
 export function hydrantLocalKeys(departmentId = "") {
   const prefix = departmentId || "unknown";
@@ -16,10 +15,8 @@ export function hydrantLocalKeys(departmentId = "") {
   };
 }
 
+/** Optional static hydrant file shipped for a department (public/departments/{id}/hydrants.json). */
 export function hydrantStaticDataUrl(departmentId = "") {
-  if (departmentId === HORN_LAKE_DEPARTMENT_ID) {
-    return `${import.meta.env.BASE_URL}hydrants.json`;
-  }
   return `${import.meta.env.BASE_URL}departments/${departmentId}/hydrants.json`;
 }
 
@@ -161,10 +158,6 @@ export function resolveHydrantMapBounds(profile = {}, hydrants = []) {
       [Math.min(...lats) - pad, Math.min(...lons) - pad],
       [Math.max(...lats) + pad, Math.max(...lons) + pad],
     ];
-  }
-
-  if (profile?.id === HORN_LAKE_DEPARTMENT_ID) {
-    return [[34.928, -90.125], [34.995, -89.965]];
   }
 
   return [[39.5, -98.5], [40.5, -97.5]];

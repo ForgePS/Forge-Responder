@@ -254,7 +254,7 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
       >
         {activeSection === "branding" ? (
           <div className="workflow-form">
-            <label><span>Top Bar Title</span><input value={profileForm.displayTitle} onChange={(e) => setProfileForm({ ...profileForm, displayTitle: e.target.value })} placeholder="Horn Lake Fire/EMS" /></label>
+            <label><span>Top Bar Title</span><input value={profileForm.displayTitle} onChange={(e) => setProfileForm({ ...profileForm, displayTitle: e.target.value })} placeholder="Your Fire/EMS Department" /></label>
             <label><span>Department Name</span><input value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} /></label>
             <label><span>Short Name</span><input value={profileForm.shortName} onChange={(e) => setProfileForm({ ...profileForm, shortName: e.target.value })} /></label>
             <label><span>Theme Name</span><input value={profileForm.themeName} onChange={(e) => setProfileForm({ ...profileForm, themeName: e.target.value })} /></label>

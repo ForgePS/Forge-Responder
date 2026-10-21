@@ -1,7 +1,6 @@
 import forgeLogo from "../assets/forge-logo.png";
-import hornLakeLogo from "../assets/horn-lake-logo.png";
 
-export { forgeLogo, hornLakeLogo };
+export { forgeLogo };
 
 export const DEFAULT_PLATFORM_LOGO_PATH = "/forge-logo.png";
 export const DEFAULT_DEMO_DEPARTMENT_LOGO_PATH = "/forge-logo.png";
@@ -22,11 +21,10 @@ export function resolvePlatformLogoUrl(url) {
 }
 
 export function resolveDepartmentLogoUrl(url) {
-  if (!url || url === "/horn-lake-logo.png" || url.endsWith("/horn-lake-logo.png")) {
-    return hornLakeLogo;
-  }
-  if (isForgeLogoUrl(url) || url === DEFAULT_DEMO_DEPARTMENT_LOGO_PATH) {
+  const value = String(url || "").trim();
+  if (!value) return forgeLogo;
+  if (isForgeLogoUrl(value) || value === DEFAULT_DEMO_DEPARTMENT_LOGO_PATH) {
     return forgeLogo;
   }
-  return url;
+  return value;
 }

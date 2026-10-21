@@ -40,17 +40,8 @@ export async function loadTenantListFromFirestore(departmentId, listKey) {
     console.error(`Failed to load tenant list ${listKey}`, error);
   }
 
-  try {
-    const legacySnap = await getDoc(doc(db, "rmsData", listKey));
-    if (legacySnap.exists()) {
-      const items = Array.isArray(legacySnap.data()?.items) ? legacySnap.data().items : [];
-      if (items.length) {
-        return { items: normalizeItems(items, listKey), source: "legacy" };
-      }
-    }
-  } catch (error) {
-    console.error(`Failed to load legacy list ${listKey}`, error);
-  }
+  // No fallback to the legacy top-level rmsData collection: it holds Horn Lake's
+  // data and must never be loaded into (or copied to) another department.
 
   const subcollection = SUBCOLLECTION_FALLBACKS[listKey];
   if (subcollection) {
@@ -73,16 +64,12 @@ export async function loadTenantListFromFirestore(departmentId, listKey) {
 
 export function resolveTenantListItems({
   remoteItems = [],
-  legacyItems = [],
   currentItems = [],
   fallbackItems = [],
   listKey = "",
 }) {
   const normalizedRemote = normalizeItems(remoteItems, listKey);
   if (normalizedRemote.length) return normalizedRemote;
-
-  const normalizedLegacy = normalizeItems(legacyItems, listKey);
-  if (normalizedLegacy.length) return normalizedLegacy;
 
   const normalizedCurrent = normalizeItems(currentItems, listKey);
   if (normalizedCurrent.length) return normalizedCurrent;

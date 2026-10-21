@@ -6,7 +6,7 @@ import { ensureDefaultRoles } from "./roleService.js";
 import { canAccessAdminRms, normalizeRoleIds } from "./permissions.js";
 import { mergeMembershipPermissions } from "./userPermissions.js";
 import { isPlatformBootstrapEmail } from "./platformBootstrap.js";
-import { DEFAULT_DEPARTMENT_ID, isPlatformScope } from "./tenantPaths.js";
+import { isPlatformScope } from "./tenantPaths.js";
 
 function normalizeEmail(value = "") {
   return String(value).trim().toLowerCase();
@@ -51,7 +51,9 @@ export async function recoverMembershipAccess(user, departmentId) {
   const db = getFirestoreDb();
   if (!db || !user?.uid || !departmentId) return null;
 
-  const membershipDepartmentId = isPlatformScope(departmentId) ? DEFAULT_DEPARTMENT_ID : departmentId;
+  // Platform scope has no department memberships.
+  if (isPlatformScope(departmentId)) return null;
+  const membershipDepartmentId = departmentId;
 
   const creator = await loadPlatformCreator(user.uid);
   if (String(creator?.status || "").toLowerCase() === "active") {
@@ -84,10 +86,10 @@ export async function recoverMembershipAccess(user, departmentId) {
 }
 
 export function resolveMembershipDepartmentId(departmentId) {
-  return isPlatformScope(departmentId) ? DEFAULT_DEPARTMENT_ID : departmentId;
+  return isPlatformScope(departmentId) ? "" : departmentId;
 }
 
-export async function bootstrapPlatformAccess(user, departmentId = DEFAULT_DEPARTMENT_ID) {
+export async function bootstrapPlatformAccess(user, departmentId) {
   if (!user?.uid || !isPlatformBootstrapEmail(user?.email)) return null;
   return recoverMembershipAccess(user, departmentId);
 }

@@ -29,7 +29,8 @@
     "backfill:memberships": "node scripts/backfill-memberships.mjs",
     "backfill:memberships:apply": "node scripts/backfill-memberships.mjs --apply",
     "test:functions": "firebase emulators:exec --only firestore --project demo-forge-rms \"node --test tests/functions/invites.test.mjs\"",
-    "inventory:legacy": "node scripts/inventory-legacy-data.mjs"
+    "inventory:legacy": "node scripts/inventory-legacy-data.mjs",
+    "cleanup:phase2": "node scripts/phase2-cleanup.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

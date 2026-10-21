@@ -48,7 +48,7 @@ export default function SocialSourcePanel({ socialConfig, onConfigChange, onAppl
             type="text"
             value={config.hashtag}
             onChange={(event) => updateConfig({ hashtag: event.target.value.replace(/^#/, "") })}
-            placeholder="HornLakeFire"
+            placeholder="YourFireDepartment"
           />
         </label>
         <div className="dd-gallery-actions">

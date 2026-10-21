@@ -42,7 +42,7 @@ import {
   syncGatewayUrl,
   writeLoginTenantId
 } from "../lib/gatewayRouting.js";
-import { DEFAULT_DEPARTMENT_ID, DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isDemoDepartment } from "../lib/tenantPaths.js";
+import { DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isDemoDepartment } from "../lib/tenantPaths.js";
 import {
   acceptInvite,
   captureInviteTokenFromUrl,
@@ -179,7 +179,7 @@ export function AuthProvider({ children }) {
 
     const creator = await loadPlatformCreator(nextUser.uid);
     const creatorActive = String(creator?.status || "").toLowerCase() === "active";
-    const departmentId = activeDepartmentId || DEFAULT_DEPARTMENT_ID;
+    const departmentId = activeDepartmentId || PLATFORM_SCOPE_ID;
 
     setIsCreator(creatorActive);
     if (creatorActive) {

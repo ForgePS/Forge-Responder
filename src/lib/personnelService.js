@@ -27,16 +27,6 @@ export async function listDepartmentPersonnel(departmentId) {
   }
 
   try {
-    const legacySnap = await getDoc(doc(db, "rmsData", PERSONNEL_LIST_KEY));
-    if (legacySnap.exists()) {
-      const items = Array.isArray(legacySnap.data()?.items) ? legacySnap.data().items : [];
-      return restoreItemsFromFirestore(items, PERSONNEL_LIST_KEY);
-    }
-  } catch (error) {
-    console.error("Failed to load legacy personnel list", error);
-  }
-
-  try {
     const records = await listRecords(departmentId, "personnel");
     if (records.length) {
       return restoreItemsFromFirestore(records, PERSONNEL_LIST_KEY);

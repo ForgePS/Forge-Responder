@@ -71,7 +71,7 @@ export default function DemoEntryPage() {
         </div>
 
         <ul className="demo-entry-list">
-          <li>Safe sandbox — separate from production Horn Lake data</li>
+          <li>Safe sandbox — separate from real department data</li>
           <li>Full RMS modules enabled for walkthroughs and classes</li>
           <li>Share this link: <code>{resolvePublicDemoUrl()}</code></li>
         </ul>

@@ -6,17 +6,9 @@ import {
   ensureCreatorDepartmentAccess,
   loadPlatformCreator,
 } from "./platformService.js";
-import { HORN_LAKE_DEPARTMENT_ID } from "./tenantPaths.js";
-
-export function isHornLakeOrgEmail(email = "") {
-  return /@hornlake\.org$/i.test(String(email || "").trim());
-}
-
-function permissionError(departmentId) {
+function permissionError() {
   return new Error(
-    departmentId === HORN_LAKE_DEPARTMENT_ID
-      ? "Missing permission to import hydrants. Ask a department admin to invite you or add you under User Permissions."
-      : "Missing permission to import hydrants for this department. Ask an admin to add your account under User Permissions."
+    "Missing permission to import hydrants for this department. Ask a department admin to invite you or add you under User Permissions."
   );
 }
 

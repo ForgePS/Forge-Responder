@@ -268,7 +268,7 @@ export default function InternalEmailBoard({ compact = false, onMessage, personn
       <section className="internal-email-board internal-email-board-unavailable">
         <p className="auth-help">
           Messages live inside each department platform. Open a department workspace or visit a department portal
-          (for example <strong>/horn-lake-fd</strong>) to use the agency inbox.
+          (for example <strong>/your-department-id</strong>) to use the agency inbox.
         </p>
         <p className="auth-help">
           Enable the module per branch under Creator Console → <strong>Department Modules</strong>.

@@ -105,32 +105,6 @@ export async function saveInternalEmailGroups(departmentId, settings, groups = [
 }
 
 export const DEFAULT_INTERNAL_EMAIL_SEEDS = {
-  "horn-lake-fd": [
-    {
-      id: "EM-H001",
-      subject: "Weekly command briefing — Jun 12",
-      body: "Command staff briefing is scheduled for Thursday at 0900 in Fire Administration. Bring staffing and fleet updates.",
-      category: "announcement",
-      priority: "high",
-      recipients: "command",
-      recipientLabel: "Command staff",
-      fromName: "Jeremy Powell",
-      fromEmail: "jpowell@hornlake.org",
-      status: "sent"
-    },
-    {
-      id: "EM-H002",
-      subject: "A Shift apparatus checks",
-      body: "Complete daily apparatus checks before 0800. Report maintenance issues through the employee portal.",
-      category: "message",
-      priority: "normal",
-      recipients: "all",
-      recipientLabel: "All personnel",
-      fromName: "Stephen White",
-      fromEmail: "swhite@hornlake.org",
-      status: "sent"
-    }
-  ],
   "forge-demo": [
     {
       id: "EM-D001",

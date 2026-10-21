@@ -126,7 +126,7 @@ export default function HydrantImportSection({
         >
           <FileUp size={28} />
           <strong>Drop CSV or JSON here</strong>
-          <span>Use the same field structure as the Horn Lake program. Leave a column blank to keep the existing value on merge imports.</span>
+          <span>Use the standard hydrant field structure. Leave a column blank to keep the existing value on merge imports.</span>
           <button type="button" className="secondary" onClick={() => inputRef.current?.click()} disabled={importing}>
             <UploadCloud size={16} /> Choose File
           </button>
@@ -229,7 +229,7 @@ export default function HydrantImportSection({
       <div className="module-card">
         <div className="module-card-header">
           <strong>Supported Formats</strong>
-          <span>Use the same hydrant structure already working for Horn Lake.</span>
+          <span>Use the standard hydrant field structure.</span>
         </div>
         <div className="integration-grid">
           <div>

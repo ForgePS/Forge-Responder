@@ -227,7 +227,7 @@ export function buildTestAlert(overrides = {}) {
     cadCode: "603",
     description: "TEST — Structure Fire",
     address: "6530 Hise Parkway",
-    city: "Horn Lake",
+    city: "Test City",
     state: "MS",
     units: "UNIT1 613C 614C",
     priority: "1",

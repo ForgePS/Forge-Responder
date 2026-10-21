@@ -45,13 +45,14 @@ export function getDemoCredentials() {
   };
 }
 
+/** Leave the demo and return to the sign-in page, where users pick their own department. */
 export function leaveDemoToProduction() {
   clearDemoMode();
   try {
-    window.localStorage.setItem("rms-active-department-id", "horn-lake-fd");
-    persistGatewayContext("horn-lake-fd", "horn-lake-fd");
+    window.localStorage.removeItem("rms-active-department-id");
+    persistGatewayContext("", "");
   } catch {
     // ignore
   }
-  window.location.href = buildDepartmentGatewayPath("horn-lake-fd");
+  window.location.href = "/";
 }

@@ -1,4 +1,4 @@
-import { HORN_LAKE_DEPARTMENT_ID } from "./tenantPaths.js";
+import { hostLockedDepartmentId, resolveHostTenant } from "./hostTenants.js";
 
 export const HYDRANT_APP_ROUTE_PREFIXES = [
   "hydrants",
@@ -11,8 +11,9 @@ export const HYDRANT_APP_ROUTE_PREFIXES = [
   "investigations",
 ];
 
-export function isHornLakeHydrantHost(hostname = typeof window !== "undefined" ? window.location.hostname : "") {
-  return String(hostname || "").toLowerCase().includes("horn-lake-fire");
+/** True on a department-branded hydrant host (see hostTenants.js). */
+export function isBrandedHydrantHost(hostname = typeof window !== "undefined" ? window.location.hostname : "") {
+  return Boolean(resolveHostTenant(hostname)?.hydrantApp);
 }
 
 export function isHydrantAppPath(pathname = typeof window !== "undefined" ? window.location.pathname : "/") {
@@ -66,13 +67,14 @@ export function resolveInitialHydrantTab({
   return "app";
 }
 
-export function hornLakeDepartmentId() {
-  return HORN_LAKE_DEPARTMENT_ID;
+/** Department locked by the current branded hydrant host, or "". */
+export function brandedHostDepartmentId(hostname = typeof window !== "undefined" ? window.location.hostname : "") {
+  return hostLockedDepartmentId(hostname);
 }
 
 export function shouldOpenHydrantsModule(location = typeof window !== "undefined" ? window.location : null) {
   if (!location) return false;
-  if (!isHornLakeHydrantHost(location.hostname)) return false;
+  if (!isBrandedHydrantHost(location.hostname)) return false;
   return Boolean(hydrantTabFromPath(location.pathname));
 }
 

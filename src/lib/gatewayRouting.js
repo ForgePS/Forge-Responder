@@ -1,7 +1,7 @@
 import { readStoredWorkspaceId } from "./creatorConsoleWorkspace.js";
 import { resolveRmsAppUrl } from "./rmsAppUrl.js";
-import { DEFAULT_DEPARTMENT_ID, DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isPlatformScope } from "./tenantPaths.js";
-import { isHydrantAppPath, isHornLakeHydrantHost, hornLakeDepartmentId } from "./hydrantAppRouting.js";
+import { DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isPlatformScope } from "./tenantPaths.js";
+import { isHydrantAppPath, isBrandedHydrantHost, brandedHostDepartmentId } from "./hydrantAppRouting.js";
 
 const DEMO_MODE_SESSION_KEY = "rms-demo-mode";
 
@@ -48,6 +48,7 @@ export const RESERVED_GATEWAY_PATHS = new Set([
   "status",
   "null",
   "undefined",
+  "utility-ack",
 ]);
 
 /** Accidental / mistyped branch IDs that should be soft-disabled from the creator registry. */
@@ -171,15 +172,21 @@ export function clearLoginTenantId() {
 /** True when the sign-in screen should treat the tenant as selected/locked. */
 export function hasLockedLoginTenant() {
   if (typeof window === "undefined") return false;
-  if (isHornLakeHydrantHost(window.location.hostname)) return true;
+  if (isBrandedHydrantHost(window.location.hostname)) return true;
   if (parseGatewayDepartmentId()) return true;
   if (readLoginTenantId()) return true;
   return false;
 }
 
+/**
+ * The department the app should show. When nothing identifies a tenant this
+ * returns PLATFORM_SCOPE_ID ("no department selected"): users see the tenant
+ * picker / access page, creators see the platform workspace. There is no
+ * default customer.
+ */
 export function resolveActiveDepartmentId() {
-  if (typeof window === "undefined") return DEFAULT_DEPARTMENT_ID;
-  if (isHornLakeHydrantHost(window.location.hostname)) return hornLakeDepartmentId();
+  if (typeof window === "undefined") return PLATFORM_SCOPE_ID;
+  if (isBrandedHydrantHost(window.location.hostname)) return brandedHostDepartmentId();
   if (isDemoSessionActive()) return DEMO_DEPARTMENT_ID;
   if (isCreatorConsolePath()) return readStoredWorkspaceId();
 
@@ -197,12 +204,12 @@ export function resolveActiveDepartmentId() {
     return storedWorkspaceId;
   }
 
-  return DEFAULT_DEPARTMENT_ID;
+  return PLATFORM_SCOPE_ID;
 }
 
 export function shouldSyncGatewayUrl(departmentId) {
   if (!departmentId || typeof window === "undefined") return false;
-  if (isHornLakeHydrantHost(window.location.hostname)) return false;
+  if (isBrandedHydrantHost(window.location.hostname)) return false;
   if (isHydrantAppPath(window.location.pathname)) return false;
   if (isCreatorConsolePath()) return false;
   if (isPlatformScope(departmentId)) return false;
@@ -272,10 +279,11 @@ export function isAlertDashboardPath(pathname = typeof window !== "undefined" ? 
 
 export function parseAlertDashboardGatewaySlug(pathname = typeof window !== "undefined" ? window.location.pathname : "/") {
   const normalized = String(pathname || "/").replace(/\/$/, "") || "/";
-  if (normalized === ALERT_DASHBOARD_PATH_SUFFIX) return DEFAULT_DEPARTMENT_ID;
+  // A bare /alerts has no department: require /{department}/alerts.
+  if (normalized === ALERT_DASHBOARD_PATH_SUFFIX) return null;
   if (!normalized.endsWith(ALERT_DASHBOARD_PATH_SUFFIX)) return null;
   const segment = normalized.split("/").filter(Boolean)[0];
-  if (!segment || segment === "alerts") return DEFAULT_DEPARTMENT_ID;
+  if (!segment || segment === "alerts") return null;
   const gatewayId = normalizeGatewayDepartmentId(decodeGatewaySegment(segment));
   if (!gatewayId || isInvalidGatewaySlug(gatewayId)) return null;
   return gatewayId;

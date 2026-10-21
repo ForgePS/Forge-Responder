@@ -1,7 +1,7 @@
 import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { legacyRoleMap } from "../data/defaultRoles.js";
 import { getFirestoreDb } from "./firebaseClient.js";
-import { DEFAULT_DEPARTMENT_ID, departmentListSegments } from "./tenantPaths.js";
+import { departmentListSegments, isPlatformScope } from "./tenantPaths.js";
 import { ensureDefaultRoles } from "./roleService.js";
 import { isPlatformBootstrapEmail } from "./platformBootstrap.js";
 import { ensureCreatorDepartmentAccess, loadPlatformCreator } from "./platformService.js";
@@ -88,7 +88,9 @@ async function linkMembershipToPersonnel(departmentId, membership) {
   return { ...membership, personnelId, updatedAt };
 }
 
-export async function ensureMembershipForUser(user, departmentId = DEFAULT_DEPARTMENT_ID) {
+export async function ensureMembershipForUser(user, departmentId) {
+  // No department selected (platform scope): nothing to join.
+  if (!departmentId || isPlatformScope(departmentId)) return null;
   const creator = await loadPlatformCreator(user.uid);
   if (creator?.status === "active") {
     return ensureCreatorDepartmentAccess(user, departmentId);

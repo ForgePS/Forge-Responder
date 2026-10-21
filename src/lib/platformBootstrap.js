@@ -1,5 +1,4 @@
 import { defaultRoles } from "../data/defaultRoles.js";
-import { DEFAULT_DEPARTMENT_ID } from "./tenantPaths.js";
 
 // Retired: platform creators are identified only by platformCreators/{uid}
 // (server-written), matching firestore.rules. Kept empty so existing callers of
@@ -10,7 +9,7 @@ export function isPlatformBootstrapEmail(email = "") {
   return PLATFORM_BOOTSTRAP_EMAILS.has(String(email).trim().toLowerCase());
 }
 
-export function buildBootstrapMembership(user, departmentId = DEFAULT_DEPARTMENT_ID) {
+export function buildBootstrapMembership(user, departmentId = "") {
   const now = new Date().toISOString();
   return {
     id: user.uid,

@@ -4,21 +4,13 @@ import {
 } from "../defaultDepartment.js";
 import { demoDepartmentProfile, demoDepartmentSettings } from "../demoDepartment.js";
 import { DEMO_LIST_SEEDS } from "../demoSeeds.js";
-import {
-  DEFAULT_DEPARTMENT_ID,
-  HORN_LAKE_DEPARTMENT_ID,
-  isDemoDepartment,
-} from "../../lib/tenantPaths.js";
-import { hornLakeDepartmentProfile, hornLakeDepartmentSettings } from "./hornLakeDepartment.js";
-import { HORN_LAKE_LIST_SEEDS } from "./hornLakeSeeds.js";
+import { isDemoDepartment } from "../../lib/tenantPaths.js";
 
-export { hornLakeDepartmentProfile, hornLakeDepartmentSettings } from "./hornLakeDepartment.js";
-export { HORN_LAKE_LIST_SEEDS } from "./hornLakeSeeds.js";
+// Every real department starts from the same generic template; its actual
+// profile, settings and lists live in Firestore. Only the demo tenant ships
+// with sample data.
 
 export function resolveDepartmentProfileDefaults(departmentId = "") {
-  if (departmentId === HORN_LAKE_DEPARTMENT_ID || departmentId === DEFAULT_DEPARTMENT_ID) {
-    return { ...hornLakeDepartmentProfile, id: departmentId || HORN_LAKE_DEPARTMENT_ID };
-  }
   if (isDemoDepartment(departmentId)) {
     return { ...demoDepartmentProfile, id: departmentId };
   }
@@ -26,9 +18,6 @@ export function resolveDepartmentProfileDefaults(departmentId = "") {
 }
 
 export function resolveDepartmentSettingsDefaults(departmentId = "") {
-  if (departmentId === HORN_LAKE_DEPARTMENT_ID || departmentId === DEFAULT_DEPARTMENT_ID) {
-    return { ...hornLakeDepartmentSettings, departmentId: departmentId || HORN_LAKE_DEPARTMENT_ID };
-  }
   if (isDemoDepartment(departmentId)) {
     return { ...demoDepartmentSettings, departmentId };
   }
@@ -39,16 +28,17 @@ export function getTenantListFallback(departmentId, listKey) {
   if (isDemoDepartment(departmentId)) {
     return DEMO_LIST_SEEDS[listKey] ?? [];
   }
-  if (departmentId === HORN_LAKE_DEPARTMENT_ID || departmentId === DEFAULT_DEPARTMENT_ID) {
-    return HORN_LAKE_LIST_SEEDS[listKey] ?? [];
-  }
   return [];
 }
 
+/**
+ * Prefix for new personnel IDs: initials of the department id's first two words
+ * ("horn-lake-fd" -> "HL", "st-charles" -> "SC"), or its first two letters for a
+ * one-word id ("camden" -> "CA").
+ */
 export function resolvePersonnelIdPrefix(departmentId = "") {
-  if (departmentId === HORN_LAKE_DEPARTMENT_ID || departmentId === DEFAULT_DEPARTMENT_ID) {
-    return "HL";
-  }
-  const slug = String(departmentId).replace(/[^a-z0-9]/gi, "").slice(0, 2).toUpperCase();
+  const words = String(departmentId).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  if (words.length >= 2) return `${words[0][0]}${words[1][0]}`.toUpperCase();
+  const slug = (words[0] || "").slice(0, 2).toUpperCase();
   return slug || "P";
 }

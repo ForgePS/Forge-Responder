@@ -11,15 +11,12 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { readStoredWorkspaceId, writeStoredWorkspaceId } from "../lib/creatorConsoleWorkspace.js";
 import {
-  bootstrapDefaultDepartmentRegistry,
   listPlatformDepartments,
   loadDepartmentProfile,
   loadDepartmentSettings,
-  pruneDuplicateHornLakeBranches,
-  pruneGhostDepartmentBranches,
-  repairMislabeledDepartmentRegistry
+  pruneGhostDepartmentBranches
 } from "../lib/platformService.js";
-import { DEFAULT_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isPlatformScope } from "../lib/tenantPaths.js";
+import { PLATFORM_SCOPE_ID, isPlatformScope } from "../lib/tenantPaths.js";
 import { resolveDepartmentBranchState } from "../lib/departmentBranchUtils.js";
 import { normalizeSubscription } from "../lib/subscriptionUtils.js";
 
@@ -62,16 +59,10 @@ export default function CreatorConsolePage() {
   async function reload() {
     try {
       if (isCreator) {
-        await repairMislabeledDepartmentRegistry();
-        await pruneDuplicateHornLakeBranches();
         await pruneGhostDepartmentBranches();
       }
 
-      let items = await listPlatformDepartments();
-      if (isCreator && !items.some((item) => item.id === DEFAULT_DEPARTMENT_ID)) {
-        await bootstrapDefaultDepartmentRegistry();
-        items = await listPlatformDepartments();
-      }
+      const items = await listPlatformDepartments();
 
       const enriched = await Promise.all(items.map(async (department) => {
         const [settings, profile] = await Promise.all([

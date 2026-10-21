@@ -10,7 +10,7 @@ import {
   isCreatorConsolePath,
   persistGatewayContext,
 } from "../lib/gatewayRouting.js";
-import { isHornLakeHydrantHost } from "../lib/hydrantAppRouting.js";
+import { isBrandedHydrantHost } from "../lib/hydrantAppRouting.js";
 import { canSelfRestoreMembership } from "../lib/membershipRecovery.js";
 import { loadPlatformCreator } from "../lib/platformService.js";
 import { isPlatformScope } from "../lib/tenantPaths.js";
@@ -24,8 +24,8 @@ export default function AccessDeniedPage({ userId = "" }) {
   const [changingTenant, setChangingTenant] = useState(false);
   const authUid = userId || user?.uid || "";
   const creatorConsoleEntry = isCreatorConsolePath();
-  const hydrantHostLocked = isHornLakeHydrantHost();
-  const canChangeTenant = !creatorConsoleEntry && !hydrantHostLocked;
+  const brandedHostLocked = isBrandedHydrantHost();
+  const canChangeTenant = !creatorConsoleEntry && !brandedHostLocked;
   const portalDepartmentId = gatewayDepartmentId || (isPlatformScope(departmentId) ? null : departmentId);
   const canRecover = canSelfRestoreMembership(user || {}) || platformCreatorRecoverable;
 

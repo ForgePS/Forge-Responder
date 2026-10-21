@@ -22,7 +22,7 @@ export default function PublicAlertDashboardPage() {
 
   const refresh = useCallback(async () => {
     if (!gatewaySlug) {
-      setError("Invalid alert dashboard URL.");
+      setError("This alert dashboard link is missing the department. Use the address that includes it, e.g. /your-department-id/alerts.");
       setLoading(false);
       return;
     }

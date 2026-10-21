@@ -22,7 +22,7 @@ import { restoreItemsFromFirestore, sanitizeItemsForFirestore } from "../lib/fir
 import { writeAuditLog } from "../lib/auditService.js";
 import { usesRecordPanelEditor } from "../lib/moduleDataEditorConfig.js";
 import { PERSONNEL_ADMIN_COLUMN_ORDER } from "../lib/personnelAdminFields.js";
-import { DEFAULT_DEPARTMENT_ID, departmentListSegments, isPlatformScope } from "../lib/tenantPaths.js";
+import { departmentListSegments, isPlatformScope } from "../lib/tenantPaths.js";
 import { loadTenantListFromFirestore } from "../lib/tenantListLoader.js";
 import { withTenantListPayload } from "../lib/tenantRecord.js";
 import { doc, setDoc } from "firebase/firestore";
@@ -35,7 +35,8 @@ const DEFAULT_COLUMNS = {
 
 export default function DataEditorPanel({ onMessage }) {
   const { departmentId, isPlatformScope: inPlatformScope } = useTenant();
-  const dataDepartmentId = inPlatformScope ? DEFAULT_DEPARTMENT_ID : departmentId;
+  // Module data always belongs to a department; none is editable in platform scope.
+  const dataDepartmentId = inPlatformScope ? "" : departmentId;
   const { user, membership } = useAuth();
   const [datasetKey, setDatasetKey] = useState(MODULE_DATASETS[0].key);
   const [rows, setRows] = useState([]);
@@ -160,7 +161,7 @@ export default function DataEditorPanel({ onMessage }) {
 
       {inPlatformScope && (
         <p className="auth-help">
-          Editing <strong>{DEFAULT_DEPARTMENT_ID}</strong> module data while in the FORGE platform workspace. Switch to a department branch to edit another tenant.
+          You are in the FORGE platform workspace. Switch to a department branch to edit its module data.
         </p>
       )}
 

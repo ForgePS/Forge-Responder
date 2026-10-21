@@ -1,6 +1,5 @@
-export const HORN_LAKE_DEPARTMENT_ID = "horn-lake-fd";
-/** Default tenant when no gateway or membership is resolved (Horn Lake production branch). */
-export const DEFAULT_DEPARTMENT_ID = HORN_LAKE_DEPARTMENT_ID;
+// There is deliberately no "default department": when no tenant is resolved the
+// app is in platform scope (tenant picker for users, platform workspace for creators).
 export const DEMO_DEPARTMENT_ID = "forge-demo";
 export const PLATFORM_SCOPE_ID = "__forge-platform__";
 
@@ -26,6 +25,11 @@ export const DEPARTMENT_COLLECTIONS = [
   "hydrants",
   "occupancies",
   "inspections",
+  "inspectionSettings",
+  "inspectionAuditEvents",
+  "inspectionTypes",
+  "inspectionTemplates",
+  "inspectionTemplateVersions",
   "preplans",
   "documents",
   "dashboardConfig",
@@ -33,8 +37,8 @@ export const DEPARTMENT_COLLECTIONS = [
   "internalEmails"
 ];
 
-export function departmentRoot(departmentId = DEFAULT_DEPARTMENT_ID) {
-  return ["departments", departmentId];
+export function departmentRoot(departmentId) {
+  return ["departments", departmentId || ""];
 }
 
 export function departmentDocPath(departmentId, ...segments) {
@@ -56,9 +60,4 @@ export function departmentRecordPath(departmentId, collectionName, recordId) {
 
 export function departmentStoragePath(departmentId, ...segments) {
   return ["departments", departmentId, ...segments].join("/");
-}
-
-/** Legacy prototype path used before multi-tenant conversion. */
-export function legacyRmsDataPath(listKey) {
-  return `rmsData/${listKey}`;
 }

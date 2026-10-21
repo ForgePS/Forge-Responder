@@ -263,7 +263,7 @@ export default function GoogleApisIntegrationPanel({
                   <input
                     value={form.defaultMapCenter}
                     onChange={(event) => updateField("defaultMapCenter", event.target.value)}
-                    placeholder="34.95,-90.03 or 6530 Hise Parkway, Horn Lake MS"
+                    placeholder="34.95,-90.03 or 123 Main St, Your City ST"
                   />
                 </label>
                 <label>

@@ -6,7 +6,7 @@ import { useTenant } from "../context/TenantContext.jsx";
 import { defaultPlatformConfig } from "../data/platformBrand.js";
 import { writeAuditLog } from "../lib/auditService.js";
 import { savePlatformConfig } from "../lib/platformService.js";
-import { DEFAULT_DEPARTMENT_ID } from "../lib/tenantPaths.js";
+import { PLATFORM_SCOPE_ID } from "../lib/tenantPaths.js";
 import {
   DEFAULT_PLATFORM_LOGO_PATH,
   isForgeLogoUrl,
@@ -16,12 +16,14 @@ import { buildPlatformLogoPath } from "../lib/storagePaths.js";
 import PlatformBrandHero from "./PlatformBrandHero.jsx";
 import ObjectUploadField from "./ObjectUploadField.jsx";
 import { resolveAvailableModules } from "../lib/platformInheritance.js";
+import { PREPLAN_FEATURE_KEYS, PREPLAN_FEATURE_LABELS, defaultPreplanFeatures } from "../lib/inspections/index.js";
 
 export default function PlatformConfigPanel({ onMessage }) {
   const { platformConfig, refreshPlatform, refreshDepartment } = useTenant();
   const { user, membership } = useAuth();
   const [form, setForm] = useState({ ...defaultPlatformConfig });
   const [availableModules, setAvailableModules] = useState([]);
+  const [availablePreplanFeatures, setAvailablePreplanFeatures] = useState(defaultPreplanFeatures());
   const [saving, setSaving] = useState(false);
   const [useCustomLogo, setUseCustomLogo] = useState(false);
 
@@ -29,6 +31,11 @@ export default function PlatformConfigPanel({ onMessage }) {
     const merged = { ...defaultPlatformConfig, ...platformConfig };
     setForm(merged);
     setAvailableModules(resolveAvailableModules(platformConfig?.availableModules));
+    setAvailablePreplanFeatures(
+      platformConfig?.availablePreplanFeatures && typeof platformConfig.availablePreplanFeatures === "object"
+        ? { ...defaultPreplanFeatures(), ...platformConfig.availablePreplanFeatures }
+        : defaultPreplanFeatures(),
+    );
     setUseCustomLogo(!isForgeLogoUrl(merged.logoUrl));
   }, [platformConfig]);
 
@@ -64,9 +71,11 @@ export default function PlatformConfigPanel({ onMessage }) {
         poweredByLabel: form.poweredByLabel.trim(),
         version: form.version.trim(),
         status: form.status || "active",
-        availableModules
+        availableModules,
+        availablePreplanFeatures,
       });
-      await writeAuditLog(DEFAULT_DEPARTMENT_ID, {
+      // Platform-level changes are logged in the platform workspace, not a customer.
+      await writeAuditLog(PLATFORM_SCOPE_ID, {
         action: "update",
         module: "FORGE Platform",
         summary: `Updated platform settings (${availableModules.length} modules available)`,
@@ -257,6 +266,28 @@ export default function PlatformConfigPanel({ onMessage }) {
                   onChange={() => toggleModule(module.key)}
                 />
                 <span>{module.label}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="platform-config-card">
+          <header>
+            <strong>Pre-Fire Plan features</strong>
+            <span>Creator allowlist for Preplan feature toggles. Departments can only enable flags that stay on here.</span>
+          </header>
+          <div className="platform-module-grid">
+            {Object.keys(PREPLAN_FEATURE_KEYS).map((key) => (
+              <label key={key} className="platform-module-card">
+                <input
+                  type="checkbox"
+                  checked={availablePreplanFeatures[key] !== false}
+                  onChange={() => setAvailablePreplanFeatures((current) => ({
+                    ...current,
+                    [key]: current[key] === false,
+                  }))}
+                />
+                <span>{PREPLAN_FEATURE_LABELS[key] || key}</span>
               </label>
             ))}
           </div>

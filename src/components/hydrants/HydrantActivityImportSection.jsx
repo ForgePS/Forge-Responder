@@ -220,7 +220,7 @@ export default function HydrantActivityImportSection({
           </div>
           <div>
             <strong>hydrant_id * / location_id</strong>
-            <p>Match existing hydrants by Horn Lake hydrant ID (example: HL 1000) or ArcGIS location_id.</p>
+            <p>Match existing hydrants by hydrant ID (example: HL 1000) or ArcGIS location_id.</p>
           </div>
           <div>
             <strong>date / time</strong>

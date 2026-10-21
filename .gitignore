@@ -17,3 +17,8 @@ _deploy_*.log
 firestore-debug.log
 storage-debug.log
 ui-debug.log
+
+# Local data backups from admin scripts (may contain personal data)
+backups/
+inventory*.txt
+cleanup*.txt
