@@ -102,6 +102,10 @@ export function academySyncPerson(departmentId, connectionId, payload) {
   return call("academySyncPerson", { departmentId, connectionId, ...payload });
 }
 
+export function listMyAcademyTraining(departmentId, payload = {}) {
+  return call("listMyAcademyTraining", { departmentId, ...payload });
+}
+
 export function listAcademyLinks(departmentId, personId) {
   return call("listAcademyLinks", { departmentId, personId });
 }

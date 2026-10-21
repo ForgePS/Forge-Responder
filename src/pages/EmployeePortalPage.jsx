@@ -51,6 +51,7 @@ import {
   tradeInvolvesEmployee,
   trainingBelongsToEmployee
 } from "../lib/employeePortalUtils.js";
+import { listMyAcademyTraining } from "../lib/academyIntegrations.js";
 import {
   advanceShiftTradeApproval,
   buildLeaveApprovalMeta,
@@ -171,6 +172,7 @@ export default function EmployeePortalPage({
   const { departmentId } = useTenant();
   const { patchMembership } = useAuth();
   const [message, setMessage] = useState("");
+  const [academyTraining, setAcademyTraining] = useState([]);
   const [leaveForm, setLeaveForm] = useState(defaultLeaveForm);
   const [tradeForm, setTradeForm] = useState(defaultTradeForm);
   const [maintenanceForm, setMaintenanceForm] = useState(defaultMaintenanceIssueForm);
@@ -210,6 +212,33 @@ export default function EmployeePortalPage({
     () => previewPerson || resolveEmployeePerson(personnel, membership, user),
     [previewPerson, personnel, membership, user]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAcademyCourses() {
+      if (!departmentId || !myPerson?.forgePersonId) {
+        setAcademyTraining([]);
+        return;
+      }
+      try {
+        const result = await listMyAcademyTraining(departmentId, {
+          personnelId: myPerson.id,
+          forgePersonId: myPerson.forgePersonId,
+        });
+        if (!cancelled) {
+          setAcademyTraining(Array.isArray(result.training) ? result.training : []);
+        }
+      } catch {
+        if (!cancelled) setAcademyTraining([]);
+      }
+    }
+
+    loadAcademyCourses();
+    return () => {
+      cancelled = true;
+    };
+  }, [departmentId, myPerson?.id, myPerson?.forgePersonId, current]);
 
   useEffect(() => {
     let cancelled = false;
@@ -284,10 +313,19 @@ export default function EmployeePortalPage({
     [certifications, membership, myPerson]
   );
 
-  const myTraining = useMemo(
-    () => training.filter((item) => trainingBelongsToEmployee(item, membership, myPerson)),
-    [training, membership, myPerson]
-  );
+  const myTraining = useMemo(() => {
+    const fromList = training.filter((item) => trainingBelongsToEmployee(item, membership, myPerson));
+    const merged = [...fromList];
+    for (const row of academyTraining) {
+      const already = merged.some(
+        (item) =>
+          item.id === row.id
+          || (row.registrationId && item.registrationId === row.registrationId)
+      );
+      if (!already) merged.push(row);
+    }
+    return merged.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  }, [training, academyTraining, membership, myPerson]);
 
   const myDocs = useMemo(
     () => documents.filter((item) => item.acknowledgementStatus === "Pending"),
@@ -1045,7 +1083,17 @@ export default function EmployeePortalPage({
         <Panel title="My Training" icon={Activity}>
           <div className="training-table">
             <div className="training-row training-head"><span>Course</span><span>Date</span><span>Completion</span><span>Status</span></div>
-            {myTraining.map((item) => <div className="training-row" key={item.id}><span>{item.course}</span><span>{item.date}</span><span>{item.completion}%</span><span>{item.status}</span></div>)}
+            {myTraining.map((item) => (
+              <div className="training-row" key={item.id}>
+                <span>
+                  {item.course}
+                  {item.source === "forge_academy" ? <small className="muted"> · Academy</small> : null}
+                </span>
+                <span>{item.date}</span>
+                <span>{item.completion}%</span>
+                <span>{item.status}</span>
+              </div>
+            ))}
             {!myTraining.length && <p className="empty-table">No training assigned to your shift or profile yet.</p>}
           </div>
         </Panel>

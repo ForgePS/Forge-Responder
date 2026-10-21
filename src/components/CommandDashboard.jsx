@@ -111,7 +111,7 @@ export default function CommandDashboard({
     ["Training Compliance", `${metrics.trainingCompliance}%`, "Department-wide", metrics.trainingCompliance >= 85 ? "success" : "warning", GraduationCap, "Training"],
     ["Units Available", metrics.unitsAvailable, `of ${apparatus.length} Total`, "success", Truck, "Apparatus"],
     ["Units Out of Service", metrics.unitsOos, "Fleet Status", metrics.unitsOos ? "critical" : "success", Wrench, "Maintenance"],
-    ["Inspections Due", metrics.inspectionsDue, "Prevention Queue", "warning", ClipboardCheck, "Inspections"],
+    ["Inspections Due", metrics.inspectionsDue, "Prevention Queue", "warning", ClipboardCheck, "Inspections Dashboard"],
     ["Open Tasks", metrics.openTasks, "Across All Areas", "info", Activity, "Dashboard"]
   ];
 
@@ -135,7 +135,7 @@ export default function CommandDashboard({
     ...metrics.overdueInspections.slice(0, 2).map((item) => ({
       title: "Inspection follow-up",
       detail: item.occupancy,
-      target: "Inspections",
+      target: "Inspections Dashboard",
     })),
   ];
   if (metrics.pendingAcknowledgements) {

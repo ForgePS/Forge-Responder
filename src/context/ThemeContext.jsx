@@ -14,7 +14,7 @@ function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", normalized);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    meta.setAttribute("content", normalized === "dark" ? "#000000" : "#eef1f6");
+    meta.setAttribute("content", normalized === "dark" ? "#111827" : "#eef2f6");
   }
 }
 

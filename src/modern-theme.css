@@ -101,7 +101,7 @@ html[data-theme="dark"] .top-brand img {
 
 .nav-label {
   padding: 7px 8px 3px;
-  color: var(--rms-text-subtle);
+  color: var(--rms-text-body);
   font-size: 14px;
   text-transform: none;
   letter-spacing: normal;

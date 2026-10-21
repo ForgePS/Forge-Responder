@@ -42,13 +42,27 @@ import { PLATFORM_SCOPE_ID } from "./lib/tenantPaths.js";
 import { FORGE_ACADEMY_CLASS_SCHEDULE_URL } from "./lib/platformUrls.js";
 import {
   Activity, AlertTriangle, Ambulance, Archive, BarChart3, Bell, BookOpen, CalendarDays, Check,
-  ChevronLeft, ChevronRight, ClipboardCheck, Clock3, Edit3, ExternalLink, FileCheck2, FileText, Gauge,
-  GraduationCap, HardHat, Home, Lock, Mail, MapPin, Menu, MonitorPlay, PackageSearch, Phone, Save, Search,
-  Settings, ShieldCheck, Trash2, Truck, Upload, UploadCloud, UserRound, Users, Wrench, X, CirclePlus
+  ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, Clock3, DollarSign, Droplets, Edit3, ExternalLink, FileBarChart2, FileCheck2, FileText, Gauge,
+  GraduationCap, HardHat, Home, Landmark, LayoutList, Lock, Mail, Map, MapPin, Menu, MonitorPlay, PackageSearch, Phone, Save, Search,
+  Settings, Settings2, ShieldCheck, Store, Trash2, Truck, Upload, UploadCloud, UserRound, Users, Wifi, Wrench, X, CirclePlus, Gavel, Flame, Zap
 } from "lucide-react";
 import InternalEmailBoardPage from "./pages/InternalEmailBoardPage.jsx";
 import DigitalDashboardPage from "./pages/DigitalDashboardPage.jsx";
-import { filterNavByEnabledModules } from "./lib/navFilter.js";
+import { filterNavByEnabledModules, filterNavByCodeLibraryAccess } from "./lib/navFilter.js";
+import {
+  filterNavGroupsByPreplanFeatures,
+  getDepartmentPreplanFeatures,
+  resolveEffectivePreplanFeatures,
+} from "./lib/inspections/index.js";
+import { getDepartmentCodeLibraryAccess } from "./lib/codeLibrary/accessService.js";
+import {
+  PREVENTION_NAV_TREE,
+  findActiveNavBranchIds,
+  isNavBranch,
+  navNodeKey,
+  navNodeLabel,
+} from "./data/preventionNav.js";
+import { groupContainsRoute, groupHasNavTree } from "./lib/navTree.js";
 import { employeePortalNavGroups, filterEmployeePortalNav } from "./data/employeePortalNav.js";
 import CommandDashboard from "./components/CommandDashboard.jsx";
 import DailyLogPage from "./pages/DailyLogPage.jsx";
@@ -115,6 +129,10 @@ import ObjectLifecycleActions from "./components/ObjectLifecycleActions.jsx";
 import { listUserNotifications, markNotificationRead } from "./lib/notificationService.js";
 import { vacancyPickupStatusDetail } from "./lib/vacancyPickupWorkflow.js";
 import HydrantTestingPage from "./pages/HydrantTestingPage.jsx";
+import HydrantDamageReportsPage from "./pages/HydrantDamageReportsPage.jsx";
+import WaterCompanyDirectoryPage from "./pages/WaterCompanyDirectoryPage.jsx";
+import WaterDistrictsPage from "./pages/WaterDistrictsPage.jsx";
+import HydrantDamageAnalyticsPage from "./pages/HydrantDamageAnalyticsPage.jsx";
 import NerisFireReportsPage from "./pages/NerisFireReportsPage.jsx";
 import NerisAnalyticsPage from "./pages/NerisAnalyticsPage.jsx";
 import { resolveInitialHydrantTab, resolveInitialAppModule, shouldOpenHydrantsModule } from "./lib/hydrantAppRouting.js";
@@ -124,15 +142,88 @@ import {
   DocumentsPage,
   HoseTestingPage,
   InspectionsPage,
-  OccupanciesPage,
-  PreplansPage
 } from "./pages/SprintModulePages.jsx";
+import {
+  AllInspectionsPage,
+  InspectionsDashboardPage,
+  InspectionsWorkQueuePage,
+  MyInspectionsPage,
+} from "./pages/InspectionsModulePages.jsx";
+import {
+  AllPreplansPage,
+  NewPreplanPage,
+  PreplansPage,
+  PreplansWorkQueuePage,
+} from "./pages/PreplansModulePages.jsx";
+import PreplanOperationalPage from "./pages/PreplanOperationalPage.jsx";
+import OccupanciesMasterPage from "./pages/OccupanciesMasterPage.jsx";
+import InspectionConfigStudioPage from "./pages/InspectionConfigStudioPage.jsx";
+import ViolationsPage from "./pages/ViolationsPage.jsx";
+import InspectionNoticesPage from "./pages/InspectionNoticesPage.jsx";
+import InspectionEnforcementPage from "./pages/InspectionEnforcementPage.jsx";
+import FireProtectionSystemsPage from "./pages/FireProtectionSystemsPage.jsx";
+import InspectionFeesPage from "./pages/InspectionFeesPage.jsx";
+import InspectionReportsPage from "./pages/InspectionReportsPage.jsx";
+import InspectionOfflinePage from "./pages/InspectionOfflinePage.jsx";
+import InspectionAutomationPage from "./pages/InspectionAutomationPage.jsx";
+import InspectionHardeningPage from "./pages/InspectionHardeningPage.jsx";
+import {
+  AdoptedCodesPage,
+  CodeAdministrationPage,
+  CodeLibraryBrowsePage,
+  CodeLibrarySavedPage,
+  LocalAmendmentsLibraryPage,
+} from "./pages/CodeLibraryPages.jsx";
+import FleetDashboardPage from "./pages/FleetDashboardPage.jsx";
+import FleetAssetsMasterPage from "./pages/FleetAssetsMasterPage.jsx";
+import FleetConfigStudioPage from "./pages/FleetConfigStudioPage.jsx";
+import FleetReadinessBoardPage from "./pages/FleetReadinessBoardPage.jsx";
+import FleetDefectsPage from "./pages/FleetDefectsPage.jsx";
+import FleetWorkOrdersPage from "./pages/FleetWorkOrdersPage.jsx";
+import FleetPmForecastPage from "./pages/FleetPmForecastPage.jsx";
+import FleetTestsPage from "./pages/FleetTestsPage.jsx";
+import FleetFuelEnergyPage from "./pages/FleetFuelEnergyPage.jsx";
+import FleetComponentsWarrantyPage from "./pages/FleetComponentsWarrantyPage.jsx";
+import FleetOperationsPage from "./pages/FleetOperationsPage.jsx";
+import FleetAccidentRiskPage from "./pages/FleetAccidentRiskPage.jsx";
+import FleetProcurementPage from "./pages/FleetProcurementPage.jsx";
+import FleetCostReplacementPage from "./pages/FleetCostReplacementPage.jsx";
+import FleetReportingPage from "./pages/FleetReportingPage.jsx";
+import FleetHardeningPage from "./pages/FleetHardeningPage.jsx";
+import FleetVendorPortalPage from "./pages/FleetVendorPortalPage.jsx";
+import { loadFleetSettings } from "./lib/fleet/index.js";
 
 const navGroups = [
   { label: "", items: [["Dashboard", Home]] },
   { label: "RMS", items: [["Personnel", Users], ["Certifications", FileCheck2], ["Training", BookOpen], ["Academy Class Schedule", GraduationCap, FORGE_ACADEMY_CLASS_SCHEDULE_URL], ["Scheduling", CalendarDays], ["Time Sheets", Clock3], ["Daily Log", ClipboardCheck]] },
-  { label: "Fleet", items: [["Apparatus", Truck], ["Assets", PackageSearch], ["Maintenance", Wrench], ["Hose Testing", Gauge]] },
-  { label: "Prevention", items: [["Occupancies", Archive], ["Inspections", ClipboardCheck], ["Preplans", ShieldCheck], ["Hydrants", Activity]] },
+  { label: "Fleet", items: [
+    ["Fleet Dashboard", Truck],
+    ["Readiness Board", ClipboardCheck],
+    ["Fleet Defects", AlertTriangle],
+    ["Fleet Work Orders", Wrench],
+    ["PM Forecast", CalendarDays],
+    ["Fleet Tests", Gauge],
+    ["Fuel & Energy", Activity],
+    ["Components & Warranty", ShieldCheck],
+    ["Fleet Operations", MapPin],
+    ["Accident & Risk", AlertTriangle],
+    ["Fleet Procurement", Landmark],
+    ["Cost & Replacement", DollarSign],
+    ["Reporting & Automation", FileBarChart2],
+    ["Vendor Portal", Store],
+    ["Fleet Hardening", ShieldCheck],
+    ["All Fleet Assets", LayoutList],
+    ["Fleet Configuration Studio", Settings2],
+    ["Apparatus", Truck],
+    ["Assets", PackageSearch],
+    ["Maintenance", Wrench],
+    ["Hose Testing", Gauge],
+  ] },
+  {
+    label: "Prevention",
+    tree: PREVENTION_NAV_TREE,
+    items: [],
+  },
   { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["NERIS Analytics", BarChart3]] },
   { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Uploads", Upload]] },
   { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay]] },
@@ -147,7 +238,7 @@ const kpis = [
   ["Training Compliance", "87%", "↑ 6% vs Last Month", "success", GraduationCap, "Training"],
   ["Units Available", "12", "of 18 Total", "info", Truck, "Apparatus"],
   ["Units Out of Service", "6", "33% of Fleet", "critical", Wrench, "Maintenance"],
-  ["Inspections Due", "27", "Next 30 Days", "warning", ClipboardCheck, "Inspections"],
+  ["Inspections Due", "27", "Next 30 Days", "warning", ClipboardCheck, "Inspections Dashboard"],
   ["Open Tasks", "64", "Across All Areas", "info", FileCheck2, "Dashboard"]
 ];
 
@@ -157,7 +248,7 @@ const moduleData = {
   Training: { icon: BookOpen, description: "Events, attendance, hours, categories, and compliance tracking.", columns: ["Training Event", "Category", "Date", "Attendees", "Status"], rows: [["Live Fire Evolution", "Fire", "Jun 10", "18 / 24", "Scheduled"], ["Pediatric Airway", "EMS CE", "Jun 14", "12 / 18", "Scheduled"], ["Driver Operations", "Driver", "Jun 20", "9 / 12", "Scheduled"], ["HazMat Refresher", "Fire", "May 28", "21 / 24", "Complete"]] },
   Scheduling: { icon: CalendarDays, description: "A/B/C shift calendar, daily roster, apparatus assignments, leave, and overtime.", columns: ["Date", "Shift", "Staffed", "Minimum", "Coverage"], rows: [["Jun 7", "A Shift", "21", "21", "Complete"], ["Jun 8", "B Shift", "20", "21", "Deficit"], ["Jun 9", "C Shift", "22", "21", "Complete"], ["Jun 10", "A Shift", "21", "21", "Complete"]] },
   Apparatus: { icon: Truck, description: "Unit readiness, mileage, engine hours, pump hours, and repair history.", columns: ["Unit", "Type", "Mileage", "PM Due", "Status"], rows: [["Engine 1", "Pumper", "31,820", "Aug 2026", "In Service"], ["Engine 2", "Pumper", "44,091", "Jul 2026", "In Service"], ["Truck 3", "Ladder", "26,445", "Jun 2026", "PM Due"], ["Rescue 1", "Rescue", "19,230", "Sep 2026", "In Service"]] },
-  Inspections: { icon: ClipboardCheck, description: "Inspection queue, violations, reinspection dates, and occupancy history.", columns: ["Occupancy", "Inspection", "Due", "Inspector", "Status"], rows: [["Horn Lake High School", "Annual", "Jun 12", "J. Mitchell", "Scheduled"], ["Logan's Roadhouse", "Reinspection", "Jun 8", "J. Mitchell", "Overdue"], ["Amazon Distribution", "Annual", "Jun 21", "J. Wade", "Scheduled"], ["Comfort Inn", "Reinspection", "Jun 15", "J. Wade", "Pending Review"]] },
+  Inspections: { icon: ClipboardCheck, description: "Inspection queue, violations, reinspection dates, and occupancy history.", columns: ["Occupancy", "Inspection", "Due", "Inspector", "Status"], rows: [["Central High School", "Annual", "Jun 12", "J. Mitchell", "Scheduled"], ["Logan's Roadhouse", "Reinspection", "Jun 8", "J. Mitchell", "Overdue"], ["Amazon Distribution", "Annual", "Jun 21", "J. Wade", "Scheduled"], ["Comfort Inn", "Reinspection", "Jun 15", "J. Wade", "Pending Review"]] },
   Hydrants: { icon: Activity, description: "Hydrant records, flow tests, inspections, district assignments, and readiness.", columns: ["Hydrant", "District", "Last Tested", "Flow Class", "Status"], rows: [["HL-1042", "1", "May 14, 2026", "Class AA", "Complete"], ["HL-1178", "2", "Apr 30, 2026", "Class A", "Complete"], ["HL-1281", "3", "Not tested", "Unknown", "Due Soon"], ["HL-1307P", "2", "Private", "Private", "Active"]] }
 };
 
@@ -174,7 +265,101 @@ function Badge({ children, tone = "neutral" }) {
   return <span className={`badge badge-${toneFromStatus(children, tone)}`}>{children}</span>;
 }
 
+const NAV_SECTIONS_STORAGE_KEY = "rms-nav-sections-collapsed";
+const NAV_NESTED_STORAGE_KEY = "rms-nav-nested-collapsed";
+
+function navSectionKey(group, index) {
+  return group.label ? group.label : `section-${index}`;
+}
+
+function navSectionTitle(group, index) {
+  if (group.label) return group.label;
+  if (groupHasNavTree(group) && group.tree?.length === 1) return group.tree[0].label || "Section";
+  if (group.items?.length === 1) return group.items[0][0];
+  return index === 0 ? "Home" : "System";
+}
+
+function readCollapsedNavSections() {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(NAV_SECTIONS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function readCollapsedNestedNav() {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(NAV_NESTED_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistJson(key, value) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGroups }) {
+  const [collapsedSections, setCollapsedSections] = useState(readCollapsedNavSections);
+  const [collapsedNested, setCollapsedNested] = useState(readCollapsedNestedNav);
+
+  useEffect(() => {
+    const activeIndex = groups.findIndex((group) => groupContainsRoute(group, current));
+    if (activeIndex < 0) return;
+    const key = navSectionKey(groups[activeIndex], activeIndex);
+    setCollapsedSections((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev, [key]: false };
+      persistJson(NAV_SECTIONS_STORAGE_KEY, next);
+      return next;
+    });
+
+    const activeGroup = groups[activeIndex];
+    if (groupHasNavTree(activeGroup)) {
+      const branchIds = findActiveNavBranchIds(activeGroup.tree, current);
+      if (!branchIds.length) return;
+      setCollapsedNested((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const id of branchIds) {
+          if (next[id]) {
+            next[id] = false;
+            changed = true;
+          }
+        }
+        if (!changed) return prev;
+        persistJson(NAV_NESTED_STORAGE_KEY, next);
+        return next;
+      });
+    }
+  }, [current, groups]);
+
+  function toggleSection(key) {
+    setCollapsedSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      persistJson(NAV_SECTIONS_STORAGE_KEY, next);
+      return next;
+    });
+  }
+
+  function toggleNested(id) {
+    setCollapsedNested((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      persistJson(NAV_NESTED_STORAGE_KEY, next);
+      return next;
+    });
+  }
+
   function handleNavClick(name, externalUrl) {
     const url = typeof externalUrl === "string" ? externalUrl.trim() : "";
     if (/^https?:\/\//i.test(url)) {
@@ -188,10 +373,143 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
     onNavigate(name);
   }
 
-  return <aside className={`side-nav ${collapsed ? "collapsed" : ""}`}>
-    <nav>{groups.map((group, index) => <section key={`${group.label}-${index}`}>{!collapsed && group.label && <span className="nav-label">{group.label}</span>}{group.items.map(([name, Icon, externalUrl]) => { const NavIcon = typeof Icon === "function" ? Icon : ShieldCheck; const isExternal = (typeof externalUrl === "string" && /^https?:\/\//i.test(externalUrl)) || name === "Academy Class Schedule"; return <button key={name} className={!isExternal && current === name ? "nav-item active" : "nav-item"} onClick={() => handleNavClick(name, externalUrl)} title={isExternal ? `${name} (opens Academy)` : name}><NavIcon size={15} /><span>{name}</span>{isExternal && !collapsed ? <ExternalLink size={12} className="nav-external-icon" aria-hidden /> : null}</button>; })}</section>)}</nav>
-    <button className="nav-collapse" onClick={() => setCollapsed(!collapsed)}>{collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}</button>
-  </aside>;
+  function renderNavTree(nodes, depth = 0) {
+    return (nodes || []).map((node) => {
+      if (isNavBranch(node)) {
+        const branchId = node.id || node.label;
+        const isBranchCollapsed = collapsedNested[branchId] === undefined
+          ? true
+          : Boolean(collapsedNested[branchId]);
+        const hasActive = branchContainsRoute(node, current);
+        const BranchIcon = typeof node.icon === "function" ? node.icon : ShieldCheck;
+        return (
+          <div
+            key={navNodeKey(node)}
+            className={`nav-branch depth-${depth}${hasActive ? " has-active" : ""}`}
+            style={{ "--nav-depth": depth }}
+          >
+            {!collapsed ? (
+              <button
+                type="button"
+                className={`nav-item nav-branch-toggle${hasActive ? " has-active" : ""}`}
+                aria-expanded={!isBranchCollapsed}
+                aria-controls={`nav-branch-${branchId}`}
+                id={`nav-branch-btn-${branchId}`}
+                onClick={() => toggleNested(branchId)}
+              >
+                <BranchIcon size={15} aria-hidden />
+                <span>{navNodeLabel(node)}</span>
+                <ChevronDown size={14} className="nav-branch-chevron" aria-hidden />
+              </button>
+            ) : null}
+            <div
+              id={`nav-branch-${branchId}`}
+              className="nav-branch-items"
+              role="group"
+              aria-labelledby={!collapsed ? `nav-branch-btn-${branchId}` : undefined}
+              hidden={isBranchCollapsed && !collapsed}
+            >
+              {renderNavTree(node.children, depth + 1)}
+            </div>
+          </div>
+        );
+      }
+
+      const NavIcon = typeof node.icon === "function" ? node.icon : ShieldCheck;
+      const isExternal =
+        (typeof node.externalUrl === "string" && /^https?:\/\//i.test(node.externalUrl))
+        || node.name === "Academy Class Schedule";
+      const display = navNodeLabel(node);
+      return (
+        <button
+          key={navNodeKey(node)}
+          type="button"
+          className={!isExternal && current === node.name ? "nav-item active" : "nav-item"}
+          style={{ "--nav-depth": depth }}
+          onClick={() => handleNavClick(node.name, node.externalUrl)}
+          title={isExternal ? `${display} (opens Academy)` : display}
+          aria-current={!isExternal && current === node.name ? "page" : undefined}
+        >
+          <NavIcon size={15} aria-hidden />
+          <span>{display}</span>
+          {isExternal && !collapsed ? (
+            <ExternalLink size={12} className="nav-external-icon" aria-hidden />
+          ) : null}
+        </button>
+      );
+    });
+  }
+
+  function branchContainsRoute(branch, routeName) {
+    if (!routeName || !branch) return false;
+    if (!isNavBranch(branch)) return branch.name === routeName;
+    return (branch.children || []).some((child) => branchContainsRoute(child, routeName));
+  }
+
+  return (
+    <aside className={`side-nav ${collapsed ? "collapsed" : ""}`}>
+      <nav aria-label="Primary">
+        {groups.map((group, index) => {
+          const key = navSectionKey(group, index);
+          const title = navSectionTitle(group, index);
+          const isSectionCollapsed = Boolean(collapsedSections[key]);
+          const showHeader = Boolean(group.label) || groupHasNavTree(group) || (group.items?.length || 0) > 1;
+          const sectionHasActive = groupContainsRoute(group, current);
+
+          return (
+            <section
+              key={key}
+              className={[
+                isSectionCollapsed && !collapsed ? "is-collapsed" : "",
+                sectionHasActive ? "has-active" : "",
+              ].filter(Boolean).join(" ") || undefined}
+            >
+              {!collapsed && showHeader ? (
+                <button
+                  type="button"
+                  className={`nav-section-toggle${sectionHasActive ? " has-active" : ""}`}
+                  aria-expanded={!isSectionCollapsed}
+                  onClick={() => toggleSection(key)}
+                >
+                  <span className="nav-label">{title}</span>
+                  <ChevronDown size={14} aria-hidden />
+                </button>
+              ) : null}
+              <div className="nav-section-items" hidden={isSectionCollapsed && !collapsed}>
+                {groupHasNavTree(group)
+                  ? renderNavTree(group.tree, 0)
+                  : group.items.map(([name, Icon, externalUrl]) => {
+                      const NavIcon = typeof Icon === "function" ? Icon : ShieldCheck;
+                      const isExternal =
+                        (typeof externalUrl === "string" && /^https?:\/\//i.test(externalUrl))
+                        || name === "Academy Class Schedule";
+                      return (
+                        <button
+                          key={name}
+                          className={!isExternal && current === name ? "nav-item active" : "nav-item"}
+                          onClick={() => handleNavClick(name, externalUrl)}
+                          title={isExternal ? `${name} (opens Academy)` : name}
+                          type="button"
+                          aria-current={!isExternal && current === name ? "page" : undefined}
+                        >
+                          <NavIcon size={15} aria-hidden />
+                          <span>{name}</span>
+                          {isExternal && !collapsed ? (
+                            <ExternalLink size={12} className="nav-external-icon" aria-hidden />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+              </div>
+            </section>
+          );
+        })}
+      </nav>
+      <button className="nav-collapse" type="button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}>
+        {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+      </button>
+    </aside>
+  );
 }
 
 function NotificationBell({ departmentId, userId }) {
@@ -1556,7 +1874,15 @@ function FleetSummary({ items }) {
   return <section className="fleet-summary">{items.map(([label, value, tone]) => <div key={label} className={`fleet-stat stat-${tone}`}><strong>{value}</strong><span>{label}</span></div>)}</section>;
 }
 
-function ApparatusPage({ units = [], setUnits, workOrders = [], setWorkOrders, canEdit = false }) {
+function ApparatusPage({
+  units = [],
+  setUnits,
+  workOrders = [],
+  setWorkOrders,
+  canEdit = false,
+  legacyWritesLocked = false,
+  onOpenFleetAssets,
+}) {
   const { getOptions } = useDropdowns();
   const [selectedId, setSelectedId] = useState(units[0]?.id || "");
   const [showWorkOrder, setShowWorkOrder] = useState(false);
@@ -1584,10 +1910,12 @@ function ApparatusPage({ units = [], setUnits, workOrders = [], setWorkOrders, c
   }
   const unitOrders = workOrders.filter((order) => order.unit === selected.unit);
   function updateStatus(status) {
+    if (!canEdit) return;
     setUnits((current) => current.map((unit) => unit.id === selected.id ? { ...unit, status } : unit));
     setMessage(`${selected.unit} status updated to ${status}`);
   }
   function completeCheck(checkName) {
+    if (!canEdit) return;
     setUnits((current) => current.map((unit) => unit.id === selected.id ? { ...unit, checks: unit.checks.map(([name, status]) => name === checkName ? [name, "Complete"] : [name, status]) } : unit));
     setMessage(`${checkName} marked complete`);
   }
@@ -1624,6 +1952,15 @@ function ApparatusPage({ units = [], setUnits, workOrders = [], setWorkOrders, c
   }
   return <div className="module-page apparatus-page">
     <section className="module-heading"><div><span className="module-icon"><Truck size={22} /></span><div><h1>Apparatus</h1><p>Unit readiness, daily checks, operating metrics, service history, and repair requests.</p></div></div><div className="heading-actions">{canEdit && <button type="button" className="secondary-button" onClick={addUnit}><CirclePlus size={14} /> Add Unit</button>}<button className="secondary-button">Fleet Report</button><button className="primary-button" onClick={() => setShowWorkOrder(true)}><CirclePlus size={14} /> New Work Order</button></div></section>
+    {legacyWritesLocked ? (
+      <div className="warning-banner" role="status">
+        Classic Apparatus list edits are locked after Fleet migration cutover.
+        {" "}
+        {typeof onOpenFleetAssets === "function" ? (
+          <button type="button" className="text-button" onClick={onOpenFleetAssets}>Open All Fleet Assets</button>
+        ) : null}
+      </div>
+    ) : null}
     <FleetSummary items={[["Total Units", units.length, "info"], ["In Service", units.filter((unit) => unit.status === "In Service").length, "success"], ["Out of Service", units.filter((unit) => unit.status === "Out of Service").length, "critical"], ["PM / Inspection Due", units.filter((unit) => /Due/.test(unit.status)).length, "warning"], ["Reserve", units.filter((unit) => unit.status === "Reserve").length, "neutral"]]} />
     {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}><X size={13} /></button></div>}
     <section className="fleet-workspace">
@@ -1653,7 +1990,7 @@ function ApparatusPage({ units = [], setUnits, workOrders = [], setWorkOrders, c
         </div>
       </Panel>
       <section className="fleet-detail">
-        <header className="profile-header"><div className="profile-identity"><span className="unit-icon large"><Truck size={24} /></span><div><h2>{selected.unit}</h2><p>{selected.year} {selected.type} - {selected.station}</p><div><Badge>{selected.status}</Badge></div></div></div><div className="heading-actions">{canEdit && <button type="button" className="secondary-button" onClick={() => setShowEdit(true)}>Edit Unit</button>}<select className="status-select" value={selected.status} onChange={(event) => updateStatus(event.target.value)}>{["In Service", "Out of Service", "PM Due", "Reserve"].map((status) => <option key={status}>{status}</option>)}</select></div></header>
+        <header className="profile-header"><div className="profile-identity"><span className="unit-icon large"><Truck size={24} /></span><div><h2>{selected.unit}</h2><p>{selected.year} {selected.type} - {selected.station}</p><div><Badge>{selected.status}</Badge></div></div></div><div className="heading-actions">{canEdit && <button type="button" className="secondary-button" onClick={() => setShowEdit(true)}>Edit Unit</button>}<select className="status-select" value={selected.status} disabled={!canEdit} onChange={(event) => updateStatus(event.target.value)}>{["In Service", "Out of Service", "PM Due", "Reserve"].map((status) => <option key={status}>{status}</option>)}</select></div></header>
         <section className="metric-strip">{[["Mileage", selected.mileage], ["Engine Hours", selected.engineHours], ["Pump Hours", selected.pumpHours], ["PM Due", selected.pmDue]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</section>
         <div className="fleet-detail-grid">
           <Panel title="Readiness Checks" icon={ClipboardCheck}><div className="check-list">{selected.checks.map(([name, status]) => <div key={name}><span>{name}</span><Badge>{status}</Badge>{status !== "Complete" && <button className="row-action" onClick={() => completeCheck(name)}>Complete</button>}</div>)}</div></Panel>
@@ -1777,14 +2114,62 @@ function AppShell() {
   const [schedulingTab, setSchedulingTab] = useState(null);
   const clearSchedulingTab = useCallback(() => setSchedulingTab(null), []);
   const deepLinkAppliedRef = useRef(Boolean(initialDeepLink?.module));
+  const [codeLibraryAccess, setCodeLibraryAccess] = useState(null);
+  const [preplanFeatures, setPreplanFeatures] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!departmentId || isPlatformScope(departmentId)) {
+      setCodeLibraryAccess(null);
+      return undefined;
+    }
+    getDepartmentCodeLibraryAccess(departmentId)
+      .then((access) => {
+        if (active) setCodeLibraryAccess(access);
+      })
+      .catch(() => {
+        if (active) setCodeLibraryAccess({ moduleEnabled: false, enabledPublicationIds: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, [departmentId]);
+
+  useEffect(() => {
+    let active = true;
+    if (!departmentId || isPlatformScope(departmentId)) {
+      setPreplanFeatures(null);
+      return undefined;
+    }
+    getDepartmentPreplanFeatures(departmentId)
+      .then((features) => {
+        if (active) {
+          setPreplanFeatures(
+            resolveEffectivePreplanFeatures(features, platformConfig?.availablePreplanFeatures),
+          );
+        }
+      })
+      .catch(() => {
+        if (active) setPreplanFeatures(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [departmentId, platformConfig?.availablePreplanFeatures]);
+
   const visibleNavGroups = useMemo(() => {
     const permissionFiltered = filterNavGroups(navGroups, permissions, { isCreator });
-    return filterNavByEnabledModules(permissionFiltered, isModuleEnabled, {
+    const moduleFiltered = filterNavByEnabledModules(permissionFiltered, isModuleEnabled, {
       isCreator,
       isPlatformScope: inPlatformScope,
       isPlatformCreator: Boolean(membership?.isPlatformCreator)
     });
-  }, [permissions, isCreator, isModuleEnabled, inPlatformScope, membership?.isPlatformCreator]);
+    const codeFiltered = filterNavByCodeLibraryAccess(moduleFiltered, codeLibraryAccess, {
+      isCreator,
+      isPlatformCreator: Boolean(membership?.isPlatformCreator),
+    });
+    return filterNavGroupsByPreplanFeatures(codeFiltered, preplanFeatures || {}, { isCreator });
+  }, [permissions, isCreator, isModuleEnabled, inPlatformScope, membership?.isPlatformCreator, codeLibraryAccess, preplanFeatures]);
   const canViewInternalEmail = hasPermission(permissions, "viewInternalEmail");
   const canViewDailyLog = hasPermission(permissions, "viewDailyLog");
   const visibleEmployeeNavGroups = useMemo(
@@ -1866,6 +2251,39 @@ function AppShell() {
   const [training, setTraining] = useTenantPersistentState(departmentId, LIST_KEYS.training, getTenantListFallback(departmentId, LIST_KEYS.training));
   const [apparatus, setApparatus] = useTenantPersistentState(departmentId, LIST_KEYS.apparatus, getTenantListFallback(departmentId, LIST_KEYS.apparatus));
   const [workOrders, setWorkOrders] = useTenantPersistentState(departmentId, LIST_KEYS.workOrders, getTenantListFallback(departmentId, LIST_KEYS.workOrders));
+  const [fleetCutover, setFleetCutover] = useState({
+    redirectApparatusToFleetAssets: false,
+    legacyApparatusWritesLocked: false,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!departmentId || isPlatformScope(departmentId)) {
+      setFleetCutover({
+        redirectApparatusToFleetAssets: false,
+        legacyApparatusWritesLocked: false,
+      });
+      return undefined;
+    }
+    loadFleetSettings(departmentId)
+      .then((next) => {
+        if (cancelled) return;
+        setFleetCutover({
+          redirectApparatusToFleetAssets: Boolean(next.redirectApparatusToFleetAssets),
+          legacyApparatusWritesLocked: Boolean(next.legacyApparatusWritesLocked),
+        });
+      })
+      .catch(() => null);
+    return () => {
+      cancelled = true;
+    };
+  }, [departmentId]);
+
+  useEffect(() => {
+    if (current === "Apparatus" && fleetCutover.redirectApparatusToFleetAssets) {
+      setCurrent("All Fleet Assets");
+    }
+  }, [current, fleetCutover.redirectApparatusToFleetAssets]);
   const [assets, setAssets] = useTenantPersistentState(departmentId, LIST_KEYS.assets, getTenantListFallback(departmentId, LIST_KEYS.assets));
   const [documents, setDocuments] = useTenantPersistentState(departmentId, LIST_KEYS.documents, getTenantListFallback(departmentId, LIST_KEYS.documents));
   const [occupancies, setOccupancies] = useTenantPersistentState(departmentId, LIST_KEYS.occupancies, getTenantListFallback(departmentId, LIST_KEYS.occupancies));
@@ -1889,7 +2307,7 @@ function AppShell() {
   const [dailyLogs, setDailyLogs] = useTenantPersistentState(departmentId, LIST_KEYS.dailyLogs, getTenantListFallback(departmentId, LIST_KEYS.dailyLogs));
   const [timeCards, setTimeCards] = useTenantPersistentState(departmentId, LIST_KEYS.timeCards, getTenantListFallback(departmentId, LIST_KEYS.timeCards));
   const [nerisFireReports, setNerisFireReports] = useTenantPersistentState(departmentId, LIST_KEYS.nerisFireReports, getTenantListFallback(departmentId, LIST_KEYS.nerisFireReports));
-  const isHydrantsView = current === "Hydrants";
+  const isHydrantsView = current === "Hydrants" || current === "Hydrant Overview";
   const showPlatformBrand = inPlatformScope || current === "Creator Console";
   const headerProfile = showPlatformBrand
     ? {
@@ -2207,7 +2625,147 @@ function AppShell() {
       />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Apparatus" ? (
-    hasPermission(permissions, "viewApparatus") ? <ApparatusPage units={apparatus} setUnits={setApparatus} workOrders={workOrders} setWorkOrders={setWorkOrders} canEdit={canEditApparatus(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "viewApparatus") ? (
+      <ApparatusPage
+        units={apparatus}
+        setUnits={fleetCutover.legacyApparatusWritesLocked ? () => {} : setApparatus}
+        workOrders={workOrders}
+        setWorkOrders={setWorkOrders}
+        canEdit={
+          canEditApparatus(permissions, isCreator)
+          && !fleetCutover.legacyApparatusWritesLocked
+        }
+        legacyWritesLocked={fleetCutover.legacyApparatusWritesLocked}
+        onOpenFleetAssets={() => setCurrent("All Fleet Assets")}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Dashboard" ? (
+    hasPermission(permissions, "viewFleetDashboard") || hasPermission(permissions, "viewApparatus") || isCreator
+      ? <FleetDashboardPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Readiness Board" ? (
+    hasPermission(permissions, "viewFleetReadiness")
+      || hasPermission(permissions, "viewFleetDashboard")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetReadinessBoardPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Defects" ? (
+    hasPermission(permissions, "viewFleetDefects")
+      || hasPermission(permissions, "viewFleetReadiness")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetDefectsPage query={query} onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Work Orders" ? (
+    hasPermission(permissions, "viewFleetWorkOrders")
+      || hasPermission(permissions, "viewFleetDefects")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? (
+        <FleetWorkOrdersPage
+          query={query}
+          onNavigate={setCurrent}
+          legacyApparatus={apparatus}
+          legacyWorkOrders={workOrders}
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "PM Forecast" ? (
+    hasPermission(permissions, "viewFleetPm")
+      || hasPermission(permissions, "viewFleetWorkOrders")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetPmForecastPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Tests" ? (
+    hasPermission(permissions, "viewFleetTests")
+      || hasPermission(permissions, "viewFleetPm")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? (
+        <FleetTestsPage
+          query={query}
+          onNavigate={setCurrent}
+          legacyApparatus={apparatus}
+          legacyHoseTests={hoseTests}
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fuel & Energy" ? (
+    hasPermission(permissions, "viewFleetFuel")
+      || hasPermission(permissions, "viewFleetTelematics")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetFuelEnergyPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Components & Warranty" ? (
+    hasPermission(permissions, "viewFleetComponents")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetComponentsWarrantyPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Operations" ? (
+    hasPermission(permissions, "viewFleetOperations")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetOperationsPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Accident & Risk" ? (
+    hasPermission(permissions, "viewFleetRisk")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetAccidentRiskPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Procurement" ? (
+    hasPermission(permissions, "viewFleetProcurement")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetProcurementPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Cost & Replacement" ? (
+    hasPermission(permissions, "viewFleetCost")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetCostReplacementPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Reporting & Automation" ? (
+    hasPermission(permissions, "viewFleetReporting")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetReportingPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Vendor Portal" ? (
+    hasPermission(permissions, "viewFleetVendorPortal")
+      || hasPermission(permissions, "viewFleetWorkOrders")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetVendorPortalPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Hardening" ? (
+    hasPermission(permissions, "manageFleetConfig")
+      || hasPermission(permissions, "manageSystemSettings")
+      || hasPermission(permissions, "viewFleetDashboard")
+      || isCreator
+      ? <FleetHardeningPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "All Fleet Assets" ? (
+    hasPermission(permissions, "viewFleetAssets") || hasPermission(permissions, "viewApparatus") || isCreator
+      ? <FleetAssetsMasterPage query={query} onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Configuration Studio" ? (
+    hasPermission(permissions, "manageFleetConfig")
+      || hasPermission(permissions, "manageSystemSettings")
+      || hasPermission(permissions, "editApparatus")
+      || isCreator
+      ? (
+        <FleetConfigStudioPage
+          onNavigate={setCurrent}
+          legacyApparatus={apparatus}
+          legacyWorkOrders={workOrders}
+        />
+      )
+      : <AccessDeniedModule name={current} />
   ) : current === "Maintenance" ? (
     hasPermission(permissions, "viewApparatus") ? <MaintenancePage orders={workOrders} setOrders={setWorkOrders} /> : <AccessDeniedModule name={current} />
   ) : current === "Assets" ? (
@@ -2215,11 +2773,201 @@ function AppShell() {
   ) : current === "Hose Testing" ? (
     hasPermission(permissions, "viewApparatus") ? <HoseTestingPage query={query} records={hoseTests} setRecords={setHoseTests} /> : <AccessDeniedModule name={current} />
   ) : current === "Occupancies" ? (
-    hasPermission(permissions, "viewInspections") ? <OccupanciesPage query={query} records={occupancies} setRecords={setOccupancies} /> : <AccessDeniedModule name={current} />
-  ) : current === "Inspections" ? (
+    hasPermission(permissions, "viewInspections") ? (
+      <OccupanciesMasterPage
+        query={query}
+        legacyRecords={occupancies}
+        onRecordsChange={setOccupancies}
+        onNavigate={setCurrent}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Configuration Studio" ? (
+    hasPermission(permissions, "manageInspectionConfig")
+      || hasPermission(permissions, "manageSystemSettings")
+      || hasPermission(permissions, "editInspections")
+      || isCreator
+      ? <InspectionConfigStudioPage />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Inspections Dashboard" || current === "Prevention Dashboard" ? (
+    hasPermission(permissions, "viewInspections") || hasPermission(permissions, "viewInspectionDashboard")
+      ? <InspectionsDashboardPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Work Queue" || current === "Prevention Work Queue" ? (
+    hasPermission(permissions, "viewInspections")
+      ? <InspectionsWorkQueuePage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "All Inspections" ? (
+    hasPermission(permissions, "viewInspections")
+      ? <AllInspectionsPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "My Inspections" ? (
+    hasPermission(permissions, "viewInspections")
+      ? <MyInspectionsPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Open Violations" ? (
+    hasPermission(permissions, "viewViolations") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <ViolationsPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Search Codes" ? (
+    hasPermission(permissions, "viewCodeLibrary") || hasPermission(permissions, "viewViolations") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <CodeLibraryBrowsePage mode="search" onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Browse Codes" ? (
+    hasPermission(permissions, "viewCodeLibrary") || hasPermission(permissions, "viewViolations") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <CodeLibraryBrowsePage mode="browse" onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Frequently Used" || current === "Saved Sections" ? (
+    hasPermission(permissions, "viewCodeLibrary") || hasPermission(permissions, "viewViolations") || isCreator
+      ? <CodeLibrarySavedPage />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Local Amendments" ? (
+    hasPermission(permissions, "viewCodeLibrary") || hasPermission(permissions, "manageInspectionConfig") || isCreator
+      ? <LocalAmendmentsLibraryPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Adopted Codes" ? (
+    hasPermission(permissions, "manageAdoptedCodes") || hasPermission(permissions, "manageInspectionConfig") || isCreator
+      ? <AdoptedCodesPage />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Code Administration" ? (
+    hasPermission(permissions, "manageCodeLibrary") || isCreator
+      ? <CodeAdministrationPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Notices & Certificates" ? (
+    hasPermission(permissions, "viewInspectionNotices")
+      || hasPermission(permissions, "viewInspections")
+      || hasPermission(permissions, "viewViolations")
+      || isCreator
+      ? <InspectionNoticesPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Enforcement" || current === "Enforcement Cases" ? (
+    hasPermission(permissions, "viewInspectionEnforcement")
+      || hasPermission(permissions, "viewInspections")
+      || hasPermission(permissions, "viewViolations")
+      || isCreator
+      ? <InspectionEnforcementPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fire Protection Systems" ? (
+    hasPermission(permissions, "viewFireProtectionSystems")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <FireProtectionSystemsPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fees & Payments" ? (
+    hasPermission(permissions, "viewInspectionFees")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <InspectionFeesPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Inspection Reports" ? (
+    hasPermission(permissions, "viewInspectionReports")
+      || hasPermission(permissions, "viewInspectionDashboard")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <InspectionReportsPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Offline & Sync" ? (
+    hasPermission(permissions, "viewInspectionOffline")
+      || hasPermission(permissions, "viewInspections")
+      || hasPermission(permissions, "conductInspections")
+      || isCreator
+      ? <InspectionOfflinePage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Automation & Integrations" ? (
+    hasPermission(permissions, "viewInspectionAutomation")
+      || hasPermission(permissions, "viewInspections")
+      || hasPermission(permissions, "manageInspectionConfig")
+      || isCreator
+      ? <InspectionAutomationPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Import & Hardening" || current === "Import & Data Quality" ? (
+    hasPermission(permissions, "viewInspectionHardening")
+      || hasPermission(permissions, "viewInspections")
+      || hasPermission(permissions, "manageInspectionConfig")
+      || isCreator
+      ? <InspectionHardeningPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Inspection Queue" || current === "Inspections" ? (
     hasPermission(permissions, "viewInspections") ? <InspectionsPage query={query} records={inspections} setRecords={setInspections} /> : <AccessDeniedModule name={current} />
+  ) : current === "New Preplan" ? (
+    hasPermission(permissions, "createPreplans")
+      || hasPermission(permissions, "editPreplans")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <NewPreplanPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Preplan Work Queue"
+    || current === "Preplan Dashboard"
+    || current === "My Preplans"
+    || current === "Draft Preplans"
+    || current === "Awaiting Review"
+    || current === "Approved Preplans"
+    || current === "Preplan Reports" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <PreplansWorkQueuePage onNavigate={setCurrent} queueFilter={current} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "All Preplans" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <AllPreplansPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Templates" ? (
+    hasPermission(permissions, "managePreplanConfig") || hasPermission(permissions, "manageInspectionConfig") || isCreator
+      ? (() => {
+        try {
+          window.sessionStorage.setItem("forge-config-studio-tab", "preplans");
+        } catch {
+          // ignore
+        }
+        return <InspectionConfigStudioPage />;
+      })()
+      : <AccessDeniedModule name={current} />
+  ) : current === "Nearby Preplans" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? (
+        <PreplanOperationalPage
+          onNavigate={setCurrent}
+          variant="nearby"
+          title="Nearby Preplans"
+          description="Operational preplans for response (map overlay comes with Phase 5)."
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "Target Hazards" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? (
+        <PreplanOperationalPage
+          onNavigate={setCurrent}
+          variant="targetHazards"
+          title="Target Hazards"
+          description="High-priority and target-hazard preplans."
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "Preplan Offline" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? (
+        <PreplanOperationalPage
+          onNavigate={setCurrent}
+          variant="offline"
+          title="Preplan Offline"
+          description="Offline packages and flush status for field devices."
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "QR Scan" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? (
+        <PreplanOperationalPage
+          onNavigate={setCurrent}
+          variant="qr"
+          title="QR Scan"
+          description="Authenticated QR access for published preplans."
+        />
+      )
+      : <AccessDeniedModule name={current} />
   ) : current === "Preplans" ? (
-    hasPermission(permissions, "viewInspections") ? <PreplansPage query={query} records={preplans} setRecords={setPreplans} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <PreplansPage onNavigate={setCurrent} query={query} />
+      : <AccessDeniedModule name={current} />
   ) : current === "NERIS Fire Reports" ? (
     hasPermission(permissions, "viewNerisReports") ? (
       <NerisFireReportsPage
@@ -2289,8 +3037,43 @@ function AppShell() {
         onOpenEmployeeProfile={showEmployeeToggle ? openEmployeeProfileForPerson : undefined}
       />
     ) : <AccessDeniedModule name={current} />
-  ) : current === "Hydrants" ? (
-    <HydrantTestingPage embedded initialTab={resolveInitialHydrantTab({ embedded: true })} departmentId={departmentId} profile={profile} personnel={personnel} />
+  ) : current === "Hydrants" || current === "Hydrant Overview" ? (
+    <HydrantTestingPage embedded initialTab={resolveInitialHydrantTab({ embedded: true })} departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
+  ) : current === "Damage Reports"
+    || current === "Open Damage Reports"
+    || current === "Awaiting Water Company"
+    || current === "Repairs in Progress"
+    || current === "Ready for Verification"
+    || current === "Overdue Repairs"
+    || current === "Closed Reports" ? (
+    hasPermission(permissions, "viewHydrantDamageReports")
+      || hasPermission(permissions, "viewHydrants")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <HydrantDamageReportsPage onNavigate={setCurrent} activeNavName={current} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Water Company Directory" ? (
+    hasPermission(permissions, "viewWaterCompanies")
+      || hasPermission(permissions, "viewHydrantDamageReports")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <WaterCompanyDirectoryPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Water Districts" ? (
+    hasPermission(permissions, "viewWaterDistricts")
+      || hasPermission(permissions, "viewWaterCompanies")
+      || hasPermission(permissions, "viewHydrantDamageReports")
+      || hasPermission(permissions, "viewHydrants")
+      || isCreator
+      ? <WaterDistrictsPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Damage Analytics" ? (
+    hasPermission(permissions, "viewHydrantDamageReports")
+      || hasPermission(permissions, "viewHydrants")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <HydrantDamageAnalyticsPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
   ) : <ModulePage name={current} query={query} />;
 
   return <main className={`app-shell ${collapsed ? "nav-collapsed" : ""} ${mobileNav ? "mobile-nav-open" : ""} ${isHydrantsView ? "hydrants-view" : ""} ${isDemoModeActive() ? "demo-mode-shell" : ""}`}>

@@ -162,6 +162,18 @@ export function tradeInvolvesEmployee(trade = {}, membership = {}, myPerson = nu
 export function trainingBelongsToEmployee(record = {}, membership = {}, myPerson = null) {
   if (recordBelongsToEmployee(record, membership, myPerson)) return true;
 
+  const forgePersonId = normalizeText(myPerson?.forgePersonId || "");
+  if (forgePersonId && normalizeText(record.forgePersonId) === forgePersonId) {
+    return true;
+  }
+
+  if (normalizeText(record.source) === "forge_academy") {
+    const personId = myPerson?.id || membership?.personnelId || "";
+    if (personId && normalizeText(record.personnelId) === normalizeText(personId)) {
+      return true;
+    }
+  }
+
   const members = normalizeText(record.members || "");
   if (!members) return false;
 

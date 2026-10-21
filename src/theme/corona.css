@@ -1,4 +1,4 @@
-/* Corona Free Dark Admin theme bridge for Forge RMS shell */
+/* Academy / EduDash theme bridge for Forge RMS shell */
 
 .app-shell {
   background: var(--rms-bg-body);
@@ -8,16 +8,16 @@
   background: var(--rms-bg-body);
 }
 
-/* ── Top bar (Corona navbar) ───────────────────────────────── */
+/* ── Top bar ───────────────────────────────────────────────── */
 .top-bar {
   min-height: 70px;
   background: var(--rms-bg-topbar);
   border-bottom: 1px solid var(--rms-border);
-  box-shadow: var(--rms-shadow-lg);
+  box-shadow: var(--rms-shadow-sm);
 }
 
 html[data-theme="dark"] .top-bar {
-  box-shadow: 20px 19px 34px -15px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--rms-shadow-md);
 }
 
 .top-bar-tagline {
@@ -38,12 +38,12 @@ html[data-theme="dark"] .top-bar-tagline {
 .global-search {
   background: var(--rms-bg-input);
   border: 1px solid var(--rms-border);
-  border-radius: var(--rms-radius-sm);
+  border-radius: 999px;
 }
 
 .global-search:focus-within {
   border-color: var(--rms-primary);
-  box-shadow: 0 0 0 2px rgba(0, 144, 231, 0.15);
+  box-shadow: 0 0 0 3px rgba(37, 161, 148, 0.18);
 }
 
 .command-time {
@@ -52,13 +52,59 @@ html[data-theme="dark"] .top-bar-tagline {
   color: var(--rms-text-body);
 }
 
-/* ── Panels / cards (Corona .card) ──────────────────────────── */
+/* ── Side nav (EduDash soft active) ─────────────────────────── */
+.side-nav {
+  background: var(--rms-bg-nav);
+}
+
+.nav-item {
+  border-radius: var(--rms-radius-md);
+}
+
+.nav-item:hover {
+  background: var(--rms-bg-hover);
+  color: var(--rms-text-strong);
+}
+
+.nav-item.active {
+  background: var(--rms-nav-active-bg);
+  color: var(--rms-primary);
+  box-shadow: none;
+}
+
+.nav-item.active svg {
+  color: var(--rms-primary);
+}
+
+.nav-section-toggle:hover {
+  background: var(--rms-bg-hover);
+  color: var(--rms-text-body);
+}
+
+.side-nav .nav-section-toggle,
+.side-nav .nav-section-toggle .nav-label {
+  color: var(--rms-text-body);
+}
+
+.side-nav .nav-item.nav-branch-toggle {
+  color: var(--rms-text-body);
+}
+
+.side-nav .nav-item.nav-branch-toggle svg {
+  color: var(--rms-icon);
+}
+
+.side-nav .nav-item.nav-branch-toggle .nav-branch-chevron {
+  color: var(--rms-text-muted);
+}
+
+/* ── Panels / cards ─────────────────────────────────────────── */
 .panel,
 .kpi-card {
   border: 1px solid var(--rms-border);
   border-radius: var(--rms-radius-md);
   background: var(--rms-bg-panel);
-  box-shadow: none;
+  box-shadow: var(--rms-shadow-sm);
 }
 
 .panel > header {
@@ -69,25 +115,25 @@ html[data-theme="dark"] .top-bar-tagline {
 
 .panel > header strong {
   color: var(--rms-text-strong);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .kpi-card:hover {
-  border-color: var(--rms-primary);
-  box-shadow: var(--rms-shadow-sm);
+  border-color: color-mix(in srgb, var(--rms-primary) 35%, var(--rms-border));
+  box-shadow: var(--rms-shadow-md);
 }
 
 .kpi-card span {
   color: var(--rms-text-muted);
 }
 
-/* ── Buttons (Corona .btn) ──────────────────────────────────── */
+/* ── Buttons ────────────────────────────────────────────────── */
 .primary-button {
   background: var(--rms-primary-solid);
   color: #ffffff;
   border: none;
   border-radius: var(--rms-radius-sm);
-  font-weight: 500;
+  font-weight: 600;
   text-transform: none;
   letter-spacing: normal;
   box-shadow: none;
@@ -119,13 +165,13 @@ textarea {
   background: var(--rms-bg-input);
   border: 1px solid var(--rms-border);
   color: var(--rms-text);
-  border-radius: 2px;
+  border-radius: var(--rms-radius-sm);
   font-size: 0.875rem;
 }
 
 html[data-theme="dark"] input::placeholder,
 html[data-theme="dark"] textarea::placeholder {
-  color: #6c7293;
+  color: var(--rms-text-muted);
 }
 
 input:focus,
@@ -133,7 +179,7 @@ select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--rms-primary);
-  box-shadow: 0 0 0 2px rgba(0, 144, 231, 0.12);
+  box-shadow: 0 0 0 3px rgba(37, 161, 148, 0.18);
 }
 
 /* ── Tables ─────────────────────────────────────────────────── */
@@ -188,10 +234,10 @@ html[data-theme="dark"] .auth-card strong {
 }
 
 /* ── Semantic tones ─────────────────────────────────────────── */
-.tone-success { color: #00d25b; }
-.tone-warning { color: #ffab00; }
-.tone-critical { color: #fc424a; }
-.tone-info { color: #8f5fe8; }
+.tone-success { color: var(--rms-success); }
+.tone-warning { color: var(--rms-warning); }
+.tone-critical { color: var(--rms-critical); }
+.tone-info { color: var(--rms-primary); }
 
 /* ── Theme toggle ───────────────────────────────────────────── */
 .theme-toggle,
@@ -203,7 +249,7 @@ html[data-theme="dark"] .auth-card strong {
 
 /* ── Demo banner ────────────────────────────────────────────── */
 .demo-mode-banner {
-  background: #0090e7;
+  background: var(--rms-primary-solid);
   color: #fff;
 }
 

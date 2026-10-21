@@ -4,7 +4,7 @@ import { ThemeProvider } from "../context/ThemeContext.jsx";
 import HydrantTestingPage from "./HydrantTestingPage.jsx";
 import LoginPage from "./LoginPage.jsx";
 import AccessDeniedPage from "./AccessDeniedPage.jsx";
-import { resolveInitialHydrantTab, isHornLakeHydrantHost, hornLakeDepartmentId } from "../lib/hydrantAppRouting.js";
+import { resolveInitialHydrantTab, isBrandedHydrantHost, brandedHostDepartmentId } from "../lib/hydrantAppRouting.js";
 
 function LoadingScreen() {
   return (
@@ -33,7 +33,7 @@ function HornLakeHydrantShell() {
     <HydrantTestingPage
       embedded={false}
       initialTab={initialTab === "app" ? "dashboard" : initialTab}
-      departmentId={hornLakeDepartmentId()}
+      departmentId={brandedHostDepartmentId()}
       profile={profile}
     />
   );
@@ -51,4 +51,4 @@ export default function HornLakeHydrantApp() {
   );
 }
 
-export { isHornLakeHydrantHost };
+export { isBrandedHydrantHost };

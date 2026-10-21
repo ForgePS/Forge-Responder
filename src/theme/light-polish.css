@@ -1,29 +1,29 @@
-/* Light theme polish — fixes dark-mode leftovers and improves contrast */
+/* Light theme polish — Academy / EduDash aligned */
 
 html[data-theme="light"] {
-  --rms-bg-body: #f6f8fb;
-  --rms-bg-shell: #f8fafc;
+  --rms-bg-body: #eef2f6;
+  --rms-bg-shell: #eef2f6;
   --rms-bg-surface: #ffffff;
   --rms-bg-surface-1: #ffffff;
-  --rms-bg-surface-2: #f1f5f9;
-  --rms-bg-surface-3: #eef2f7;
-  --rms-bg-hover: #e8eef5;
-  --rms-bg-hover-2: #dfe7f0;
+  --rms-bg-surface-2: #f8f9fa;
+  --rms-bg-surface-3: #f3f4f6;
+  --rms-bg-hover: #e6f7f5;
+  --rms-bg-hover-2: #d9f2ef;
   --rms-bg-panel: #ffffff;
-  --rms-bg-panel-header: #f8fafc;
+  --rms-bg-panel-header: #f8f9fa;
   --rms-bg-kpi-a: #ffffff;
-  --rms-bg-kpi-b: #f8fafc;
-  --rms-border: #d7e0ea;
-  --rms-border-subtle: #e5ebf2;
-  --rms-border-divider: #e2e8f0;
-  --rms-text: #334155;
-  --rms-text-strong: #0f172a;
-  --rms-text-body: #475569;
-  --rms-text-muted: #64748b;
-  --rms-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.04);
-  --rms-shadow-md: 0 10px 28px rgba(15, 23, 42, 0.08);
+  --rms-bg-kpi-b: #f8f9fa;
+  --rms-border: rgba(209, 213, 219, 0.5);
+  --rms-border-subtle: #e5e7eb;
+  --rms-border-divider: rgba(209, 213, 219, 0.5);
+  --rms-text: #212529;
+  --rms-text-strong: #212529;
+  --rms-text-body: #4b5563;
+  --rms-text-muted: #6c757d;
+  --rms-shadow-sm: 0 4px 30px rgba(46, 45, 116, 0.05);
+  --rms-shadow-md: 0 6px 32px rgba(46, 45, 116, 0.08);
   --rms-chart-center: #ffffff;
-  --rms-donut-ring: conic-gradient(#16a34a 0 87%, #d97706 87% 95%, #dc2626 95%);
+  --rms-donut-ring: conic-gradient(#45b369 0 87%, #ff9f29 87% 95%, #ef4a00 95%);
 }
 
 html[data-theme="light"] .app-shell {
@@ -63,12 +63,26 @@ html[data-theme="light"] .app-footer {
   color: var(--rms-text-muted);
 }
 
-html[data-theme="light"] .nav-label {
-  color: var(--rms-text-subtle);
+html[data-theme="light"] .nav-label,
+html[data-theme="light"] .nav-section-toggle,
+html[data-theme="light"] .nav-section-toggle .nav-label {
+  color: var(--rms-text-body);
 }
 
 html[data-theme="light"] .nav-item {
   color: var(--rms-text-body);
+}
+
+html[data-theme="light"] .side-nav .nav-item.nav-branch-toggle {
+  color: var(--rms-text-body);
+}
+
+html[data-theme="light"] .side-nav .nav-item.nav-branch-toggle svg {
+  color: var(--rms-icon);
+}
+
+html[data-theme="light"] .side-nav .nav-item.nav-branch-toggle .nav-branch-chevron {
+  color: var(--rms-text-muted);
 }
 
 html[data-theme="light"] .nav-item svg {
@@ -197,8 +211,8 @@ html[data-theme="light"] .badge-warning {
 }
 
 html[data-theme="light"] .badge-info {
-  color: #1d4ed8;
-  background: #dbeafe;
+  color: #145d55;
+  background: #e6f7f5;
 }
 
 html[data-theme="light"] .badge-neutral {
@@ -226,8 +240,8 @@ html[data-theme="light"] .profile-header {
 }
 
 html[data-theme="light"] .person-row.selected {
-  background: #eff6ff;
-  box-shadow: inset 3px 0 #2563eb;
+  background: #e6f7f5;
+  box-shadow: inset 3px 0 #25a194;
 }
 
 html[data-theme="light"] .schedule-stat {

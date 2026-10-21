@@ -14,7 +14,9 @@ export const defaultPlatformConfig = {
   poweredByLabel: "POWERED BY",
   version: "2.5.0",
   status: "active",
-  availableModules: ADMIN_MODULE_OPTIONS.map((module) => module.key)
+  availableModules: ADMIN_MODULE_OPTIONS.map((module) => module.key),
+  /** Creator allowlist for Pre-Fire Plan feature flags (null/omitted = all allowed). */
+  availablePreplanFeatures: null,
 };
 
 export const platformBrand = { ...defaultPlatformConfig };
