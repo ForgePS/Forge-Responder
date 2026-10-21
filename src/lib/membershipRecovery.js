@@ -72,7 +72,14 @@ export async function recoverMembershipAccess(user, departmentId) {
     payload.createdAt = new Date().toISOString();
   }
 
-  await setDoc(doc(db, "departments", membershipDepartmentId, "users", user.uid), payload, { merge: true });
+  try {
+    await setDoc(doc(db, "departments", membershipDepartmentId, "users", user.uid), payload, { merge: true });
+  } catch (error) {
+    // Rules only allow this for platform creators and active department admins.
+    // A disabled or demoted user cannot restore their own access.
+    console.warn("Membership self-restore not permitted", error);
+    return null;
+  }
   return { id: user.uid, ...payload };
 }
 

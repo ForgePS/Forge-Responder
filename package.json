@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
+    "test:nav": "node scripts/test-prevention-nav.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "migrate:tenant": "node scripts/migrate-horn-lake-to-tenant.mjs",
     "migrate:tenant:dry-run": "node scripts/migrate-horn-lake-to-tenant.mjs --dry-run",
@@ -18,11 +19,20 @@
     "seed:gateways": "node scripts/seed-rms-gateways.mjs",
     "sync:neris-schema": "node scripts/sync-neris-schema.mjs",
     "import:neris-xlsx": "node scripts/import-neris-xlsx.mjs",
-    "push:test-alert": "node functions/scripts/pushTestAlert.js"
+    "push:test-alert": "node functions/scripts/pushTestAlert.js",
+    "fleet:load-smoke": "node scripts/fleet-load-smoke.mjs",
+    "ifc:parse": "node scripts/ifc/parseIfcDocx.mjs",
+    "ifc:publish": "node scripts/ifc/publishIfcLibrary.mjs",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-forge-rms \"node --test tests/rules/firestore.rules.test.mjs\"",
+    "build:staging": "vite build --mode staging",
+    "deploy:staging:rules": "firebase deploy --only firestore:rules,storage --project staging",
+    "backfill:memberships": "node scripts/backfill-memberships.mjs",
+    "backfill:memberships:apply": "node scripts/backfill-memberships.mjs --apply"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
     "firebase": "^11.10.0",
+    "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lucide-react": "latest",
     "react": "latest",
@@ -31,6 +41,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "4.0.1",
     "firebase-admin": "^13.4.0"
   }
 }

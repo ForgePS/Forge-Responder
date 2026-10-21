@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "rms-dashboard-7562e"
+    "default": "rms-dashboard-7562e",
+    "prod": "rms-dashboard-7562e",
+    "staging": "forge-rms-staging"
   }
 }

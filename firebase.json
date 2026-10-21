@@ -1,26 +1,65 @@
-﻿{
-  "firestore": { "rules": "firestore.rules" },
-  "storage": { "rules": "storage.rules" },
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "functions": [
     {
       "source": "functions",
       "codebase": "default",
-      "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log", "*.local"]
-    },
-    {
-      "source": "functions-identity",
-      "codebase": "identity",
-      "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log", "*.local"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
     }
   ],
   "hosting": {
     "site": "rms-dashboard-7562e",
     "public": "dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "documents/**", "downloads/**"],
-    "rewrites": [{ "source": "**", "destination": "/index.html" }],
-    "headers": [{
-      "source": "/index.html",
-      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
-    }]
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "documents/**",
+      "downloads/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ]
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "storage": {
+      "port": 9199
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
   }
 }

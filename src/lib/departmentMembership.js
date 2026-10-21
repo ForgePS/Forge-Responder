@@ -73,13 +73,19 @@ async function linkMembershipToPersonnel(departmentId, membership) {
   const personnelId = await resolvePersonnelIdByEmail(departmentId, membership.email);
   if (!personnelId) return membership;
 
-  const updated = {
-    ...membership,
-    personnelId,
-    updatedAt: new Date().toISOString()
-  };
-  await setDoc(doc(getFirestoreDb(), "departments", departmentId, "users", membership.uid), updated, { merge: true });
-  return updated;
+  const updatedAt = new Date().toISOString();
+  try {
+    // Only write the link fields: rules allow a member to set their own personnelId once.
+    await setDoc(
+      doc(getFirestoreDb(), "departments", departmentId, "users", membership.uid),
+      { personnelId, updatedAt },
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn("Could not link membership to personnel record", error);
+    return membership;
+  }
+  return { ...membership, personnelId, updatedAt };
 }
 
 export async function ensureMembershipForUser(user, departmentId = DEFAULT_DEPARTMENT_ID) {
@@ -106,24 +112,16 @@ export async function ensureMembershipForUser(user, departmentId = DEFAULT_DEPAR
   if (existing?.status === "active") {
     let nextMembership = existing;
     if (!existing.roleIds?.length) {
+      // Derive roleIds from the legacy role in memory. Users may not write their own
+      // roleIds (firestore.rules); an admin or the back-fill script persists them.
       const roleId = legacyRoleMap[existing.role] || existing.role || "readOnly";
-      nextMembership = { ...existing, roleIds: [roleId], updatedAt: new Date().toISOString() };
-      await setDoc(doc(getFirestoreDb(), "departments", departmentId, "users", user.uid), nextMembership, { merge: true });
+      nextMembership = { ...existing, roleIds: [roleId] };
     }
     return linkMembershipToPersonnel(departmentId, nextMembership);
   }
 
-  let hasUsers = true;
-  try {
-    hasUsers = await departmentHasUsers(departmentId);
-  } catch (error) {
-    console.warn("Unable to check department user count", error);
-  }
-  if (!hasUsers) {
-    const created = await createDepartmentMembership(departmentId, user, "department_admin");
-    return linkMembershipToPersonnel(departmentId, created);
-  }
-
+  // No self-service membership: the first admin is created when the department is
+  // provisioned, and other users are added by a department admin.
   return existing;
 }
 

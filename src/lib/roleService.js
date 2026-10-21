@@ -74,7 +74,23 @@ function resolveRoleTemplate(existingRoles = [], cloneFromRoleId = "readOnly") {
   return defaultRoles.find((role) => role.id === "readOnly") || defaultRoles[0];
 }
 
+function isPermissionDenied(error) {
+  return error?.code === "permission-denied" || /insufficient permissions/i.test(String(error?.message || ""));
+}
+
+// Seeding/patching roles needs department-admin rights (firestore.rules). For everyone
+// else, fall back to the stored roles merged with defaults in memory.
 export async function ensureDefaultRoles(departmentId) {
+  try {
+    return await seedDefaultRoles(departmentId);
+  } catch (error) {
+    if (!isPermissionDenied(error)) throw error;
+    const existing = await listRecords(departmentId, "roles");
+    return sortDepartmentRoles(existing.map((role) => mergeRoleWithDefaults(role)));
+  }
+}
+
+async function seedDefaultRoles(departmentId) {
   let existing = await listRecords(departmentId, "roles");
   const existingIds = new Set(existing.map((item) => item.id));
   const missing = defaultRoles.filter((item) => !existingIds.has(item.id));

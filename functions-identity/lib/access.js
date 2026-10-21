@@ -3,11 +3,16 @@
 const BOOTSTRAP_PLATFORM_EMAILS = new Set([
   "admin@forgepublicsafety.com",
   "jpowell@hornlake.org",
+  "jeremyepowell@hotmail.com",
 ]);
 
 async function isPlatformCreator(db, auth) {
   if (!auth?.uid) return false;
-  if (auth.token?.email && BOOTSTRAP_PLATFORM_EMAILS.has(String(auth.token.email).toLowerCase())) {
+  if (
+    auth.token?.email
+    && auth.token.email_verified === true
+    && BOOTSTRAP_PLATFORM_EMAILS.has(String(auth.token.email).toLowerCase())
+  ) {
     return true;
   }
   const creatorSnap = await db.doc(`platformCreators/${auth.uid}`).get();

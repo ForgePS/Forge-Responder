@@ -1,8 +1,5 @@
 import { getFirebaseAuth } from "./firebaseClient.js";
-import {
-  createDepartmentMembership,
-  loadDepartmentMembership,
-} from "./departmentMembership.js";
+import { loadDepartmentMembership } from "./departmentMembership.js";
 import { recoverMembershipAccess } from "./membershipRecovery.js";
 import { isPlatformBootstrapEmail } from "./platformBootstrap.js";
 import {
@@ -49,9 +46,11 @@ export async function ensureHydrantImportAccess(departmentId) {
     if (recovered?.status === "active") return recovered;
   }
 
-  if (departmentId === HORN_LAKE_DEPARTMENT_ID && isHornLakeOrgEmail(user.email)) {
-    const created = await createDepartmentMembership(departmentId, user, "department_admin");
-    if (created?.status === "active") return created;
+  // Legacy: firestore.rules still let verified @hornlake.org accounts into horn-lake-fd
+  // until the membership back-fill is done. Nothing is written here; users can no longer
+  // create their own (admin) membership.
+  if (departmentId === HORN_LAKE_DEPARTMENT_ID && isHornLakeOrgEmail(user.email) && user.emailVerified) {
+    return { id: user.uid, uid: user.uid, email: user.email, status: "active", departmentId, roleIds: [] };
   }
 
   const recovered = await recoverMembershipAccess(user, departmentId);

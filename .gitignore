@@ -5,3 +5,15 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+_tmp_ifc_extract.txt
+scripts/ifc/out/
+!.env.example
+!.env.staging
+
+# Local scratch / tokens / deploy logs
+tmp-*
+_tmp_*
+_deploy_*.log
+firestore-debug.log
+storage-debug.log
+ui-debug.log
