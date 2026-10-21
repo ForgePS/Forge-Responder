@@ -272,9 +272,22 @@ html[data-theme="dark"] .nav-item.active svg {
     display: none;
   }
 
-  .app-shell,
+  /* Rows: top bar, page, footer (demo adds the banner first). Each shell
+     variant needs its own row count, or the page lands in the footer row. */
+  .app-shell {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
   .app-shell.demo-mode-shell {
-    grid-template-rows: auto minmax(0, 1fr) 52px;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+
+  .app-shell.hydrants-view {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .app-shell.demo-mode-shell.hydrants-view {
+    grid-template-rows: auto auto minmax(0, 1fr);
   }
 }
 

@@ -2425,6 +2425,25 @@ function AppShell() {
     || defaultPlatformConfig.tagline;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  // On narrow screens the side menu slides in under the top bar. The bar's height
+  // depends on what wraps, so measure where it ends while the menu is open.
+  useEffect(() => {
+    if (!mobileNav || typeof window === "undefined") return undefined;
+    const placeMenu = () => {
+      const bar = document.querySelector(".app-shell .top-bar");
+      if (!bar) return;
+      const top = `${Math.max(0, Math.round(bar.getBoundingClientRect().bottom))}px`;
+      document.documentElement.style.setProperty("--rms-mobile-nav-top", top);
+      document.documentElement.style.setProperty("--rms-mobile-nav-top-demo", top);
+    };
+    placeMenu();
+    window.addEventListener("resize", placeMenu);
+    window.addEventListener("scroll", placeMenu, { passive: true });
+    return () => {
+      window.removeEventListener("resize", placeMenu);
+      window.removeEventListener("scroll", placeMenu);
+    };
+  }, [mobileNav]);
   const [query, setQuery] = useState("");
   const shiftRotation = useMemo(
     () => normalizeShiftRotation(settings?.shiftRotation, profile?.shifts),
