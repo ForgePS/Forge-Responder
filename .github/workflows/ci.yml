@@ -47,6 +47,9 @@ jobs:
         run: npm ci
         working-directory: functions
 
+      - name: Lint (undefined names)
+        run: npm run lint
+
       - name: Build web app
         run: npm run build
 

@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazyPage } from "./lib/lazyPage.js";
+import { normalizeTableRows } from "./lib/tableRows.js";
 import { useAuth } from "./context/AuthContext.jsx";
-import AdminControlCenterPage from "./pages/AdminControlCenterPage.jsx";
-import TimeSheetsPage from "./pages/TimeSheetsPage.jsx";
-import ShiftTradesPanel from "./components/scheduling/ShiftTradesPanel.jsx";
-import LeaveRequestsPanel from "./components/scheduling/LeaveRequestsPanel.jsx";
-import CallShiftPanel from "./components/scheduling/CallShiftPanel.jsx";
+const AdminControlCenterPage = lazyPage(() => import("./pages/AdminControlCenterPage.jsx"));
+const TimeSheetsPage = lazyPage(() => import("./pages/TimeSheetsPage.jsx"));
+const ShiftTradesPanel = lazyPage(() => import("./components/scheduling/ShiftTradesPanel.jsx"));
+const LeaveRequestsPanel = lazyPage(() => import("./components/scheduling/LeaveRequestsPanel.jsx"));
+const CallShiftPanel = lazyPage(() => import("./components/scheduling/CallShiftPanel.jsx"));
 import { normalizeCallShiftRules } from "./lib/callShiftRules.js";
-import EmployeePortalPage from "./pages/EmployeePortalPage.jsx";
+const EmployeePortalPage = lazyPage(() => import("./pages/EmployeePortalPage.jsx"));
 import {
   canAccessAdminRms,
   canAccessEmployeePortal,
@@ -46,8 +48,8 @@ import {
   GraduationCap, HardHat, Home, Landmark, LayoutList, Lock, Mail, Map, MapPin, Menu, MonitorPlay, PackageSearch, Phone, Save, Search,
   Settings, Settings2, ShieldCheck, Store, Trash2, Truck, Upload, UploadCloud, UserRound, Users, Wifi, Wrench, X, CirclePlus, Gavel, Flame, Zap
 } from "lucide-react";
-import InternalEmailBoardPage from "./pages/InternalEmailBoardPage.jsx";
-import DigitalDashboardPage from "./pages/DigitalDashboardPage.jsx";
+const InternalEmailBoardPage = lazyPage(() => import("./pages/InternalEmailBoardPage.jsx"));
+const DigitalDashboardPage = lazyPage(() => import("./pages/DigitalDashboardPage.jsx"));
 import { filterNavByEnabledModules, filterNavByCodeLibraryAccess } from "./lib/navFilter.js";
 import {
   filterNavGroupsByPreplanFeatures,
@@ -65,13 +67,13 @@ import {
 import { groupContainsRoute, groupHasNavTree } from "./lib/navTree.js";
 import { employeePortalNavGroups, filterEmployeePortalNav } from "./data/employeePortalNav.js";
 import CommandDashboard from "./components/CommandDashboard.jsx";
-import DailyLogPage from "./pages/DailyLogPage.jsx";
-import PersonnelPage from "./pages/PersonnelPage.jsx";
+const DailyLogPage = lazyPage(() => import("./pages/DailyLogPage.jsx"));
+const PersonnelPage = lazyPage(() => import("./pages/PersonnelPage.jsx"));
 import DepartmentSwitcher from "./components/DepartmentSwitcher.jsx";
 import PlatformFooter from "./components/PlatformFooter.jsx";
-import ShiftCalendar from "./components/ShiftCalendar.jsx";
-import WeekRosterView from "./components/WeekRosterView.jsx";
-import AdminDailyRoster from "./components/admin/AdminDailyRoster.jsx";
+const ShiftCalendar = lazyPage(() => import("./components/ShiftCalendar.jsx"));
+const WeekRosterView = lazyPage(() => import("./components/WeekRosterView.jsx"));
+const AdminDailyRoster = lazyPage(() => import("./components/admin/AdminDailyRoster.jsx"));
 import {
   buildMonthCalendar,
   formatDayId,
@@ -104,8 +106,8 @@ import { normalizeSchedulingSettings } from "./lib/schedulingSettings.js";
 import { normalizeEmployeePortalRules } from "./lib/employeePortalRules.js";
 import { normalizePayRules } from "./lib/payRules.js";
 import { normalizeDailyLogSettings } from "./lib/dailyLogSettings.js";
-import CreatorConsolePage from "./pages/CreatorConsolePage.jsx";
-import DepartmentSetupWizard from "./components/onboarding/DepartmentSetupWizard.jsx";
+const CreatorConsolePage = lazyPage(() => import("./pages/CreatorConsolePage.jsx"));
+const DepartmentSetupWizard = lazyPage(() => import("./components/onboarding/DepartmentSetupWizard.jsx"));
 import ManagedSelect from "./components/ManagedSelect.jsx";
 import FleetRecordEditModal, { APPARATUS_EDIT_FIELDS } from "./components/FleetRecordEditModal.jsx";
 import { useDropdowns } from "./context/DropdownContext.jsx";
@@ -129,13 +131,13 @@ import {
 import ObjectLifecycleActions from "./components/ObjectLifecycleActions.jsx";
 import { listUserNotifications, markNotificationRead } from "./lib/notificationService.js";
 import { vacancyPickupStatusDetail } from "./lib/vacancyPickupWorkflow.js";
-import HydrantTestingPage from "./pages/HydrantTestingPage.jsx";
-import HydrantDamageReportsPage from "./pages/HydrantDamageReportsPage.jsx";
-import WaterCompanyDirectoryPage from "./pages/WaterCompanyDirectoryPage.jsx";
-import WaterDistrictsPage from "./pages/WaterDistrictsPage.jsx";
-import HydrantDamageAnalyticsPage from "./pages/HydrantDamageAnalyticsPage.jsx";
-import NerisFireReportsPage from "./pages/NerisFireReportsPage.jsx";
-import NerisAnalyticsPage from "./pages/NerisAnalyticsPage.jsx";
+const HydrantTestingPage = lazyPage(() => import("./pages/HydrantTestingPage.jsx"));
+const HydrantDamageReportsPage = lazyPage(() => import("./pages/HydrantDamageReportsPage.jsx"));
+const WaterCompanyDirectoryPage = lazyPage(() => import("./pages/WaterCompanyDirectoryPage.jsx"));
+const WaterDistrictsPage = lazyPage(() => import("./pages/WaterDistrictsPage.jsx"));
+const HydrantDamageAnalyticsPage = lazyPage(() => import("./pages/HydrantDamageAnalyticsPage.jsx"));
+const NerisFireReportsPage = lazyPage(() => import("./pages/NerisFireReportsPage.jsx"));
+const NerisAnalyticsPage = lazyPage(() => import("./pages/NerisAnalyticsPage.jsx"));
 import { resolveInitialHydrantTab, resolveInitialAppModule, shouldOpenHydrantsModule } from "./lib/hydrantAppRouting.js";
 import {
   AnalyticsPage,
@@ -156,18 +158,18 @@ import {
   PreplansPage,
   PreplansWorkQueuePage,
 } from "./pages/PreplansModulePages.jsx";
-import PreplanOperationalPage from "./pages/PreplanOperationalPage.jsx";
-import OccupanciesMasterPage from "./pages/OccupanciesMasterPage.jsx";
-import InspectionConfigStudioPage from "./pages/InspectionConfigStudioPage.jsx";
-import ViolationsPage from "./pages/ViolationsPage.jsx";
-import InspectionNoticesPage from "./pages/InspectionNoticesPage.jsx";
-import InspectionEnforcementPage from "./pages/InspectionEnforcementPage.jsx";
-import FireProtectionSystemsPage from "./pages/FireProtectionSystemsPage.jsx";
-import InspectionFeesPage from "./pages/InspectionFeesPage.jsx";
-import InspectionReportsPage from "./pages/InspectionReportsPage.jsx";
-import InspectionOfflinePage from "./pages/InspectionOfflinePage.jsx";
-import InspectionAutomationPage from "./pages/InspectionAutomationPage.jsx";
-import InspectionHardeningPage from "./pages/InspectionHardeningPage.jsx";
+const PreplanOperationalPage = lazyPage(() => import("./pages/PreplanOperationalPage.jsx"));
+const OccupanciesMasterPage = lazyPage(() => import("./pages/OccupanciesMasterPage.jsx"));
+const InspectionConfigStudioPage = lazyPage(() => import("./pages/InspectionConfigStudioPage.jsx"));
+const ViolationsPage = lazyPage(() => import("./pages/ViolationsPage.jsx"));
+const InspectionNoticesPage = lazyPage(() => import("./pages/InspectionNoticesPage.jsx"));
+const InspectionEnforcementPage = lazyPage(() => import("./pages/InspectionEnforcementPage.jsx"));
+const FireProtectionSystemsPage = lazyPage(() => import("./pages/FireProtectionSystemsPage.jsx"));
+const InspectionFeesPage = lazyPage(() => import("./pages/InspectionFeesPage.jsx"));
+const InspectionReportsPage = lazyPage(() => import("./pages/InspectionReportsPage.jsx"));
+const InspectionOfflinePage = lazyPage(() => import("./pages/InspectionOfflinePage.jsx"));
+const InspectionAutomationPage = lazyPage(() => import("./pages/InspectionAutomationPage.jsx"));
+const InspectionHardeningPage = lazyPage(() => import("./pages/InspectionHardeningPage.jsx"));
 import {
   AdoptedCodesPage,
   CodeAdministrationPage,
@@ -175,23 +177,23 @@ import {
   CodeLibrarySavedPage,
   LocalAmendmentsLibraryPage,
 } from "./pages/CodeLibraryPages.jsx";
-import FleetDashboardPage from "./pages/FleetDashboardPage.jsx";
-import FleetAssetsMasterPage from "./pages/FleetAssetsMasterPage.jsx";
-import FleetConfigStudioPage from "./pages/FleetConfigStudioPage.jsx";
-import FleetReadinessBoardPage from "./pages/FleetReadinessBoardPage.jsx";
-import FleetDefectsPage from "./pages/FleetDefectsPage.jsx";
-import FleetWorkOrdersPage from "./pages/FleetWorkOrdersPage.jsx";
-import FleetPmForecastPage from "./pages/FleetPmForecastPage.jsx";
-import FleetTestsPage from "./pages/FleetTestsPage.jsx";
-import FleetFuelEnergyPage from "./pages/FleetFuelEnergyPage.jsx";
-import FleetComponentsWarrantyPage from "./pages/FleetComponentsWarrantyPage.jsx";
-import FleetOperationsPage from "./pages/FleetOperationsPage.jsx";
-import FleetAccidentRiskPage from "./pages/FleetAccidentRiskPage.jsx";
-import FleetProcurementPage from "./pages/FleetProcurementPage.jsx";
-import FleetCostReplacementPage from "./pages/FleetCostReplacementPage.jsx";
-import FleetReportingPage from "./pages/FleetReportingPage.jsx";
-import FleetHardeningPage from "./pages/FleetHardeningPage.jsx";
-import FleetVendorPortalPage from "./pages/FleetVendorPortalPage.jsx";
+const FleetDashboardPage = lazyPage(() => import("./pages/FleetDashboardPage.jsx"));
+const FleetAssetsMasterPage = lazyPage(() => import("./pages/FleetAssetsMasterPage.jsx"));
+const FleetConfigStudioPage = lazyPage(() => import("./pages/FleetConfigStudioPage.jsx"));
+const FleetReadinessBoardPage = lazyPage(() => import("./pages/FleetReadinessBoardPage.jsx"));
+const FleetDefectsPage = lazyPage(() => import("./pages/FleetDefectsPage.jsx"));
+const FleetWorkOrdersPage = lazyPage(() => import("./pages/FleetWorkOrdersPage.jsx"));
+const FleetPmForecastPage = lazyPage(() => import("./pages/FleetPmForecastPage.jsx"));
+const FleetTestsPage = lazyPage(() => import("./pages/FleetTestsPage.jsx"));
+const FleetFuelEnergyPage = lazyPage(() => import("./pages/FleetFuelEnergyPage.jsx"));
+const FleetComponentsWarrantyPage = lazyPage(() => import("./pages/FleetComponentsWarrantyPage.jsx"));
+const FleetOperationsPage = lazyPage(() => import("./pages/FleetOperationsPage.jsx"));
+const FleetAccidentRiskPage = lazyPage(() => import("./pages/FleetAccidentRiskPage.jsx"));
+const FleetProcurementPage = lazyPage(() => import("./pages/FleetProcurementPage.jsx"));
+const FleetCostReplacementPage = lazyPage(() => import("./pages/FleetCostReplacementPage.jsx"));
+const FleetReportingPage = lazyPage(() => import("./pages/FleetReportingPage.jsx"));
+const FleetHardeningPage = lazyPage(() => import("./pages/FleetHardeningPage.jsx"));
+const FleetVendorPortalPage = lazyPage(() => import("./pages/FleetVendorPortalPage.jsx"));
 import { loadFleetSettings } from "./lib/fleet/index.js";
 
 const navGroups = [
@@ -662,6 +664,16 @@ function TopBar({
       </button>
     </div>
   </header>;
+}
+
+/** Shown in the page area while a module's code downloads the first time. */
+function PageLoading() {
+  return (
+    <div className="page-loading" role="status" aria-live="polite">
+      <span className="page-loading-spinner" aria-hidden="true" />
+      <span>Loading...</span>
+    </div>
+  );
 }
 
 function LoadingScreen({ message = "Loading..." }) {
@@ -3106,6 +3118,7 @@ function AppShell() {
   return <main className={`app-shell ${collapsed ? "nav-collapsed" : ""} ${mobileNav ? "mobile-nav-open" : ""} ${isHydrantsView ? "hydrants-view" : ""} ${isDemoModeActive() ? "demo-mode-shell" : ""}`}>
     {isDemoModeActive() && <DemoModeBanner />}
     {setupWizardOpen && !inPlatformScope && departmentId && (
+      <Suspense fallback={null}>
       <DepartmentSetupWizard
         key={departmentId}
         departmentId={departmentId}
@@ -3120,6 +3133,7 @@ function AppShell() {
           if (!completed) setSetupWizardDismissed(true);
         }}
       />
+      </Suspense>
     )}
     <TopBar
           query={query}
@@ -3158,7 +3172,10 @@ function AppShell() {
           />
         )}
         {mobileNav && <button className="mobile-scrim" onClick={() => setMobileNav(false)}><X size={20} /></button>}
-    <section className={`workspace ${isHydrantsView ? "workspace-hydrants" : ""}`}>{pageContent}</section>
+    <section className={`workspace ${isHydrantsView ? "workspace-hydrants" : ""}`}>
+      {/* Module pages load on demand (see lazyPage). */}
+      <Suspense fallback={<PageLoading />}>{pageContent}</Suspense>
+    </section>
     {!isHydrantsView ? (
       <PlatformFooter
         departmentName={inPlatformScope ? platformConfig?.name : profile.name}
@@ -3185,7 +3202,7 @@ export default function App() {
     return <GatewayNotFoundPage />;
   }
 
-  if (!authRequired) return <AppShell />;
+  if (!authRequired) return <Suspense fallback={<LoadingScreen />}><AppShell /></Suspense>;
   // Wait for access to resolve everywhere, including the creator console: creator
   // status comes from the server-side platformCreators record, which loads async.
   if (authLoading || membershipLoading || !ready) {
@@ -3196,5 +3213,5 @@ export default function App() {
   }
   if (!user) return isDemoModeActive() ? <DemoEntryPage /> : <LoginPage />;
   if (!membership && !isCreator) return <AccessDeniedPage userId={user?.uid} />;
-  return <AppShell />;
+  return <Suspense fallback={<LoadingScreen />}><AppShell /></Suspense>;
 }

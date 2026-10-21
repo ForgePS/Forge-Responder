@@ -3606,3 +3606,9 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
 .platform-audit-field > span { font-size: 14px; color: var(--rms-text-muted); }
 .platform-audit-field select, .platform-audit-field input { width: 100%; min-height: 32px; }
 .platform-audit-summary { white-space: normal; min-width: 240px; }
+
+/* Lazy-loaded module pages */
+.page-loading { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 240px; color: var(--rms-text-muted); font-size: 14px; }
+.page-loading-spinner { width: 18px; height: 18px; border: 2px solid var(--rms-border); border-top-color: var(--rms-primary); border-radius: 50%; animation: page-loading-spin .8s linear infinite; }
+@keyframes page-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .page-loading-spinner { animation: none; } }

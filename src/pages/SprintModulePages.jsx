@@ -4,6 +4,7 @@ import {
   Gauge, PackageSearch, ShieldCheck, Upload, X
 } from "lucide-react";
 import { documentCategoryMap } from "../data/sprintModuleSeeds.js";
+import { exportCsv } from "../utils/dashboardMetrics.js";
 import FleetRecordEditModal, { ASSET_EDIT_FIELDS } from "../components/FleetRecordEditModal.jsx";
 import ObjectUploadField from "../components/ObjectUploadField.jsx";
 import ObjectLifecycleActions from "../components/ObjectLifecycleActions.jsx";
