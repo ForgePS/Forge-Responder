@@ -64,7 +64,8 @@ import {
   navNodeKey,
   navNodeLabel,
 } from "./data/preventionNav.js";
-import { groupContainsRoute, groupHasNavTree } from "./lib/navTree.js";
+import { groupContainsRoute, groupHasNavTree, groupNavLeavesAsItems } from "./lib/navTree.js";
+import { buildPageIndex, pageFromLocation, pageHistoryState, pageSlug, slugFromHistoryState, urlWithPage } from "./lib/pageUrl.js";
 import { employeePortalNavGroups, filterEmployeePortalNav } from "./data/employeePortalNav.js";
 import CommandDashboard from "./components/CommandDashboard.jsx";
 const DailyLogPage = lazyPage(() => import("./pages/DailyLogPage.jsx"));
@@ -233,6 +234,14 @@ const navGroups = [
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
   { label: "Future / Later", items: [["Incidents", AlertTriangle], ["EMS Reports", Ambulance], ["Compliance Export", Upload]] }
 ];
+
+// Every in-app page reachable from the menu, keyed by its URL slug (?page=...).
+const PAGE_INDEX = buildPageIndex(
+  navGroups
+    .flatMap((group) => groupNavLeavesAsItems(group))
+    .filter(([, , externalUrl]) => !externalUrl)
+    .map(([name]) => name)
+);
 
 const kpis = [
   ["Personnel On Duty", "42", "of 56 Assigned", "info", Users, "Scheduling"],
@@ -2122,7 +2131,9 @@ function AppShell() {
   const [personnelNavigateId, setPersonnelNavigateId] = useState("");
   const [employeePreviewPersonId, setEmployeePreviewPersonId] = useState("");
   const [current, setCurrent] = useState(
-    initialDeepLink?.module === CREATOR_CONSOLE_MODULE ? CREATOR_CONSOLE_MODULE : initialModule
+    initialDeepLink?.module === CREATOR_CONSOLE_MODULE
+      ? CREATOR_CONSOLE_MODULE
+      : (typeof window !== "undefined" && pageFromLocation(PAGE_INDEX, window.location)) || initialModule
   );
   const [schedulingTab, setSchedulingTab] = useState(null);
   const clearSchedulingTab = useCallback(() => setSchedulingTab(null), []);
@@ -2197,6 +2208,40 @@ function AppShell() {
   const showEmployeeToggle = canAccessEmployeePortal(permissions);
   const effectiveAppView = showAdminToggle ? appView : "employee";
 
+  // Keep the open page in the address (?page=...) so it can be bookmarked,
+  // shared and reached with back/forward. The first sync replaces the current
+  // history entry; later page changes add entries.
+  const pageUrlSyncedRef = useRef(false);
+  const pageFromHistoryRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || effectiveAppView !== "admin") return;
+    if (current === CREATOR_CONSOLE_MODULE || isCreatorConsolePath()) return; // has its own /creator-console path
+    const slug = current === "Dashboard" ? "" : pageSlug(current);
+    const sameUrl = (new URLSearchParams(window.location.search).get("page") || "") === slug;
+    const replace = !pageUrlSyncedRef.current || pageFromHistoryRef.current;
+    pageUrlSyncedRef.current = true;
+    pageFromHistoryRef.current = false;
+    if (sameUrl && slugFromHistoryState(window.history.state) === slug) return;
+    const nextUrl = urlWithPage(window.location.href, slug);
+    if (replace || sameUrl) window.history.replaceState(pageHistoryState(slug), "", nextUrl);
+    else window.history.pushState(pageHistoryState(slug), "", nextUrl);
+  }, [current, effectiveAppView]);
+
+  useEffect(() => {
+    function handlePageHistory() {
+      // Only react to entries this app created (other code also fires popstate).
+      const slug = slugFromHistoryState(window.history.state);
+      if (slug === null) return;
+      const name = slug ? PAGE_INDEX.get(slug) : "Dashboard";
+      if (!name) return;
+      pageFromHistoryRef.current = true;
+      setCurrent((existing) => (existing === name ? existing : name));
+      setMobileNav(false);
+    }
+    window.addEventListener("popstate", handlePageHistory);
+    return () => window.removeEventListener("popstate", handlePageHistory);
+  }, []);
+
   useEffect(() => {
     if (membershipLoading || !user?.uid || showAdminToggle) return undefined;
     if (adminRecoveryAttemptedRef.current) return undefined;
@@ -2216,6 +2261,12 @@ function AppShell() {
   useEffect(() => {
     if (membershipLoading) return;
     if (parseAppDeepLink(window.location)?.module) return;
+    // A ?page= address picks the page; don't reset it to the dashboard.
+    if (pageFromLocation(PAGE_INDEX, window.location)) {
+      persistAppViewPref("admin");
+      setAppView("admin");
+      return;
+    }
     if (shouldOpenHydrantsModule(window.location)) {
       persistAppViewPref("admin");
       setAppView("admin");
