@@ -955,3 +955,21 @@ exports.registerDepartmentDomain = onCall(async (request) =>
 
 exports.departmentDomainStatus = onCall(async (request) =>
   departmentDomains.departmentDomainStatus(admin.firestore(), request));
+
+// ---------------------------------------------------------------------------
+// Billing lifecycle (manual/check billing): daily reminders, past-due marking,
+// complimentary renewals. Suspension stays a manual Creator Console decision.
+// ---------------------------------------------------------------------------
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const billingLifecycle = require("./lib/billingLifecycle");
+
+exports.billingLifecycleDaily = onSchedule(
+  { schedule: "every day 08:00", timeZone: billingLifecycle.TIME_ZONE, retryCount: 1 },
+  async () => {
+    const result = await billingLifecycle.runBillingLifecycle(admin.firestore());
+    console.log(`Billing lifecycle ${result.today}: ${result.actions.length} action(s)`, result.actions.map((a) => `${a.departmentId}:${a.kind}`));
+  }
+);
+
+exports.previewBillingLifecycle = onCall(async (request) =>
+  billingLifecycle.previewBillingLifecycle(admin.firestore(), request));

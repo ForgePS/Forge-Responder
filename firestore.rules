@@ -96,6 +96,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Billing reminders / past-due / renewal log written by the daily
+    // billingLifecycleDaily function. Creators only.
+    match /platformBillingEvents/{eventId} {
+      allow read: if isPlatformCreator();
+      allow write: if false;
+    }
+
     // Department invites: created/revoked/accepted only by Cloud Functions
     // (functions/lib/invites.js). Department admins can list their own.
     match /invites/{inviteId} {
