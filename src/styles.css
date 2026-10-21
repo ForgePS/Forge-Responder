@@ -1178,9 +1178,12 @@ tbody tr:hover { background: var(--rms-bg-hover); }
 @media (max-width: 980px) {
   .app-shell, .app-shell.nav-collapsed { grid-template-columns: minmax(0, 1fr); } /* minmax(0, …) so wide content can't stretch the page sideways */
   .top-bar { position: sticky; top: 0; z-index: 30; }
-  .side-nav { position: fixed; z-index: 20; top: var(--rms-mobile-nav-top, 108px); bottom: 0; left: 0; width: 238px; transform: translateX(-100%); }
-  .demo-mode-shell .side-nav { top: var(--rms-mobile-nav-top-demo, 156px); }
-  .demo-mode-shell .mobile-scrim { top: var(--rms-mobile-nav-top-demo, 156px); }
+  /* Phone menu: a full-height drawer pinned to the screen's left edge, above the
+     top bar, so it never depends on where the bar is. */
+  .side-nav { position: fixed; z-index: 40; top: 0; bottom: 0; left: 0; width: min(280px, 82vw); padding-top: env(safe-area-inset-top); transform: translateX(-100%); visibility: hidden; transition: transform .2s ease, visibility 0s linear .2s; overscroll-behavior: contain; box-shadow: 4px 0 24px rgba(2,6,23,.35); }
+  .mobile-nav-open .side-nav { visibility: visible; transition: transform .2s ease; }
+  /* 16px text in fields stops iPhones zooming in when one is tapped (and staying zoomed). */
+  input, select, textarea { font-size: 16px !important; }
   .mobile-nav-open .side-nav { transform: translateX(0); }
   .workspace { grid-column: 1; }
   .mobile-menu { display: grid; position: relative; z-index: 31; flex-shrink: 0; }
@@ -1196,7 +1199,7 @@ tbody tr:hover { background: var(--rms-bg-hover); }
   .top-bar-tagline { font-size: 14px; letter-spacing: 0.08em; }
   .global-search { width: auto; flex: 1; }
   .profile-button div { display: none; }
-  .mobile-scrim { position: fixed; top: var(--rms-mobile-nav-top, 108px); right: 0; bottom: 0; left: 0; z-index: 15; display: block; background: rgba(2,6,23,.68); color: transparent; }
+  .mobile-scrim { position: fixed; inset: 0; z-index: 35; display: flex; justify-content: flex-end; align-items: flex-start; padding: calc(14px + env(safe-area-inset-top)) 14px 0 0; background: rgba(2,6,23,.68); color: #fff; touch-action: none; overscroll-behavior: contain; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .dashboard-column:last-child { grid-column: auto; grid-template-columns: 1fr; }
   .dashboard-column:last-child > h2 { grid-column: auto; }

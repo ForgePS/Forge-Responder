@@ -620,7 +620,7 @@ function TopBar({
   const brandSubtitle = profile.shortName || profile.name;
 
   return <header className="top-bar">
-    <button className="icon-button mobile-menu" type="button" onClick={toggleMobileNav}><Menu size={19} /></button>
+    <button className="icon-button mobile-menu" type="button" aria-label="Menu" onClick={toggleMobileNav}><Menu size={19} /></button>
     <div className="top-bar-lead">
       <div className="top-bar-lead-row">
         <div className={`top-brand ${wideBrandLogo ? "top-brand-wide" : ""}`}>
@@ -2425,23 +2425,15 @@ function AppShell() {
     || defaultPlatformConfig.tagline;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
-  // On narrow screens the side menu slides in under the top bar. The bar's height
-  // depends on what wraps, so measure where it ends while the menu is open.
+  // On narrow screens the side menu is a full-height drawer pinned to the
+  // screen edge (styles.css). While it is open, lock the page behind it.
   useEffect(() => {
-    if (!mobileNav || typeof window === "undefined") return undefined;
-    const placeMenu = () => {
-      const bar = document.querySelector(".app-shell .top-bar");
-      if (!bar) return;
-      const top = `${Math.max(0, Math.round(bar.getBoundingClientRect().bottom))}px`;
-      document.documentElement.style.setProperty("--rms-mobile-nav-top", top);
-      document.documentElement.style.setProperty("--rms-mobile-nav-top-demo", top);
-    };
-    placeMenu();
-    window.addEventListener("resize", placeMenu);
-    window.addEventListener("scroll", placeMenu, { passive: true });
+    if (!mobileNav || typeof document === "undefined") return undefined;
+    const html = document.documentElement;
+    const previousOverflow = html.style.overflow;
+    html.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("resize", placeMenu);
-      window.removeEventListener("scroll", placeMenu);
+      html.style.overflow = previousOverflow;
     };
   }, [mobileNav]);
   const [query, setQuery] = useState("");
@@ -3252,7 +3244,7 @@ function AppShell() {
             groups={visibleEmployeeNavGroups}
           />
         )}
-        {mobileNav && <button className="mobile-scrim" onClick={() => setMobileNav(false)}><X size={20} /></button>}
+        {mobileNav && <button className="mobile-scrim" type="button" aria-label="Close menu" onClick={() => setMobileNav(false)}><X size={24} /></button>}
     <section className={`workspace ${isHydrantsView ? "workspace-hydrants" : ""}`}>
       {canGoBack && effectiveAppView === "admin" && (
         <div className="page-back-bar">
