@@ -24,3 +24,4 @@ backups/
 inventory*.txt
 cleanup*.txt
 domains*.txt
+subscriptions*.txt
