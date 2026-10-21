@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Check, Image, RotateCcw } from "lucide-react";
+import { Check, Image, Mail, RotateCcw } from "lucide-react";
+import { httpsCallable } from "firebase/functions";
+import { getFirebaseFunctions } from "../lib/firebaseClient.js";
 import { ADMIN_MODULE_OPTIONS } from "../data/adminRegistry.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
@@ -17,6 +19,49 @@ import PlatformBrandHero from "./PlatformBrandHero.jsx";
 import ObjectUploadField from "./ObjectUploadField.jsx";
 import { resolveAvailableModules } from "../lib/platformInheritance.js";
 import { PREPLAN_FEATURE_KEYS, PREPLAN_FEATURE_LABELS, defaultPreplanFeatures } from "../lib/inspections/index.js";
+
+const EMAIL_STATUS_TEXT = {
+  sent: "Sent. Check your inbox (and spam folder) in a minute.",
+  not_configured: "Email isn't configured: the RESEND_API_KEY secret is missing on Cloud Functions.",
+  failed: "The email provider rejected the message. Check the sender domain is verified in Resend.",
+  no_recipient: "Your account has no email address.",
+};
+
+/** Creator check that invite/billing email delivery works. */
+function EmailTestCard() {
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState("");
+
+  async function sendTest() {
+    setSending(true);
+    setResult("");
+    try {
+      const functions = getFirebaseFunctions();
+      const response = await httpsCallable(functions, "sendTestEmail")({});
+      const { to, status } = response.data || {};
+      setResult(`${to}: ${EMAIL_STATUS_TEXT[status] || status}`);
+    } catch (error) {
+      setResult(error?.message || "Could not send the test email.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <section className="platform-config-card">
+      <header>
+        <strong>Email delivery</strong>
+        <span>Invites and billing reminders are sent from noreply@forgeresponder.com through Resend.</span>
+      </header>
+      <div className="platform-config-actions">
+        <button className="secondary-button" type="button" onClick={sendTest} disabled={sending}>
+          <Mail size={14} /> {sending ? "Sending..." : "Send test email to me"}
+        </button>
+      </div>
+      {result && <p className="auth-help" role="status">{result}</p>}
+    </section>
+  );
+}
 
 export default function PlatformConfigPanel({ onMessage }) {
   const { platformConfig, refreshPlatform, refreshDepartment } = useTenant();
@@ -251,6 +296,8 @@ export default function PlatformConfigPanel({ onMessage }) {
             </label>
           </div>
         </section>
+
+        <EmailTestCard />
 
         <section className="platform-config-card">
           <header>

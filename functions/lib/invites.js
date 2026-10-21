@@ -10,6 +10,7 @@ const crypto = require("node:crypto");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { Timestamp } = require("firebase-admin/firestore");
 const { isPlatformCreator } = require("./access");
+const { sendTextEmail } = require("./mailer");
 
 const INVITE_TTL_DAYS = 14;
 const ADMIN_ROLE_IDS = ["fireChief", "itAdmin"];
@@ -144,38 +145,20 @@ async function validateRoleIds(db, departmentId, roleIds) {
   return requested;
 }
 
-async function sendInviteEmail({ to, departmentName, inviteUrl, invitedByName, sendWithSendGridText }) {
-  const apiKey = String(process.env.SENDGRID_API_KEY || "").trim();
-  const fromEmail = String(process.env.SENDGRID_FROM_EMAIL || "").trim();
-  if (!apiKey || !fromEmail) return "not_configured";
+async function sendInviteEmail({ to, departmentName, inviteUrl, invitedByName, replyTo }) {
   const text = [
-    `${invitedByName || "Your department administrator"} invited you to ${departmentName} on FORGE RMS.`,
+    `${invitedByName || "Your department administrator"} invited you to ${departmentName} on FORGE Responder.`,
     "",
     `Accept the invite: ${inviteUrl}`,
     "",
     `Sign in or create an account using this email address (${to}). The link expires in ${INVITE_TTL_DAYS} days.`,
   ].join("\n");
-  try {
-    await sendWithSendGridText({ apiKey, fromEmail, to, subject: `You're invited to ${departmentName} on FORGE RMS`, text });
-    return "sent";
-  } catch (error) {
-    console.error("Invite email failed", error);
-    return "failed";
-  }
-}
-
-async function sendWithSendGridText({ apiKey, fromEmail, to, subject, text }) {
-  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      personalizations: [{ to: [{ email: to }] }],
-      from: { email: fromEmail, name: "FORGE RMS" },
-      subject,
-      content: [{ type: "text/plain", value: text }],
-    }),
+  return sendTextEmail({
+    to: [to],
+    replyTo,
+    subject: `You're invited to ${departmentName} on FORGE Responder`,
+    text,
   });
-  if (!response.ok) throw new Error(`SendGrid ${response.status}: ${await response.text()}`);
 }
 
 async function createInvite(db, request) {
@@ -232,7 +215,8 @@ async function createInvite(db, request) {
       departmentName,
       inviteUrl,
       invitedByName: request.auth.token?.name || request.auth.token?.email,
-      sendWithSendGridText,
+      // Replies go to the admin who sent the invite.
+      replyTo: normalizeEmail(request.auth.token?.email),
     });
   await db.doc(`invites/${inviteId}`).update({ emailStatus });
 

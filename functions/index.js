@@ -51,6 +51,11 @@ const twilioAccountSid = defineSecret("TWILIO_ACCOUNT_SID");
 const twilioAuthToken = defineSecret("TWILIO_AUTH_TOKEN");
 const twilioFromNumber = defineSecret("TWILIO_FROM_NUMBER");
 
+// Email (Resend). Set with: firebase functions:secrets:set RESEND_API_KEY
+// Every function that sends email must list it in `secrets`.
+const resendApiKey = defineSecret("RESEND_API_KEY");
+const EMAIL_SECRETS = [resendApiKey];
+
 function buildSmsBody(message = "", record = {}) {
   const custom = String(message || record.message || "").trim();
   const parts = [
@@ -933,7 +938,7 @@ exports.hydrantDamageAckPortalSubmit = onCall(
 // ---------------------------------------------------------------------------
 const invites = require("./lib/invites");
 
-exports.createDepartmentInvite = onCall(async (request) =>
+exports.createDepartmentInvite = onCall({ secrets: EMAIL_SECRETS }, async (request) =>
   invites.createInvite(admin.firestore(), request));
 
 exports.revokeDepartmentInvite = onCall(async (request) =>
@@ -964,7 +969,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const billingLifecycle = require("./lib/billingLifecycle");
 
 exports.billingLifecycleDaily = onSchedule(
-  { schedule: "every day 08:00", timeZone: billingLifecycle.TIME_ZONE, retryCount: 1 },
+  { schedule: "every day 08:00", timeZone: billingLifecycle.TIME_ZONE, retryCount: 1, secrets: EMAIL_SECRETS },
   async () => {
     const result = await billingLifecycle.runBillingLifecycle(admin.firestore());
     console.log(`Billing lifecycle ${result.today}: ${result.actions.length} action(s)`, result.actions.map((a) => `${a.departmentId}:${a.kind}`));
@@ -973,3 +978,8 @@ exports.billingLifecycleDaily = onSchedule(
 
 exports.previewBillingLifecycle = onCall(async (request) =>
   billingLifecycle.previewBillingLifecycle(admin.firestore(), request));
+
+// Creator-only: send a test email to yourself to confirm email delivery works.
+const { sendTestEmail } = require("./lib/emailTest");
+exports.sendTestEmail = onCall({ secrets: EMAIL_SECRETS }, async (request) =>
+  sendTestEmail(admin.firestore(), request));
