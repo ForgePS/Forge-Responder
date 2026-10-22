@@ -23,6 +23,7 @@ import { resolveAvailableModules } from "../lib/platformInheritance.js";
 import { canManageBranchSubscription, canViewBranchSubscription, hasPermission } from "../lib/permissions.js";
 import { resolveDepartmentLogoUrl } from "../lib/brandAssets.js";
 import { buildDepartmentLogoPath } from "../lib/storagePaths.js";
+import { disabledModulesFor } from "../lib/moduleAccess.js";
 import {
   buildStationDetailsFromProfile,
   normalizeStationDetails,
@@ -193,14 +194,16 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
         subscription: _subscription,
         customerSubscription: _customerSubscription,
         subscriptionAccessAllowed: _subscriptionAccessAllowed,
+        // Display-only: the effective module list comes from the server's entitlements.
+        enabledModules: _effectiveModules,
+        disabledModules: _disabledModules,
         ...storedSettings
       } = settings || {};
       const settingsPayload = {
         ...storedSettings,
         departmentId,
-        enabledModules: canManageModules
-          ? enabledModules
-          : (settings.enabledModules || []),
+        // Only platform creators change which modules are off (rules refuse others).
+        ...(canManageModules ? { disabledModules: disabledModulesFor(enabledModules) } : {}),
         shiftRotation: canManageOperations
           ? normalizeShiftRotation(shiftRotation, profilePayload.shifts)
           : normalizeShiftRotation(settings.shiftRotation, profilePayload.shifts),

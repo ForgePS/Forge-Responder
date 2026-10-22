@@ -93,8 +93,9 @@ export async function saveInternalEmailGroups(departmentId, settings, groups = [
     throw new Error("Database unavailable");
   }
 
+  // Only this field (merge keeps the rest): the in-memory settings carry
+  // display-only values (effective modules, subscription) that rules refuse.
   const payload = {
-    ...settings,
     departmentId,
     internalEmailGroups: groups,
     updatedAt: new Date().toISOString(),

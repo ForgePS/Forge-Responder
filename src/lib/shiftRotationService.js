@@ -8,8 +8,9 @@ export async function saveShiftRotation(departmentId, settings, shiftRotation, p
     throw new Error("Database unavailable");
   }
 
+  // Only this field (merge keeps the rest): the in-memory settings carry
+  // display-only values (effective modules, subscription) that rules refuse.
   const payload = {
-    ...settings,
     departmentId,
     shiftRotation: normalizeShiftRotation(shiftRotation, profileShifts),
     updatedAt: new Date().toISOString(),

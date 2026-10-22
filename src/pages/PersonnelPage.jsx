@@ -17,6 +17,9 @@ import {
 import PersonnelDetailView from "../components/personnel/PersonnelDetailView.jsx";
 import PersonnelImportModal from "../components/personnel/PersonnelImportModal.jsx";
 import PersonnelListView from "../components/personnel/PersonnelListView.jsx";
+import { useTenant } from "../context/TenantContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import { limitCheck, limitMessage } from "../lib/moduleAccess.js";
 
 export default function PersonnelPage({
   query,
@@ -31,6 +34,8 @@ export default function PersonnelPage({
   onInitialPersonConsumed,
   onOpenEmployeeProfile,
 }) {
+  const { entitlements } = useTenant();
+  const { isCreator } = useAuth();
   const safeRecords = Array.isArray(records) ? records : [];
   const [view, setView] = useState("list");
   const [selectedId, setSelectedId] = useState("");
@@ -236,7 +241,18 @@ export default function PersonnelPage({
     }));
   }
 
+  /** Whether `adding` more people fit the plan; shows the message when not. */
+  function personnelFit(adding) {
+    if (isCreator) return true;
+    // Count what's on screen (fresher than the server's tally), at least the server's.
+    const used = Math.max(safeRecords.length, Number(entitlements?.usage?.personnel || 0));
+    const check = limitCheck({ ...entitlements, usage: { personnel: used } }, "maxPersonnel", "personnel", adding);
+    if (!check.allowed) setSavedMessage(limitMessage("personnel records", check));
+    return check.allowed;
+  }
+
   function addPersonnel() {
+    if (!personnelFit(1)) return;
     const now = new Date().toISOString();
     const newPerson = createEmptyPersonnelRecord({
       id: nextPersonnelRecordId(safeRecords, { prefix: resolvePersonnelIdPrefix(departmentId) }),
@@ -282,6 +298,7 @@ export default function PersonnelPage({
 
   async function handlePersonnelImport(outcome = {}) {
     if (!setRecords || !outcome.records) return;
+    if (Number(outcome.created || 0) > 0 && !personnelFit(Number(outcome.created))) return;
     try {
       let records = outcome.records;
       if (departmentId) {
@@ -345,6 +362,7 @@ export default function PersonnelPage({
               </div>
             </div>
           </section>
+          {savedMessage && <div className="success-banner" role="status">{savedMessage}</div>}
           <PersonnelListView
             records={safeRecords}
             globalQuery={query}

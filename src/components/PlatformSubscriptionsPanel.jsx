@@ -20,6 +20,7 @@ import {
   syncCustomerSubscriptions,
   updateSubscriptionStatus,
 } from "../lib/platformSubscriptionService.js";
+import { ADMIN_MODULE_OPTIONS } from "../data/adminRegistry.js";
 
 const EMPTY_PLAN_FORM = {
   id: "",
@@ -30,6 +31,7 @@ const EMPTY_PLAN_FORM = {
   maxPersonnel: 0,
   maxPortalUsers: 0,
   maxStations: 1,
+  modules: [],
   isActive: true,
   sortOrder: 100,
   highlight: "",
@@ -550,6 +552,7 @@ export default function PlatformSubscriptionsPanel({ onMessage, onOpenDepartment
                     <div><span>Personnel</span><strong>{plan.maxPersonnel || "Unlimited"}</strong></div>
                     <div><span>Portal users</span><strong>{plan.maxPortalUsers || "Unlimited"}</strong></div>
                     <div><span>Stations</span><strong>{plan.maxStations || "Unlimited"}</strong></div>
+                    <div><span>Modules</span><strong>{plan.modules?.length ? `${plan.modules.length} of ${ADMIN_MODULE_OPTIONS.length}` : "All"}</strong></div>
                   </div>
                 </div>
               </article>
@@ -596,6 +599,35 @@ export default function PlatformSubscriptionsPanel({ onMessage, onOpenDepartment
                   <span>Max stations (0 = unlimited)</span>
                   <input type="number" value={String(planForm.maxStations ?? 0)} onChange={(event) => setPlanForm((prev) => ({ ...prev, maxStations: Number(event.target.value) }))} />
                 </label>
+                <fieldset className="plan-module-picker" style={{ gridColumn: "1 / -1" }}>
+                  <legend>Modules in this plan</legend>
+                  <p className="auth-help" style={{ margin: "0 0 6px" }}>
+                    Departments on this plan can use only the ticked modules. With every module ticked, modules added later are included automatically.
+                  </p>
+                  <div className="module-toggle-grid">
+                    {ADMIN_MODULE_OPTIONS.map((module) => {
+                      const ticked = !planForm.modules?.length || planForm.modules.includes(module.key);
+                      const alwaysOn = ["dashboard", "administration"].includes(module.key);
+                      return (
+                        <label key={module.key} className="module-toggle">
+                          <input
+                            type="checkbox"
+                            checked={ticked || alwaysOn}
+                            disabled={alwaysOn}
+                            onChange={() => setPlanForm((prev) => {
+                              const current = prev.modules?.length ? prev.modules : ADMIN_MODULE_OPTIONS.map((m) => m.key);
+                              const next = current.includes(module.key)
+                                ? current.filter((key) => key !== module.key)
+                                : [...current, module.key];
+                              return { ...prev, modules: next.length === ADMIN_MODULE_OPTIONS.length ? [] : next };
+                            })}
+                          />
+                          <span>{module.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
                 <label>
                   <span>Sort order</span>
                   <input type="number" value={String(planForm.sortOrder ?? 0)} onChange={(event) => setPlanForm((prev) => ({ ...prev, sortOrder: Number(event.target.value) }))} />

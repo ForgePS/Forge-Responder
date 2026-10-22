@@ -23,6 +23,7 @@ import { ensureDefaultRoles } from "./roleService.js";
 import { defaultSubscriptionDates, normalizeSubscription } from "./subscriptionUtils.js";
 import { normalizeDepartmentStateId } from "./departmentBranchUtils.js";
 import { GHOST_DEPARTMENT_IDS, RESERVED_GATEWAY_PATHS } from "./gatewayRouting.js";
+import { disabledModulesFor } from "./moduleAccess.js";
 
 async function resolveDepartmentRegistryProfile(departmentId) {
   if (isDemoDepartment(departmentId)) {
@@ -263,13 +264,14 @@ export async function saveDepartmentSubscription(departmentId, subscription = {}
   return normalized;
 }
 
+/** Saves which modules are switched OFF (platform creators only, per the rules). */
 export async function saveDepartmentModules(departmentId, enabledModules = []) {
   const db = getFirestoreDb();
   if (!db || !departmentId || isPlatformScope(departmentId)) return null;
 
   const payload = {
     departmentId,
-    enabledModules,
+    disabledModules: disabledModulesFor(enabledModules),
     updatedAt: new Date().toISOString()
   };
   await setDoc(doc(db, "departments", departmentId, "settings", "main"), payload, { merge: true });

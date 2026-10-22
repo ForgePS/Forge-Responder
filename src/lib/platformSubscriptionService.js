@@ -18,6 +18,7 @@ import { listPlatformDepartments, loadDepartmentSettings } from "./platformServi
 import { notifyDepartmentsChanged } from "./departmentProvisioning.js";
 import { PLATFORM_SCOPE_ID, isPlatformScope } from "./tenantPaths.js";
 import { normalizeSubscription } from "./subscriptionUtils.js";
+import { MODULE_KEYS } from "./moduleAccess.js";
 
 /**
  * @typedef {Object} SubscriptionPlan
@@ -84,6 +85,8 @@ function mapPlan(id, data) {
     maxPersonnel: Number(data.maxPersonnel ?? data.maxStudents ?? 0),
     maxPortalUsers: Number(data.maxPortalUsers ?? 0),
     maxStations: Number(data.maxStations ?? data.maxAcademyTenants ?? 0),
+    // Modules included in the plan; empty = every module (new ones included).
+    modules: Array.isArray(data.modules) ? data.modules.filter((key) => MODULE_KEYS.includes(key)) : [],
     isActive: data.isActive !== false,
     sortOrder: Number(data.sortOrder ?? 0),
     highlight: String(data.highlight ?? ""),
@@ -198,6 +201,12 @@ function nowIso() {
 }
 
 /** @param {Partial<SubscriptionPlan> & { id: string }} input @param {string} userId */
+/** Every module ticked is stored as [] (= all), so future modules are included. */
+function planModulesToStore(modules) {
+  const known = Array.isArray(modules) ? MODULE_KEYS.filter((key) => modules.includes(key)) : [];
+  return known.length === MODULE_KEYS.length ? [] : known;
+}
+
 export async function saveSubscriptionPlan(input, userId) {
   const db = requireDb();
   const planId = slugifyDepartmentId(input.id || input.name || "plan");
@@ -209,6 +218,7 @@ export async function saveSubscriptionPlan(input, userId) {
     maxPersonnel: Math.max(Number(input.maxPersonnel ?? 0), 0),
     maxPortalUsers: Math.max(Number(input.maxPortalUsers ?? 0), 0),
     maxStations: Math.max(Number(input.maxStations ?? 0), 0),
+    modules: planModulesToStore(input.modules),
     isActive: input.isActive !== false,
     sortOrder: Number(input.sortOrder ?? 0),
     highlight: input.highlight?.trim() ?? "",

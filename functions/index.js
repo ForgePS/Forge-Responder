@@ -2,7 +2,7 @@ const admin = require("firebase-admin");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const twilio = require("twilio");
-const { assertDepartmentAccess, assertDepartmentAccessOrPublicGateway, assertDepartmentManage, assertPlatformSuperAdmin } = require("./lib/access");
+const { assertDepartmentAccess, assertDepartmentAccessOrPublicGateway, assertDepartmentManage, assertPlatformSuperAdmin, isPlatformCreator } = require("./lib/access");
 const { resolvePersonnelPhones } = require("./lib/personnel");
 const { toUsE164 } = require("./lib/phone");
 const {
@@ -978,6 +978,8 @@ exports.billingLifecycleDaily = onSchedule(
   async () => {
     const result = await billingLifecycle.runBillingLifecycle(admin.firestore());
     console.log(`Billing lifecycle ${result.today}: ${result.actions.length} action(s)`, result.actions.map((a) => `${a.departmentId}:${a.kind}`));
+    // Nightly safety net: re-derive every department's entitlements.
+    await entitlements.refreshAll(admin.firestore());
   }
 );
 
@@ -999,3 +1001,50 @@ exports.departmentUsage = onCall({ memory: "512MiB", timeoutSeconds: 120 }, asyn
 
 exports.exportDepartmentData = onCall({ memory: "1GiB", timeoutSeconds: 540 }, async (request) =>
   platformConsole.exportDepartmentData(admin.firestore(), admin.storage().bucket(), request));
+
+// ---- Entitlements (plan modules and limits, enforced by firestore.rules) ----
+// platformEntitlements/<departmentId> is derived from the subscription, plan,
+// department settings (disabledModules) and usage; these keep it current.
+const entitlements = require("./lib/entitlements");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+
+const refreshEntitlementsFor = (departmentId) =>
+  entitlements.refreshDepartment(admin.firestore(), departmentId)
+    .catch((error) => console.error(`Entitlements refresh failed for ${departmentId}`, error));
+
+exports.entitlementsOnSubscription = onDocumentWritten("platformSubscriptions/{departmentId}", (event) =>
+  refreshEntitlementsFor(event.params.departmentId));
+
+exports.entitlementsOnPlan = onDocumentWritten("platformSubscriptionPlans/{planId}", (event) =>
+  entitlements.refreshForPlan(admin.firestore(), event.params.planId));
+
+exports.entitlementsOnSettings = onDocumentWritten("departments/{departmentId}/settings/main", (event) => {
+  if (!entitlements.modulesChanged(event.data?.before?.data(), event.data?.after?.data())) return null;
+  return refreshEntitlementsFor(event.params.departmentId);
+});
+
+exports.entitlementsOnProfile = onDocumentWritten("departments/{departmentId}/profile/main", (event) => {
+  if (!entitlements.stationsChanged(event.data?.before?.data(), event.data?.after?.data())) return null;
+  return refreshEntitlementsFor(event.params.departmentId);
+});
+
+exports.entitlementsOnMembers = onDocumentWritten("departments/{departmentId}/users/{uid}", (event) =>
+  refreshEntitlementsFor(event.params.departmentId));
+
+exports.entitlementsOnPersonnel = onDocumentWritten(
+  `departments/{departmentId}/lists/${entitlements.PERSONNEL_LIST}/items/{itemId}`,
+  (event) => {
+    // Only adds and removes change the count.
+    if (event.data?.before?.exists && event.data?.after?.exists) return null;
+    return refreshEntitlementsFor(event.params.departmentId);
+  }
+);
+
+/** Creators: re-derive every department's entitlements now. */
+exports.refreshEntitlements = onCall({ timeoutSeconds: 300 }, async (request) => {
+  if (!request.auth?.uid || !(await isPlatformCreator(admin.firestore(), request.auth))) {
+    throw new HttpsError("permission-denied", "Only platform creators can refresh entitlements.");
+  }
+  const results = await entitlements.refreshAll(admin.firestore());
+  return { count: results.length };
+});

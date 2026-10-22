@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { useAuth } from "./AuthContext.jsx";
 import { normalizeShiftRotation } from "../data/defaultShiftRotation.js";
 import { normalizePayPeriod } from "../lib/payPeriods.js";
@@ -16,6 +16,7 @@ import {
   resolveAvailableModules,
 } from "../lib/platformInheritance.js";
 import { loadPlatformConfig } from "../lib/platformService.js";
+import { effectiveModules } from "../lib/moduleAccess.js";
 import {
   customerSubscriptionToLegacyTerm,
   getCustomerSubscription,
@@ -369,6 +370,33 @@ export function TenantProvider({ children }) {
   const refreshDepartment = useCallback(() => setDepartmentRefreshKey((value) => value + 1), []);
   const refreshPlatform = useCallback(() => setPlatformRefreshKey((value) => value + 1), []);
 
+  // Plan modules and limits, kept by the server (platformEntitlements/<id>).
+  const [entitlements, setEntitlements] = useState(null);
+  useEffect(() => {
+    setEntitlements(null);
+    const firestoreDb = getFirestoreDb();
+    if (inPlatformScope || !departmentId || !firebaseEnabled || !firestoreDb) return undefined;
+    return onSnapshot(
+      doc(firestoreDb, "platformEntitlements", departmentId),
+      (snap) => setEntitlements(snap.exists() ? snap.data() : null),
+      () => setEntitlements(null),
+    );
+  }, [departmentId, inPlatformScope]);
+
+  // The modules this department can use: the server's list once it exists,
+  // otherwise everything except what's switched off. settings.enabledModules
+  // carries this so the menu and pages follow it.
+  const enabledModules = useMemo(
+    () => (Array.isArray(entitlements?.modules) && entitlements.modules.length
+      ? entitlements.modules
+      : effectiveModules({ disabledModules: settings?.disabledModules })),
+    [entitlements, settings?.disabledModules],
+  );
+  const effectiveSettings = useMemo(
+    () => (inPlatformScope ? settings : { ...settings, enabledModules }),
+    [settings, enabledModules, inPlatformScope],
+  );
+
   const value = useMemo(
     () => ({
       departmentId,
@@ -377,7 +405,8 @@ export function TenantProvider({ children }) {
       gatewayReady,
       gatewayError,
       profile,
-      settings,
+      settings: effectiveSettings,
+      entitlements,
       platformConfig,
       isPlatformScope: inPlatformScope,
       ready: ready && gatewayReady,
@@ -386,12 +415,10 @@ export function TenantProvider({ children }) {
       refreshPlatform,
       isModuleEnabled: (moduleKey) => {
         if (inPlatformScope) return false;
-        const available = resolveAvailableModules(platformConfig?.availableModules);
-        if (!available.includes(moduleKey)) return false;
-        return settings.enabledModules?.includes(moduleKey) ?? true;
+        return enabledModules.includes(moduleKey);
       }
     }),
-    [departmentId, gatewayDepartmentId, gatewayRecord, gatewayReady, gatewayError, profile, settings, platformConfig, inPlatformScope, ready, refreshDepartment]
+    [departmentId, gatewayDepartmentId, gatewayRecord, gatewayReady, gatewayError, profile, effectiveSettings, entitlements, enabledModules, platformConfig, inPlatformScope, ready, refreshDepartment]
   );
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;

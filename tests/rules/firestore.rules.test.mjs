@@ -178,12 +178,116 @@ describe("per-item lists", () => {
   });
 });
 
-describe("department admins", () => {
-  it("can add and edit members", async () => {
+describe("plan entitlements", () => {
+  const ent = (extra = {}) => ({
+    departmentId: A,
+    modules: ["dashboard", "personnel", "training", "administration"],
+    limits: { maxPersonnel: 2, maxPortalUsers: 0, maxStations: 1 },
+    usage: { personnel: 1, portalUsers: 2, stations: 1 },
+    ...extra,
+  });
+  const people = `departments/${A}/lists/hlfd-rms-personnel`;
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `platformEntitlements/${A}`), ent());
+      await setDoc(doc(db, people), { storage: "items" });
+      await setDoc(doc(db, `${people}/items/P1`), { id: "P1", _order: 1 });
+      await setDoc(doc(db, `departments/${A}/lists/hlfd-rms-apparatus`), { storage: "items" });
+      await setDoc(doc(db, `departments/${A}/lists/hlfd-rms-apparatus/items/E1`), { id: "E1", _order: 1 });
+      await setDoc(doc(db, `departments/${A}/hydrants/h1`), { id: "h1" });
+      await setDoc(doc(db, `departments/${A}/profile/main`), { name: "A", stationDetails: [{ name: "Station 1" }] });
+      await setDoc(doc(db, `departments/${A}/settings/main`), { enabledModules: ["personnel"] });
+    });
+  });
+
+  it("switched-off modules can be read but not changed", async () => {
+    const db = memberA().firestore();
+    await assertSucceeds(getDoc(doc(db, `departments/${A}/lists/hlfd-rms-apparatus/items/E1`)));
+    await assertFails(setDoc(doc(db, `departments/${A}/lists/hlfd-rms-apparatus/items/E2`), { id: "E2", _order: 2 }));
+    await assertFails(deleteDoc(doc(db, `departments/${A}/lists/hlfd-rms-apparatus/items/E1`)));
+    await assertSucceeds(getDoc(doc(db, `departments/${A}/hydrants/h1`)));
+    await assertFails(setDoc(doc(db, `departments/${A}/hydrants/h2`), { id: "h2" }));
+    await assertFails(setDoc(doc(db, `departments/${A}/fleetAssets/f1`), { id: "f1" }));
+    await assertFails(setDoc(doc(db, `departments/${A}/inspections/i9`), { id: "i9" }));
+  });
+
+  it("switched-on modules work as normal", async () => {
+    const db = memberA().firestore();
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/lists/hlfd-rms-training/items/T1`), { id: "T1", _order: 1 }));
+    // Collections that belong to no module are not gated.
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/auditLogs/l2`), { action: "x" }));
+    // Incidents belong to NERIS Fire Reports, which is off here.
+    await assertFails(setDoc(doc(db, `departments/${A}/incidents/i2`), { summary: "x" }));
+  });
+
+  it("platform creators are not limited", async () => {
+    const db = creator().firestore();
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/hydrants/h3`), { id: "h3" }));
+    await assertSucceeds(setDoc(doc(db, `${people}/items/P9`), { id: "P9", _order: 9 }));
+  });
+
+  it("personnel can be added up to the plan limit, never past it", async () => {
+    const db = memberA().firestore();
+    await assertSucceeds(setDoc(doc(db, `${people}/items/P2`), { id: "P2", _order: 2 }));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `platformEntitlements/${A}`), ent({ usage: { personnel: 2 } }));
+    });
+    await assertFails(setDoc(doc(db, `${people}/items/P3`), { id: "P3", _order: 3 }));
+    // Existing records stay editable and removable at the limit.
+    await assertSucceeds(setDoc(doc(db, `${people}/items/P1`), { id: "P1", _order: 1, rank: "Captain" }));
+    await assertSucceeds(deleteDoc(doc(db, `${people}/items/P1`)));
+  });
+
+  it("an older array personnel list cannot grow past the limit", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), people), { items: [{ id: "P1" }, { id: "P2" }] });
+    });
+    const db = memberA().firestore();
+    await assertFails(setDoc(doc(db, people), { items: [{ id: "P1" }, { id: "P2" }, { id: "P3" }] }));
+    await assertSucceeds(setDoc(doc(db, people), { items: [{ id: "P1" }, { id: "P2", rank: "FF" }] }));
+  });
+
+  it("stations cannot grow past the plan limit", async () => {
     const db = adminA().firestore();
-    await assertSucceeds(setDoc(doc(db, `departments/${A}/users/new-user`), membership("new-user", A)));
+    await assertFails(setDoc(doc(db, `departments/${A}/profile/main`), { stationDetails: [{ name: "1" }, { name: "2" }] }, { merge: true }));
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/profile/main`), { stationDetails: [{ name: "Station 1 (HQ)" }] }, { merge: true }));
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/profile/main`), { name: "Renamed" }, { merge: true }));
+  });
+
+  it("only platform creators change a department's module list", async () => {
+    await assertFails(setDoc(doc(adminA().firestore(), `departments/${A}/settings/main`), { enabledModules: ["personnel", "hydrants"] }, { merge: true }));
+    await assertSucceeds(setDoc(doc(adminA().firestore(), `departments/${A}/settings/main`), { timezone: "America/Chicago" }, { merge: true }));
+    await assertSucceeds(setDoc(doc(creator().firestore(), `departments/${A}/settings/main`), { enabledModules: ["personnel", "hydrants"] }, { merge: true }));
+  });
+
+  it("nobody but the server writes entitlements; the department can read its own", async () => {
+    await assertFails(setDoc(doc(adminA().firestore(), `platformEntitlements/${A}`), ent({ modules: ["hydrants"] })));
+    await assertFails(setDoc(doc(creator().firestore(), `platformEntitlements/${A}`), ent()));
+    await assertSucceeds(getDoc(doc(memberA().firestore(), `platformEntitlements/${A}`)));
+    await assertFails(getDoc(doc(memberB().firestore(), `platformEntitlements/${A}`)));
+  });
+
+  it("departments without an entitlements record are not restricted yet", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => deleteDoc(doc(ctx.firestore(), `platformEntitlements/${A}`)));
+    const db = memberA().firestore();
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/hydrants/h4`), { id: "h4" }));
+    await assertSucceeds(setDoc(doc(db, `${people}/items/P5`), { id: "P5", _order: 5 }));
+  });
+});
+
+describe("department admins", () => {
+  it("edit members, but add people only by invite", async () => {
+    const db = adminA().firestore();
+    // Invites check the plan's portal-user limit; direct creation would skip it.
+    await assertFails(setDoc(doc(db, `departments/${A}/users/new-user`), membership("new-user", A)));
     await assertSucceeds(updateDoc(doc(db, `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
     await assertSucceeds(setDoc(doc(db, `departments/${A}/roles/firefighter`), { name: "FF", permissions: {} }));
+  });
+
+  it("platform creators can still add members directly", async () => {
+    const db = creator().firestore();
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/users/new-user`), membership("new-user", A)));
   });
 
   it("cannot grant platform-creator flags", async () => {

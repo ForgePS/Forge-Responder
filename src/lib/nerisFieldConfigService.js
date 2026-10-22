@@ -13,8 +13,9 @@ export async function saveNerisFieldConfig(departmentId, fieldConfig, existingSe
   }
 
   const normalized = normalizeNerisFieldConfig(fieldConfig);
+  // Only this field (merge keeps the rest): the in-memory settings carry
+  // display-only values (effective modules, subscription) that rules refuse.
   const payload = {
-    ...existingSettings,
     departmentId,
     nerisFieldConfig: normalized,
     updatedAt: new Date().toISOString(),

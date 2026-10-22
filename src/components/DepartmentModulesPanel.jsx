@@ -10,6 +10,7 @@ import {
   saveDepartmentModules
 } from "../lib/platformService.js";
 import { resolveAvailableModules } from "../lib/platformInheritance.js";
+import { effectiveModules } from "../lib/moduleAccess.js";
 
 export default function DepartmentModulesPanel({ onMessage, onOpenDepartment }) {
   const { platformConfig } = useTenant();
@@ -44,7 +45,8 @@ export default function DepartmentModulesPanel({ onMessage, onOpenDepartment }) 
     if (!departmentId) return;
     const settings = await loadDepartmentSettings(departmentId);
     const allowed = new Set(availableModules.map((module) => module.key));
-    setEnabledModules((settings.enabledModules || []).filter((key) => allowed.has(key)));
+    // Stored as switched-off modules; everything else is on.
+    setEnabledModules(effectiveModules({ disabledModules: settings.disabledModules }).filter((key) => allowed.has(key)));
   }
 
   useEffect(() => {
@@ -169,7 +171,7 @@ function DepartmentModuleSummary({ department, availableModules, active, onSelec
     loadDepartmentSettings(department.id).then((settings) => {
       if (cancelled) return;
       const allowed = new Set(availableModules.map((module) => module.key));
-      const enabled = (settings.enabledModules || []).filter((key) => allowed.has(key));
+      const enabled = effectiveModules({ disabledModules: settings.disabledModules }).filter((key) => allowed.has(key));
       setCount(enabled.length);
     });
     return () => { cancelled = true; };

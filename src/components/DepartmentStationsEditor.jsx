@@ -1,5 +1,8 @@
 import { CirclePlus, Trash2 } from "lucide-react";
 import AdminTextInput from "./AdminTextInput.jsx";
+import { useTenant } from "../context/TenantContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import { limitCheck, limitMessage } from "../lib/moduleAccess.js";
 import {
   createEmptyStation,
   normalizeStationDetails,
@@ -11,6 +14,11 @@ export default function DepartmentStationsEditor({
   onChange,
 }) {
   const stations = normalizeStationDetails(value);
+  const { entitlements } = useTenant();
+  const { isCreator } = useAuth();
+  // The plan's station limit (the database refuses saves past it too).
+  const stationLimit = limitCheck({ ...entitlements, usage: { stations: stations.length } }, "maxStations", "stations", 1);
+  const atLimit = !isCreator && !stationLimit.allowed;
 
   function updateStation(index, patch) {
     onChange(
@@ -35,10 +43,11 @@ export default function DepartmentStationsEditor({
           <strong>Station Information</strong>
           <p className="auth-help">Add address and contact details for each station in this department.</p>
         </div>
-        <button className="secondary-button" type="button" onClick={addStation}>
+        <button className="secondary-button" type="button" onClick={addStation} disabled={atLimit}>
           <CirclePlus size={14} /> Add station
         </button>
       </header>
+      {atLimit && <p className="auth-help" role="status">{limitMessage("stations", stationLimit)}</p>}
 
       {!stations.length ? (
         <p className="auth-help">No stations configured yet. Add a station to get started.</p>
