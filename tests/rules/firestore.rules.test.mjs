@@ -135,6 +135,49 @@ describe("members keep normal access", () => {
   });
 });
 
+describe("per-item lists", () => {
+  const header = `departments/${A}/lists/hlfd-rms-training`;
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, header), { storage: "items", departmentId: A });
+      await setDoc(doc(db, `${header}/items/T1`), { id: "T1", title: "Live fire", _order: 1024 });
+      await setDoc(doc(db, `departments/${A}/lists/hlfd-rms-active911-alerts`), { storage: "items" });
+      await setDoc(doc(db, `departments/${A}/lists/hlfd-rms-active911-alerts/items/a1`), { id: "a1", _order: 1024 });
+    });
+  });
+
+  it("members read and write their own department's items", async () => {
+    const db = memberA().firestore();
+    await assertSucceeds(getDoc(doc(db, `${header}/items/T1`)));
+    await assertSucceeds(setDoc(doc(db, `${header}/items/T2`), { id: "T2", _order: 2048 }));
+    await assertSucceeds(deleteDoc(doc(db, `${header}/items/T1`)));
+  });
+
+  it("other departments can't read or write them", async () => {
+    const db = memberB().firestore();
+    await assertFails(getDoc(doc(db, `${header}/items/T1`)));
+    await assertFails(setDoc(doc(db, `${header}/items/T9`), { id: "T9", _order: 1 }));
+  });
+
+  it("an items array can't be written onto a per-item list's header", async () => {
+    const db = memberA().firestore();
+    await assertFails(setDoc(doc(db, header), { items: [{ id: "X" }] }, { merge: true }));
+    await assertSucceeds(setDoc(doc(db, header), { updatedAt: "now" }, { merge: true }));
+  });
+
+  it("an older array list can still be saved", async () => {
+    const db = memberA().firestore();
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/lists/hlfd-rms-personnel`), { items: [{ id: "P2" }] }, { merge: true }));
+  });
+
+  it("public alert lists stay readable per item", async () => {
+    const db = env.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(db, `departments/${A}/lists/hlfd-rms-active911-alerts/items/a1`)));
+    await assertFails(getDoc(doc(db, `${header}/items/T1`)));
+  });
+});
+
 describe("department admins", () => {
   it("can add and edit members", async () => {
     const db = adminA().firestore();

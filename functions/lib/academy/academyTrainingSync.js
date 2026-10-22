@@ -3,6 +3,8 @@
  * so they appear in Employee Portal → My Training.
  */
 
+const { readListItems, replaceListItems } = require("../listStore");
+
 const TRAINING_LIST_KEY = "hlfd-rms-training";
 const PERSONNEL_LIST_KEYS = ["hlfd-rms-personnel", "personnel"];
 
@@ -32,24 +34,11 @@ function enrollmentStatusLabel(status) {
 }
 
 async function loadListItems(db, departmentId, listKey) {
-  const snap = await db.doc(`departments/${departmentId}/lists/${listKey}`).get();
-  if (!snap.exists) return [];
-  const items = snap.data()?.items;
-  return Array.isArray(items) ? items : [];
+  return readListItems(db, departmentId, listKey);
 }
 
 async function saveListItems(db, departmentId, listKey, items, updatedBy = "academy-sync") {
-  const now = new Date().toISOString();
-  await db.doc(`departments/${departmentId}/lists/${listKey}`).set(
-    {
-      items,
-      departmentId,
-      updatedAt: now,
-      updated_at: now,
-      updatedBy,
-    },
-    { merge: true }
-  );
+  await replaceListItems(db, departmentId, listKey, items, { updatedBy });
 }
 
 async function loadPersonnelItems(db, departmentId) {

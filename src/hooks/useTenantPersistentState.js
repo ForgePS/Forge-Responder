@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getFirestoreDb, firebaseEnabled } from "../lib/firebaseClient.js";
-import { departmentListPath, departmentListSegments, isPlatformScope } from "../lib/tenantPaths.js";
+import { departmentListPath, isPlatformScope } from "../lib/tenantPaths.js";
 import { writeAuditLog } from "../lib/auditService.js";
 import { restoreItemsFromFirestore, sanitizeItemsForFirestore } from "../lib/firestoreSanitize.js";
 import { loadTenantListFromFirestore, resolveTenantListItems } from "../lib/tenantListLoader.js";
 import { migrateTenantListItems, tenantListItemsChanged } from "../lib/dataMigrations.js";
 import { withTenantListPayload } from "../lib/tenantRecord.js";
+import { ensureItemIds, entriesFromRecords, isItemsStorage, itemsFromRecords, planListWrites } from "../lib/listItemsPlan.js";
+import { commitListPlan, itemsHeaderPayload, listHeaderRef, listItemsQuery, recordsFromSnapshot } from "../lib/tenantListStore.js";
 
 import { LIST_MODULE_NAMES } from "../lib/tenantListKeys.js";
 
@@ -34,6 +36,12 @@ function readInitialItems(cacheKey, listKey, fallback) {
   return restoreItemsFromFirestore(fallback, listKey);
 }
 
+/**
+ * A department list kept in Firestore and mirrored in local state.
+ * Lists stored per item (header { storage: "items" }) save only the items that
+ * changed; older lists stored as one array record keep working as before until
+ * they are migrated. A list that doesn't exist yet is created per item.
+ */
 export function useTenantPersistentState(departmentId, listKey, fallback) {
   const { user } = useAuth();
   const storageDepartmentId = isPlatformScope(departmentId) ? null : departmentId;
@@ -41,7 +49,13 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
   const loadedRef = useRef(false);
   const fallbackRef = useRef(fallback);
   const itemsRef = useRef([]);
+  // "unknown" until the header is read; then "array", "items" or "missing".
+  const modeRef = useRef("unknown");
+  // Per-item lists: what the server holds (id -> order + content), to diff saves against.
+  const entriesRef = useRef(new Map());
+  const userRef = useRef(user);
   fallbackRef.current = fallback;
+  userRef.current = user;
 
   const [items, setItems] = useState(() => readInitialItems(cacheKey, listKey, fallback));
   const [loaded, setLoaded] = useState(false);
@@ -54,21 +68,51 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
     loadedRef.current = loaded;
   }, [loaded]);
 
+  /** Save the whole list in whichever format it uses. */
+  async function persistItems(normalizedItems) {
+    const firestoreDb = getFirestoreDb();
+    const uid = userRef.current?.uid;
+    if (!firebaseEnabled || !firestoreDb || !storageDepartmentId || !uid) return false;
+    const firestoreItems = sanitizeItemsForFirestore(normalizedItems);
+
+    if (modeRef.current === "items" || modeRef.current === "missing") {
+      const plan = planListWrites(entriesRef.current, firestoreItems);
+      entriesRef.current = plan.entries;
+      await commitListPlan(firestoreDb, storageDepartmentId, listKey, plan);
+      if (modeRef.current === "missing") {
+        // First save of a brand-new list: mark it as per-item from the start.
+        await setDoc(
+          listHeaderRef(firestoreDb, storageDepartmentId, listKey),
+          itemsHeaderPayload({ departmentId: storageDepartmentId, userId: uid, itemCount: firestoreItems.length }),
+          { merge: true },
+        );
+      }
+      return true;
+    }
+
+    const payload = withTenantListPayload(firestoreItems, { departmentId: storageDepartmentId, userId: uid });
+    await setDoc(listHeaderRef(firestoreDb, storageDepartmentId, listKey), payload, { merge: true });
+    return true;
+  }
+
   useEffect(() => {
     let cancelled = false;
-    let unsubscribe = () => {};
+    let unsubscribeHeader = () => {};
+    let unsubscribeItems = null;
+    modeRef.current = "unknown";
+    entriesRef.current = new Map();
 
     // Only this department's own data is ever loaded. (The old fallback to the
     // top-level rmsData collection copied Horn Lake's lists into other tenants.)
-    async function resolveRemoteSnapshot(tenantSnap) {
+    async function resolveArraySnapshot(tenantSnap) {
       if (tenantSnap?.exists()) {
         const remoteItems = Array.isArray(tenantSnap.data()?.items) ? tenantSnap.data().items : [];
         return restoreItemsFromFirestore(remoteItems, listKey);
       }
 
-      const loaded = await loadTenantListFromFirestore(storageDepartmentId, listKey);
-      if (loaded.items.length) {
-        return loaded.items;
+      const loadedList = await loadTenantListFromFirestore(storageDepartmentId, listKey);
+      if (loadedList.items.length) {
+        return loadedList.items;
       }
 
       return resolveTenantListItems({
@@ -82,53 +126,55 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
     function applyResolvedItems(nextItems, sourceLabel = "firebase") {
       if (cancelled) return;
       const migratedItems = migrateTenantListItems(nextItems, listKey);
-      setItems(migratedItems);
+      const { items: withIds } = ensureItemIds(migratedItems);
+      setItems(withIds);
       try {
-        window.localStorage.setItem(cacheKey, JSON.stringify(migratedItems));
+        window.localStorage.setItem(cacheKey, JSON.stringify(withIds));
       } catch (error) {
         console.warn(`Local cache save failed for ${cacheKey}`, error);
       }
       loadedRef.current = true;
       setLoaded(true);
-      console.log(`Synced ${departmentListPath(storageDepartmentId, listKey)} from ${sourceLabel}`, migratedItems.length);
+      console.log(`Synced ${departmentListPath(storageDepartmentId, listKey)} from ${sourceLabel}`, withIds.length);
 
-      if (
-        tenantListItemsChanged(nextItems, migratedItems)
-        && firebaseEnabled
-        && getFirestoreDb()
-        && storageDepartmentId
-        && user?.uid
-      ) {
-        const firestoreDb = getFirestoreDb();
-        const payload = withTenantListPayload(
-          sanitizeItemsForFirestore(migratedItems),
-          { departmentId: storageDepartmentId, userId: user.uid },
-        );
-        setDoc(doc(firestoreDb, ...departmentListSegments(storageDepartmentId, listKey)), payload, { merge: true })
-          .catch((error) => console.warn(`Failed to persist migrated ${listKey}`, error));
+      // Data fixes applied on load (renamed units, missing ids) are saved back.
+      if (tenantListItemsChanged(nextItems, withIds) && modeRef.current !== "missing") {
+        persistItems(withIds).catch((error) => console.warn(`Failed to persist migrated ${listKey}`, error));
       }
+    }
+
+    function startItemsListener(firestoreDb) {
+      if (unsubscribeItems) return;
+      unsubscribeItems = onSnapshot(listItemsQuery(firestoreDb, storageDepartmentId, listKey), (querySnap) => {
+        if (cancelled) return;
+        const records = recordsFromSnapshot(querySnap);
+        entriesRef.current = entriesFromRecords(records);
+        applyResolvedItems(restoreItemsFromFirestore(itemsFromRecords(records), listKey), "firebase (per item)");
+      }, (error) => {
+        console.error(`Firebase subscribe failed for ${listKey} items`, error);
+        if (!cancelled) {
+          loadedRef.current = true;
+          setLoaded(true);
+        }
+      });
+    }
+
+    function stopItemsListener() {
+      if (unsubscribeItems) unsubscribeItems();
+      unsubscribeItems = null;
     }
 
     async function healEmptyTenantDoc(nextItems) {
       const firestoreDb = getFirestoreDb();
-      if (!firestoreDb || !storageDepartmentId || !user?.uid || !nextItems.length) return;
+      if (!firestoreDb || !storageDepartmentId || !userRef.current?.uid || !nextItems.length) return;
 
       try {
-        const tenantRef = doc(firestoreDb, ...departmentListSegments(storageDepartmentId, listKey));
-        const tenantSnap = await getDoc(tenantRef);
-        const remoteItems = tenantSnap.exists() && Array.isArray(tenantSnap.data()?.items)
-          ? tenantSnap.data().items
-          : [];
-        if (remoteItems.length) return;
-
-        const payload = withTenantListPayload(
-          sanitizeItemsForFirestore(nextItems),
-          { departmentId: storageDepartmentId, userId: user.uid }
-        );
-        await setDoc(tenantRef, payload, { merge: true });
-        console.log(`Restored empty ${departmentListPath(storageDepartmentId, listKey)} document`, nextItems.length);
+        const tenantSnap = await getDoc(listHeaderRef(firestoreDb, storageDepartmentId, listKey));
+        if (tenantSnap.exists()) return;
+        await persistItems(nextItems);
+        console.log(`Created ${departmentListPath(storageDepartmentId, listKey)}`, nextItems.length);
       } catch (error) {
-        console.warn(`Failed to heal empty tenant list ${listKey}`, error);
+        console.warn(`Failed to create tenant list ${listKey}`, error);
       }
     }
 
@@ -142,18 +188,24 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
     setLoaded(false);
     loadedRef.current = false;
 
-    const tenantRef = doc(firestoreDb, ...departmentListSegments(storageDepartmentId, listKey));
-    unsubscribe = onSnapshot(tenantRef, async (tenantSnap) => {
+    unsubscribeHeader = onSnapshot(listHeaderRef(firestoreDb, storageDepartmentId, listKey), async (headerSnap) => {
       if (cancelled) return;
+      const header = headerSnap.exists() ? headerSnap.data() : null;
 
+      if (isItemsStorage(header)) {
+        if (modeRef.current !== "items") {
+          modeRef.current = "items";
+          startItemsListener(firestoreDb);
+        }
+        return;
+      }
+
+      stopItemsListener();
+      modeRef.current = headerSnap.exists() ? "array" : "missing";
       try {
-        const nextItems = await resolveRemoteSnapshot(tenantSnap);
-        applyResolvedItems(nextItems, tenantSnap.exists() ? "firebase" : "fallback");
-
-        const remoteItems = tenantSnap.exists() && Array.isArray(tenantSnap.data()?.items)
-          ? tenantSnap.data().items
-          : [];
-        if (!remoteItems.length && nextItems.length && !tenantSnap.exists()) {
+        const nextItems = await resolveArraySnapshot(headerSnap);
+        applyResolvedItems(nextItems, headerSnap.exists() ? "firebase" : "fallback");
+        if (!headerSnap.exists() && nextItems.length) {
           await healEmptyTenantDoc(nextItems);
         }
       } catch (error) {
@@ -173,7 +225,8 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
 
     return () => {
       cancelled = true;
-      unsubscribe();
+      unsubscribeHeader();
+      stopItemsListener();
     };
   }, [departmentId, storageDepartmentId, listKey, cacheKey, user?.uid]);
 
@@ -188,7 +241,8 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
       }
 
       const safeItems = normalizeDataset(nextItems, current);
-      const normalizedItems = restoreItemsFromFirestore(safeItems, listKey);
+      // Every item gets a unique id so it can be stored as its own record.
+      const { items: normalizedItems } = ensureItemIds(restoreItemsFromFirestore(safeItems, listKey));
 
       if (JSON.stringify(normalizedItems) === JSON.stringify(current)) {
         return current;
@@ -200,25 +254,23 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
         console.error(`Local cache save failed for ${cacheKey}`, error);
       }
 
-      const firestoreDb = getFirestoreDb();
-      if (firebaseEnabled && firestoreDb && storageDepartmentId && user?.uid && loadedRef.current) {
-        const firestoreItems = sanitizeItemsForFirestore(normalizedItems);
-        const payload = withTenantListPayload(firestoreItems, { departmentId: storageDepartmentId, userId: user.uid });
-        setDoc(doc(firestoreDb, ...departmentListSegments(storageDepartmentId, listKey)), payload, { merge: true })
-          .then(() => {
+      if (loadedRef.current) {
+        persistItems(normalizedItems)
+          .then((saved) => {
             const moduleName = LIST_MODULE_NAMES[listKey];
-            if (moduleName) {
+            const actor = userRef.current;
+            if (saved && moduleName && actor?.uid) {
               writeAuditLog(storageDepartmentId, {
                 action: "update",
                 module: moduleName,
                 summary: `Saved ${moduleName} (${normalizedItems.length} records)`,
-                actorUid: user.uid,
-                actorName: user.displayName || user.email || "User"
+                actorUid: actor.uid,
+                actorName: actor.displayName || actor.email || "User"
               }).catch((error) => console.warn("Audit log write failed", error));
             }
           })
           .catch((error) => console.error(`Firebase save failed for ${listKey}`, error));
-      } else if (!loadedRef.current) {
+      } else {
         console.warn(`Skipped Firebase save for ${listKey} until remote data finishes loading`);
       }
 

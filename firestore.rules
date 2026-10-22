@@ -292,9 +292,22 @@ service cloud.firestore {
         allow update: if canAccessDepartment(departmentId)
           && (isPlatformCreator() || subscriptionFieldUnchanged());
       }
+      // A list is either one record holding an items array (older), or a header
+      // { storage: "items" } with each item in lists/{listKey}/items/{itemId}.
+      // Once a list is per-item, writing an items array onto its header is
+      // refused, so an out-of-date app can't save into the old format unseen.
       match /lists/{listKey} {
         allow read: if isPublicAlertList(listKey) || canAccessDepartment(departmentId);
-        allow write: if canAccessDepartment(departmentId);
+        allow create: if canAccessDepartment(departmentId);
+        allow update: if canAccessDepartment(departmentId)
+          && !(resource.data.get("storage", "") == "items"
+               && request.resource.data.get("items", []).size() > 0);
+        allow delete: if canAccessDepartment(departmentId);
+
+        match /items/{itemId} {
+          allow read: if isPublicAlertList(listKey) || canAccessDepartment(departmentId);
+          allow write: if canAccessDepartment(departmentId);
+        }
       }
       // Memberships: created and changed by department admins (or platform creators) only.
       // Users can never grant themselves access or roles.

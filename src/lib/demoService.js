@@ -8,7 +8,7 @@ import { ensureDefaultRoles } from "./roleService.js";
 import { seedInternalEmailsForScope } from "./internalEmailService.js";
 import { sanitizeItemsForFirestore } from "./firestoreSanitize.js";
 import { DEMO_DEPARTMENT_ID, departmentListSegments } from "./tenantPaths.js";
-import { withTenantListPayload } from "./tenantRecord.js";
+import { readTenantList, replaceTenantList } from "./tenantListStore.js";
 
 export async function ensureDemoDepartmentShell() {
   const db = getFirestoreDb();
@@ -24,8 +24,12 @@ export async function ensureDemoDepartmentShell() {
     ...mapDemoDepartmentProfile(),
     updatedAt: now
   }, { merge: true });
+  // Never write `subscription`: only platform creators may change it (rules), and
+  // the demo's default dates change daily, so including it blocked every demo
+  // login after the first day.
+  const { subscription: _subscription, ...demoSettings } = demoDepartmentSettings;
   await setDoc(doc(db, "departments", DEMO_DEPARTMENT_ID, "settings", "main"), {
-    ...demoDepartmentSettings,
+    ...demoSettings,
     updatedAt: now
   }, { merge: true });
   await ensureDefaultRoles(DEMO_DEPARTMENT_ID);
@@ -41,26 +45,16 @@ export async function bootstrapDemoLists(userId = "demo-bootstrap") {
 
   for (const listKey of DEMO_LIST_KEYS) {
     try {
-      const ref = doc(db, ...departmentListSegments(DEMO_DEPARTMENT_ID, listKey));
-      const existing = await getDoc(ref);
+      const existing = await readTenantList(db, DEMO_DEPARTMENT_ID, listKey);
       const forceReseed = DEMO_FORCE_RESEED_KEYS.includes(listKey);
-      if (
-        !forceReseed
-        && existing.exists()
-        && Array.isArray(existing.data()?.items)
-        && existing.data().items.length
-      ) {
+      if (!forceReseed && existing.items.length) {
         continue;
       }
 
-      const items = sanitizeItemsForFirestore(DEMO_LIST_SEEDS[listKey] || []);
-      await setDoc(ref, {
-        ...withTenantListPayload(items, {
-          departmentId: DEMO_DEPARTMENT_ID,
-          userId
-        }),
-        seededBy: "demo-bootstrap"
-      }, { merge: true });
+      await replaceTenantList(db, DEMO_DEPARTMENT_ID, listKey, DEMO_LIST_SEEDS[listKey] || [], {
+        userId,
+        headerFields: { seededBy: "demo-bootstrap" },
+      });
       seeded += 1;
     } catch (error) {
       console.error(`Failed to seed demo list ${listKey}`, error);

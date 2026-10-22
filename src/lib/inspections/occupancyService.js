@@ -6,7 +6,7 @@ import {
   listRecords,
   updateRecord,
 } from "../firestoreService.js";
-import { departmentListSegments } from "../tenantPaths.js";
+import { readTenantList } from "../tenantListStore.js";
 import { LIST_KEYS } from "../tenantListKeys.js";
 import { writeInspectionAuditLog } from "./inspectionAudit.js";
 import { OCCUPANCIES_COLLECTION } from "./paths.js";
@@ -140,10 +140,8 @@ export async function loadLegacyOccupancyListItems(departmentId) {
   const db = getFirestoreDb();
   if (!db) return [];
   try {
-    const snap = await getDoc(doc(db, ...departmentListSegments(departmentId, LIST_KEYS.occupancies)));
-    if (!snap.exists()) return [];
-    const items = snap.data()?.items;
-    return Array.isArray(items) ? items.filter(Boolean) : [];
+    const { items } = await readTenantList(db, departmentId, LIST_KEYS.occupancies);
+    return items.filter(Boolean);
   } catch (error) {
     console.warn("Unable to load legacy occupancy list", error);
     return [];

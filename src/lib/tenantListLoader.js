@@ -1,8 +1,7 @@
-import { doc, getDoc } from "firebase/firestore";
 import { getFirestoreDb } from "./firebaseClient.js";
 import { restoreItemsFromFirestore } from "./firestoreSanitize.js";
 import { listRecords } from "./firestoreService.js";
-import { departmentListSegments } from "./tenantPaths.js";
+import { readTenantList } from "./tenantListStore.js";
 
 const SUBCOLLECTION_FALLBACKS = {
   "hlfd-rms-personnel": "personnel",
@@ -27,12 +26,11 @@ export async function loadTenantListFromFirestore(departmentId, listKey) {
   let tenantEmpty = false;
 
   try {
-    const tenantSnap = await getDoc(doc(db, ...departmentListSegments(departmentId, listKey)));
-    if (tenantSnap.exists()) {
+    const list = await readTenantList(db, departmentId, listKey);
+    if (list.exists) {
       tenantExists = true;
-      const items = Array.isArray(tenantSnap.data()?.items) ? tenantSnap.data().items : [];
-      if (items.length) {
-        return { items: normalizeItems(items, listKey), source: "tenant" };
+      if (list.items.length) {
+        return { items: normalizeItems(list.items, listKey), source: "tenant" };
       }
       tenantEmpty = true;
     }

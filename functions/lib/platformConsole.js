@@ -6,6 +6,7 @@ const crypto = require("node:crypto");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { Timestamp, GeoPoint, DocumentReference } = require("firebase-admin/firestore");
 const { isPlatformCreator } = require("./access");
+const { countListItems } = require("./listStore");
 
 // Never exported: integration credentials (API keys/secrets) live here.
 const EXCLUDED_FROM_EXPORT = new Set(["integrations", "academyIntegrations"]);
@@ -55,10 +56,10 @@ async function storageUsage(bucket, departmentId) {
 
 async function usageForDepartment(db, bucket, id, registry = {}) {
   const ref = db.doc(`departments/${id}`);
-  const [collections, subscription, personnelDoc, activeMembers, totalMembers, pendingInvites, last, storage] = await Promise.all([
+  const [collections, subscription, personnelCount, activeMembers, totalMembers, pendingInvites, last, storage] = await Promise.all([
     ref.listCollections(),
     db.doc(`platformSubscriptions/${id}`).get(),
-    db.doc(`departments/${id}/lists/${PERSONNEL_LIST}`).get(),
+    countListItems(db, id, PERSONNEL_LIST),
     countOf(ref.collection("users").where("status", "==", "active")),
     countOf(ref.collection("users")),
     countOf(db.collection("invites").where("departmentId", "==", id).where("status", "==", "pending")),
@@ -73,7 +74,6 @@ async function usageForDepartment(db, bucket, id, registry = {}) {
     .slice(0, 5)
     .map(([name, n]) => ({ name, count: n }));
   const sub = subscription.exists ? subscription.data() : null;
-  const personnelItems = personnelDoc.exists ? personnelDoc.data()?.items : null;
 
   return {
     departmentId: id,
@@ -88,7 +88,7 @@ async function usageForDepartment(db, bucket, id, registry = {}) {
     },
     members: { active: activeMembers, total: totalMembers },
     pendingInvites,
-    personnel: Array.isArray(personnelItems) ? personnelItems.length : 0,
+    personnel: personnelCount || 0,
     records,
     topCollections,
     storage,

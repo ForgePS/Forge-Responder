@@ -2,15 +2,13 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { resolveGatewayDepartmentId } from "./gatewayService.js";
 import { getFirestoreDb } from "./firebaseClient.js";
 import { LIST_KEYS } from "./tenantListKeys.js";
+import { readTenantList } from "./tenantListStore.js";
 import { sanitizeActive911Alert } from "./alertDashboard.js";
 
 const PUBLIC_DOC_PATH = "alert-dashboard";
 
 async function loadListItems(db, departmentId, listKey) {
-  const snap = await getDoc(doc(db, "departments", departmentId, "lists", listKey));
-  if (!snap.exists()) return [];
-  const data = snap.data() || {};
-  return Array.isArray(data.items) ? data.items : [];
+  return (await readTenantList(db, departmentId, listKey)).items;
 }
 
 export async function loadPublicAlertDashboardFromFirestore(gatewaySlug = "") {

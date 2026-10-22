@@ -24,8 +24,7 @@ import { usesRecordPanelEditor } from "../lib/moduleDataEditorConfig.js";
 import { PERSONNEL_ADMIN_COLUMN_ORDER } from "../lib/personnelAdminFields.js";
 import { departmentListSegments, isPlatformScope } from "../lib/tenantPaths.js";
 import { loadTenantListFromFirestore } from "../lib/tenantListLoader.js";
-import { withTenantListPayload } from "../lib/tenantRecord.js";
-import { doc, setDoc } from "firebase/firestore";
+import { replaceTenantList } from "../lib/tenantListStore.js";
 
 const DEFAULT_COLUMNS = {
   "hlfd-rms-personnel": PERSONNEL_ADMIN_COLUMN_ORDER.slice(0, 12),
@@ -113,12 +112,9 @@ export default function DataEditorPanel({ onMessage }) {
 
     setSaving(true);
     try {
-      const firestoreItems = sanitizeItemsForFirestore(stripRowKeys(rows));
-      const payload = withTenantListPayload(firestoreItems, {
-        departmentId: dataDepartmentId,
+      await replaceTenantList(db, dataDepartmentId, datasetKey, stripRowKeys(rows), {
         userId: user?.uid || "system"
       });
-      await setDoc(doc(db, ...departmentListSegments(dataDepartmentId, datasetKey)), payload, { merge: true });
       await writeAuditLog(dataDepartmentId, {
         action: "update",
         module: "Data Editor",

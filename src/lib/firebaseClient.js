@@ -1,12 +1,12 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { connectAuthEmulator, getAuth } from "firebase/auth";
 import {
   initializeAppCheck,
   ReCaptchaV3Provider,
   ReCaptchaEnterpriseProvider,
 } from "firebase/app-check";
-import { deleteDoc, doc, getDoc, getDocs, getFirestore, setDoc, collection } from "firebase/firestore";
-import { deleteObject as deleteStorageObject, getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, setDoc, collection } from "firebase/firestore";
+import { connectStorageEmulator, deleteObject as deleteStorageObject, getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
@@ -24,6 +24,8 @@ const appCheckProvider = String(import.meta.env.VITE_FIREBASE_APPCHECK_PROVIDER 
 const appCheckDebugToken = String(import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN || "").trim();
 
 export const firebaseEnabled = Object.values(firebaseConfig).every(Boolean);
+// Set only by .env.emulator (npm run dev:emulator) for local testing.
+const useEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
 export const appCheckConfigured = Boolean(appCheckSiteKey);
 
 let app;
@@ -65,7 +67,14 @@ function firebaseServices() {
     db = getFirestore(app);
     storage = getStorage(app);
     functions = getFunctions(app, "us-central1");
-    initAppCheck(app);
+    if (useEmulators) {
+      // Local testing only (npm run dev:emulator): never talks to the real project.
+      connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+      connectFirestoreEmulator(db, "127.0.0.1", 8080);
+      connectStorageEmulator(storage, "127.0.0.1", 9199);
+    } else {
+      initAppCheck(app);
+    }
   }
   return { app, auth, db, storage, functions, appCheck };
 }
@@ -187,36 +196,6 @@ export async function deleteFirebaseFile(storagePath) {
     console.warn("Firebase Storage delete failed", storagePath, error);
     return false;
   }
-}
-
-export async function loadTenantList(departmentId, listKey, fallback = []) {
-  const services = firebaseServices();
-  if (!services || !departmentId) return fallback;
-  try {
-    const tenantSnap = await getDoc(doc(services.db, "departments", departmentId, "lists", listKey));
-    if (tenantSnap.exists()) {
-      const data = tenantSnap.data();
-      return Array.isArray(data.items) ? data.items : fallback;
-    }
-    return fallback;
-  } catch (error) {
-    console.warn(`Tenant list ${departmentId}/lists/${listKey} unavailable`, error);
-    return fallback;
-  }
-}
-
-export async function saveTenantList(departmentId, listKey, items, options = {}) {
-  const services = firebaseServices();
-  if (!services || !departmentId) return null;
-  const payload = {
-    items,
-    departmentId,
-    updated_at: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    updatedBy: options.userId || "system"
-  };
-  await setDoc(doc(services.db, "departments", departmentId, "lists", listKey), payload, { merge: true });
-  return payload;
 }
 
 export function tenantCollectionRef(departmentId, collectionName) {

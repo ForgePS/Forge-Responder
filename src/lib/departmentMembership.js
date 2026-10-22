@@ -1,7 +1,8 @@
 import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { legacyRoleMap } from "../data/defaultRoles.js";
 import { getFirestoreDb } from "./firebaseClient.js";
-import { departmentListSegments, isPlatformScope } from "./tenantPaths.js";
+import { isPlatformScope } from "./tenantPaths.js";
+import { readTenantList } from "./tenantListStore.js";
 import { ensureDefaultRoles } from "./roleService.js";
 import { isPlatformBootstrapEmail } from "./platformBootstrap.js";
 import { ensureCreatorDepartmentAccess, loadPlatformCreator } from "./platformService.js";
@@ -52,10 +53,10 @@ async function resolvePersonnelIdByEmail(departmentId, email) {
   const firestoreDb = getFirestoreDb();
   if (!firestoreDb) return "";
 
-  const snap = await getDoc(doc(firestoreDb, ...departmentListSegments(departmentId, "hlfd-rms-personnel")));
-  if (!snap.exists()) return "";
+  const list = await readTenantList(firestoreDb, departmentId, "hlfd-rms-personnel");
+  if (!list.exists) return "";
 
-  const items = Array.isArray(snap.data()?.items) ? snap.data().items : [];
+  const { items } = list;
   const normalizedEmail = email.toLowerCase();
   const match = items.find((person) => String(person.email || "").toLowerCase() === normalizedEmail);
   if (match?.id) return match.id;

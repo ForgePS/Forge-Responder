@@ -1,4 +1,5 @@
 const admin = require("firebase-admin");
+const { replaceListItems } = require("./listStore");
 const {
   authenticateUser,
   createAccessToken,
@@ -117,13 +118,7 @@ async function syncAlerts(db, departmentId, options = {}) {
     source: "active911",
   }));
 
-  await db.doc(`departments/${departmentId}/lists/hlfd-rms-active911-alerts`).set({
-    items: alerts,
-    departmentId,
-    updatedAt: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    updatedBy: options.userId || "system",
-  }, { merge: true });
+  await replaceListItems(db, departmentId, "hlfd-rms-active911-alerts", alerts, { updatedBy: options.userId || "system" });
 
   return {
     agency: result.agency,

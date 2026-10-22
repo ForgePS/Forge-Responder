@@ -33,13 +33,23 @@ if (!DEPT) {
 initializeApp({ credential: applicationDefault(), projectId: PROJECT_ID });
 const db = getFirestore();
 
-/** Lists are stored as an items array, sometimes as JSON strings. */
+/** Array lists may hold JSON strings. */
 function readItems(data) {
   const raw = Array.isArray(data?.items) ? data.items : [];
   return raw.map((item) => {
     if (typeof item !== "string") return item;
     try { return JSON.parse(item); } catch { return item; }
   });
+}
+
+/** A list in either format: one array record, or a header plus per-item records. */
+async function readList(ref) {
+  const snap = await ref.get();
+  if (snap.exists && snap.data()?.storage === "items") {
+    const itemDocs = (await ref.collection("items").orderBy("_order").get()).docs;
+    return { snap, perItem: true, itemDocs, items: itemDocs.map((d) => { const { _order, ...rest } = d.data(); return rest; }) };
+  }
+  return { snap, perItem: false, itemDocs: [], items: snap.exists ? readItems(snap.data()) : [] };
 }
 
 const personName = (p) =>
@@ -58,8 +68,9 @@ async function main() {
   console.log(`Department name: ${deptSnap.data()?.name || deptSnap.data()?.departmentName || "(none)"}\n`);
 
   const ref = db.doc(`departments/${DEPT}/lists/${PERSONNEL_KEY}`);
-  const snap = await ref.get();
-  const listPeople = snap.exists ? readItems(snap.data()) : [];
+  const list = await readList(ref);
+  const { snap } = list;
+  const listPeople = list.items;
   const show = (p, id) => `  - ${p?.id || id || "(no id)"}  ${personName(p) || "(no name)"}  ${p?.rank || ""}  ${p?.status || ""}`.trimEnd();
   console.log(`Personnel list (departments/${DEPT}/lists/${PERSONNEL_KEY}): ${listPeople.length} to remove`);
   for (const p of listPeople) console.log(show(p));
@@ -79,8 +90,7 @@ async function main() {
   const names = new Set(people.map((p) => personName(p).toLowerCase()).filter(Boolean));
   console.log("\nStill referring to these people (left unchanged):");
   for (const key of RELATED_KEYS) {
-    const s = await db.doc(`departments/${DEPT}/lists/${key}`).get();
-    const items = s.exists ? readItems(s.data()) : [];
+    const { items } = await readList(db.doc(`departments/${DEPT}/lists/${key}`));
     const linked = items.filter((item) => {
       const text = JSON.stringify(item || {}).toLowerCase();
       return [...ids].some((id) => text.includes(id.toLowerCase())) || [...names].some((n) => text.includes(n));
@@ -105,7 +115,11 @@ async function main() {
   }
 
   // Back up everything first, including records nested under each person.
-  const backup = { list: snap.exists ? { path: ref.path, data: snap.data() } : null, perPerson: [] };
+  const backup = {
+    list: snap.exists ? { path: ref.path, data: snap.data() } : null,
+    listItems: list.itemDocs.map((d) => ({ path: d.ref.path, data: d.data() })),
+    perPerson: [],
+  };
   for (const d of subDocs) {
     const nested = {};
     for (const col of await d.ref.listCollections()) {
@@ -118,12 +132,15 @@ async function main() {
   writeFileSync(path, JSON.stringify(backup, null, 2));
   console.log(`\nBackup saved: ${path}`);
 
-  if (listPeople.length) {
+  if (list.perItem) {
+    for (const d of list.itemDocs) await d.ref.delete();
+    await ref.update({ itemCount: 0, updatedAt: FieldValue.serverTimestamp(), clearedBy: "scripts/clear-department-personnel.mjs" });
+  } else if (listPeople.length) {
     await ref.update({ items: [], updatedAt: FieldValue.serverTimestamp(), clearedBy: "scripts/clear-department-personnel.mjs" });
   }
   for (const d of subDocs) await db.recursiveDelete(d.ref);
 
-  const listAfter = (await ref.get()).exists ? readItems((await ref.get()).data()).length : 0;
+  const listAfter = (await readList(ref)).items.length;
   const subAfter = (await db.collection(`departments/${DEPT}/personnel`).get()).size;
   console.log(`Removed ${listPeople.length} from the list and ${subDocs.length} per-person record(s).`);
   console.log(`Now: list has ${listAfter}, per-person records ${subAfter}.\n`);

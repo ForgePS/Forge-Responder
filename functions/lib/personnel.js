@@ -1,3 +1,5 @@
+const { readListItems } = require("./listStore");
+
 const PERSONNEL_LIST_KEYS = [
   "hlfd-rms-personnel",
   "personnel",
@@ -5,11 +7,8 @@ const PERSONNEL_LIST_KEYS = [
 
 async function loadPersonnelItems(db, departmentId) {
   for (const listKey of PERSONNEL_LIST_KEYS) {
-    const snap = await db.doc(`departments/${departmentId}/lists/${listKey}`).get();
-    if (snap.exists) {
-      const items = snap.data()?.items;
-      if (Array.isArray(items) && items.length) return items;
-    }
+    const items = await readListItems(db, departmentId, listKey);
+    if (items.length) return items;
   }
   return [];
 }

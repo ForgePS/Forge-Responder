@@ -29,3 +29,6 @@ subscriptions*.txt
 # Firebase deploy cache
 .firebase/
 demo-rename*.txt
+
+# Fake emulator settings are safe to commit
+!.env.emulator

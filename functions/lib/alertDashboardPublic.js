@@ -1,6 +1,7 @@
 const { syncAlerts } = require("./active911Store");
 const { clientConfig: googleApisClientConfig, loadIntegration: loadGoogleApisIntegration } = require("./googleApisStore");
 const { resolveGatewayDepartmentId } = require("./gatewayResolver");
+const { readListItems } = require("./listStore");
 
 const LIST_KEYS = {
   active911Alerts: "hlfd-rms-active911-alerts",
@@ -10,10 +11,7 @@ const LIST_KEYS = {
 };
 
 async function loadListItems(db, departmentId, listKey) {
-  const snap = await db.doc(`departments/${departmentId}/lists/${listKey}`).get();
-  if (!snap.exists) return [];
-  const data = snap.data() || {};
-  return Array.isArray(data.items) ? data.items : [];
+  return readListItems(db, departmentId, listKey);
 }
 
 function publicStationDetails(profile = {}) {
@@ -84,21 +82,20 @@ async function loadPublicAlertDashboard(db, gatewaySlug, options = {}) {
   }
 
   const [
-    alertsDoc,
+    alertsItems,
     businessDirectory,
     displays,
     profileSnap,
     googleIntegration,
   ] = await Promise.all([
-    db.doc(`departments/${departmentId}/lists/${LIST_KEYS.active911Alerts}`).get().catch(() => null),
+    loadListItems(db, departmentId, LIST_KEYS.active911Alerts).catch(() => []),
     loadListItems(db, departmentId, LIST_KEYS.alertBusinessDirectory),
     loadListItems(db, departmentId, LIST_KEYS.digitalDashboardDisplays),
     db.doc(`departments/${departmentId}/profile/main`).get().catch(() => null),
     loadGoogleApisIntegration(db, departmentId).catch(() => null),
   ]);
 
-  const alertsData = alertsDoc?.exists ? (alertsDoc.data() || {}) : {};
-  const alerts = Array.isArray(alertsData.items) ? alertsData.items : [];
+  const alerts = Array.isArray(alertsItems) ? alertsItems : [];
   const profile = profileSnap?.exists ? (profileSnap.data() || {}) : {};
   const mapsConfig = googleApisClientConfig(googleIntegration || {});
 
