@@ -4,10 +4,11 @@ import { isDemoModeActive } from "../lib/demoMode.js";
 import { writeStoredWorkspaceId } from "../lib/creatorConsoleWorkspace.js";
 import { listPlatformDepartments } from "../lib/platformService.js";
 import { PLATFORM_SCOPE_ID } from "../lib/tenantPaths.js";
+import { workspaceUrl } from "../lib/workspaceUrl.js";
 import { useTenant } from "../context/TenantContext.jsx";
 
 export default function DepartmentSwitcher({ isCreator, onScopeChange }) {
-  const { departmentId, setDepartmentId, profile, platformConfig } = useTenant();
+  const { departmentId, profile, platformConfig } = useTenant();
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -36,10 +37,13 @@ export default function DepartmentSwitcher({ isCreator, onScopeChange }) {
 
   if (!isCreator || isDemoModeActive()) return null;
 
+  // The department comes from the address (horn-lake-fd.forgeresponder.com or
+  // /horn-lake-fd), so switching must go to the other department's address;
+  // only changing the app's state snapped straight back to the old one.
   function handleChange(nextId) {
     writeStoredWorkspaceId(nextId);
-    setDepartmentId(nextId);
     onScopeChange?.(nextId);
+    window.location.assign(workspaceUrl(nextId));
   }
 
   const platformTitle = platformConfig?.platformTitle || "FORGE RMS";
