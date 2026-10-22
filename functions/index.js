@@ -623,11 +623,16 @@ const academyCallables = require("./lib/academy/callables");
  */
 exports.resolveForgePersonIdentity = onCall(async (request) => {
   const departmentId = String(request.data?.departmentId || "").trim();
-  await assertDepartmentAccess(request, departmentId);
+  await assertDepartmentAccess(admin.firestore(), departmentId, request.auth);
 
   try {
     return await resolvePersonIdentityViaHub(admin.firestore(), departmentId, request.data?.person || {});
   } catch (error) {
+    console.error("resolveForgePersonIdentity failed", {
+      departmentId,
+      message: error instanceof Error ? error.message : String(error),
+      cause: error?.cause?.code || error?.cause?.message || undefined,
+    });
     throw new HttpsError(
       "internal",
       error instanceof Error ? error.message : "Identity resolve failed."

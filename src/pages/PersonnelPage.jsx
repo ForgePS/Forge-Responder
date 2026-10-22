@@ -95,11 +95,20 @@ export default function PersonnelPage({
 
     try {
       let forgePersonId = String(selected?.forgePersonId || draft.forgePersonId || "").trim();
+      let hubLinkError = "";
 
       // Never invent a local personId. Resolve via Hub when configured and missing.
+      // A Hub outage must not block saving the profile: save without the ID and
+      // say the link is pending. A duplicate-identity review still stops the save.
       if (!forgePersonId && departmentId) {
-        const resolved = await resolveForgePersonIdForPersonnel(departmentId, draft);
-        forgePersonId = resolved.forgePersonId || "";
+        try {
+          const resolved = await resolveForgePersonIdForPersonnel(departmentId, draft);
+          forgePersonId = resolved.forgePersonId || "";
+        } catch (hubError) {
+          if (hubError instanceof IdentityReviewRequiredError) throw hubError;
+          console.warn("Forge ID lookup failed; saving without it", hubError);
+          hubLinkError = hubError instanceof Error ? hubError.message : String(hubError);
+        }
       }
 
       const updatedPerson = normalizePersonnelRecord({
@@ -132,7 +141,9 @@ export default function PersonnelPage({
       setSavedMessage(
         forgePersonId
           ? "Profile saved (Forge person ID linked)"
-          : "Profile saved"
+          : hubLinkError
+            ? `Profile saved. Forge person ID link is pending (Integration Hub: ${hubLinkError}).`
+            : "Profile saved"
       );
     } catch (error) {
       console.error("Failed to save personnel profile", error);

@@ -27,7 +27,7 @@ async function isDepartmentMember(db, departmentId, uid) {
 
 async function assertDepartmentAccess(db, departmentId, auth) {
   if (!auth?.uid) {
-    throw new HttpsError("unauthenticated", "Sign in to send shift broadcast messages.");
+    throw new HttpsError("unauthenticated", "Sign in to continue.");
   }
   if (!departmentId) {
     throw new HttpsError("invalid-argument", "departmentId is required.");
