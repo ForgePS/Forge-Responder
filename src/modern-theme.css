@@ -1,16 +1,18 @@
 /* Modern polish — uses theme tokens from tokens.css */
 
+/* Header row: auto (at least 108px via .top-bar min-height) so a header that
+   wraps onto two lines grows instead of spilling over the page. */
 .app-shell {
-  grid-template-rows: 108px minmax(0, 1fr) 52px;
+  grid-template-rows: auto minmax(0, 1fr) 52px;
   background: var(--rms-shell-glow-a), var(--rms-shell-glow-b), var(--rms-shell-gradient);
 }
 
 .app-shell.demo-mode-shell {
-  grid-template-rows: auto 108px minmax(0, 1fr) 52px;
+  grid-template-rows: auto auto minmax(0, 1fr) 52px;
 }
 
 .hydrants-view {
-  grid-template-rows: 108px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .workspace {

@@ -592,13 +592,13 @@ function TopBar({
     <div className="top-bar-lead">
       <div className="top-bar-lead-row">
         <div className={`top-brand ${wideBrandLogo ? "top-brand-wide" : ""}`}>
-          <div className={wideBrandLogo ? "top-brand-logo-wrap" : undefined}>
+          <div className={wideBrandLogo ? "top-brand-logo-wrap" : "top-brand-logo"}>
             <img src={resolveDepartmentLogoUrl(profile.logoUrl)} alt={profile.name} />
           </div>
           {!wideBrandLogo && (
             <div className="top-brand-text">
-              <strong>{brandTitle}</strong>
-              {brandSubtitle && brandSubtitle !== brandTitle && <span>{brandSubtitle}</span>}
+              <strong title={brandTitle}>{brandTitle}</strong>
+              {brandSubtitle && brandSubtitle !== brandTitle && <span title={brandSubtitle}>{brandSubtitle}</span>}
             </div>
           )}
         </div>

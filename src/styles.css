@@ -8,8 +8,11 @@ button { border: 0; cursor: pointer; }
    Windows then draws their options on white, leaving light (dark-theme) text
    unreadable. Give options the theme colours explicitly. */
 select option, select optgroup { background-color: var(--rms-bg-input); color: var(--rms-text-strong); }
-.app-shell { min-height: 100vh; display: grid; grid-template-columns: 238px minmax(0, 1fr); grid-template-rows: 128px minmax(0, 1fr) 56px; background: var(--rms-shell-glow-a, radial-gradient(circle at 70% 0%, rgba(18,68,105,.24), transparent 36%)), var(--rms-bg-body); }
-.app-shell.demo-mode-shell { grid-template-rows: auto 128px minmax(0, 1fr) 56px; }
+.app-shell { min-height: 100vh; display: grid; grid-template-columns: 238px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) 56px; background: var(--rms-shell-glow-a, radial-gradient(circle at 70% 0%, rgba(18,68,105,.24), transparent 36%)), var(--rms-bg-body); }
+/* Header row sizes to its content so a wrapped header grows instead
+   of spilling over the sidebar. */
+.app-shell > .top-bar { min-height: 108px; }
+.app-shell.demo-mode-shell { grid-template-rows: auto auto minmax(0, 1fr) 56px; }
 .demo-mode-banner { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 18px; border-bottom: 1px solid #7c2d12; background: linear-gradient(90deg, rgba(124,45,18,.45), rgba(180,83,9,.28)); }
 .demo-mode-banner strong { display: block; color: #fdba74; font-size: 14px; }
 .demo-mode-banner span { display: block; color: #fde68a; font-size: 14px; }
@@ -43,11 +46,15 @@ select option, select optgroup { background-color: var(--rms-bg-input); color: v
 .top-brand-wide .top-brand-logo-wrap img { height: 104px; max-width: 380px; object-fit: contain; object-position: top left; }
 .top-bar-utilities { display: flex; align-items: center; gap: 12px; flex: 0 1 auto; min-width: 0; margin-left: auto; align-self: center; padding-top: 2px; }
 .top-bar-utilities .global-search { margin-left: 0; }
-.top-brand { flex: 0 0 auto; min-width: 0; max-width: 460px; display: flex; align-items: center; gap: 14px; }
-.top-brand img { height: 72px; width: auto; max-width: 240px; object-fit: contain; flex: 0 0 auto; }
-.top-brand-wide { max-width: 380px; }
-.top-brand-text { min-width: 0; }
-.top-brand-text strong, .top-brand-text span { display: block; }
+/* Department header: the same fixed geometry for every department, whatever the
+   logo's shape or the name's length. The logo is scaled to fit a fixed box and
+   names stay on one line (full name on hover). */
+.top-brand { flex: 0 0 auto; width: 420px; min-width: 0; display: flex; align-items: center; gap: 14px; }
+.top-brand-logo { flex: 0 0 auto; width: 120px; height: 72px; display: flex; align-items: center; justify-content: center; }
+.top-brand-logo img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.top-brand-wide { width: auto; max-width: 380px; }
+.top-brand-text { flex: 1 1 auto; min-width: 0; }
+.top-brand-text strong, .top-brand-text span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top-brand-text strong { font-size: 22px; line-height: 1.15; }
 .top-brand-text span { margin-top: 2px; color: var(--rms-text-muted); font-size: 14px; }
 .command-time { display: flex; align-items: center; gap: 26px; color: var(--rms-text-body); font-size: 14px; white-space: nowrap; }
@@ -62,7 +69,8 @@ select option, select optgroup { background-color: var(--rms-bg-input); color: v
 .profile-button strong, .profile-button small { display: block; }
 .profile-button strong { font-size: 14px; }.profile-button small { color: var(--rms-text-muted); font-size: 14px; }
 .profile-button svg { color: var(--rms-text-muted); }
-.mobile-menu { display: none; }
+/* .top-bar prefix: a later .icon-button rule otherwise shows it on desktop. */
+.top-bar .mobile-menu { display: none; }
 .side-nav { grid-column: 1; grid-row: 2; position: relative; min-height: 0; overflow-y: auto; scrollbar-width: thin; border-right: 1px solid var(--rms-border-divider); background: var(--rms-bg-nav); }
 .side-nav nav { padding: 10px 10px 50px; }
 .side-nav nav section { display: grid; gap: 1px; margin-bottom: 8px; }
@@ -337,7 +345,7 @@ footer i, .app-footer i { width: 9px; height: 9px; border-radius: 50%; backgroun
 }
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 10px; }
 .workspace-hydrants { padding: 0; overflow: hidden; }
-.hydrants-view { grid-template-rows: 128px minmax(0, 1fr); }
+.hydrants-view { grid-template-rows: auto minmax(0, 1fr); }
 .hydrants-view footer, .hydrants-view .app-footer { display: none; }
 .hydrant-module-root {
   min-height: calc(100vh - 108px);
@@ -1172,7 +1180,7 @@ tbody tr:hover { background: var(--rms-bg-hover); }
   }
 }
 @media (max-width: 1450px) {
-  .top-brand { width: 350px; }
+  .top-brand:not(.top-brand-wide) { width: 360px; }
   .command-time { display: none; }
   .kpi-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); }
   .dashboard-grid { grid-template-columns: 1fr 1.45fr; }
@@ -1190,14 +1198,14 @@ tbody tr:hover { background: var(--rms-bg-hover); }
   input, select, textarea { font-size: 16px !important; }
   .mobile-nav-open .side-nav { transform: translateX(0); }
   .workspace { grid-column: 1; }
-  .mobile-menu { display: grid; position: relative; z-index: 31; flex-shrink: 0; }
+  .top-bar .mobile-menu { display: grid; position: relative; z-index: 31; flex-shrink: 0; }
   .top-bar-lead { max-width: none; }
   .top-bar-lead-row { flex-wrap: wrap; }
   .top-bar-tagline { font-size: 14px; letter-spacing: 0.08em; }
   .top-bar-utilities { flex-wrap: wrap; justify-content: flex-end; }
-  .top-brand { width: auto; max-width: 280px; }
+  .top-brand:not(.top-brand-wide) { width: 160px; }
   .top-brand-text { display: none; }
-  .top-brand img { height: 64px; max-width: 260px; }
+  .top-brand-logo { width: 160px; height: 64px; }
   .top-brand-wide .top-brand-logo-wrap { height: 64px; }
   .top-brand-wide .top-brand-logo-wrap img { height: 88px; max-width: 280px; }
   .top-bar-tagline { font-size: 14px; letter-spacing: 0.08em; }
@@ -1228,8 +1236,10 @@ tbody tr:hover { background: var(--rms-bg-hover); }
   .top-bar { flex-wrap: wrap; align-items: center; gap: 8px; min-height: 0; padding: 8px 10px; }
   .top-bar-lead, .top-bar-lead-row, .top-bar-utilities { display: contents; }
   .top-bar .mobile-menu { order: 0; align-self: center; margin-top: 0; }
-  .top-brand { order: 1; flex: 0 1 auto; width: auto; min-width: 0; max-width: 170px; }
-  .top-brand img { height: 40px; max-width: 150px; }
+  .top-brand { order: 1; flex: 0 0 auto; min-width: 0; }
+  .top-brand:not(.top-brand-wide) { width: 120px; }
+  .top-brand-logo { width: 120px; height: 40px; }
+  .top-brand-wide { max-width: 170px; }
   .top-brand-wide .top-brand-logo-wrap { height: 40px; }
   .top-brand-wide .top-brand-logo-wrap img { height: 56px; max-width: 170px; }
   .top-bar .department-switcher { order: 2; flex: 1 1 100%; min-width: 0; }
