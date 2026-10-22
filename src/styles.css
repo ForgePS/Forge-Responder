@@ -4,6 +4,10 @@ html { font-size: 14px; }
 body { margin: 0; font-size: 14px; min-width: 320px; min-height: 100vh; background: var(--rms-bg-body); color: var(--rms-text); }
 button, input { font: inherit; }
 button { border: 0; cursor: pointer; }
+/* Dropdown lists: some selects have a see-through background, and Chrome on
+   Windows then draws their options on white, leaving light (dark-theme) text
+   unreadable. Give options the theme colours explicitly. */
+select option, select optgroup { background-color: var(--rms-bg-input); color: var(--rms-text-strong); }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 238px minmax(0, 1fr); grid-template-rows: 128px minmax(0, 1fr) 56px; background: var(--rms-shell-glow-a, radial-gradient(circle at 70% 0%, rgba(18,68,105,.24), transparent 36%)), var(--rms-bg-body); }
 .app-shell.demo-mode-shell { grid-template-rows: auto 128px minmax(0, 1fr) 56px; }
 .demo-mode-banner { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 18px; border-bottom: 1px solid #7c2d12; background: linear-gradient(90deg, rgba(124,45,18,.45), rgba(180,83,9,.28)); }
