@@ -8,8 +8,27 @@ service cloud.firestore {
 
     // Platform creators are listed in platformCreators/{uid}, which only the
     // server/console can write. No email allowlists.
+    // Signed in with a two-factor (authenticator app) code this session.
+    function hasSecondFactor() {
+      return request.auth != null
+        && request.auth.token.get("firebase", {}).get("sign_in_second_factor", null) != null;
+    }
+
+    // Department admins must use two-factor once platformConfig/main.mfaAdminDeadline
+    // has passed (set by scripts/two-factor.mjs); the shared demo is exempt.
+    function adminTwoFactorDeadlinePassed() {
+      return exists(/databases/$(database)/documents/platformConfig/main)
+        && get(/databases/$(database)/documents/platformConfig/main).data.get("mfaAdminDeadline", null) != null
+        && request.time >= get(/databases/$(database)/documents/platformConfig/main).data.mfaAdminDeadline;
+    }
+    function adminTwoFactorOk(departmentId) {
+      return hasSecondFactor() || isDemoDepartment(departmentId) || !adminTwoFactorDeadlinePassed();
+    }
+
+    // Creator powers need a session signed in with a two-factor code.
     function isPlatformCreator() {
       return isAuthenticated()
+        && hasSecondFactor()
         && exists(/databases/$(database)/documents/platformCreators/$(request.auth.uid))
         && get(/databases/$(database)/documents/platformCreators/$(request.auth.uid)).data.status == "active";
     }
@@ -48,6 +67,7 @@ service cloud.firestore {
       return isPlatformCreator() || (
         isDepartmentMember(departmentId)
         && isDepartmentActive(departmentId)
+        && adminTwoFactorOk(departmentId)
         && (
           membershipData(departmentId).get("role", "") in ["department_admin"]
           || membershipData(departmentId).get("roleIds", []).hasAny(["fireChief", "itAdmin"])

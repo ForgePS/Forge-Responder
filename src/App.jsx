@@ -28,6 +28,9 @@ import DemoEntryPage from "./pages/DemoEntryPage.jsx";
 import DemoModeBanner from "./components/DemoModeBanner.jsx";
 import GatewayNotFoundPage from "./pages/GatewayNotFoundPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
+import TwoFactorScreen from "./components/security/TwoFactorScreen.jsx";
+import TwoFactorReminder from "./components/security/TwoFactorReminder.jsx";
+import { useTwoFactorStatus } from "./hooks/useTwoFactorStatus.js";
 import { isDemoEntryPath, isDemoModeActive } from "./lib/demoMode.js";
 import {
   CREATOR_CONSOLE_MODULE,
@@ -1873,6 +1876,7 @@ function AppShell() {
 export default function App() {
   const { authRequired, authLoading, membershipLoading, user, membership, isCreator } = useAuth();
   const { ready, gatewayDepartmentId, gatewayError } = useTenant();
+  const twoFactor = useTwoFactorStatus();
 
   if (isDemoEntryPath() && !authLoading) {
     return <DemoEntryPage />;
@@ -1897,6 +1901,27 @@ export default function App() {
     return <GatewayNotFoundPage />;
   }
   if (!user) return isDemoModeActive() ? <DemoEntryPage /> : <LoginPage />;
+  // Two-factor before anything else: creators always, department admins after the deadline.
+  if (twoFactor.level === "required") {
+    if (twoFactor.sessionOk === null) return <LoadingScreen message="Checking sign-in..." />;
+    if (!twoFactor.sessionOk) {
+      return (
+        <TwoFactorScreen
+          enrolled={twoFactor.enrolled}
+          reason={isCreator
+            ? "Platform creator accounts must use two-factor login."
+            : "Department administrator accounts must use two-factor login."}
+        />
+      );
+    }
+  }
   if (!membership && !isCreator) return <AccessDeniedPage userId={user?.uid} />;
-  return <Suspense fallback={<LoadingScreen />}><AppShell /></Suspense>;
+  return (
+    <>
+      <Suspense fallback={<LoadingScreen />}><AppShell /></Suspense>
+      {twoFactor.level === "grace" && twoFactor.sessionOk === false && (
+        <TwoFactorReminder daysLeft={twoFactor.daysLeft} enrolled={twoFactor.enrolled} />
+      )}
+    </>
+  );
 }

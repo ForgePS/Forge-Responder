@@ -15,6 +15,8 @@ const A = "dept-a";
 let db;
 
 const auth = (uid, email) => ({ uid, token: { email, name: uid } });
+// Signed in with a two-factor code (creators need one for creator powers).
+const auth2fa = (uid, email) => ({ uid, token: { email, name: uid, firebase: { sign_in_second_factor: "totp" } } });
 const req = (authCtx, data) => ({ auth: authCtx, data });
 const ADMIN = auth("admin-a", "chief@a.gov");
 const MEMBER = auth("member-a", "ff@a.gov");
@@ -143,7 +145,7 @@ describe("createInvite", () => {
   it("refuses invites for suspended departments", async () => {
     await db.doc(`platformSubscriptions/${A}`).set({ status: "suspended", planId: "pilot" });
     await expectHttpsError(
-      invites.createInvite(db, req(auth("creator-1", "c@forge.test"), { departmentId: A, email: "x@a.gov", roleIds: ["firefighter"], sendEmail: false })),
+      invites.createInvite(db, req(auth2fa("creator-1", "c@forge.test"), { departmentId: A, email: "x@a.gov", roleIds: ["firefighter"], sendEmail: false })),
       "failed-precondition"
     );
   });

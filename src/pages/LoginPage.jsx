@@ -25,6 +25,8 @@ import { isBrandedHydrantHost } from "../lib/hydrantAppRouting.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
+import { getFirebaseAuth } from "../lib/firebaseClient.js";
+import { completeSignInWithCode, isSecondFactorRequiredError, secondFactorResolver } from "../lib/twoFactor.js";
 import { clearPendingInviteToken, inviteErrorMessage, previewInvite, readPendingInviteToken } from "../lib/inviteService.js";
 import { parseTenantSubdomain, platformOrigin, tenantOrigin, useTenantSubdomains } from "../lib/tenantDomains.js";
 
@@ -159,6 +161,10 @@ export default function LoginPage() {
     }
   }
 
+  // Two-factor sign-in step (after a correct password).
+  const [codeResolver, setCodeResolver] = useState(null);
+  const [code, setCode] = useState("");
+
   async function handleSubmit(event) {
     event.preventDefault();
     setSubmitting(true);
@@ -172,7 +178,28 @@ export default function LoginPage() {
         await signUp(email.trim(), password, displayName);
       }
     } catch (submitError) {
-      setError(authErrorMessage(submitError));
+      if (isSecondFactorRequiredError(submitError)) {
+        // Password was right; this account uses two-factor: ask for the code.
+        setCodeResolver(secondFactorResolver(getFirebaseAuth(), submitError));
+        setCode("");
+      } else {
+        setError(authErrorMessage(submitError));
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleCodeSubmit(event) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    try {
+      await completeSignInWithCode(codeResolver, code);
+    } catch (codeError) {
+      setError(codeError?.code === "auth/invalid-verification-code"
+        ? "That code didn't match. Use the newest code from your authenticator app."
+        : authErrorMessage(codeError));
     } finally {
       setSubmitting(false);
     }
@@ -252,6 +279,31 @@ export default function LoginPage() {
             {error && <div className="auth-error">{error}</div>}
             <button className="primary-button auth-submit" type="submit">
               Continue
+            </button>
+          </form>
+        ) : codeResolver ? (
+          <form className="auth-form" onSubmit={handleCodeSubmit}>
+            <p className="auth-help">
+              <ShieldCheck size={16} /> Enter the 6-digit code from your authenticator app.
+            </p>
+            <label>
+              <span>Code</span>
+              <input
+                value={code}
+                onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                required
+                autoFocus
+              />
+            </label>
+            {error && <div className="auth-error">{error}</div>}
+            <button className="primary-button auth-submit" type="submit" disabled={submitting || code.length !== 6}>
+              {submitting ? "Please wait..." : "Verify"}
+            </button>
+            <button className="text-button" type="button" onClick={() => { setCodeResolver(null); setError(""); }}>
+              Use a different account
             </button>
           </form>
         ) : (

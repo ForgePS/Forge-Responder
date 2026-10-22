@@ -1040,6 +1040,41 @@ exports.entitlementsOnPersonnel = onDocumentWritten(
   }
 );
 
+/**
+ * Creators: clear someone's two-factor setup (lost phone). They sign in with
+ * their password next time and set it up again. Your own account: use
+ * scripts/two-factor.mjs --reset instead, so you can't lock yourself out here.
+ */
+exports.resetTwoFactor = onCall(async (request) => {
+  const db = admin.firestore();
+  if (!(await isPlatformCreator(db, request.auth))) {
+    throw new HttpsError("permission-denied", "Only platform creators (signed in with two-factor) can reset two-factor.");
+  }
+  const email = String(request.data?.email || "").trim().toLowerCase();
+  if (!email) throw new HttpsError("invalid-argument", "Enter the person's email address.");
+  let user;
+  try {
+    user = await admin.auth().getUserByEmail(email);
+  } catch {
+    throw new HttpsError("not-found", "No account uses that email address.");
+  }
+  if (user.uid === request.auth.uid) {
+    throw new HttpsError("failed-precondition", "Reset your own two-factor with scripts/two-factor.mjs.");
+  }
+  await admin.auth().updateUser(user.uid, { multiFactor: { enrolledFactors: null } });
+  await admin.auth().revokeRefreshTokens(user.uid);
+  await db.collection("platformAuditLogs").add({
+    action: "security.two-factor-reset",
+    module: "Creator Console",
+    recordId: user.uid,
+    summary: `Reset two-factor login for ${email}`,
+    actorUid: request.auth.uid,
+    actorName: request.auth.token?.email || "",
+    created_at: new Date().toISOString(),
+  });
+  return { email, cleared: true };
+});
+
 /** Creators: re-derive every department's entitlements now. */
 exports.refreshEntitlements = onCall({ timeoutSeconds: 300 }, async (request) => {
   if (!request.auth?.uid || !(await isPlatformCreator(admin.firestore(), request.auth))) {

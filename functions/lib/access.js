@@ -1,8 +1,10 @@
 const { HttpsError } = require("firebase-functions/v2/https");
+const { hasSecondFactor, assertAdminSecondFactor } = require("./twoFactor");
 
-// Platform creators are listed in platformCreators/{uid} (no email allowlists).
+// Platform creators are listed in platformCreators/{uid} (no email allowlists),
+// and creator powers need a session signed in with a two-factor code.
 async function isPlatformCreator(db, auth) {
-  if (!auth?.uid) return false;
+  if (!auth?.uid || !hasSecondFactor(auth)) return false;
   const creatorSnap = await db.doc(`platformCreators/${auth.uid}`).get();
   return creatorSnap.exists && creatorSnap.data()?.status === "active";
 }
@@ -60,6 +62,7 @@ async function assertDepartmentManage(db, departmentId, auth) {
     || permissions.manageSystemSettings
     || permissions.managePermissions
   ) {
+    await assertAdminSecondFactor(db, departmentId, auth);
     return;
   }
 
@@ -98,6 +101,7 @@ async function assertPlatformSuperAdmin(db, departmentId, auth) {
     || user.role === "creator"
     || roleIds.includes("creator")
   ) {
+    await assertAdminSecondFactor(db, departmentId, auth);
     return;
   }
 

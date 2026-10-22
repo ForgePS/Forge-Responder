@@ -11,7 +11,8 @@ const consoleFns = require("./lib/platformConsole.js");
 
 const PROJECT_ID = "demo-forge-rms";
 const BUCKET = `${PROJECT_ID}.appspot.com`;
-const CREATOR = { auth: { uid: "creator-1", token: { email: "c@forge.test" } } };
+const CREATOR = { auth: { uid: "creator-1", token: { email: "c@forge.test", firebase: { sign_in_second_factor: "totp" } } } };
+const CREATOR_NO_2FA = { auth: { uid: "creator-1", token: { email: "c@forge.test" } } };
 const MEMBER = { auth: { uid: "member-1", token: { email: "m@a.gov" } } };
 let db;
 let bucket;

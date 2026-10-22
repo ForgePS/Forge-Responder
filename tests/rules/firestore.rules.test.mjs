@@ -26,7 +26,11 @@ const stranger = () => as("stranger", { email: "stranger@example.com", email_ver
 const adminA = () => as("admin-a", { email: "chief@a.gov", email_verified: true });
 const memberA = () => as("member-a", { email: "ff@a.gov", email_verified: true });
 const memberB = () => as("member-b", { email: "ff@b.gov", email_verified: true });
-const creator = () => as("creator-1", { email: "creator@forge.test", email_verified: true });
+// Creators sign in with a two-factor code (creator powers need one).
+const SECOND_FACTOR = { firebase: { sign_in_provider: "password", sign_in_second_factor: "totp" } };
+const creator = () => as("creator-1", { email: "creator@forge.test", email_verified: true, ...SECOND_FACTOR });
+const creatorNo2fa = () => as("creator-1", { email: "creator@forge.test", email_verified: true });
+const adminA2fa = () => as("admin-a", { email: "chief@a.gov", email_verified: true, ...SECOND_FACTOR });
 const disabledAdminA = () => as("disabled-admin-a", { email: "old@a.gov", email_verified: true });
 
 function membership(uid, departmentId, extra = {}) {
@@ -175,6 +179,41 @@ describe("per-item lists", () => {
     const db = env.unauthenticatedContext().firestore();
     await assertSucceeds(getDoc(doc(db, `departments/${A}/lists/hlfd-rms-active911-alerts/items/a1`)));
     await assertFails(getDoc(doc(db, `${header}/items/T1`)));
+  });
+});
+
+describe("two-factor login", () => {
+  const setDeadline = (date) => env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "platformConfig/main"), { mfaAdminDeadline: date }, { merge: true });
+  });
+
+  it("creator powers need a session signed in with a code", async () => {
+    await assertSucceeds(getDoc(doc(creator().firestore(), `departments/${B}/incidents/i9`)));
+    await assertFails(getDoc(doc(creatorNo2fa().firestore(), `departments/${A}/incidents/i1`)));
+    await assertFails(setDoc(doc(creatorNo2fa().firestore(), `departments/${A}/users/new-user`), membership("new-user", A)));
+    await assertSucceeds(setDoc(doc(creator().firestore(), `departments/${A}/users/new-user`), membership("new-user", A)));
+  });
+
+  it("department admins keep admin powers until the deadline", async () => {
+    await setDeadline(new Date(Date.now() + 14 * 24 * 3600 * 1000));
+    await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
+  });
+
+  it("after the deadline, admin powers need a code; ordinary member access does not", async () => {
+    await setDeadline(new Date(Date.now() - 24 * 3600 * 1000));
+    await assertFails(updateDoc(doc(adminA().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
+    await assertFails(setDoc(doc(adminA().firestore(), `departments/${A}/roles/firefighter`), { name: "FF", permissions: {} }));
+    await assertSucceeds(updateDoc(doc(adminA2fa().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
+    await assertSucceeds(getDoc(doc(adminA().firestore(), `departments/${A}/incidents/i1`)));
+  });
+
+  it("the shared demo is exempt", async () => {
+    await setDeadline(new Date(Date.now() - 24 * 3600 * 1000));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "departments/forge-demo/users/demo-chief"), membership("demo-chief", "forge-demo", { role: "department_admin", roleIds: ["fireChief"] }));
+    });
+    const db = as("demo-chief", { email: "demo@forge.demo", email_verified: true }).firestore();
+    await assertSucceeds(setDoc(doc(db, "departments/forge-demo/roles/firefighter"), { name: "FF", permissions: {} }));
   });
 });
 

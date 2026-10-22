@@ -10,6 +10,7 @@ const crypto = require("node:crypto");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { Timestamp } = require("firebase-admin/firestore");
 const { isPlatformCreator } = require("./access");
+const { assertAdminSecondFactor } = require("./twoFactor");
 const { sendTextEmail } = require("./mailer");
 
 const INVITE_TTL_DAYS = 14;
@@ -94,6 +95,7 @@ async function assertDepartmentAdmin(db, departmentId, auth) {
   if (!snap.exists || !isAdminMembership(snap.data())) {
     throw new HttpsError("permission-denied", "Department administrator access is required.");
   }
+  await assertAdminSecondFactor(db, departmentId, auth);
 }
 
 async function loadDepartmentName(db, departmentId) {

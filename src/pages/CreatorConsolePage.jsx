@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, Building2, CirclePlus, CalendarRange, Layers, Mail, ScrollText, Settings } from "lucide-react";
+import { BarChart3, Building2, CirclePlus, CalendarRange, Layers, Mail, ScrollText, Settings, ShieldCheck } from "lucide-react";
 import PlatformUsagePanel from "../components/platform/PlatformUsagePanel.jsx";
 import PlatformAuditLogPanel from "../components/platform/PlatformAuditLogPanel.jsx";
+import PlatformSecurityPanel from "../components/platform/PlatformSecurityPanel.jsx";
 import CreateDepartmentPanel from "../components/CreateDepartmentPanel.jsx";
 import DepartmentBranchesPanel from "../components/DepartmentBranchesPanel.jsx";
 import CreatorWorkspaceHero from "../components/CreatorWorkspaceHero.jsx";
@@ -42,6 +43,7 @@ const PLATFORM_TABS = [
   ["subscriptions", "Subscriptions", CalendarRange],
   ["usage", "Usage", BarChart3],
   ["audit", "Audit Log", ScrollText],
+  ["security", "Security", ShieldCheck],
   ["internalEmail", "Messages", Mail]
 ];
 
@@ -156,8 +158,8 @@ export default function CreatorConsolePage() {
     : (activeDepartment?.shortName || activeDepartment?.name || workspaceId);
   const visibleTabs = (inPlatformWorkspace
     ? PLATFORM_TABS.filter(([id]) => id !== "internalEmail")
-    : PLATFORM_TABS.filter(([id]) => !["platform", "subscriptions", "usage", "audit"].includes(id))
-  ).filter(([id]) => isCreator || !["subscriptions", "usage", "audit"].includes(id));
+    : PLATFORM_TABS.filter(([id]) => !["platform", "subscriptions", "usage", "audit", "security"].includes(id))
+  ).filter(([id]) => isCreator || !["subscriptions", "usage", "audit", "security"].includes(id));
 
   return (
     <div className="module-page platform-admin-page">
@@ -299,6 +301,12 @@ export default function CreatorConsolePage() {
       {tab === "audit" && inPlatformWorkspace && isCreator && (
         <Panel title="Audit Log" icon={ScrollText}>
           <PlatformAuditLogPanel />
+        </Panel>
+      )}
+
+      {tab === "security" && inPlatformWorkspace && isCreator && (
+        <Panel title="Two-factor login" icon={ShieldCheck}>
+          <PlatformSecurityPanel />
         </Panel>
       )}
 
