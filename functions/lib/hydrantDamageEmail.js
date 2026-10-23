@@ -86,6 +86,12 @@ async function sendWithSendGrid({
     ],
   };
 
+  // Staging (functions/.env.forge-rms-staging): log instead of emailing anyone.
+  if (process.env.EMAIL_DELIVERY === "log") {
+    console.log("[email not sent: EMAIL_DELIVERY=log]", JSON.stringify({ to, subject, attachment: filename || "hydrant-damage-report.pdf" }));
+    return { ok: true, status: 202, providerMessageId: "logged", errorText: "" };
+  }
+
   const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: {

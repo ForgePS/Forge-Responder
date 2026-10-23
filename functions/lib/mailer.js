@@ -55,6 +55,12 @@ async function sendTextEmail({ to = [], cc = [], replyTo = "", subject, text }) 
   const ccList = cleanList(cc).filter((e) => !toList.includes(e));
   if (!toList.length) return "no_recipient";
 
+  // Staging (functions/.env.forge-rms-staging): log instead of emailing anyone.
+  if (process.env.EMAIL_DELIVERY === "log") {
+    console.log("[email not sent: EMAIL_DELIVERY=log]", JSON.stringify({ to: toList, cc: ccList, subject, text: String(text || "").slice(0, 2000) }));
+    return "logged";
+  }
+
   const resendKey = String(process.env.RESEND_API_KEY || "").trim();
   const sendGridKey = String(process.env.SENDGRID_API_KEY || "").trim();
   const sendGridFrom = String(process.env.SENDGRID_FROM_EMAIL || "").trim();

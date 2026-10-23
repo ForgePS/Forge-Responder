@@ -20,8 +20,11 @@
     }
   ],
   "hosting": {
-    "site": "rms-dashboard-7562e",
+    "target": "app",
     "public": "dist",
+    "predeploy": [
+      "node scripts/build-for-project.mjs"
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",

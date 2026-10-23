@@ -3,5 +3,21 @@
     "default": "rms-dashboard-7562e",
     "prod": "rms-dashboard-7562e",
     "staging": "forge-rms-staging"
+  },
+  "targets": {
+    "rms-dashboard-7562e": {
+      "hosting": {
+        "app": [
+          "rms-dashboard-7562e"
+        ]
+      }
+    },
+    "forge-rms-staging": {
+      "hosting": {
+        "app": [
+          "forge-rms-staging"
+        ]
+      }
+    }
   }
 }

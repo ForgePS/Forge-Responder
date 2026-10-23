@@ -35,7 +35,9 @@
     "test": "npm run test:unit && npm run test:rules && npm run test:functions",
     "lint": "eslint src",
     "dev:emulator": "vite --mode emulator",
-    "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-forge-rms"
+    "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-forge-rms",
+    "deploy:staging": "firebase deploy --only hosting,functions,firestore:rules,firestore:indexes,storage --project staging",
+    "seed:staging": "node scripts/seed-staging.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",

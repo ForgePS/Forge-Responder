@@ -72,6 +72,20 @@ function buildSmsBody(message = "", record = {}) {
 }
 
 function createTwilioClient(secrets) {
+  // Staging (functions/.env.forge-rms-staging): log instead of texting anyone.
+  if (process.env.SMS_DELIVERY === "log") {
+    return {
+      client: {
+        messages: {
+          create: async ({ to, body }) => {
+            console.log("[text not sent: SMS_DELIVERY=log]", JSON.stringify({ to, body }));
+            return { sid: "logged", status: "logged" };
+          },
+        },
+      },
+      fromNumber: "logged",
+    };
+  }
   const accountSid = secrets.TWILIO_ACCOUNT_SID;
   const authToken = secrets.TWILIO_AUTH_TOKEN;
   const fromNumber = secrets.TWILIO_FROM_NUMBER;
