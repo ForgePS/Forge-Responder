@@ -1,0 +1,17 @@
+{
+  "id": "/field",
+  "name": "FORGE Field",
+  "short_name": "FORGE Field",
+  "description": "Offline field app for Fire/EMS crews: truck checks, hydrants, hose testing, damage forms, daily logs and incident reports.",
+  "start_url": "/field",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0f14",
+  "theme_color": "#b91c1c",
+  "icons": [
+    { "src": "/field-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/field-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/field-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
@@ -10,6 +10,7 @@ import { DropdownProvider } from "./context/DropdownContext.jsx";
 import { TenantProvider } from "./context/TenantContext.jsx";
 import { isAlertDashboardPath } from "./lib/gatewayRouting.js";
 import { isUtilityAckPath } from "./lib/hydrantDamage/utilityAckPortal.js";
+import { isFieldAppPath } from "./field/fieldPaths.js";
 import "./theme/tokens.css";
 import "./styles.css";
 import "./modern-theme.css";
@@ -23,6 +24,9 @@ import "./theme/time-card.css";
 import "./theme/corona.css";
 import "./styles/neris-incident.css";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
+
+// The offline field app (/field) loads on demand and is cached by its service worker.
+const FieldApp = lazy(() => import("./field/FieldApp.jsx"));
 
 function Root() {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
@@ -42,6 +46,20 @@ function Root() {
     return (
       <ErrorBoundary>
         <UtilityAckPortalPage />
+      </ErrorBoundary>
+    );
+  }
+
+  if (isFieldAppPath(pathname)) {
+    return (
+      <ErrorBoundary>
+        <AuthProvider>
+          <TenantProvider>
+            <Suspense fallback={null}>
+              <FieldApp />
+            </Suspense>
+          </TenantProvider>
+        </AuthProvider>
       </ErrorBoundary>
     );
   }

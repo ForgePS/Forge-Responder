@@ -249,7 +249,7 @@ export function resolveFailResponseAction(failedItems = []) {
  * Complete a check: snapshot answers, meters, fail handling, update asset readiness.
  * @param {string} departmentId
  * @param {string} checkId
- * @param {{ answers?: object, failNotes?: object, result?: string }} payload
+ * @param {{ answers?: object, failNotes?: object, result?: string, completedAt?: string }} payload
  * @param {{ actorUid?: string, actorName?: string }} [audit]
  */
 export async function completeFleetCheck(departmentId, checkId, payload = {}, audit = {}) {
@@ -275,7 +275,8 @@ export async function completeFleetCheck(departmentId, checkId, payload = {}, au
       ? "available_restricted"
       : "available";
 
-  const stamp = nowIso();
+  // Checks done offline in the field pass the time they were finished.
+  const stamp = payload.completedAt || nowIso();
   const meterReadings = [];
   const sections = existing.templateSnapshot?.sections || [];
   for (const section of sections) {
@@ -325,7 +326,9 @@ export async function completeFleetCheck(departmentId, checkId, payload = {}, au
 
   // Apply fail handling via status decision records (Phase 5).
   const asset = await getFleetAsset(departmentId, existing.fleetAssetId);
-  if (asset) {
+  // A check synced late from the field must not overwrite a newer check's readiness.
+  const newerCheckOnAsset = Boolean(asset?.lastCheckAt && String(asset.lastCheckAt) > String(stamp));
+  if (asset && !newerCheckOnAsset) {
     await saveFleetAsset(departmentId, {
       ...asset,
       lastCheckAt: stamp,
