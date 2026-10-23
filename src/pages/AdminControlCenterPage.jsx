@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Database, Flame, KeyRound, LayoutGrid, Settings, ShieldCheck, Wand2, X } from "lucide-react";
+import { ChevronDown, Database, KeyRound, LayoutGrid, Settings, ShieldCheck, Wand2, X } from "lucide-react";
 import DataEditorPanel from "../components/DataEditorPanel.jsx";
 import DepartmentConfigPanel from "../components/DepartmentConfigPanel.jsx";
-import NerisFieldSettingsPanel from "../components/NerisFieldSettingsPanel.jsx";
 import GoogleApisIntegrationPanel from "../components/digitalDashboard/GoogleApisIntegrationPanel.jsx";
 import Active911IntegrationPanel from "../components/digitalDashboard/Active911IntegrationPanel.jsx";
 import DamageFormJotformIntegrationPanel from "../components/digitalDashboard/DamageFormJotformIntegrationPanel.jsx";
@@ -53,7 +52,6 @@ export default function AdminControlCenterPage({
   const canConfigureDamageForm = isCreator
     || hasPermission(permissions, "manageSystemSettings")
     || hasPermission(permissions, "accessAdminRms");
-  const canConfigureNerisFields = canConfigureDamageForm;
   const canViewAcademyIntegrations = isCreator
     || hasPermission(permissions, "academyIntegrationsView");
   const canManageAcademyIntegrations = isCreator
@@ -152,16 +150,6 @@ export default function AdminControlCenterPage({
           onToggle={toggleSection}
         >
           <DepartmentConfigPanel onMessage={setMessage} apparatus={apparatus} />
-        </AdminSectionPill>
-
-        <AdminSectionPill
-          id="neris-fields"
-          label="NERIS Field Settings"
-          icon={Flame}
-          isOpen={isOpen("neris-fields")}
-          onToggle={toggleSection}
-        >
-          <NerisFieldSettingsPanel onMessage={setMessage} canConfigure={canConfigureNerisFields} />
         </AdminSectionPill>
 
         <AdminSectionPill

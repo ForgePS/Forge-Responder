@@ -57,20 +57,6 @@ export function autoPopulateReport(report = {}, sources = {}) {
     }
   }
 
-  if (!workspace.units?.length && sources.apparatus?.length) {
-    workspace.units = sources.apparatus.slice(0, 3).map((unit) => ({
-      unitId: unit.unit || unit.name || unit.id,
-      apparatusType: unit.type || unit.apparatusType || "",
-      station: unit.station || "",
-      dispatchTime: "",
-      enrouteTime: "",
-      arrivalTime: "",
-      clearTime: "",
-      source: "apparatus",
-    }));
-    autoPopulateSources["workspace.units"] = "apparatus";
-  }
-
   if (!workspace.personnel?.length) {
     const staffing = resolveStaffingForDate(report.incidentDate, sources);
     if (staffing.length) {
@@ -123,8 +109,11 @@ function matchOccupancy(address, occupancies) {
 /** @param {string} address @param {Array<Record<string, unknown>>} hydrants */
 function matchNearbyHydrants(address, hydrants) {
   if (!address || !hydrants.length) return [];
-  const district = address.includes("goodman") ? "1" : "2";
-  return hydrants.filter((h) => String(h.district || "") === district);
+  // Only hydrants recorded at the same street address.
+  return hydrants.filter((h) => {
+    const at = String(h.address || h.location || "").toLowerCase().trim();
+    return at && (address.includes(at) || at.includes(address));
+  }).slice(0, 10);
 }
 
 /**
@@ -133,18 +122,8 @@ function matchNearbyHydrants(address, hydrants) {
  */
 function resolveStaffingForDate(incidentDate, sources) {
   const day = (sources.scheduleDays || []).find((d) => d.date === incidentDate || d.id === incidentDate);
-  if (!day?.roster?.length) {
-    return (sources.personnel || []).slice(0, 4).map((person) => ({
-      personnelId: person.id,
-      name: getPersonDisplayName(person),
-      rank: person.rank || "",
-      certification: person.emsLevel || person.certification || "",
-      unitId: person.assignment || "",
-      role: "Responder",
-      source: "personnel-roster",
-    }));
-  }
-  return day.roster.slice(0, 6).map((slot) => ({
+  if (!day?.roster?.length) return [];
+  return day.roster.map((slot) => ({
     personnelId: slot.personnelId || slot.id,
     name: slot.name || slot.personName || "",
     rank: slot.rank || "",

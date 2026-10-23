@@ -1097,3 +1097,78 @@ exports.refreshEntitlements = onCall({ timeoutSeconds: 300 }, async (request) =>
   const results = await entitlements.refreshAll(admin.firestore());
   return { count: results.length };
 });
+
+// ---- AI narrative drafts for NERIS reports (Claude). Set the key with:
+// firebase functions:secrets:set ANTHROPIC_API_KEY
+const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
+const nerisNarrative = require("./lib/nerisNarrative");
+
+exports.draftNerisNarrative = onCall(
+  { secrets: [anthropicApiKey], timeoutSeconds: 120, memory: "512MiB" },
+  async (request) => {
+    const db = admin.firestore();
+    const departmentId = String(request.data?.departmentId || "").trim();
+    await assertDepartmentAccess(db, departmentId, request.auth);
+
+    const ent = await db.doc(`platformEntitlements/${departmentId}`).get();
+    const modules = ent.data()?.modules;
+    if (Array.isArray(modules) && !modules.includes("nerisFireReports")) {
+      throw new HttpsError("permission-denied", "NERIS reports aren't included in your department's plan.");
+    }
+
+    const report = request.data?.report;
+    if (!report || typeof report !== "object") {
+      throw new HttpsError("invalid-argument", "Open a report first.");
+    }
+    const style = ["standard", "concise", "detailed"].includes(request.data?.style) ? request.data.style : "standard";
+    const key = anthropicApiKey.value();
+    if (!key) throw new HttpsError("failed-precondition", "AI narratives aren't set up yet (missing API key).");
+
+    await nerisNarrative.reserveDailyUse(db, departmentId);
+
+    const Anthropic = require("@anthropic-ai/sdk");
+    const AnthropicClient = Anthropic.default || Anthropic;
+    const client = new AnthropicClient({ apiKey: key, timeout: 90_000, maxRetries: 2 });
+    try {
+      const result = await nerisNarrative.draftNarrative(client, {
+        report,
+        notes: String(request.data?.notes || ""),
+        style,
+        existingNarrative: String(request.data?.existingNarrative || ""),
+      });
+      await db.collection(`departments/${departmentId}/auditLogs`).add({
+        action: "neris.ai-narrative-draft",
+        module: "NERIS",
+        recordId: String(report.id || ""),
+        summary: `AI narrative draft for ${String(report.reportNumber || "report")}`,
+        actorUid: request.auth.uid,
+        actorName: request.auth.token?.email || "",
+        model: result.model,
+        created_at: new Date().toISOString(),
+      }).catch(() => undefined);
+      return result;
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      if (error instanceof AnthropicClient.RateLimitError) {
+        throw new HttpsError("resource-exhausted", "The AI service is busy. Try again in a minute.");
+      }
+      if (error instanceof AnthropicClient.AuthenticationError || error instanceof AnthropicClient.PermissionDeniedError) {
+        console.error("draftNerisNarrative: API key rejected", error.status);
+        throw new HttpsError("failed-precondition", "AI narratives aren't set up correctly. Contact FORGE Public Safety.");
+      }
+      if (error instanceof AnthropicClient.APIConnectionError) {
+        throw new HttpsError("unavailable", "Couldn't reach the AI service. Try again.");
+      }
+      if (error instanceof AnthropicClient.APIError && /credit balance/i.test(String(error.message))) {
+        console.error("draftNerisNarrative: Anthropic account is out of credits");
+        throw new HttpsError("failed-precondition", "AI drafting is paused right now. Write the narrative yourself, and contact FORGE Public Safety if this keeps happening.");
+      }
+      if (error instanceof AnthropicClient.APIError) {
+        console.error("draftNerisNarrative: API error", error.status, error.message);
+        throw new HttpsError("internal", "The AI service had a problem. Try again.");
+      }
+      console.error("draftNerisNarrative failed", error);
+      throw new HttpsError("internal", "Couldn't draft the narrative. Try again.");
+    }
+  }
+);

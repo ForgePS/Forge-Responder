@@ -1,7 +1,10 @@
 /** Unique, readable record IDs (e.g. WO-LX3K9A2F) that don't collide after deletes. */
 export function uniqueRecordId(prefix) {
   const time = Date.now().toString(36).toUpperCase();
-  const rand = Math.floor(Math.random() * 36 ** 3).toString(36).toUpperCase().padStart(3, "0");
+  const bytes = new Uint32Array(2);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(bytes);
+  else { bytes[0] = Math.random() * 2 ** 32; bytes[1] = Math.random() * 2 ** 32; }
+  const rand = (bytes[0].toString(36) + bytes[1].toString(36)).toUpperCase().slice(0, 8).padStart(8, "0");
   return `${prefix}-${time}${rand}`;
 }
 
