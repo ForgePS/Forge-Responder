@@ -1,0 +1,69 @@
+# Build + test on every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      # Firebase emulators (rules + functions tests) need Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('package-lock.json') }}
+
+      - name: Install (web app)
+        run: npm ci
+
+      - name: Install (Cloud Functions)
+        run: npm ci
+        working-directory: functions
+
+      - name: Lint (undefined names)
+        run: npm run lint
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Cloud Functions load
+        working-directory: functions
+        env:
+          GCLOUD_PROJECT: demo-forge-rms
+        run: node -e "const f = require('./index.js'); console.log(Object.keys(f).length + ' functions load')"
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Security rules tests (emulator)
+        run: npm run test:rules
+
+      - name: Cloud Functions tests (emulator)
+        run: npm run test:functions

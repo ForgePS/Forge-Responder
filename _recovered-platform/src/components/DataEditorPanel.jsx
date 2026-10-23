@@ -1,0 +1,210 @@
+import { useEffect, useMemo, useState } from "react";
+import { Database } from "lucide-react";
+import AdminRecordCards from "./AdminRecordCards.jsx";
+import SystemRecordCollectionEditor from "./SystemRecordCollectionEditor.jsx";
+import { MODULE_DATASETS } from "../data/adminRegistry.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { useTenant } from "../context/TenantContext.jsx";
+import {
+  ROW_KEY_FIELD,
+  collectColumns,
+  createRowKey,
+  createUniqueRecordId,
+  mergeColumnKeys,
+  parseCellValue,
+  stripRowKeys,
+  withStableRowKeys
+} from "../lib/adminCellUtils.js";
+import { orderColumns } from "../lib/adminFieldSchema.js";
+import { createBlankRecord } from "../lib/adminRecordDefaults.js";
+import { getFirestoreDb } from "../lib/firebaseClient.js";
+import { restoreItemsFromFirestore, sanitizeItemsForFirestore } from "../lib/firestoreSanitize.js";
+import { writeAuditLog } from "../lib/auditService.js";
+import { usesRecordPanelEditor } from "../lib/moduleDataEditorConfig.js";
+import { PERSONNEL_ADMIN_COLUMN_ORDER } from "../lib/personnelAdminFields.js";
+import { DEFAULT_DEPARTMENT_ID, departmentListSegments, isPlatformScope } from "../lib/tenantPaths.js";
+import { withTenantListPayload } from "../lib/tenantRecord.js";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+
+const DEFAULT_COLUMNS = {
+  "hlfd-rms-personnel": PERSONNEL_ADMIN_COLUMN_ORDER.slice(0, 12),
+};
+
+export default function DataEditorPanel({ onMessage }) {
+  const { departmentId, isPlatformScope: inPlatformScope } = useTenant();
+  const dataDepartmentId = inPlatformScope ? DEFAULT_DEPARTMENT_ID : departmentId;
+  const { user, membership } = useAuth();
+  const [datasetKey, setDatasetKey] = useState(MODULE_DATASETS[0].key);
+  const [rows, setRows] = useState([]);
+  const [columnKeys, setColumnKeys] = useState(["id"]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const columns = useMemo(() => orderColumns(columnKeys, datasetKey), [columnKeys, datasetKey]);
+  const activeDataset = MODULE_DATASETS.find((item) => item.key === datasetKey);
+  const datasetLabel = activeDataset?.label || datasetKey;
+  const datasetTitle = activeDataset ? `${activeDataset.group} · ${activeDataset.label}` : datasetLabel;
+  const usePanelEditor = usesRecordPanelEditor(datasetKey);
+
+  async function loadDataset() {
+    const db = getFirestoreDb();
+    if (!db || !dataDepartmentId || !datasetKey) return;
+
+    setLoading(true);
+    try {
+      const snap = await getDoc(doc(db, ...departmentListSegments(dataDepartmentId, datasetKey)));
+      let items = snap.exists() ? snap.data()?.items : [];
+
+      if (!Array.isArray(items) || !items.length) {
+        const legacySnap = await getDoc(doc(db, "rmsData", datasetKey));
+        if (legacySnap.exists()) {
+          items = legacySnap.data()?.items;
+        }
+      }
+
+      const restored = restoreItemsFromFirestore(Array.isArray(items) ? items : [], datasetKey);
+      const keyedRows = withStableRowKeys(restored, { persisted: true });
+      setRows(keyedRows);
+      setColumnKeys(orderColumns(collectColumns(keyedRows), datasetKey));
+    } catch (error) {
+      console.error(`Failed to load dataset ${datasetKey}`, error);
+      onMessage?.(`Failed to load ${datasetTitle} dataset`);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadDataset();
+  }, [dataDepartmentId, datasetKey]);
+
+  function updateCell(rowIndex, column, valueOrUpdater) {
+    setRows((current) => current.map((row, index) => {
+      if (index !== rowIndex) return row;
+      const rawValue = typeof valueOrUpdater === "function"
+        ? valueOrUpdater(row[column])
+        : valueOrUpdater;
+      const nextValue = typeof rawValue === "string"
+        ? parseCellValue(rawValue, row[column], column)
+        : rawValue;
+      return { ...row, [column]: nextValue };
+    }));
+  }
+
+  function addRow() {
+    const rowKey = createRowKey();
+    const nextId = createUniqueRecordId(datasetKey);
+    const fallbackColumns = DEFAULT_COLUMNS[datasetKey] || ["id"];
+    const blank = {
+      [ROW_KEY_FIELD]: rowKey,
+      ...createBlankRecord(columns.length ? columns : fallbackColumns, datasetKey, nextId)
+    };
+    if (!blank.id) blank.id = nextId;
+    setRows((current) => [...current, blank]);
+    setColumnKeys((current) => orderColumns(mergeColumnKeys([blank], datasetKey, current), datasetKey));
+    return rowKey;
+  }
+
+  function removeRow(rowIndex) {
+    setRows((current) => {
+      const nextRows = current.filter((_, index) => index !== rowIndex);
+      setColumnKeys(orderColumns(collectColumns(nextRows), datasetKey));
+      return nextRows;
+    });
+  }
+
+  async function saveDataset() {
+    const db = getFirestoreDb();
+    if (!db || !dataDepartmentId) return;
+
+    setSaving(true);
+    try {
+      const firestoreItems = sanitizeItemsForFirestore(stripRowKeys(rows));
+      const payload = withTenantListPayload(firestoreItems, {
+        departmentId: dataDepartmentId,
+        userId: user?.uid || "system"
+      });
+      await setDoc(doc(db, ...departmentListSegments(dataDepartmentId, datasetKey)), payload, { merge: true });
+      await writeAuditLog(dataDepartmentId, {
+        action: "update",
+        module: "Data Editor",
+        summary: `Saved ${datasetLabel} (${rows.length} records)`,
+        actorUid: user?.uid,
+        actorName: membership?.displayName || user?.email
+      });
+      onMessage?.(`Saved ${datasetLabel} (${rows.length} records)`);
+      await loadDataset();
+    } catch (error) {
+      console.error("Failed to save dataset", error);
+      onMessage?.("Save failed — check permissions and try again");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="data-editor-panel">
+      <div className="data-editor-toolbar">
+        <label>
+          <span>Module dataset</span>
+          <select value={datasetKey} onChange={(event) => setDatasetKey(event.target.value)}>
+            {MODULE_DATASETS.map((dataset) => (
+              <option key={dataset.key} value={dataset.key}>
+                {dataset.group} · {dataset.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {!usePanelEditor && (
+          <div className="data-editor-actions">
+            <button className="secondary-button" type="button" onClick={addRow}>Add row</button>
+            <button className="primary-button" type="button" onClick={saveDataset} disabled={saving || loading}>
+              {saving ? "Saving..." : "Save dataset"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {inPlatformScope && (
+        <p className="auth-help">
+          Editing <strong>{DEFAULT_DEPARTMENT_ID}</strong> module data while in the FORGE platform workspace. Switch to a department branch to edit another tenant.
+        </p>
+      )}
+
+      {!usePanelEditor && (
+        <p className="auth-help">
+          <Database size={14} /> Edit records with dropdowns and checkboxes where available. Status, priority, and yes/no fields use friendly controls.
+        </p>
+      )}
+
+      {usePanelEditor ? (
+        <SystemRecordCollectionEditor
+          collectionName={datasetKey}
+          rows={rows}
+          columns={columns}
+          loading={loading}
+          saving={saving}
+          onUpdateCell={updateCell}
+          onAddRecord={addRow}
+          onRemoveRecord={removeRow}
+          onSave={saveDataset}
+        />
+      ) : loading ? (
+        <p className="auth-help">Loading {datasetLabel}...</p>
+      ) : (
+        <div className="admin-record-scroll">
+          <AdminRecordCards
+            rows={rows}
+            columns={columns}
+            collectionName={datasetKey}
+            context={{ datasetKey }}
+            onUpdateCell={updateCell}
+            onRemoveRow={removeRow}
+          />
+          {!rows.length && <p className="empty-table">No records yet. Add a row to get started.</p>}
+        </div>
+      )}
+    </section>
+  );
+}

@@ -1,0 +1,135 @@
+.employee-officer-box {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--rms-border);
+  border-radius: 8px;
+  background: var(--rms-bg-subtle, rgba(255, 255, 255, 0.04));
+}
+
+.employee-officer-box span {
+  color: var(--rms-text-muted);
+  font-size: 13px;
+}
+
+.employee-officer-box strong {
+  color: var(--rms-text-strong);
+  font-size: 16px;
+}
+
+.employee-request-form {
+  display: grid;
+  gap: 14px;
+}
+
+.employee-approval-hint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--rms-border-subtle);
+  background: var(--rms-bg-hover);
+}
+
+.employee-trade-form .employee-trade-calendars {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.portal-day-picker {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--rms-border);
+  border-radius: 8px;
+  background: var(--rms-bg-panel, transparent);
+}
+
+.portal-day-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.portal-day-picker-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-day-picker-nav span {
+  min-width: 120px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.portal-day-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.portal-day-picker-weekday {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rms-text-muted);
+  padding: 4px 0;
+}
+
+.portal-day-picker-pad {
+  min-height: 44px;
+}
+
+.portal-day-picker-day {
+  min-height: 44px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  border: 1px solid var(--rms-border-subtle);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rms-text-body);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.portal-day-picker-day small {
+  font-size: 9px;
+  color: var(--rms-text-muted);
+}
+
+.portal-day-picker-day.is-today {
+  border-color: var(--rms-brand);
+}
+
+.portal-day-picker-day.is-selected,
+.portal-day-picker-day.is-in-range {
+  background: var(--rms-brand);
+  border-color: var(--rms-brand);
+  color: #fff;
+}
+
+.portal-day-picker-day.is-selected small,
+.portal-day-picker-day.is-in-range small {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.portal-day-picker-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rms-text-muted);
+}
+
+.employee-leave-history time,
+.employee-trade-history time {
+  min-width: 88px;
+}
+
+@media (max-width: 900px) {
+  .employee-trade-form .employee-trade-calendars {
+    grid-template-columns: 1fr;
+  }
+}

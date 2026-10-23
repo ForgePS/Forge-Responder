@@ -1,11 +1,56 @@
 rules_version = '2';
 
+// Storage access mirrors Firestore department membership.
+// Existing files keep working through their tokenized download URLs
+// (download tokens bypass these rules), so locking reads down does not
+// break images/documents already saved in Firestore records.
 service firebase.storage {
   match /b/{bucket}/o {
-    // Department documents and uploaded pre-fire plans.
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Same source of truth as firestore.rules: platformCreators/{uid} (server-written).
+    function isPlatformCreator() {
+      return isAuthenticated()
+        && firestore.exists(/databases/(default)/documents/platformCreators/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/platformCreators/$(request.auth.uid)).data.status == "active";
+    }
+
+    function isDepartmentMember(departmentId) {
+      return isAuthenticated()
+        && firestore.exists(/databases/(default)/documents/departments/$(departmentId)/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/departments/$(departmentId)/users/$(request.auth.uid)).data.status == "active";
+    }
+
+    function canAccessDepartment(departmentId) {
+      return isPlatformCreator()
+        || isDepartmentMember(departmentId)
+        || (isAuthenticated() && departmentId == "forge-demo");
+    }
+
+    // Uploads: max 100 MB (pre-fire plan PDFs, dashboard media).
+    function isAllowedUpload() {
+      return request.resource == null || request.resource.size < 100 * 1024 * 1024;
+    }
+
+    match /departments/{departmentId}/{allPaths=**} {
+      allow read: if canAccessDepartment(departmentId);
+      allow create, update: if canAccessDepartment(departmentId) && isAllowedUpload();
+      allow delete: if canAccessDepartment(departmentId);
+    }
+
+    // Platform-wide branding (creator console logo uploads).
+    match /platform/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isPlatformCreator() && isAllowedUpload();
+    }
+
+    // Legacy uploads outside departments/ — no new reads or writes.
+    // Previously saved download URLs still work via their tokens.
     match /{allPaths=**} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if isPlatformCreator();
+      allow write: if false;
     }
   }
 }

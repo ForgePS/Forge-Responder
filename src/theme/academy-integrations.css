@@ -1,0 +1,124 @@
+.admin-integration-card {
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-integration-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.admin-integration-card__actions,
+.academy-connection-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.academy-empty-state {
+  padding: 1rem 0;
+}
+
+.academy-connection-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.academy-connection-card {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.academy-connection-card__title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.academy-connection-form,
+.academy-provider-fields {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.academy-provider-fields {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.academy-audit-drawer {
+  margin-top: 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 1rem;
+}
+
+.academy-audit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.academy-workflow-shell {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.academy-person-block + .academy-person-block {
+  margin-top: 1rem;
+}
+
+.academy-json-preview {
+  max-height: 160px;
+  overflow: auto;
+  font-size: 0.75rem;
+  background: #f7f7f8;
+  padding: 0.5rem;
+  border-radius: 6px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  background: #e8eef5;
+  color: #1f3a5f;
+}
+
+.badge-muted {
+  background: #eee;
+  color: #555;
+}
+
+.muted.small,
+.small {
+  font-size: 0.85rem;
+}
+
+.form-success {
+  color: #17633a;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

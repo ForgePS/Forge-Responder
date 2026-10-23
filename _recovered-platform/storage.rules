@@ -1,0 +1,15 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Department-scoped uploads (Phase 5 will require auth + membership).
+    match /departments/{departmentId}/{allPaths=**} {
+      allow read, write: if true;
+    }
+
+    // Legacy uploads — migrate under departments/{departmentId}.
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}

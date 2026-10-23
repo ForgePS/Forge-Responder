@@ -1,0 +1,137 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isPlatformCreator() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/platformCreators/$(request.auth.uid))
+        && get(/databases/$(database)/documents/platformCreators/$(request.auth.uid)).data.status == "active";
+    }
+
+    function isDepartmentMember(departmentId) {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/departments/$(departmentId)/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/departments/$(departmentId)/users/$(request.auth.uid)).data.status == "active";
+    }
+
+    function canAccessDepartment(departmentId) {
+      return isPlatformCreator() || isDepartmentMember(departmentId);
+    }
+
+    match /platformCreators/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    match /platformDepartments/{departmentId} {
+      allow read: if isPlatformCreator() || isDepartmentMember(departmentId);
+      allow create, update: if isPlatformCreator();
+      allow delete: if false;
+    }
+
+    // Shared reference datasets (not department-owned).
+    match /appData/{document} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /{collection}/{document} {
+      allow read: if collection in [
+        "emsProtocolsFull",
+        "fireSogsFull",
+        "fireSogDetails",
+        "fireCodesFull",
+        "fireCodeIndexFull",
+        "fireCodePdfSections",
+        "fireCodeDocxSections",
+        "hoseInventory"
+      ];
+      allow write: if isAuthenticated() && collection in [
+        "emsProtocolsFull",
+        "fireSogsFull",
+        "fireSogDetails",
+        "fireCodesFull",
+        "fireCodeIndexFull",
+        "fireCodePdfSections",
+        "fireCodeDocxSections",
+        "hoseInventory"
+      ];
+    }
+
+    match /rmsData/{document} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /departments/{departmentId} {
+      match /profile/{document} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canAccessDepartment(departmentId);
+      }
+      match /settings/{document} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canAccessDepartment(departmentId);
+      }
+      match /lists/{listKey} {
+        allow read, write: if canAccessDepartment(departmentId);
+      }
+      match /users/{userId} {
+        allow read: if canAccessDepartment(departmentId) || (isAuthenticated() && request.auth.uid == userId);
+        allow create: if isAuthenticated() && (request.auth.uid == userId || isPlatformCreator());
+        allow update: if canAccessDepartment(departmentId) || (isAuthenticated() && request.auth.uid == userId);
+        allow delete: if canAccessDepartment(departmentId);
+      }
+      match /roles/{roleId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canAccessDepartment(departmentId);
+      }
+      match /dropdowns/{dropdownId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canAccessDepartment(departmentId);
+      }
+      match /auditLogs/{logId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if canAccessDepartment(departmentId);
+        allow update, delete: if false;
+      }
+      match /notifications/{notificationId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if canAccessDepartment(departmentId);
+        allow update: if canAccessDepartment(departmentId);
+        allow delete: if false;
+      }
+      match /{collection}/{document} {
+        allow read, write: if canAccessDepartment(departmentId);
+      }
+    }
+
+    match /preFirePlans/{document} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /hydrants/{document} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /hydrantInspections/{document} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /hydrantFlowTests/{document} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /dailyActivity/{document} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /hoseTests/{document} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

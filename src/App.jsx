@@ -1,23 +1,241 @@
-import { useEffect, useMemo, useState } from "react";
-import { initializeApp } from "firebase/app";
-import { doc, getDoc, getFirestore, setDoc } from "firebase/firestore";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazyPage } from "./lib/lazyPage.js";
+import { useAuth } from "./context/AuthContext.jsx";
+const AdminControlCenterPage = lazyPage(() => import("./pages/AdminControlCenterPage.jsx"));
+const TimeSheetsPage = lazyPage(() => import("./pages/TimeSheetsPage.jsx"));
+import { normalizeCallShiftRules } from "./lib/callShiftRules.js";
+const EmployeePortalPage = lazyPage(() => import("./pages/EmployeePortalPage.jsx"));
 import {
-  Activity, AlertTriangle, Ambulance, Archive, BarChart3, Bell, BookOpen, CalendarDays, Check,
-  ChevronLeft, ChevronRight, ClipboardCheck, Clock3, Edit3, FileCheck2, FileText, Gauge,
-  GraduationCap, HardHat, Home, Mail, MapPin, Menu, PackageSearch, Phone, Save, Search,
-  Settings, ShieldCheck, Truck, Upload, UploadCloud, UserRound, Users, Wrench, X, CirclePlus
+  canAccessAdminRms,
+  canAccessEmployeePortal,
+  canAccessSystemAdmin,
+  canEditNerisReports,
+  canEditApparatus,
+  canEditAssets,
+  canEditPersonnel,
+  canEditScheduleRoster,
+  canViewPersonnelPrivateInfo,
+  filterNavGroups,
+  hasPermission
+} from "./lib/permissions.js";
+import ThemeToggle from "./components/ThemeToggle.jsx";
+import { useTenant } from "./context/TenantContext.jsx";
+import { isPlatformScope } from "./lib/tenantPaths.js";
+import { useTenantPersistentState } from "./hooks/useTenantPersistentState.js";
+import { formatRoleLabel, membershipInitials } from "./lib/departmentMembership.js";
+import AccessDeniedPage from "./pages/AccessDeniedPage.jsx";
+import DemoEntryPage from "./pages/DemoEntryPage.jsx";
+import DemoModeBanner from "./components/DemoModeBanner.jsx";
+import GatewayNotFoundPage from "./pages/GatewayNotFoundPage.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
+import TwoFactorScreen from "./components/security/TwoFactorScreen.jsx";
+import TwoFactorReminder from "./components/security/TwoFactorReminder.jsx";
+import { useTwoFactorStatus } from "./hooks/useTwoFactorStatus.js";
+import { isDemoEntryPath, isDemoModeActive } from "./lib/demoMode.js";
+import {
+  CREATOR_CONSOLE_MODULE,
+  CREATOR_CONSOLE_PATH,
+  isAlertDashboardPath,
+  isCreatorConsolePath,
+  parseAppDeepLink
+} from "./lib/gatewayRouting.js";
+import { PLATFORM_SCOPE_ID } from "./lib/tenantPaths.js";
+import { FORGE_ACADEMY_CLASS_SCHEDULE_URL } from "./lib/platformUrls.js";
+import {
+  Activity,
+  AlertTriangle,
+  Ambulance,
+  BarChart3,
+  Bell,
+  BookOpen,
+  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  Clock3,
+  DollarSign,
+  ExternalLink,
+  FileBarChart2,
+  FileCheck2,
+  FileText,
+  Gauge,
+  GraduationCap,
+  Home,
+  Landmark,
+  LayoutList,
+  Mail,
+  MapPin,
+  Menu,
+  MonitorPlay,
+  PackageSearch,
+  Search,
+  Settings,
+  Settings2,
+  ShieldCheck,
+  Store,
+  Truck,
+  Upload,
+  Users,
+  Wrench,
+  X,
 } from "lucide-react";
-import departmentLogo from "./assets/horn-lake-fire-dept-logo.png";
+const InternalEmailBoardPage = lazyPage(() => import("./pages/InternalEmailBoardPage.jsx"));
+const DigitalDashboardPage = lazyPage(() => import("./pages/DigitalDashboardPage.jsx"));
+import { filterNavByEnabledModules, filterNavByCodeLibraryAccess } from "./lib/navFilter.js";
+import {
+  filterNavGroupsByPreplanFeatures,
+  getDepartmentPreplanFeatures,
+  resolveEffectivePreplanFeatures,
+} from "./lib/inspections/index.js";
+import { getDepartmentCodeLibraryAccess } from "./lib/codeLibrary/accessService.js";
+import {
+  PREVENTION_NAV_TREE,
+  findActiveNavBranchIds,
+  isNavBranch,
+  navNodeKey,
+  navNodeLabel,
+} from "./data/preventionNav.js";
+import { groupContainsRoute, groupHasNavTree, groupNavLeavesAsItems } from "./lib/navTree.js";
+import { buildPageIndex, depthFromHistoryState, pageFromLocation, pageHistoryState, pageSlug, slugFromHistoryState, urlWithPage } from "./lib/pageUrl.js";
+import { employeePortalNavGroups, filterEmployeePortalNav } from "./data/employeePortalNav.js";
+import CommandDashboard from "./components/CommandDashboard.jsx";
+const DailyLogPage = lazyPage(() => import("./pages/DailyLogPage.jsx"));
+const PersonnelPage = lazyPage(() => import("./pages/PersonnelPage.jsx"));
+import DepartmentSwitcher from "./components/DepartmentSwitcher.jsx";
+import PlatformFooter from "./components/PlatformFooter.jsx";
+import { formatDayId } from "./lib/shiftCalendar.js";
+import { buildLiveScheduleDayMetrics } from "./lib/schedulingRoster.js";
+import { normalizeShiftRotation } from "./data/defaultShiftRotation.js";
+import { normalizePayPeriod } from "./lib/payPeriods.js";
+import { normalizeSchedulingSettings } from "./lib/schedulingSettings.js";
+import { normalizeEmployeePortalRules } from "./lib/employeePortalRules.js";
+import { normalizePayRules } from "./lib/payRules.js";
+import { normalizeDailyLogSettings } from "./lib/dailyLogSettings.js";
+const CreatorConsolePage = lazyPage(() => import("./pages/CreatorConsolePage.jsx"));
+import { ModulePage, AccessDeniedModule } from "./pages/ModulePage.jsx";
+const CertificationsPage = lazyPage(() => import("./pages/CertificationsPage.jsx"));
+const SchedulingPage = lazyPage(() => import("./pages/SchedulingPage.jsx"));
+const TrainingPage = lazyPage(() => import("./pages/TrainingPage.jsx"));
+const ApparatusPage = lazyPage(() => import("./pages/ApparatusPage.jsx"));
+const MaintenancePage = lazyPage(() => import("./pages/MaintenancePage.jsx"));
+const DepartmentSetupWizard = lazyPage(() => import("./components/onboarding/DepartmentSetupWizard.jsx"));
+import { defaultDepartmentSettings } from "./data/defaultDepartment.js";
+import { defaultPlatformConfig } from "./data/platformBrand.js";
+import { getTenantListFallback } from "./data/tenants/index.js";
+import { LIST_KEYS } from "./lib/tenantListKeys.js";
+import { resolveDepartmentLogoUrl, resolvePlatformLogoUrl } from "./lib/brandAssets.js";
+import { listUserNotifications, markNotificationRead } from "./lib/notificationService.js";
+const HydrantTestingPage = lazyPage(() => import("./pages/HydrantTestingPage.jsx"));
+const HydrantDamageReportsPage = lazyPage(() => import("./pages/HydrantDamageReportsPage.jsx"));
+const WaterCompanyDirectoryPage = lazyPage(() => import("./pages/WaterCompanyDirectoryPage.jsx"));
+const WaterDistrictsPage = lazyPage(() => import("./pages/WaterDistrictsPage.jsx"));
+const HydrantDamageAnalyticsPage = lazyPage(() => import("./pages/HydrantDamageAnalyticsPage.jsx"));
+const NerisFireReportsPage = lazyPage(() => import("./pages/NerisFireReportsPage.jsx"));
+const NerisAnalyticsPage = lazyPage(() => import("./pages/NerisAnalyticsPage.jsx"));
+import { resolveInitialHydrantTab, resolveInitialAppModule, shouldOpenHydrantsModule } from "./lib/hydrantAppRouting.js";
+import {
+  AnalyticsPage,
+  AssetsPageConnected,
+  DocumentsPage,
+  HoseTestingPage,
+  InspectionsPage,
+} from "./pages/SprintModulePages.jsx";
+import {
+  AllInspectionsPage,
+  InspectionsDashboardPage,
+  InspectionsWorkQueuePage,
+  MyInspectionsPage,
+} from "./pages/InspectionsModulePages.jsx";
+import {
+  AllPreplansPage,
+  NewPreplanPage,
+  PreplansPage,
+  PreplansWorkQueuePage,
+} from "./pages/PreplansModulePages.jsx";
+const PreplanOperationalPage = lazyPage(() => import("./pages/PreplanOperationalPage.jsx"));
+const OccupanciesMasterPage = lazyPage(() => import("./pages/OccupanciesMasterPage.jsx"));
+const InspectionConfigStudioPage = lazyPage(() => import("./pages/InspectionConfigStudioPage.jsx"));
+const ViolationsPage = lazyPage(() => import("./pages/ViolationsPage.jsx"));
+const InspectionNoticesPage = lazyPage(() => import("./pages/InspectionNoticesPage.jsx"));
+const InspectionEnforcementPage = lazyPage(() => import("./pages/InspectionEnforcementPage.jsx"));
+const FireProtectionSystemsPage = lazyPage(() => import("./pages/FireProtectionSystemsPage.jsx"));
+const InspectionFeesPage = lazyPage(() => import("./pages/InspectionFeesPage.jsx"));
+const InspectionReportsPage = lazyPage(() => import("./pages/InspectionReportsPage.jsx"));
+const InspectionOfflinePage = lazyPage(() => import("./pages/InspectionOfflinePage.jsx"));
+const InspectionAutomationPage = lazyPage(() => import("./pages/InspectionAutomationPage.jsx"));
+const InspectionHardeningPage = lazyPage(() => import("./pages/InspectionHardeningPage.jsx"));
+import {
+  AdoptedCodesPage,
+  CodeAdministrationPage,
+  CodeLibraryBrowsePage,
+  CodeLibrarySavedPage,
+  LocalAmendmentsLibraryPage,
+} from "./pages/CodeLibraryPages.jsx";
+const FleetDashboardPage = lazyPage(() => import("./pages/FleetDashboardPage.jsx"));
+const FleetAssetsMasterPage = lazyPage(() => import("./pages/FleetAssetsMasterPage.jsx"));
+const FleetConfigStudioPage = lazyPage(() => import("./pages/FleetConfigStudioPage.jsx"));
+const FleetReadinessBoardPage = lazyPage(() => import("./pages/FleetReadinessBoardPage.jsx"));
+const FleetDefectsPage = lazyPage(() => import("./pages/FleetDefectsPage.jsx"));
+const FleetWorkOrdersPage = lazyPage(() => import("./pages/FleetWorkOrdersPage.jsx"));
+const FleetPmForecastPage = lazyPage(() => import("./pages/FleetPmForecastPage.jsx"));
+const FleetTestsPage = lazyPage(() => import("./pages/FleetTestsPage.jsx"));
+const FleetFuelEnergyPage = lazyPage(() => import("./pages/FleetFuelEnergyPage.jsx"));
+const FleetComponentsWarrantyPage = lazyPage(() => import("./pages/FleetComponentsWarrantyPage.jsx"));
+const FleetOperationsPage = lazyPage(() => import("./pages/FleetOperationsPage.jsx"));
+const FleetAccidentRiskPage = lazyPage(() => import("./pages/FleetAccidentRiskPage.jsx"));
+const FleetProcurementPage = lazyPage(() => import("./pages/FleetProcurementPage.jsx"));
+const FleetCostReplacementPage = lazyPage(() => import("./pages/FleetCostReplacementPage.jsx"));
+const FleetReportingPage = lazyPage(() => import("./pages/FleetReportingPage.jsx"));
+const FleetHardeningPage = lazyPage(() => import("./pages/FleetHardeningPage.jsx"));
+const FleetVendorPortalPage = lazyPage(() => import("./pages/FleetVendorPortalPage.jsx"));
+import { loadFleetSettings } from "./lib/fleet/index.js";
 
 const navGroups = [
   { label: "", items: [["Dashboard", Home]] },
-  { label: "RMS", items: [["Personnel", Users], ["Certifications", FileCheck2], ["Training", BookOpen], ["Scheduling", CalendarDays], ["Shift Trades", Activity]] },
-  { label: "Fleet", items: [["Apparatus", Truck], ["Assets", PackageSearch], ["Maintenance", Wrench], ["Hose Testing", Gauge]] },
-  { label: "Prevention", items: [["Occupancies", Archive], ["Inspections", ClipboardCheck], ["Preplans", ShieldCheck], ["Hydrants", Activity]] },
+  { label: "RMS", items: [["Personnel", Users], ["Certifications", FileCheck2], ["Training", BookOpen], ["Academy Class Schedule", GraduationCap, FORGE_ACADEMY_CLASS_SCHEDULE_URL], ["Scheduling", CalendarDays], ["Time Sheets", Clock3], ["Daily Log", ClipboardCheck]] },
+  { label: "Fleet", items: [
+    ["Fleet Dashboard", Truck],
+    ["Readiness Board", ClipboardCheck],
+    ["Fleet Defects", AlertTriangle],
+    ["Fleet Work Orders", Wrench],
+    ["PM Forecast", CalendarDays],
+    ["Fleet Tests", Gauge],
+    ["Fuel & Energy", Activity],
+    ["Components & Warranty", ShieldCheck],
+    ["Fleet Operations", MapPin],
+    ["Accident & Risk", AlertTriangle],
+    ["Fleet Procurement", Landmark],
+    ["Cost & Replacement", DollarSign],
+    ["Reporting & Automation", FileBarChart2],
+    ["Vendor Portal", Store],
+    ["Fleet Hardening", ShieldCheck],
+    ["All Fleet Assets", LayoutList],
+    ["Fleet Configuration Studio", Settings2],
+    ["Apparatus", Truck],
+    ["Assets", PackageSearch],
+    ["Maintenance", Wrench],
+    ["Hose Testing", Gauge],
+  ] },
+  {
+    label: "Prevention",
+    tree: PREVENTION_NAV_TREE,
+    items: [],
+  },
+  { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["NERIS Analytics", BarChart3]] },
   { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Uploads", Upload]] },
-  { label: "", items: [["Analytics", BarChart3], ["Administration", Settings]] },
-  { label: "Future / Later", items: [["Incidents", AlertTriangle], ["EMS Reports", Ambulance], ["Fire Reports", FileText], ["Compliance Export", Upload]] }
+  { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay]] },
+  { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
+  { label: "Future / Later", items: [["Incidents", AlertTriangle], ["EMS Reports", Ambulance], ["Compliance Export", Upload]] }
 ];
+
+// Every in-app page reachable from the menu, keyed by its URL slug (?page=...).
+const PAGE_INDEX = buildPageIndex(
+  navGroups
+    .flatMap((group) => groupNavLeavesAsItems(group))
+    .filter(([, , externalUrl]) => !externalUrl)
+    .map(([name]) => name)
+);
 
 const kpis = [
   ["Personnel On Duty", "42", "of 56 Assigned", "info", Users, "Scheduling"],
@@ -26,651 +244,1684 @@ const kpis = [
   ["Training Compliance", "87%", "↑ 6% vs Last Month", "success", GraduationCap, "Training"],
   ["Units Available", "12", "of 18 Total", "info", Truck, "Apparatus"],
   ["Units Out of Service", "6", "33% of Fleet", "critical", Wrench, "Maintenance"],
-  ["Inspections Due", "27", "Next 30 Days", "warning", ClipboardCheck, "Inspections"],
+  ["Inspections Due", "27", "Next 30 Days", "warning", ClipboardCheck, "Inspections Dashboard"],
   ["Open Tasks", "64", "Across All Areas", "info", FileCheck2, "Dashboard"]
 ];
 
-const moduleData = {
-  Personnel: { icon: Users, description: "Roster, assignments, contact information, documents, and employment status.", columns: ["Name", "Rank", "Assignment", "EMS Level", "Status"], rows: [["Jeremy Powell", "Fire Chief", "Administration", "Paramedic", "Active"], ["Stephen White", "Deputy Chief", "Administration", "Paramedic", "Active"], ["Gregory Scruggs", "Battalion Chief", "A Shift", "AEMT", "Active"], ["Mike Mallett", "Battalion Chief", "B Shift", "Paramedic", "Active"], ["Adam Tutor", "Captain", "C Shift", "EMT", "Active"], ["Cole Casey", "Firefighter", "A Shift", "Paramedic", "Leave"]] },
-  Certifications: { icon: FileCheck2, description: "Renewal tracking and 30/60/90-day expiration alerts.", columns: ["Personnel", "Certification", "Expires", "Renewal", "Status"], rows: [["Cole Casey", "Paramedic", "Jun 24, 2026", "Submitted", "Due Soon"], ["Adam Tutor", "Firefighter II", "Jul 12, 2026", "Not Started", "Due Soon"], ["Mike Mallett", "Instructor I", "Aug 08, 2026", "In Progress", "Active"], ["Gregory Scruggs", "AEMT", "May 31, 2026", "Overdue", "Expired"]] },
-  Training: { icon: BookOpen, description: "Events, attendance, hours, categories, and compliance tracking.", columns: ["Training Event", "Category", "Date", "Attendees", "Status"], rows: [["Live Fire Evolution", "Fire", "Jun 10", "18 / 24", "Scheduled"], ["Pediatric Airway", "EMS CE", "Jun 14", "12 / 18", "Scheduled"], ["Driver Operations", "Driver", "Jun 20", "9 / 12", "Scheduled"], ["HazMat Refresher", "Fire", "May 28", "21 / 24", "Complete"]] },
-  Scheduling: { icon: CalendarDays, description: "A/B/C shift calendar, daily roster, apparatus assignments, leave, and overtime.", columns: ["Date", "Shift", "Staffed", "Minimum", "Coverage"], rows: [["Jun 7", "A Shift", "21", "21", "Complete"], ["Jun 8", "B Shift", "20", "21", "Deficit"], ["Jun 9", "C Shift", "22", "21", "Complete"], ["Jun 10", "A Shift", "21", "21", "Complete"]] },
-  Apparatus: { icon: Truck, description: "Unit readiness, mileage, engine hours, pump hours, and repair history.", columns: ["Unit", "Type", "Mileage", "PM Due", "Status"], rows: [["Engine 1", "Pumper", "31,820", "Aug 2026", "In Service"], ["Engine 2", "Pumper", "44,091", "Jul 2026", "In Service"], ["Truck 3", "Ladder", "26,445", "Jun 2026", "PM Due"], ["Rescue 1", "Rescue", "19,230", "Sep 2026", "In Service"]] },
-  Inspections: { icon: ClipboardCheck, description: "Inspection queue, violations, reinspection dates, and occupancy history.", columns: ["Occupancy", "Inspection", "Due", "Inspector", "Status"], rows: [["Horn Lake High School", "Annual", "Jun 12", "J. Mitchell", "Scheduled"], ["Logan's Roadhouse", "Reinspection", "Jun 8", "J. Mitchell", "Overdue"], ["Amazon Distribution", "Annual", "Jun 21", "J. Wade", "Scheduled"], ["Comfort Inn", "Reinspection", "Jun 15", "J. Wade", "Pending Review"]] },
-  Hydrants: { icon: Activity, description: "Hydrant records, flow tests, inspections, district assignments, and readiness.", columns: ["Hydrant", "District", "Last Tested", "Flow Class", "Status"], rows: [["HL-1042", "1", "May 14, 2026", "Class AA", "Complete"], ["HL-1178", "2", "Apr 30, 2026", "Class A", "Complete"], ["HL-1281", "3", "Not tested", "Unknown", "Due Soon"], ["HL-1307P", "2", "Private", "Private", "Active"]] }
-};
+const NAV_SECTIONS_STORAGE_KEY = "rms-nav-sections-collapsed";
+const NAV_NESTED_STORAGE_KEY = "rms-nav-nested-collapsed";
 
-const personnelRecords = [
-  { id: "HL-001", name: "Jeremy Powell", initials: "JP", rank: "Fire Chief", shift: "Administration", assignment: "Administration", ems: "Paramedic", driver: "Approved", status: "Active", email: "jpowell@hornlake.org", phone: "(662) 555-0101", station: "Fire Administration", hireDate: "March 14, 2005", supervisor: "Mayor / Board of Aldermen", address: "3101 Goodman Road W, Horn Lake, MS", emergency: "Jennifer Powell · (662) 555-0181", documents: ["Employment Agreement.pdf", "Annual Evaluation 2026.pdf"], certifications: [["Paramedic", "Dec 18, 2026", "Active"], ["Fire Officer IV", "Sep 10, 2027", "Active"], ["NIMS ICS-400", "No expiration", "Complete"]] },
-  { id: "HL-002", name: "Stephen White", initials: "SW", rank: "Deputy Chief", shift: "Administration", assignment: "Operations", ems: "Paramedic", driver: "Approved", status: "Active", email: "swhite@hornlake.org", phone: "(662) 555-0102", station: "Fire Administration", hireDate: "August 9, 2007", supervisor: "Jeremy Powell", address: "Horn Lake, MS", emergency: "Ashley White · (662) 555-0182", documents: ["Promotion Letter.pdf", "Annual Evaluation 2026.pdf"], certifications: [["Paramedic", "Nov 14, 2026", "Active"], ["Fire Officer III", "May 4, 2028", "Active"]] },
-  { id: "HL-014", name: "Gregory Scruggs", initials: "GS", rank: "Battalion Chief", shift: "A Shift", assignment: "Station 1 / Battalion 1", ems: "AEMT", driver: "Approved", status: "Active", email: "gscruggs@hornlake.org", phone: "(662) 555-0114", station: "Station 1", hireDate: "January 18, 2011", supervisor: "Stephen White", address: "Horn Lake, MS", emergency: "Morgan Scruggs · (662) 555-0194", documents: ["Driver Clearance.pdf"], certifications: [["AEMT", "May 31, 2026", "Expired"], ["Fire Officer II", "Feb 18, 2027", "Active"]] },
-  { id: "HL-021", name: "Mike Mallett", initials: "MM", rank: "Battalion Chief", shift: "B Shift", assignment: "Station 2 / Battalion 1", ems: "Paramedic", driver: "Approved", status: "Active", email: "mmallett@hornlake.org", phone: "(662) 555-0121", station: "Station 2", hireDate: "June 2, 2012", supervisor: "Stephen White", address: "Horn Lake, MS", emergency: "Taylor Mallett · (662) 555-0191", documents: ["Instructor Credentials.pdf"], certifications: [["Instructor I", "Aug 08, 2026", "Active"], ["Paramedic", "Jan 12, 2027", "Active"]] },
-  { id: "HL-033", name: "Adam Tutor", initials: "AT", rank: "Captain", shift: "C Shift", assignment: "Engine 3", ems: "EMT", driver: "Approved", status: "Active", email: "atutor@hornlake.org", phone: "(662) 555-0133", station: "Station 3", hireDate: "October 21, 2016", supervisor: "C Shift Battalion Chief", address: "Horn Lake, MS", emergency: "Casey Tutor · (662) 555-0193", documents: ["Driver Clearance.pdf"], certifications: [["Firefighter II", "Jul 12, 2026", "Due Soon"], ["EMT", "Oct 2, 2027", "Active"]] },
-  { id: "HL-041", name: "Cole Casey", initials: "CC", rank: "Firefighter", shift: "A Shift", assignment: "Engine 1", ems: "Paramedic", driver: "Trainee", status: "Leave", email: "ccasey@hornlake.org", phone: "(662) 555-0141", station: "Station 1", hireDate: "April 12, 2021", supervisor: "A Shift Captain", address: "Horn Lake, MS", emergency: "Jordan Casey · (662) 555-0192", documents: ["Leave Request.pdf"], certifications: [["Paramedic", "Jun 24, 2026", "Due Soon"], ["Firefighter I/II", "Apr 12, 2028", "Active"]] }
-];
-
-const initialCertificationRecords = [
-  { id: "CERT-101", person: "Cole Casey", type: "Paramedic", category: "EMS", issue: "Jun 24, 2024", expires: "Jun 24, 2026", days: 17, renewal: "Submitted", status: "Due Soon", document: "Paramedic Renewal.pdf" },
-  { id: "CERT-102", person: "Adam Tutor", type: "Firefighter II", category: "Fire", issue: "Jul 12, 2023", expires: "Jul 12, 2026", days: 35, renewal: "Not Started", status: "Due Soon", document: "" },
-  { id: "CERT-103", person: "Mike Mallett", type: "Instructor I", category: "Fire", issue: "Aug 08, 2023", expires: "Aug 08, 2026", days: 62, renewal: "In Progress", status: "Active", document: "Instructor I.pdf" },
-  { id: "CERT-104", person: "Gregory Scruggs", type: "AEMT", category: "EMS", issue: "May 31, 2024", expires: "May 31, 2026", days: -7, renewal: "Overdue", status: "Expired", document: "AEMT Card.pdf" },
-  { id: "CERT-105", person: "Jeremy Powell", type: "Paramedic", category: "EMS", issue: "Dec 18, 2024", expires: "Dec 18, 2026", days: 194, renewal: "Not Started", status: "Active", document: "Paramedic Card.pdf" },
-  { id: "CERT-106", person: "Stephen White", type: "Fire Officer III", category: "Fire", issue: "May 04, 2025", expires: "May 04, 2028", days: 697, renewal: "Not Started", status: "Active", document: "Fire Officer III.pdf" }
-];
-
-const initialScheduleDays = [
-  { id: "2026-06-07", weekday: "Sun", date: "Jun 7", shift: "A Shift", staffed: 21, minimum: 21, leave: 1, status: "Complete" },
-  { id: "2026-06-08", weekday: "Mon", date: "Jun 8", shift: "B Shift", staffed: 20, minimum: 21, leave: 2, status: "Deficit" },
-  { id: "2026-06-09", weekday: "Tue", date: "Jun 9", shift: "C Shift", staffed: 22, minimum: 21, leave: 0, status: "Complete" },
-  { id: "2026-06-10", weekday: "Wed", date: "Jun 10", shift: "A Shift", staffed: 21, minimum: 21, leave: 1, status: "Complete" },
-  { id: "2026-06-11", weekday: "Thu", date: "Jun 11", shift: "B Shift", staffed: 19, minimum: 21, leave: 3, status: "Deficit" },
-  { id: "2026-06-12", weekday: "Fri", date: "Jun 12", shift: "C Shift", staffed: 21, minimum: 21, leave: 1, status: "Complete" },
-  { id: "2026-06-13", weekday: "Sat", date: "Jun 13", shift: "A Shift", staffed: 20, minimum: 21, leave: 2, status: "Deficit" }
-];
-
-const initialRoster = [
-  { id: "R-01", name: "Gregory Scruggs", rank: "Battalion Chief", shift: "A Shift", apparatus: "Battalion 1", position: "Command", status: "On Duty" },
-  { id: "R-02", name: "Devin Lee", rank: "Captain", shift: "A Shift", apparatus: "Engine 1", position: "Officer", status: "On Duty" },
-  { id: "R-03", name: "Cole Casey", rank: "Firefighter", shift: "A Shift", apparatus: "Engine 1", position: "Medic / Driver", status: "Leave" },
-  { id: "R-04", name: "Marcus Reed", rank: "Firefighter", shift: "B Shift", apparatus: "Engine 2", position: "Driver", status: "On Duty" },
-  { id: "R-05", name: "Taylor Brooks", rank: "Lieutenant", shift: "B Shift", apparatus: "Truck 3", position: "Officer", status: "On Duty" },
-  { id: "R-06", name: "Adam Tutor", rank: "Captain", shift: "C Shift", apparatus: "Rescue 1", position: "Officer", status: "On Duty" },
-  { id: "R-07", name: "Jordan Wade", rank: "Firefighter", shift: "C Shift", apparatus: "Engine 3", position: "Medic", status: "On Duty" }
-];
-
-const initialLeaveRequests = [
-  { id: "L-101", person: "Cole Casey", type: "Vacation", dates: "Jun 7-8", hours: "24 hrs", status: "Approved" },
-  { id: "L-102", person: "Morgan Johnson", type: "Vacation", dates: "Jun 19-23", hours: "48 hrs", status: "Pending" },
-  { id: "L-103", person: "Alex Davis", type: "Personal", dates: "Jun 11", hours: "12 hrs", status: "Pending" }
-];
-
-const initialOvertimeOffers = [
-  { id: "OT-201", date: "Jun 8", shift: "B Shift", position: "Firefighter / Paramedic", applicants: 3, status: "Open" },
-  { id: "OT-202", date: "Jun 11", shift: "B Shift", position: "Driver / Operator", applicants: 2, status: "Open" },
-  { id: "OT-203", date: "Jun 13", shift: "A Shift", position: "Firefighter", applicants: 4, status: "Open" }
-];
-
-const initialTrades = [
-  { id: "TR-301", requestedBy: "R. Williams", give: "Jun 12 - A Shift", receive: "Jun 15 - A Shift", coverage: "D. Lee", submitted: "Jun 7", status: "Pending Review" },
-  { id: "TR-302", requestedBy: "M. Johnson", give: "Jun 11 - B Shift", receive: "Jun 14 - B Shift", coverage: "T. Brooks", submitted: "Jun 6", status: "Awaiting Member" },
-  { id: "TR-303", requestedBy: "A. Davis", give: "Jun 9 - C Shift", receive: "Jun 18 - C Shift", coverage: "J. Wade", submitted: "Jun 5", status: "Approved" },
-  { id: "TR-304", requestedBy: "C. Casey", give: "Jun 16 - A Shift", receive: "Jun 22 - A Shift", coverage: "M. Reed", submitted: "Jun 4", status: "Denied" }
-];
-
-const initialApparatus = [
-  { id: "APP-01", unit: "Engine 1", type: "Pumper", station: "Station 1", year: "2021", mileage: "31,820", engineHours: "4,218", pumpHours: "386", fuel: "82%", pmDue: "Aug 14, 2026", status: "In Service", operator: "D. Lee", checks: [["Daily cab check", "Complete"], ["Medical inventory", "Complete"], ["Pump test", "Complete"], ["SCBA inventory", "Complete"]] },
-  { id: "APP-02", unit: "Engine 2", type: "Pumper", station: "Station 2", year: "2018", mileage: "44,091", engineHours: "6,104", pumpHours: "591", fuel: "68%", pmDue: "Jun 7, 2026", status: "Out of Service", operator: "M. Reed", checks: [["Daily cab check", "Complete"], ["Medical inventory", "Complete"], ["Pump test", "Failed"], ["SCBA inventory", "Complete"]] },
-  { id: "APP-03", unit: "Truck 3", type: "Aerial", station: "Station 3", year: "2020", mileage: "26,445", engineHours: "3,870", pumpHours: "214", fuel: "74%", pmDue: "Jun 18, 2026", status: "PM Due", operator: "T. Brooks", checks: [["Daily cab check", "Complete"], ["Aerial controls", "Complete"], ["Ground ladders", "Complete"], ["Hydraulic inspection", "Due"]] },
-  { id: "APP-04", unit: "Rescue 1", type: "Heavy Rescue", station: "Station 1", year: "2022", mileage: "19,230", engineHours: "2,991", pumpHours: "N/A", fuel: "91%", pmDue: "Sep 2, 2026", status: "In Service", operator: "A. Tutor", checks: [["Daily cab check", "Complete"], ["Extrication tools", "Complete"], ["Medical inventory", "Complete"], ["Generator", "Complete"]] },
-  { id: "APP-05", unit: "Brush 2", type: "Brush", station: "Station 2", year: "2017", mileage: "38,604", engineHours: "4,832", pumpHours: "301", fuel: "56%", pmDue: "Jun 21, 2026", status: "Reserve", operator: "Unassigned", checks: [["Weekly cab check", "Complete"], ["Pump test", "Complete"], ["Wildland equipment", "Due"], ["Radio check", "Complete"]] }
-];
-
-const initialWorkOrders = [
-  { id: "WO-26041", unit: "Engine 2", issue: "Pump relief valve failed annual test", category: "Pump", priority: "High", opened: "Jun 7", vendor: "Mid-South Apparatus", cost: "$2,450", status: "In Progress" },
-  { id: "WO-26042", unit: "Truck 3", issue: "Preventive maintenance and aerial inspection", category: "PM", priority: "Medium", opened: "Jun 6", vendor: "Internal Fleet", cost: "$780", status: "Scheduled" },
-  { id: "WO-26039", unit: "Rescue 1", issue: "Compartment light replacement", category: "Electrical", priority: "Low", opened: "Jun 3", vendor: "Internal Fleet", cost: "$95", status: "Awaiting Parts" },
-  { id: "WO-26035", unit: "Engine 1", issue: "Replace rear tire pair", category: "Tires", priority: "Medium", opened: "May 28", vendor: "Gateway Tire", cost: "$1,340", status: "Complete" }
-];
-
-const initialAssets = [
-  { id: "AST-1042", name: "Thermal Imaging Camera", category: "Electronics", serial: "TIC-88431", location: "Engine 1", assigned: "D. Lee", inspection: "Jul 12, 2026", value: "$9,800", status: "In Service" },
-  { id: "AST-1178", name: "Cardiac Monitor", category: "Medical", serial: "LP15-22018", location: "Rescue 1", assigned: "A. Tutor", inspection: "Jun 30, 2026", value: "$28,500", status: "In Service" },
-  { id: "AST-1204", name: "Hydraulic Spreader", category: "Extrication", serial: "HUR-77291", location: "Rescue 1", assigned: "A. Tutor", inspection: "Aug 8, 2026", value: "$14,200", status: "In Service" },
-  { id: "AST-1281", name: "Four-Gas Meter", category: "HazMat", serial: "MSA-31904", location: "Station 2", assigned: "M. Reed", inspection: "Jun 10, 2026", value: "$2,100", status: "Inspection Due" },
-  { id: "AST-1307", name: "Portable Radio", category: "Communications", serial: "APX-55210", location: "Repair Vendor", assigned: "Unassigned", inspection: "Sep 14, 2026", value: "$4,600", status: "Out for Repair" },
-  { id: "AST-1350", name: "SCBA Pack", category: "PPE", serial: "MSA-44012", location: "Station 1", assigned: "Unassigned", inspection: "Jun 24, 2026", value: "$7,400", status: "Available" }
-];
-
-
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
-};
-
-const firebaseEnabled = Object.values(firebaseConfig).every(Boolean);
-const firebaseApp = firebaseEnabled ? initializeApp(firebaseConfig) : null;
-const firestoreDb = firebaseEnabled ? getFirestore(firebaseApp) : null;
-
-function normalizeDataset(value, fallback) {
-  if (Array.isArray(value)) return value;
-  if (value && Array.isArray(value.items)) return value.items;
-  return fallback;
+function navSectionKey(group, index) {
+  return group.label ? group.label : `section-${index}`;
 }
 
-function usePersistentState(key, fallback) {
-  const [items, setItems] = useState(() => {
-    try {
-      const cached = window.localStorage.getItem(key);
-      return cached ? normalizeDataset(JSON.parse(cached), fallback) : fallback;
-    } catch (error) {
-      console.warn(`Local cache read failed for ${key}`, error);
-      return fallback;
-    }
-  });
+function navSectionTitle(group, index) {
+  if (group.label) return group.label;
+  if (groupHasNavTree(group) && group.tree?.length === 1) return group.tree[0].label || "Section";
+  if (group.items?.length === 1) return group.items[0][0];
+  return index === 0 ? "Home" : "System";
+}
 
-  const [loaded, setLoaded] = useState(false);
+function readCollapsedNavSections() {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(NAV_SECTIONS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function readCollapsedNestedNav() {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(NAV_NESTED_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistJson(key, value) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGroups }) {
+  const [collapsedSections, setCollapsedSections] = useState(readCollapsedNavSections);
+  const [collapsedNested, setCollapsedNested] = useState(readCollapsedNestedNav);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadFromFirebase() {
-      if (!firebaseEnabled || !firestoreDb) {
-        console.warn(`Firebase is not configured. ${key} will use localStorage only.`);
-        setLoaded(true);
-        return;
-      }
-
-      try {
-        const snapshot = await getDoc(doc(firestoreDb, "rmsData", key));
-        if (!cancelled && snapshot.exists()) {
-          const data = snapshot.data();
-          const nextItems = normalizeDataset(data.items, fallback);
-          setItems(nextItems);
-          window.localStorage.setItem(key, JSON.stringify(nextItems));
-          console.log(`Loaded ${key} from Firebase`, nextItems);
-        }
-      } catch (error) {
-        console.error(`Firebase load failed for ${key}`, error);
-      } finally {
-        if (!cancelled) setLoaded(true);
-      }
-    }
-
-    loadFromFirebase();
-    return () => { cancelled = true; };
-  }, [key]);
-
-  const setPersistentItems = (updater) => {
-    setItems((current) => {
-      const nextItems = typeof updater === "function" ? updater(current) : updater;
-      const safeItems = normalizeDataset(nextItems, current);
-
-      try {
-        window.localStorage.setItem(key, JSON.stringify(safeItems));
-      } catch (error) {
-        console.error(`Local cache save failed for ${key}`, error);
-      }
-
-      if (firebaseEnabled && firestoreDb) {
-        setDoc(doc(firestoreDb, "rmsData", key), {
-          items: safeItems,
-          updated_at: new Date().toISOString()
-        }, { merge: true })
-          .then(() => console.log(`Saved ${key} to Firebase`, safeItems))
-          .catch((error) => console.error(`Firebase save failed for ${key}`, error));
-      } else {
-        console.warn(`Firebase not configured. Saved ${key} to localStorage only.`);
-      }
-
-      return safeItems;
+    const activeIndex = groups.findIndex((group) => groupContainsRoute(group, current));
+    if (activeIndex < 0) return;
+    const key = navSectionKey(groups[activeIndex], activeIndex);
+    setCollapsedSections((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev, [key]: false };
+      persistJson(NAV_SECTIONS_STORAGE_KEY, next);
+      return next;
     });
-  };
 
-  return [items, setPersistentItems, loaded];
+    const activeGroup = groups[activeIndex];
+    if (groupHasNavTree(activeGroup)) {
+      const branchIds = findActiveNavBranchIds(activeGroup.tree, current);
+      if (!branchIds.length) return;
+      setCollapsedNested((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const id of branchIds) {
+          if (next[id]) {
+            next[id] = false;
+            changed = true;
+          }
+        }
+        if (!changed) return prev;
+        persistJson(NAV_NESTED_STORAGE_KEY, next);
+        return next;
+      });
+    }
+  }, [current, groups]);
+
+  function toggleSection(key) {
+    setCollapsedSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      persistJson(NAV_SECTIONS_STORAGE_KEY, next);
+      return next;
+    });
+  }
+
+  function toggleNested(id) {
+    setCollapsedNested((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      persistJson(NAV_NESTED_STORAGE_KEY, next);
+      return next;
+    });
+  }
+
+  function handleNavClick(name, externalUrl) {
+    const url = typeof externalUrl === "string" ? externalUrl.trim() : "";
+    if (/^https?:\/\//i.test(url)) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (name === "Academy Class Schedule") {
+      window.open(FORGE_ACADEMY_CLASS_SCHEDULE_URL, "_blank", "noopener,noreferrer");
+      return;
+    }
+    onNavigate(name);
+  }
+
+  function renderNavTree(nodes, depth = 0) {
+    return (nodes || []).map((node) => {
+      if (isNavBranch(node)) {
+        const branchId = node.id || node.label;
+        const isBranchCollapsed = collapsedNested[branchId] === undefined
+          ? true
+          : Boolean(collapsedNested[branchId]);
+        const hasActive = branchContainsRoute(node, current);
+        const BranchIcon = typeof node.icon === "function" ? node.icon : ShieldCheck;
+        return (
+          <div
+            key={navNodeKey(node)}
+            className={`nav-branch depth-${depth}${hasActive ? " has-active" : ""}`}
+            style={{ "--nav-depth": depth }}
+          >
+            {!collapsed ? (
+              <button
+                type="button"
+                className={`nav-item nav-branch-toggle${hasActive ? " has-active" : ""}`}
+                aria-expanded={!isBranchCollapsed}
+                aria-controls={`nav-branch-${branchId}`}
+                id={`nav-branch-btn-${branchId}`}
+                onClick={() => toggleNested(branchId)}
+              >
+                <BranchIcon size={15} aria-hidden />
+                <span>{navNodeLabel(node)}</span>
+                <ChevronDown size={14} className="nav-branch-chevron" aria-hidden />
+              </button>
+            ) : null}
+            <div
+              id={`nav-branch-${branchId}`}
+              className="nav-branch-items"
+              role="group"
+              aria-labelledby={!collapsed ? `nav-branch-btn-${branchId}` : undefined}
+              hidden={isBranchCollapsed && !collapsed}
+            >
+              {renderNavTree(node.children, depth + 1)}
+            </div>
+          </div>
+        );
+      }
+
+      const NavIcon = typeof node.icon === "function" ? node.icon : ShieldCheck;
+      const isExternal =
+        (typeof node.externalUrl === "string" && /^https?:\/\//i.test(node.externalUrl))
+        || node.name === "Academy Class Schedule";
+      const display = navNodeLabel(node);
+      return (
+        <button
+          key={navNodeKey(node)}
+          type="button"
+          className={!isExternal && current === node.name ? "nav-item active" : "nav-item"}
+          style={{ "--nav-depth": depth }}
+          onClick={() => handleNavClick(node.name, node.externalUrl)}
+          title={isExternal ? `${display} (opens Academy)` : display}
+          aria-current={!isExternal && current === node.name ? "page" : undefined}
+        >
+          <NavIcon size={15} aria-hidden />
+          <span>{display}</span>
+          {isExternal && !collapsed ? (
+            <ExternalLink size={12} className="nav-external-icon" aria-hidden />
+          ) : null}
+        </button>
+      );
+    });
+  }
+
+  function branchContainsRoute(branch, routeName) {
+    if (!routeName || !branch) return false;
+    if (!isNavBranch(branch)) return branch.name === routeName;
+    return (branch.children || []).some((child) => branchContainsRoute(child, routeName));
+  }
+
+  return (
+    <aside className={`side-nav ${collapsed ? "collapsed" : ""}`}>
+      <nav aria-label="Primary">
+        {groups.map((group, index) => {
+          const key = navSectionKey(group, index);
+          const title = navSectionTitle(group, index);
+          const isSectionCollapsed = Boolean(collapsedSections[key]);
+          const showHeader = Boolean(group.label) || groupHasNavTree(group) || (group.items?.length || 0) > 1;
+          const sectionHasActive = groupContainsRoute(group, current);
+
+          return (
+            <section
+              key={key}
+              className={[
+                isSectionCollapsed && !collapsed ? "is-collapsed" : "",
+                sectionHasActive ? "has-active" : "",
+              ].filter(Boolean).join(" ") || undefined}
+            >
+              {!collapsed && showHeader ? (
+                <button
+                  type="button"
+                  className={`nav-section-toggle${sectionHasActive ? " has-active" : ""}`}
+                  aria-expanded={!isSectionCollapsed}
+                  onClick={() => toggleSection(key)}
+                >
+                  <span className="nav-label">{title}</span>
+                  <ChevronDown size={14} aria-hidden />
+                </button>
+              ) : null}
+              <div className="nav-section-items" hidden={isSectionCollapsed && !collapsed}>
+                {groupHasNavTree(group)
+                  ? renderNavTree(group.tree, 0)
+                  : group.items.map(([name, Icon, externalUrl]) => {
+                      const NavIcon = typeof Icon === "function" ? Icon : ShieldCheck;
+                      const isExternal =
+                        (typeof externalUrl === "string" && /^https?:\/\//i.test(externalUrl))
+                        || name === "Academy Class Schedule";
+                      return (
+                        <button
+                          key={name}
+                          className={!isExternal && current === name ? "nav-item active" : "nav-item"}
+                          onClick={() => handleNavClick(name, externalUrl)}
+                          title={isExternal ? `${name} (opens Academy)` : name}
+                          type="button"
+                          aria-current={!isExternal && current === name ? "page" : undefined}
+                        >
+                          <NavIcon size={15} aria-hidden />
+                          <span>{name}</span>
+                          {isExternal && !collapsed ? (
+                            <ExternalLink size={12} className="nav-external-icon" aria-hidden />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+              </div>
+            </section>
+          );
+        })}
+      </nav>
+      <button className="nav-collapse" type="button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}>
+        {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+      </button>
+    </aside>
+  );
 }
 
-function toneFromStatus(value, fallback = "neutral") {
-  const text = String(value).toLowerCase();
-  if (/active|complete|approved|in service|scheduled|compliant|upcoming/.test(text)) return "success";
-  if (/overdue|expired|deficit|out of service|high/.test(text)) return "critical";
-  if (/due|pending|leave|pm|medium/.test(text)) return "warning";
-  if (/review|submitted|progress/.test(text)) return "info";
-  return fallback;
+function NotificationBell({ departmentId, userId }) {
+  const [notifications, setNotifications] = useState([]);
+  const [open, setOpen] = useState(false);
+  const unread = notifications.filter((item) => item.status === "unread").length;
+
+  useEffect(() => {
+    if (!departmentId) return undefined;
+    let cancelled = false;
+    listUserNotifications(departmentId, userId).then((items) => {
+      if (!cancelled) setNotifications(items.slice(0, 20));
+    });
+    return () => { cancelled = true; };
+  }, [departmentId, userId]);
+
+  async function handleRead(notificationId) {
+    await markNotificationRead(departmentId, notificationId);
+    setNotifications((current) =>
+      current.map((item) => item.id === notificationId ? { ...item, status: "read" } : item)
+    );
+  }
+
+  return <div className="notification-wrap">
+    <button className="icon-button notification-button" onClick={() => setOpen(!open)} type="button">
+      <Bell size={17} />
+      {unread > 0 && <i>{unread}</i>}
+    </button>
+    {open && (
+      <section className="notification-panel">
+        <header><strong>Notifications</strong><button onClick={() => setOpen(false)}><X size={14} /></button></header>
+        <div className="notification-list">
+          {notifications.map((item) => (
+            <button key={item.id} className={item.status === "unread" ? "notification-item unread" : "notification-item"} onClick={() => handleRead(item.id)}>
+              <strong>{item.title}</strong>
+              <span>{item.message}</span>
+              <small>{String(item.created_at || "").slice(0, 16)}</small>
+            </button>
+          ))}
+          {!notifications.length && <p className="empty-table">No notifications yet.</p>}
+        </div>
+      </section>
+    )}
+  </div>;
 }
 
-function Badge({ children, tone = "neutral" }) {
-  return <span className={`badge badge-${toneFromStatus(children, tone)}`}>{children}</span>;
+function useLiveClock(timezone = "America/Chicago") {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(now);
+
+  const timeLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(now);
+
+  return { dateLabel, timeLabel };
 }
 
-function SideNav({ current, collapsed, setCollapsed, onNavigate }) {
-  return <aside className={`side-nav ${collapsed ? "collapsed" : ""}`}>
-    <nav>{navGroups.map((group, index) => <section key={`${group.label}-${index}`}>{!collapsed && group.label && <span className="nav-label">{group.label}</span>}{group.items.map(([name, Icon]) => <button key={name} className={current === name ? "nav-item active" : "nav-item"} onClick={() => onNavigate(name)} title={name}><Icon size={15} /><span>{name}</span></button>)}</section>)}</nav>
-    <button className="nav-collapse" onClick={() => setCollapsed(!collapsed)}>{collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}</button>
-  </aside>;
-}
+function TopBar({
+  query,
+  setQuery,
+  toggleMobileNav,
+  profile,
+  membership,
+  user,
+  onSignOut,
+  appView,
+  onSelectAdminView,
+  onSelectEmployeeView,
+  showAdminToggle,
+  showEmployeeToggle,
+  departmentId,
+  isCreator,
+  wideBrandLogo = false,
+  tagline = "",
+  hideSearch = false
+}) {
+  const initials = membershipInitials(membership, user);
+  const displayName = membership?.displayName || user?.displayName || user?.email || "User";
+  const roleLabel = formatRoleLabel(membership?.role || "member", membership);
+  const { dateLabel, timeLabel } = useLiveClock(profile.timezone || "America/Chicago");
+  const brandTitle = profile.displayTitle || profile.name || defaultPlatformConfig.platformTitle;
+  const brandSubtitle = profile.shortName || profile.name;
 
-function TopBar({ query, setQuery, toggleMobileNav }) {
   return <header className="top-bar">
-    <button className="icon-button mobile-menu" onClick={toggleMobileNav}><Menu size={19} /></button>
-    <div className="top-brand"><img src={departmentLogo} alt="Horn Lake Fire Department" /><div><strong>Horn Lake Fire/EMS Dashboard</strong><span>Horn Lake Command</span></div></div>
-    <div className="command-time"><span><CalendarDays size={15} /> Jun 7, 2026</span><span><Clock3 size={15} /> 11:32 AM</span></div>
-    <label className="global-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search personnel, apparatus, occupancies, training, inspections..." /></label>
-    <button className="icon-button notification-button"><Bell size={17} /><i>6</i></button>
-    <button className="profile-button"><span>JS</span><div><strong>Chief J. Smith</strong><small>Fire Chief</small></div><ChevronRight size={13} /></button>
+    <button className="icon-button mobile-menu" type="button" aria-label="Menu" onClick={toggleMobileNav}><Menu size={19} /></button>
+    <div className="top-bar-lead">
+      <div className="top-bar-lead-row">
+        <div className={`top-brand ${wideBrandLogo ? "top-brand-wide" : ""}`}>
+          <div className={wideBrandLogo ? "top-brand-logo-wrap" : "top-brand-logo"}>
+            <img src={resolveDepartmentLogoUrl(profile.logoUrl)} alt={profile.name} />
+          </div>
+          {!wideBrandLogo && (
+            <div className="top-brand-text">
+              <strong title={brandTitle}>{brandTitle}</strong>
+              {brandSubtitle && brandSubtitle !== brandTitle && <span title={brandSubtitle}>{brandSubtitle}</span>}
+            </div>
+          )}
+        </div>
+        <DepartmentSwitcher isCreator={isCreator} />
+        {(showAdminToggle || showEmployeeToggle) && (
+          <div className="segmented-control view-toggle">
+            {showAdminToggle && (
+              <button
+                type="button"
+                className={appView === "admin" ? "active" : ""}
+                title="Open command center with sidebar modules"
+                onClick={onSelectAdminView}
+              >
+                Admin RMS
+              </button>
+            )}
+            {showEmployeeToggle && (
+              <button
+                type="button"
+                className={appView === "employee" ? "active" : ""}
+                title="Open self-service member portal"
+                onClick={onSelectEmployeeView}
+              >
+                Employee Portal
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {tagline && <p className="top-bar-tagline">{tagline}</p>}
+    </div>
+    <div className="top-bar-utilities">
+      <div className="command-time"><span><CalendarDays size={15} /> {dateLabel}</span><span><Clock3 size={15} /> {timeLabel}</span></div>
+      {!hideSearch && <label className="global-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search personnel, apparatus, occupancies, training, inspections..." /></label>}
+      <NotificationBell departmentId={departmentId} userId={user?.uid} />
+      <button className="profile-button" type="button" onClick={onSignOut} title="Sign out">
+        <span>{initials}</span>
+        <div><strong>{displayName}</strong><small>{roleLabel}</small></div>
+        <ChevronRight size={13} />
+      </button>
+    </div>
   </header>;
 }
 
-function Panel({ title, icon: Icon, action, children, className = "" }) {
-  return <section className={`panel ${className}`}><header><div><Icon size={15} /><strong>{title}</strong></div>{action}</header><div className="panel-body">{children}</div></section>;
-}
-
-function MiniTable({ columns, rows }) {
-  return <div className="mini-table"><div className="mini-row mini-head" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>{columns.map((column) => <span key={column}>{column}</span>)}</div>{rows.map((row) => <div className="mini-row" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }} key={row.join("-")}>{row.map((cell, index) => <span key={`${cell}-${index}`} className={index === row.length - 1 ? `cell-${toneFromStatus(cell)}` : ""}>{cell}</span>)}</div>)}</div>;
-}
-
-function Dashboard({ onNavigate, personnel, certifications, apparatus, workOrders }) {
-  const activePersonnel = personnel.filter((p) => p.status === "Active").length;
-  const onLeave = personnel.filter((p) => p.status === "Leave").length;
-  const paramedics = personnel.filter((p) => p.ems === "Paramedic").length;
-  const driverApproved = personnel.filter((p) => p.driver === "Approved").length;
-
-  const certsExpiring30 = certifications.filter((c) => Number(c.days) <= 30).length;
-
-  const unitsAvailable = apparatus.filter((u) => u.status === "In Service").length;
-  const unitsOos = apparatus.filter((u) => u.status !== "In Service").length;
-
-  const workOrdersDue = workOrders.filter((w) =>
-    ["Overdue", "Due Soon", "Open"].includes(w.status)
-  ).length;
-
-  const liveKpis = [
-    ["Active Personnel", activePersonnel, `${personnel.length} Total`, "info", Users, "Personnel"],
-    ["Personnel On Leave", onLeave, "Current Leave Status", "warning", Users, "Personnel"],
-    ["Paramedics", paramedics, "EMS Qualified", "success", Ambulance, "Personnel"],
-    ["Driver Approved", driverApproved, "Cleared Operators", "info", Truck, "Personnel"],
-    ["Certs Expiring", certsExpiring30, "Next 30 Days", "warning", FileCheck2, "Certifications"],
-    ["Units Available", unitsAvailable, `${apparatus.length} Total Fleet`, "success", Truck, "Apparatus"],
-    ["Units OOS", unitsOos, "Not In Service", unitsOos > 0 ? "critical" : "success", Wrench, "Maintenance"],
-    ["Work Orders Due", workOrdersDue, "Open / Due Soon", "warning", Wrench, "Maintenance"]
-  ];
-
+/** Shown in the page area while a module's code downloads the first time. */
+function PageLoading() {
   return (
-    <div className="dashboard">
-      <section className="kpi-grid">
-        {liveKpis.map(([label, value, note, tone, Icon, target]) => (
-          <button key={label} className={`kpi-card tone-${tone}`} onClick={() => onNavigate(target)}>
-            <Icon size={27} />
-            <span>{label}</span>
-            <strong>{value}</strong>
-            <small>{note}</small>
-          </button>
-        ))}
-      </section>
+    <div className="page-loading" role="status" aria-live="polite">
+      <span className="page-loading-spinner" aria-hidden="true" />
+      <span>Loading...</span>
     </div>
   );
 }
 
-function DataTable({ columns, rows, query }) {
-  const filtered = useMemo(() => rows.filter((row) => row.join(" ").toLowerCase().includes(query.toLowerCase())), [rows, query]);
-  return <div className="data-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}<th /></tr></thead><tbody>{filtered.map((row) => <tr key={row.join("-")}>{row.map((cell, index) => <td key={`${cell}-${index}`}>{index === row.length - 1 ? <Badge>{cell}</Badge> : cell}</td>)}<td><button className="row-action">Open</button></td></tr>)}</tbody></table>{!filtered.length && <div className="empty-table">No records match the current search.</div>}</div>;
+function LoadingScreen({ message = "Loading..." }) {
+  return (
+    <div className="auth-screen">
+      <div className="auth-theme-toggle-wrap">
+        <ThemeToggle />
+      </div>
+      <section className="auth-card auth-loading"><p>{message}</p></section>
+    </div>
+  );
 }
 
-function PersonnelPage({ query, records = [], setRecords }) {
-  setRecords((current) =>
-  current.map((person) =>
-    person.id === updatedPerson.id ? updatedPerson : person
-  )
-);
-  const safeRecords = Array.isArray(records) ? records : [];
-  const visiblePeople = safeRecords.filter((person) =>
-    Object.values(person).join(" ").toLowerCase().includes(query.toLowerCase())
-  );
+const DEEP_LINK_SESSION_KEY = "rms-deep-link-applied";
 
-  const [selectedId, setSelectedId] = useState(safeRecords[0]?.id || "");
-  const [editing, setEditing] = useState(false);
-  const [savedMessage, setSavedMessage] = useState("");
+function wasDeepLinkApplied() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(DEEP_LINK_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
-  const selected = safeRecords.find((person) => person.id === selectedId) || safeRecords[0] || null;
-  const [draft, setDraft] = useState(selected || {});
+function markDeepLinkApplied() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(DEEP_LINK_SESSION_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+const APP_VIEW_PREF_KEY = "rms-app-view-pref";
+const EMPTY_SHIFTS = [];
+
+function persistAppViewPref(view) {
+  try {
+    window.sessionStorage.setItem(APP_VIEW_PREF_KEY, view);
+    window.localStorage.removeItem("rms-app-view");
+  } catch {
+    // ignore
+  }
+}
+
+function readAppViewPref(hasAdminAccess) {
+  if (!hasAdminAccess) return "employee";
+  try {
+    const sessionPref = window.sessionStorage.getItem(APP_VIEW_PREF_KEY);
+    if (sessionPref === "employee") return "employee";
+  } catch {
+    // ignore
+  }
+  return "admin";
+}
+
+function AppShell() {
+  const { departmentId, profile, platformConfig, isPlatformScope: inPlatformScope, settings, isModuleEnabled, setDepartmentId, refreshDepartment } = useTenant();
+  const {
+    user,
+    membership,
+    permissions,
+    signOut,
+    isCreator,
+    switchCreatorDepartment,
+    recoverAccess,
+    membershipLoading
+  } = useAuth();
+  const syncedDepartmentRef = useRef(null);
+  const adminRecoveryAttemptedRef = useRef(false);
 
   useEffect(() => {
-    if (!selectedId && safeRecords[0]?.id) setSelectedId(safeRecords[0].id);
-    if (selected) setDraft(selected);
-  }, [selected, selectedId, safeRecords]);
+    if (!isCreator || !departmentId || isPlatformScope(departmentId)) return;
+    if (typeof window !== "undefined" && window.location.pathname.replace(/\/$/, "") === CREATOR_CONSOLE_PATH) return;
+    if (syncedDepartmentRef.current === departmentId) return;
+    syncedDepartmentRef.current = departmentId;
+    switchCreatorDepartment(departmentId);
+  }, [isCreator, departmentId, switchCreatorDepartment]);
+  const initialDeepLink = typeof window !== "undefined" ? parseAppDeepLink(window.location) : null;
+  const initialModule = typeof window !== "undefined" ? resolveInitialAppModule(window.location) : "Dashboard";
+  const [appView, setAppView] = useState(initialDeepLink?.module ? "admin" : "admin");
+  const [employeeSection, setEmployeeSection] = useState("My Dashboard");
+  const [personnelNavigateId, setPersonnelNavigateId] = useState("");
+  const [employeePreviewPersonId, setEmployeePreviewPersonId] = useState("");
+  const [current, setCurrent] = useState(
+    initialDeepLink?.module === CREATOR_CONSOLE_MODULE
+      ? CREATOR_CONSOLE_MODULE
+      : (typeof window !== "undefined" && pageFromLocation(PAGE_INDEX, window.location)) || initialModule
+  );
+  const [schedulingTab, setSchedulingTab] = useState(null);
+  const clearSchedulingTab = useCallback(() => setSchedulingTab(null), []);
+  const deepLinkAppliedRef = useRef(Boolean(initialDeepLink?.module));
+  const [codeLibraryAccess, setCodeLibraryAccess] = useState(null);
+  const [preplanFeatures, setPreplanFeatures] = useState(null);
 
-  function selectPerson(person) {
-    setSelectedId(person.id);
-    setDraft(person);
-    setEditing(false);
-    setSavedMessage("");
+  useEffect(() => {
+    let active = true;
+    if (!departmentId || isPlatformScope(departmentId)) {
+      setCodeLibraryAccess(null);
+      return undefined;
+    }
+    getDepartmentCodeLibraryAccess(departmentId)
+      .then((access) => {
+        if (active) setCodeLibraryAccess(access);
+      })
+      .catch(() => {
+        if (active) setCodeLibraryAccess({ moduleEnabled: false, enabledPublicationIds: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, [departmentId]);
+
+  useEffect(() => {
+    let active = true;
+    if (!departmentId || isPlatformScope(departmentId)) {
+      setPreplanFeatures(null);
+      return undefined;
+    }
+    getDepartmentPreplanFeatures(departmentId)
+      .then((features) => {
+        if (active) {
+          setPreplanFeatures(
+            resolveEffectivePreplanFeatures(features, platformConfig?.availablePreplanFeatures),
+          );
+        }
+      })
+      .catch(() => {
+        if (active) setPreplanFeatures(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [departmentId, platformConfig?.availablePreplanFeatures]);
+
+  const visibleNavGroups = useMemo(() => {
+    const permissionFiltered = filterNavGroups(navGroups, permissions, { isCreator });
+    const moduleFiltered = filterNavByEnabledModules(permissionFiltered, isModuleEnabled, {
+      isCreator,
+      isPlatformScope: inPlatformScope,
+      isPlatformCreator: Boolean(membership?.isPlatformCreator)
+    });
+    const codeFiltered = filterNavByCodeLibraryAccess(moduleFiltered, codeLibraryAccess, {
+      isCreator,
+      isPlatformCreator: Boolean(membership?.isPlatformCreator),
+    });
+    return filterNavGroupsByPreplanFeatures(codeFiltered, preplanFeatures || {}, { isCreator });
+  }, [permissions, isCreator, isModuleEnabled, inPlatformScope, membership?.isPlatformCreator, codeLibraryAccess, preplanFeatures]);
+  const canViewInternalEmail = hasPermission(permissions, "viewInternalEmail");
+  const canViewDailyLog = hasPermission(permissions, "viewDailyLog");
+  const visibleEmployeeNavGroups = useMemo(
+    () => filterEmployeePortalNav(employeePortalNavGroups, {
+      canViewInternalEmail,
+      canViewDailyLog,
+      isModuleEnabled,
+    }),
+    [canViewInternalEmail, canViewDailyLog, isModuleEnabled]
+  );
+  const showAdminToggle = canAccessAdminRms(permissions, isCreator);
+  const showEmployeeToggle = canAccessEmployeePortal(permissions);
+  const effectiveAppView = showAdminToggle ? appView : "employee";
+
+  // Keep the open page in the address (?page=...) so it can be bookmarked,
+  // shared and reached with back/forward. The first sync replaces the current
+  // history entry; later page changes add entries.
+  const pageUrlSyncedRef = useRef(false);
+  const pageFromHistoryRef = useRef(false);
+  // In-app Back button: shown once there's an earlier in-app page to return to.
+  const [canGoBack, setCanGoBack] = useState(() => (
+    typeof window !== "undefined" && depthFromHistoryState(window.history.state) > 0
+  ));
+  useEffect(() => {
+    if (typeof window === "undefined" || effectiveAppView !== "admin") return;
+    if (current === CREATOR_CONSOLE_MODULE || isCreatorConsolePath()) return; // has its own /creator-console path
+    const slug = current === "Dashboard" ? "" : pageSlug(current);
+    const sameUrl = (new URLSearchParams(window.location.search).get("page") || "") === slug;
+    const replace = !pageUrlSyncedRef.current || pageFromHistoryRef.current;
+    pageUrlSyncedRef.current = true;
+    pageFromHistoryRef.current = false;
+    const depth = depthFromHistoryState(window.history.state);
+    if (sameUrl && slugFromHistoryState(window.history.state) === slug) return;
+    const nextUrl = urlWithPage(window.location.href, slug);
+    if (replace || sameUrl) {
+      window.history.replaceState(pageHistoryState(slug, depth), "", nextUrl);
+      setCanGoBack(depth > 0);
+    } else {
+      window.history.pushState(pageHistoryState(slug, depth + 1), "", nextUrl);
+      setCanGoBack(true);
+    }
+  }, [current, effectiveAppView]);
+
+  useEffect(() => {
+    function handlePageHistory() {
+      // Only react to entries this app created (other code also fires popstate).
+      const slug = slugFromHistoryState(window.history.state);
+      if (slug === null) return;
+      const name = slug ? PAGE_INDEX.get(slug) : "Dashboard";
+      if (!name) return;
+      pageFromHistoryRef.current = true;
+      setCanGoBack(depthFromHistoryState(window.history.state) > 0);
+      setCurrent((existing) => (existing === name ? existing : name));
+      setMobileNav(false);
+    }
+    window.addEventListener("popstate", handlePageHistory);
+    return () => window.removeEventListener("popstate", handlePageHistory);
+  }, []);
+
+  useEffect(() => {
+    if (membershipLoading || !user?.uid || showAdminToggle) return undefined;
+    if (adminRecoveryAttemptedRef.current) return undefined;
+    let cancelled = false;
+    (async () => {
+      const restored = await recoverAccess();
+      adminRecoveryAttemptedRef.current = true;
+      if (!cancelled && restored) {
+        persistAppViewPref("admin");
+        setAppView("admin");
+        setCurrent("Dashboard");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [showAdminToggle, user?.uid, recoverAccess, membershipLoading]);
+
+  useEffect(() => {
+    if (membershipLoading) return;
+    if (parseAppDeepLink(window.location)?.module) return;
+    // A ?page= address picks the page; don't reset it to the dashboard.
+    if (pageFromLocation(PAGE_INDEX, window.location)) {
+      persistAppViewPref("admin");
+      setAppView("admin");
+      return;
+    }
+    if (shouldOpenHydrantsModule(window.location)) {
+      persistAppViewPref("admin");
+      setAppView("admin");
+      setCurrent("Hydrants");
+      return;
+    }
+    if (!showAdminToggle && showEmployeeToggle) {
+      setAppView("employee");
+      return;
+    }
+    const nextView = readAppViewPref(showAdminToggle);
+    setAppView(nextView);
+    if (nextView === "admin" && showAdminToggle && !shouldOpenHydrantsModule(window.location)) {
+      setCurrent("Dashboard");
+    }
+  }, [showAdminToggle, showEmployeeToggle, membershipLoading]);
+
+  useEffect(() => {
+    if (membershipLoading || deepLinkAppliedRef.current || wasDeepLinkApplied()) return undefined;
+    const deepLink = parseAppDeepLink(window.location);
+    if (!deepLink?.module) return undefined;
+
+    deepLinkAppliedRef.current = true;
+    markDeepLinkApplied();
+
+    if (
+      deepLink.module === CREATOR_CONSOLE_MODULE
+      && (isCreator || membership?.isPlatformCreator)
+      && !isCreatorConsolePath()
+    ) {
+      setDepartmentId(PLATFORM_SCOPE_ID);
+    }
+
+    if (deepLink.module === CREATOR_CONSOLE_MODULE) {
+      persistAppViewPref("admin");
+      setAppView("admin");
+      setCurrent(CREATOR_CONSOLE_MODULE);
+      setMobileNav(false);
+    }
+
+    return undefined;
+  }, [membershipLoading, isCreator, membership?.isPlatformCreator, permissions, setDepartmentId]);
+
+  const [personnel, setPersonnel] = useTenantPersistentState(departmentId, LIST_KEYS.personnel, getTenantListFallback(departmentId, LIST_KEYS.personnel));
+
+  // New-department setup wizard: opens for admins of a department flagged
+  // onboardingRequired until it's finished ("Finish later" hides it for this
+  // session). System Admin can also open it on demand.
+  const [setupWizardOpen, setSetupWizardOpen] = useState(false);
+  const [setupWizardDismissed, setSetupWizardDismissed] = useState(false);
+  const setupWizardNeeded = Boolean(
+    !inPlatformScope
+    && departmentId
+    && settings?.onboardingRequired
+    && !settings?.onboardingCompletedAt
+    && canAccessSystemAdmin(permissions, isCreator)
+  );
+  useEffect(() => {
+    if (setupWizardNeeded && !setupWizardDismissed) setSetupWizardOpen(true);
+  }, [setupWizardNeeded, setupWizardDismissed]);
+  useEffect(() => {
+    const open = () => setSetupWizardOpen(true);
+    window.addEventListener("forge:open-setup-wizard", open);
+    return () => window.removeEventListener("forge:open-setup-wizard", open);
+  }, []);
+  useEffect(() => {
+    // Switching departments resets the "finish later" choice.
+    setSetupWizardDismissed(false);
+    setSetupWizardOpen(false);
+  }, [departmentId]);
+  const [certifications, setCertifications] = useTenantPersistentState(departmentId, LIST_KEYS.certifications, getTenantListFallback(departmentId, LIST_KEYS.certifications));
+  const [training, setTraining] = useTenantPersistentState(departmentId, LIST_KEYS.training, getTenantListFallback(departmentId, LIST_KEYS.training));
+  const [apparatus, setApparatus] = useTenantPersistentState(departmentId, LIST_KEYS.apparatus, getTenantListFallback(departmentId, LIST_KEYS.apparatus));
+  const [workOrders, setWorkOrders] = useTenantPersistentState(departmentId, LIST_KEYS.workOrders, getTenantListFallback(departmentId, LIST_KEYS.workOrders));
+  const [fleetCutover, setFleetCutover] = useState({
+    redirectApparatusToFleetAssets: false,
+    legacyApparatusWritesLocked: false,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!departmentId || isPlatformScope(departmentId)) {
+      setFleetCutover({
+        redirectApparatusToFleetAssets: false,
+        legacyApparatusWritesLocked: false,
+      });
+      return undefined;
+    }
+    loadFleetSettings(departmentId)
+      .then((next) => {
+        if (cancelled) return;
+        setFleetCutover({
+          redirectApparatusToFleetAssets: Boolean(next.redirectApparatusToFleetAssets),
+          legacyApparatusWritesLocked: Boolean(next.legacyApparatusWritesLocked),
+        });
+      })
+      .catch(() => null);
+    return () => {
+      cancelled = true;
+    };
+  }, [departmentId]);
+
+  useEffect(() => {
+    if (current === "Apparatus" && fleetCutover.redirectApparatusToFleetAssets) {
+      setCurrent("All Fleet Assets");
+    }
+  }, [current, fleetCutover.redirectApparatusToFleetAssets]);
+  const [assets, setAssets] = useTenantPersistentState(departmentId, LIST_KEYS.assets, getTenantListFallback(departmentId, LIST_KEYS.assets));
+  const [documents, setDocuments] = useTenantPersistentState(departmentId, LIST_KEYS.documents, getTenantListFallback(departmentId, LIST_KEYS.documents));
+  const [occupancies, setOccupancies] = useTenantPersistentState(departmentId, LIST_KEYS.occupancies, getTenantListFallback(departmentId, LIST_KEYS.occupancies));
+  const [inspections, setInspections] = useTenantPersistentState(departmentId, LIST_KEYS.inspections, getTenantListFallback(departmentId, LIST_KEYS.inspections));
+  const [preplans, setPreplans] = useTenantPersistentState(departmentId, LIST_KEYS.preplans, getTenantListFallback(departmentId, LIST_KEYS.preplans));
+  const [hoseTests, setHoseTests] = useTenantPersistentState(departmentId, LIST_KEYS.hoseTests, getTenantListFallback(departmentId, LIST_KEYS.hoseTests));
+  const [scheduleDays, setScheduleDays] = useTenantPersistentState(departmentId, LIST_KEYS.scheduleDays, getTenantListFallback(departmentId, LIST_KEYS.scheduleDays));
+  const [roster, setRoster, rosterLoaded] = useTenantPersistentState(departmentId, LIST_KEYS.roster, getTenantListFallback(departmentId, LIST_KEYS.roster));
+  const [leaveRequests, setLeaveRequests] = useTenantPersistentState(departmentId, LIST_KEYS.leaveRequests, getTenantListFallback(departmentId, LIST_KEYS.leaveRequests));
+  const [overtimeOffers, setOvertimeOffers] = useTenantPersistentState(departmentId, LIST_KEYS.overtimeOffers, getTenantListFallback(departmentId, LIST_KEYS.overtimeOffers));
+  const [vacancyPickups, setVacancyPickups] = useTenantPersistentState(departmentId, LIST_KEYS.vacancyPickups, getTenantListFallback(departmentId, LIST_KEYS.vacancyPickups));
+  const [shiftTrades, setShiftTrades] = useTenantPersistentState(departmentId, LIST_KEYS.shiftTrades, getTenantListFallback(departmentId, LIST_KEYS.shiftTrades));
+  const [callShifts, setCallShifts] = useTenantPersistentState(departmentId, LIST_KEYS.callShifts, getTenantListFallback(departmentId, LIST_KEYS.callShifts));
+  const [digitalDashboardDisplays, setDigitalDashboardDisplays] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardDisplays, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardDisplays));
+  const [digitalDashboardMedia, setDigitalDashboardMedia] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardMedia, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardMedia));
+  const [digitalDashboardPlaylists, setDigitalDashboardPlaylists] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardPlaylists, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardPlaylists));
+  const [digitalDashboardSchedules, setDigitalDashboardSchedules] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardSchedules, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardSchedules));
+  const [active911Alerts, setActive911Alerts] = useTenantPersistentState(departmentId, LIST_KEYS.active911Alerts, getTenantListFallback(departmentId, LIST_KEYS.active911Alerts));
+  const [alertDashboardConfig, setAlertDashboardConfig] = useTenantPersistentState(departmentId, LIST_KEYS.alertDashboardConfig, getTenantListFallback(departmentId, LIST_KEYS.alertDashboardConfig));
+  const [alertBusinessDirectory, setAlertBusinessDirectory] = useTenantPersistentState(departmentId, LIST_KEYS.alertBusinessDirectory, getTenantListFallback(departmentId, LIST_KEYS.alertBusinessDirectory));
+  const [dailyLogs, setDailyLogs] = useTenantPersistentState(departmentId, LIST_KEYS.dailyLogs, getTenantListFallback(departmentId, LIST_KEYS.dailyLogs));
+  const [timeCards, setTimeCards] = useTenantPersistentState(departmentId, LIST_KEYS.timeCards, getTenantListFallback(departmentId, LIST_KEYS.timeCards));
+  const [nerisFireReports, setNerisFireReports] = useTenantPersistentState(departmentId, LIST_KEYS.nerisFireReports, getTenantListFallback(departmentId, LIST_KEYS.nerisFireReports));
+  const isHydrantsView = current === "Hydrants" || current === "Hydrant Overview";
+  const showPlatformBrand = inPlatformScope || current === "Creator Console";
+  const headerProfile = showPlatformBrand
+    ? {
+      ...profile,
+      name: platformConfig?.name || profile.name,
+      shortName: platformConfig?.name || profile.shortName,
+      displayTitle: platformConfig?.platformTitle || profile.displayTitle,
+      logoUrl: resolvePlatformLogoUrl(platformConfig?.logoUrl)
+    }
+    : profile;
+  const headerTagline = platformConfig?.tagline
+    || settings?.platform?.tagline
+    || defaultDepartmentSettings.platform?.tagline
+    || defaultPlatformConfig.tagline;
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileNav, setMobileNav] = useState(false);
+  // On narrow screens the side menu is a full-height drawer pinned to the
+  // screen edge (styles.css). While it is open, lock the page behind it.
+  useEffect(() => {
+    if (!mobileNav || typeof document === "undefined") return undefined;
+    const html = document.documentElement;
+    const previousOverflow = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = previousOverflow;
+    };
+  }, [mobileNav]);
+  const [query, setQuery] = useState("");
+  const shiftRotation = useMemo(
+    () => normalizeShiftRotation(settings?.shiftRotation, profile?.shifts),
+    [settings?.shiftRotation, profile?.shifts]
+  );
+  const profileShifts = useMemo(
+    () => (Array.isArray(profile?.shifts) ? profile.shifts : EMPTY_SHIFTS),
+    [profile?.shifts]
+  );
+  const payPeriod = useMemo(
+    () => normalizePayPeriod(settings?.payPeriod),
+    [settings?.payPeriod]
+  );
+  const portalRules = useMemo(
+    () => normalizeEmployeePortalRules(settings?.employeePortalRules),
+    [settings?.employeePortalRules]
+  );
+  const payRules = useMemo(
+    () => normalizePayRules(settings?.payRules),
+    [settings?.payRules]
+  );
+  const dailyLogSettings = useMemo(
+    () => normalizeDailyLogSettings(settings?.dailyLogSettings),
+    [settings?.dailyLogSettings]
+  );
+  const schedulingSettings = useMemo(
+    () => normalizeSchedulingSettings(settings?.schedulingSettings, apparatus.map((unit) => unit.unit)),
+    [settings?.schedulingSettings, apparatus]
+  );
+  const callShiftRules = useMemo(
+    () => normalizeCallShiftRules(settings?.callShiftRules),
+    [settings?.callShiftRules]
+  );
+  const employeePreviewPerson = useMemo(
+    () => personnel.find((person) => person.id === employeePreviewPersonId) || null,
+    [personnel, employeePreviewPersonId]
+  );
+  const dashboardLiveDayMetrics = useMemo(
+    () => buildLiveScheduleDayMetrics({
+      referenceDayId: formatDayId(new Date()),
+      dayCount: 7,
+      scheduleDays,
+      rotation: shiftRotation,
+      roster,
+      personnel,
+      leaveRequests,
+      shiftTrades,
+      schedulingSettings,
+      apparatus,
+    }),
+    [
+      scheduleDays,
+      shiftRotation,
+      roster,
+      personnel,
+      leaveRequests,
+      shiftTrades,
+      schedulingSettings,
+      apparatus,
+    ]
+  );
+
+  function openPersonnelProfile(personnelId = "") {
+    if (!personnelId) return;
+    setPersonnelNavigateId(personnelId);
+    persistAppViewPref("admin");
+    setAppView("admin");
+    setCurrent("Personnel");
+    setQuery("");
+    setMobileNav(false);
   }
 
-  function saveProfile() {
-    if (!draft?.id || !setRecords) return;
+  function openEmployeeProfileForPerson(personnelId = "") {
+    if (!personnelId) return;
+    setEmployeePreviewPersonId(personnelId);
+    persistAppViewPref("employee");
+    setAppView("employee");
+    setEmployeeSection("My Profile");
+    setMobileNav(false);
+  }
 
-    const updatedPerson = {
-      ...draft,
-      updated_at: new Date().toISOString()
-    };
+  function navigate(name, options = {}) {
+    if (!showAdminToggle) return;
+    const moduleName = name === "Platform Admin" ? CREATOR_CONSOLE_MODULE : name;
+    if (moduleName === "Scheduling" && options.schedulingTab) {
+      setSchedulingTab(options.schedulingTab);
+    } else {
+      setSchedulingTab(null);
+    }
+    setCurrent(moduleName);
+    setQuery("");
+    setMobileNav(false);
+    if (appView !== "admin") setAppView("admin");
+    if (moduleName === CREATOR_CONSOLE_MODULE && typeof window !== "undefined") {
+      const nextUrl = inPlatformScope
+        ? `${CREATOR_CONSOLE_PATH}?scope=platform`
+        : `${CREATOR_CONSOLE_PATH}`;
+      if (window.location.pathname.replace(/\/$/, "") !== CREATOR_CONSOLE_PATH) {
+        window.history.replaceState({}, "", nextUrl);
+      }
+    }
+  }
 
-    setRecords((current) =>
-      current.map((person) =>
-        person.id === updatedPerson.id ? updatedPerson : person
+  function handleSelectAdminView() {
+    persistAppViewPref("admin");
+    setAppView("admin");
+    setCurrent("Dashboard");
+    setQuery("");
+    setMobileNav(false);
+  }
+
+  function handleSelectEmployeeView() {
+    setEmployeePreviewPersonId("");
+    persistAppViewPref("employee");
+    setAppView("employee");
+    setEmployeeSection("My Dashboard");
+    setMobileNav(false);
+  }
+
+  function navigateEmployee(name) {
+    setEmployeeSection(name);
+    setMobileNav(false);
+  }
+  const pageContent = effectiveAppView === "employee" ? (
+    <EmployeePortalPage
+      current={employeeSection}
+      onNavigate={setEmployeeSection}
+      membership={membership}
+      user={user}
+      permissions={permissions}
+      showInternalEmail={isModuleEnabled("internalEmail")}
+      personnel={personnel}
+      certifications={certifications}
+      training={training}
+      documents={documents}
+      setDocuments={setDocuments}
+      leaveRequests={leaveRequests}
+      setLeaveRequests={setLeaveRequests}
+      shiftTrades={shiftTrades}
+      setShiftTrades={setShiftTrades}
+      vacancyPickups={vacancyPickups}
+      setVacancyPickups={setVacancyPickups}
+      setPersonnel={setPersonnel}
+      scheduleDays={scheduleDays}
+      roster={roster}
+      apparatus={apparatus}
+      schedulingSettings={schedulingSettings}
+      dailyLogs={dailyLogs}
+      setDailyLogs={setDailyLogs}
+      shiftChangeTime={dailyLogSettings.shiftChangeTime}
+      isCreator={isCreator}
+      workOrders={workOrders}
+      setWorkOrders={setWorkOrders}
+      shiftRotation={shiftRotation}
+      profileShifts={profileShifts}
+      payPeriod={payPeriod}
+      portalRules={portalRules}
+      payRules={payRules}
+      departmentTitle={profile?.displayTitle || profile?.name || "Fire and EMS"}
+      departmentLogoUrl={profile?.logoUrl || ""}
+      stationNames={Array.isArray(profile?.stations) ? profile.stations : []}
+      timeCards={timeCards}
+      setTimeCards={setTimeCards}
+      previewPerson={employeePreviewPerson}
+      onClearPreviewPerson={() => {
+        setEmployeePreviewPersonId("");
+        persistAppViewPref("admin");
+        setAppView("admin");
+        setCurrent("System Admin");
+        setMobileNav(false);
+      }}
+    />
+  ) : current === "Dashboard" ? (
+    <CommandDashboard onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={certifications} apparatus={apparatus} workOrders={workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} />
+  ) : current === "Personnel" ? (
+    hasPermission(permissions, "viewPersonnel") ? (
+      <PersonnelPage
+        query={query}
+        records={personnel}
+        setRecords={setPersonnel}
+        training={training}
+        departmentId={departmentId}
+        canEditPhoto={canEditPersonnel(permissions, isCreator)}
+        canEditProfile={canEditPersonnel(permissions, isCreator)}
+        canViewPrivateInfo={canViewPersonnelPrivateInfo(permissions, isCreator)}
+        initialPersonId={personnelNavigateId}
+        onInitialPersonConsumed={() => setPersonnelNavigateId("")}
+        onOpenEmployeeProfile={showEmployeeToggle ? openEmployeeProfileForPerson : undefined}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Certifications" ? (
+    hasPermission(permissions, "viewCertifications") ? (
+      <CertificationsPage
+        query={query}
+        records={certifications}
+        setRecords={setCertifications}
+        departmentId={departmentId}
+        canEdit={
+          hasPermission(permissions, "editCertifications")
+          || hasPermission(permissions, "manageSystemSettings")
+        }
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Training" ? (
+    hasPermission(permissions, "viewTraining") ? (
+      <TrainingPage
+        query={query}
+        records={training}
+        setRecords={setTraining}
+        canEdit={
+          hasPermission(permissions, "editTraining")
+          || hasPermission(permissions, "manageSystemSettings")
+        }
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Scheduling" ? (
+    hasPermission(permissions, "viewSchedule") ? (
+      <SchedulingPage
+        days={scheduleDays}
+        setDays={setScheduleDays}
+        roster={roster}
+        setRoster={setRoster}
+        personnel={personnel}
+        setPersonnel={setPersonnel}
+        apparatus={apparatus}
+        leaveRequests={leaveRequests}
+        setLeaveRequests={setLeaveRequests}
+        overtimeOffers={overtimeOffers}
+        setOvertimeOffers={setOvertimeOffers}
+        vacancyPickups={vacancyPickups}
+        setVacancyPickups={setVacancyPickups}
+        shiftTrades={shiftTrades}
+        setShiftTrades={setShiftTrades}
+        callShifts={callShifts}
+        setCallShifts={setCallShifts}
+        shiftRotation={shiftRotation}
+        profileShifts={profileShifts}
+        schedulingSettings={schedulingSettings}
+        departmentName={profile?.displayTitle || profile?.name || ""}
+        departmentId={departmentId}
+        stationNames={Array.isArray(profile?.stations) ? profile.stations : []}
+        shiftChangeTime={dailyLogSettings.shiftChangeTime}
+        canEditRoster={canEditScheduleRoster(permissions, isCreator)}
+        canManageCallShifts={
+          isCreator
+          || hasPermission(permissions, "editSchedule")
+          || hasPermission(permissions, "manageSystemSettings")
+        }
+        callShiftRules={callShiftRules}
+        rosterLoaded={rosterLoaded}
+        initialTab={schedulingTab}
+        onInitialTabConsumed={clearSchedulingTab}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Time Sheets" ? (
+    hasPermission(permissions, "viewSchedule") ? (
+      <TimeSheetsPage
+        personnel={personnel}
+        timeCards={timeCards}
+        setTimeCards={setTimeCards}
+        payPeriod={payPeriod}
+        payRules={payRules}
+        leaveRequests={leaveRequests}
+        roster={roster}
+        scheduleDays={scheduleDays}
+        schedulingSettings={schedulingSettings}
+        apparatus={apparatus}
+        shiftRotation={shiftRotation}
+        shiftTrades={shiftTrades}
+        departmentTitle={profile?.displayTitle || profile?.name || "Fire and EMS"}
+        departmentLogoUrl={profile?.logoUrl || ""}
+        shiftChangeTime={dailyLogSettings.shiftChangeTime}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Daily Log" ? (
+    hasPermission(permissions, "viewDailyLog") ? (
+      <DailyLogPage
+        query={query}
+        records={dailyLogs}
+        setRecords={setDailyLogs}
+        personnel={personnel}
+        apparatus={apparatus}
+        roster={roster}
+        leaveRequests={leaveRequests}
+        shiftTrades={shiftTrades}
+        scheduleDays={scheduleDays}
+        schedulingSettings={schedulingSettings}
+        profileShifts={profileShifts}
+        shiftRotation={shiftRotation}
+        shiftChangeTime={dailyLogSettings.shiftChangeTime}
+        canEdit={
+          hasPermission(permissions, "editDailyLog")
+          || hasPermission(permissions, "editSchedule")
+        }
+        canUnlock={
+          isCreator
+          || hasPermission(permissions, "manageSystemSettings")
+        }
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Apparatus" ? (
+    hasPermission(permissions, "viewApparatus") ? (
+      <ApparatusPage
+        units={apparatus}
+        setUnits={fleetCutover.legacyApparatusWritesLocked ? () => {} : setApparatus}
+        workOrders={workOrders}
+        setWorkOrders={setWorkOrders}
+        canEdit={
+          canEditApparatus(permissions, isCreator)
+          && !fleetCutover.legacyApparatusWritesLocked
+        }
+        legacyWritesLocked={fleetCutover.legacyApparatusWritesLocked}
+        onOpenFleetAssets={() => setCurrent("All Fleet Assets")}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Dashboard" ? (
+    hasPermission(permissions, "viewFleetDashboard") || hasPermission(permissions, "viewApparatus") || isCreator
+      ? <FleetDashboardPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Readiness Board" ? (
+    hasPermission(permissions, "viewFleetReadiness")
+      || hasPermission(permissions, "viewFleetDashboard")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetReadinessBoardPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Defects" ? (
+    hasPermission(permissions, "viewFleetDefects")
+      || hasPermission(permissions, "viewFleetReadiness")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetDefectsPage query={query} onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Work Orders" ? (
+    hasPermission(permissions, "viewFleetWorkOrders")
+      || hasPermission(permissions, "viewFleetDefects")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? (
+        <FleetWorkOrdersPage
+          query={query}
+          onNavigate={setCurrent}
+          legacyApparatus={apparatus}
+          legacyWorkOrders={workOrders}
+        />
       )
-    );
+      : <AccessDeniedModule name={current} />
+  ) : current === "PM Forecast" ? (
+    hasPermission(permissions, "viewFleetPm")
+      || hasPermission(permissions, "viewFleetWorkOrders")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetPmForecastPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Tests" ? (
+    hasPermission(permissions, "viewFleetTests")
+      || hasPermission(permissions, "viewFleetPm")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? (
+        <FleetTestsPage
+          query={query}
+          onNavigate={setCurrent}
+          legacyApparatus={apparatus}
+          legacyHoseTests={hoseTests}
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fuel & Energy" ? (
+    hasPermission(permissions, "viewFleetFuel")
+      || hasPermission(permissions, "viewFleetTelematics")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetFuelEnergyPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Components & Warranty" ? (
+    hasPermission(permissions, "viewFleetComponents")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetComponentsWarrantyPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Operations" ? (
+    hasPermission(permissions, "viewFleetOperations")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetOperationsPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Accident & Risk" ? (
+    hasPermission(permissions, "viewFleetRisk")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetAccidentRiskPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Procurement" ? (
+    hasPermission(permissions, "viewFleetProcurement")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetProcurementPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Cost & Replacement" ? (
+    hasPermission(permissions, "viewFleetCost")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetCostReplacementPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Reporting & Automation" ? (
+    hasPermission(permissions, "viewFleetReporting")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetReportingPage onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Vendor Portal" ? (
+    hasPermission(permissions, "viewFleetVendorPortal")
+      || hasPermission(permissions, "viewFleetWorkOrders")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <FleetVendorPortalPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Hardening" ? (
+    hasPermission(permissions, "manageFleetConfig")
+      || hasPermission(permissions, "manageSystemSettings")
+      || hasPermission(permissions, "viewFleetDashboard")
+      || isCreator
+      ? <FleetHardeningPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "All Fleet Assets" ? (
+    hasPermission(permissions, "viewFleetAssets") || hasPermission(permissions, "viewApparatus") || isCreator
+      ? <FleetAssetsMasterPage query={query} onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fleet Configuration Studio" ? (
+    hasPermission(permissions, "manageFleetConfig")
+      || hasPermission(permissions, "manageSystemSettings")
+      || hasPermission(permissions, "editApparatus")
+      || isCreator
+      ? (
+        <FleetConfigStudioPage
+          onNavigate={setCurrent}
+          legacyApparatus={apparatus}
+          legacyWorkOrders={workOrders}
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "Maintenance" ? (
+    hasPermission(permissions, "viewApparatus") ? <MaintenancePage orders={workOrders} setOrders={setWorkOrders} /> : <AccessDeniedModule name={current} />
+  ) : current === "Assets" ? (
+    hasPermission(permissions, "viewAssets") ? <AssetsPageConnected query={query} records={assets} setRecords={setAssets} canEdit={canEditAssets(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
+  ) : current === "Hose Testing" ? (
+    hasPermission(permissions, "viewApparatus") ? <HoseTestingPage query={query} records={hoseTests} setRecords={setHoseTests} /> : <AccessDeniedModule name={current} />
+  ) : current === "Occupancies" ? (
+    hasPermission(permissions, "viewInspections") ? (
+      <OccupanciesMasterPage
+        query={query}
+        legacyRecords={occupancies}
+        onRecordsChange={setOccupancies}
+        onNavigate={setCurrent}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Configuration Studio" ? (
+    hasPermission(permissions, "manageInspectionConfig")
+      || hasPermission(permissions, "manageSystemSettings")
+      || hasPermission(permissions, "editInspections")
+      || isCreator
+      ? <InspectionConfigStudioPage />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Inspections Dashboard" || current === "Prevention Dashboard" ? (
+    hasPermission(permissions, "viewInspections") || hasPermission(permissions, "viewInspectionDashboard")
+      ? <InspectionsDashboardPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Work Queue" || current === "Prevention Work Queue" ? (
+    hasPermission(permissions, "viewInspections")
+      ? <InspectionsWorkQueuePage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "All Inspections" ? (
+    hasPermission(permissions, "viewInspections")
+      ? <AllInspectionsPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "My Inspections" ? (
+    hasPermission(permissions, "viewInspections")
+      ? <MyInspectionsPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Open Violations" ? (
+    hasPermission(permissions, "viewViolations") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <ViolationsPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Search Codes" ? (
+    hasPermission(permissions, "viewCodeLibrary") || hasPermission(permissions, "viewViolations") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <CodeLibraryBrowsePage mode="search" onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Browse Codes" ? (
+    hasPermission(permissions, "viewCodeLibrary") || hasPermission(permissions, "viewViolations") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <CodeLibraryBrowsePage mode="browse" onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Frequently Used" || current === "Saved Sections" ? (
+    hasPermission(permissions, "viewCodeLibrary") || hasPermission(permissions, "viewViolations") || isCreator
+      ? <CodeLibrarySavedPage />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Local Amendments" ? (
+    hasPermission(permissions, "viewCodeLibrary") || hasPermission(permissions, "manageInspectionConfig") || isCreator
+      ? <LocalAmendmentsLibraryPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Adopted Codes" ? (
+    hasPermission(permissions, "manageAdoptedCodes") || hasPermission(permissions, "manageInspectionConfig") || isCreator
+      ? <AdoptedCodesPage />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Code Administration" ? (
+    hasPermission(permissions, "manageCodeLibrary") || isCreator
+      ? <CodeAdministrationPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Notices & Certificates" ? (
+    hasPermission(permissions, "viewInspectionNotices")
+      || hasPermission(permissions, "viewInspections")
+      || hasPermission(permissions, "viewViolations")
+      || isCreator
+      ? <InspectionNoticesPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Enforcement" || current === "Enforcement Cases" ? (
+    hasPermission(permissions, "viewInspectionEnforcement")
+      || hasPermission(permissions, "viewInspections")
+      || hasPermission(permissions, "viewViolations")
+      || isCreator
+      ? <InspectionEnforcementPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fire Protection Systems" ? (
+    hasPermission(permissions, "viewFireProtectionSystems")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <FireProtectionSystemsPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Fees & Payments" ? (
+    hasPermission(permissions, "viewInspectionFees")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <InspectionFeesPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Inspection Reports" ? (
+    hasPermission(permissions, "viewInspectionReports")
+      || hasPermission(permissions, "viewInspectionDashboard")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <InspectionReportsPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Offline & Sync" ? (
+    hasPermission(permissions, "viewInspectionOffline")
+      || hasPermission(permissions, "viewInspections")
+      || hasPermission(permissions, "conductInspections")
+      || isCreator
+      ? <InspectionOfflinePage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Automation & Integrations" ? (
+    hasPermission(permissions, "viewInspectionAutomation")
+      || hasPermission(permissions, "viewInspections")
+      || hasPermission(permissions, "manageInspectionConfig")
+      || isCreator
+      ? <InspectionAutomationPage query={query} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Import & Hardening" || current === "Import & Data Quality" ? (
+    hasPermission(permissions, "viewInspectionHardening")
+      || hasPermission(permissions, "viewInspections")
+      || hasPermission(permissions, "manageInspectionConfig")
+      || isCreator
+      ? <InspectionHardeningPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Inspection Queue" || current === "Inspections" ? (
+    hasPermission(permissions, "viewInspections") ? <InspectionsPage query={query} records={inspections} setRecords={setInspections} /> : <AccessDeniedModule name={current} />
+  ) : current === "New Preplan" ? (
+    hasPermission(permissions, "createPreplans")
+      || hasPermission(permissions, "editPreplans")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <NewPreplanPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Preplan Work Queue"
+    || current === "Preplan Dashboard"
+    || current === "My Preplans"
+    || current === "Draft Preplans"
+    || current === "Awaiting Review"
+    || current === "Approved Preplans"
+    || current === "Preplan Reports" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <PreplansWorkQueuePage onNavigate={setCurrent} queueFilter={current} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "All Preplans" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <AllPreplansPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Templates" ? (
+    hasPermission(permissions, "managePreplanConfig") || hasPermission(permissions, "manageInspectionConfig") || isCreator
+      ? (() => {
+        try {
+          window.sessionStorage.setItem("forge-config-studio-tab", "preplans");
+        } catch {
+          // ignore
+        }
+        return <InspectionConfigStudioPage />;
+      })()
+      : <AccessDeniedModule name={current} />
+  ) : current === "Nearby Preplans" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? (
+        <PreplanOperationalPage
+          onNavigate={setCurrent}
+          variant="nearby"
+          title="Nearby Preplans"
+          description="Operational preplans for response (map overlay comes with Phase 5)."
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "Target Hazards" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? (
+        <PreplanOperationalPage
+          onNavigate={setCurrent}
+          variant="targetHazards"
+          title="Target Hazards"
+          description="High-priority and target-hazard preplans."
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "Preplan Offline" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? (
+        <PreplanOperationalPage
+          onNavigate={setCurrent}
+          variant="offline"
+          title="Preplan Offline"
+          description="Offline packages and flush status for field devices."
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "QR Scan" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? (
+        <PreplanOperationalPage
+          onNavigate={setCurrent}
+          variant="qr"
+          title="QR Scan"
+          description="Authenticated QR access for published preplans."
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "Preplans" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
+      ? <PreplansPage onNavigate={setCurrent} query={query} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "NERIS Fire Reports" ? (
+    hasPermission(permissions, "viewNerisReports") ? (
+      <NerisFireReportsPage
+        query={query}
+        records={nerisFireReports}
+        setRecords={setNerisFireReports}
+        canEdit={canEditNerisReports(permissions, isCreator)}
+        personnel={personnel}
+        apparatus={apparatus}
+        occupancies={occupancies}
+        preplans={preplans}
+        inspections={inspections}
+        scheduleDays={scheduleDays}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "NERIS Analytics" ? (
+    hasPermission(permissions, "viewNerisReports") ? (
+      <NerisAnalyticsPage reports={nerisFireReports} />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Analytics" ? (
+    hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={certifications} training={training} apparatus={apparatus} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />
+  ) : current === "Messages" ? (
+    hasPermission(permissions, "viewInternalEmail") ? <InternalEmailBoardPage personnel={personnel} /> : <AccessDeniedModule name={current} />
+  ) : current === "Digital Dashboard" ? (
+    hasPermission(permissions, "viewDigitalDashboard") ? (
+      <DigitalDashboardPage
+        displays={digitalDashboardDisplays}
+        setDisplays={setDigitalDashboardDisplays}
+        media={digitalDashboardMedia}
+        setMedia={setDigitalDashboardMedia}
+        playlists={digitalDashboardPlaylists}
+        setPlaylists={setDigitalDashboardPlaylists}
+        schedules={digitalDashboardSchedules}
+        setSchedules={setDigitalDashboardSchedules}
+        active911Alerts={active911Alerts}
+        setActive911Alerts={setActive911Alerts}
+        alertDashboardConfig={alertDashboardConfig}
+        setAlertDashboardConfig={setAlertDashboardConfig}
+        alertBusinessDirectory={alertBusinessDirectory}
+        setAlertBusinessDirectory={setAlertBusinessDirectory}
+        permissions={permissions}
+        isCreator={isCreator}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : ["SOGs / Policies", "EMS Protocols", "Forms", "Uploads"].includes(current) ? (
+    hasPermission(permissions, "viewDocuments") ? (
+      <DocumentsPage
+        query={query}
+        records={documents}
+        setRecords={setDocuments}
+        navLabel={current}
+        departmentId={departmentId}
+        canEdit={
+          hasPermission(permissions, "editDocuments")
+          || hasPermission(permissions, "manageSystemSettings")
+        }
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Creator Console" ? (
+    hasPermission(permissions, "manageDepartments") ? <CreatorConsolePage /> : <AccessDeniedModule name={current} />
+  ) : current === "System Admin" ? (
+    canAccessSystemAdmin(permissions, isCreator) ? (
+      <AdminControlCenterPage
+        personnel={personnel}
+        apparatus={apparatus}
+        onOpenPersonnelProfile={openPersonnelProfile}
+        onOpenEmployeeProfile={showEmployeeToggle ? openEmployeeProfileForPerson : undefined}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Hydrants" || current === "Hydrant Overview" ? (
+    <HydrantTestingPage embedded initialTab={resolveInitialHydrantTab({ embedded: true })} departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
+  ) : current === "Damage Reports"
+    || current === "Open Damage Reports"
+    || current === "Awaiting Water Company"
+    || current === "Repairs in Progress"
+    || current === "Ready for Verification"
+    || current === "Overdue Repairs"
+    || current === "Closed Reports" ? (
+    hasPermission(permissions, "viewHydrantDamageReports")
+      || hasPermission(permissions, "viewHydrants")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <HydrantDamageReportsPage onNavigate={setCurrent} activeNavName={current} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Water Company Directory" ? (
+    hasPermission(permissions, "viewWaterCompanies")
+      || hasPermission(permissions, "viewHydrantDamageReports")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <WaterCompanyDirectoryPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Water Districts" ? (
+    hasPermission(permissions, "viewWaterDistricts")
+      || hasPermission(permissions, "viewWaterCompanies")
+      || hasPermission(permissions, "viewHydrantDamageReports")
+      || hasPermission(permissions, "viewHydrants")
+      || isCreator
+      ? <WaterDistrictsPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Damage Analytics" ? (
+    hasPermission(permissions, "viewHydrantDamageReports")
+      || hasPermission(permissions, "viewHydrants")
+      || hasPermission(permissions, "viewInspections")
+      || isCreator
+      ? <HydrantDamageAnalyticsPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
+  ) : <ModulePage name={current} query={query} />;
 
-    setSelectedId(updatedPerson.id);
-    setEditing(false);
-    setSavedMessage("Test Save");
-
-    console.log("Updated personnel:", updatedPerson);
-  }
-
-  function addPersonnel() {
-    const now = new Date().toISOString();
-    const nextNumber = safeRecords.length + 1;
-    const newPerson = {
-      id: `HL-${String(100 + nextNumber).padStart(3, "0")}`,
-      name: "New Personnel",
-      initials: "NP",
-      rank: "Firefighter",
-      shift: "Unassigned",
-      assignment: "Unassigned",
-      ems: "EMT",
-      driver: "Not Approved",
-      status: "Active",
-      email: "",
-      phone: "",
-      station: "Unassigned",
-      hireDate: "",
-      supervisor: "",
-      address: "",
-      emergency: "",
-      documents: [],
-      certifications: [],
-      created_at: now,
-      updated_at: now
-    };
-
-    setRecords((current) => [newPerson, ...current]);
-    setSelectedId(newPerson.id);
-    setDraft(newPerson);
-    setEditing(true);
-    setSavedMessage("New personnel record created");
-  }
-
-  if (!selected) {
-    return <div className="module-page personnel-page"><section className="placeholder-page"><h1>Personnel</h1><p>No personnel records found.</p><button className="primary-button" onClick={addPersonnel}>Add Personnel</button></section></div>;
-  }
-
-  return <div className="module-page personnel-page">
-    <section className="module-heading"><div><span className="module-icon"><Users size={22} /></span><div><h1>Personnel</h1><p>Roster, assignments, contact information, certifications, documents, and employment status.</p></div></div><div className="heading-actions"><button className="secondary-button">Export Roster</button><button className="primary-button" onClick={addPersonnel}>Add Personnel</button></div></section>
-    <section className="personnel-summary">
-      {[
-        ["Active Personnel", safeRecords.filter((p) => p.status === "Active").length],
-        ["On Leave", safeRecords.filter((p) => p.status === "Leave").length],
-        ["Paramedics", safeRecords.filter((p) => p.ems === "Paramedic").length],
-        ["Driver Approved", safeRecords.filter((p) => p.driver === "Approved").length]
-      ].map(([label, value]) => <div key={label}><strong>{value}</strong><span>{label}</span></div>)}
-    </section>
-    <section className="personnel-workspace">
-      <Panel title="Personnel Roster" icon={Users} action={<span className="panel-count">{visiblePeople.length} records</span>}>
-        <div className="personnel-list">{visiblePeople.map((person) => <button key={person.id} className={person.id === selected.id ? "person-row selected" : "person-row"} onClick={() => selectPerson(person)}><span className="avatar">{person.initials}</span><span><strong>{person.name}</strong><small>{person.rank} · {person.shift}</small></span><Badge>{person.status}</Badge></button>)}</div>
-      </Panel>
-      <section className="profile-workspace">
-        <header className="profile-header"><div className="profile-identity"><span className="avatar large">{selected.initials}</span><div><h2>{selected.name}</h2><p>{selected.rank} · {selected.id}</p><div><Badge>{selected.status}</Badge><Badge tone="info">{selected.shift}</Badge><Badge tone="neutral">{selected.ems}</Badge></div></div></div><div className="heading-actions">{editing ? <><button className="secondary-button" onClick={() => { setEditing(false); setDraft(selected); }}>Cancel</button><button className="primary-button" onClick={saveProfile}><Save size={14} /> Save Profile</button></> : <button className="primary-button" onClick={() => setEditing(true)}><Edit3 size={14} /> Edit Profile</button>}</div></header>
-        {savedMessage && <div className="success-banner">{savedMessage}</div>}
-        <div className="profile-grid">
-          <Panel title="Assignment & Employment" icon={UserRound}><div className="profile-fields">{[["Name", "name"], ["Rank", "rank"], ["Shift", "shift"], ["Assignment", "assignment"], ["Station", "station"], ["Supervisor", "supervisor"], ["Hire Date", "hireDate"]].map(([label, key]) => <ProfileField key={key} label={label} value={draft[key] || ""} editing={editing} onChange={(value) => setDraft((current) => ({ ...current, [key]: value }))} />)}</div></Panel>
-          <Panel title="Contact Information" icon={Phone}><div className="profile-fields">{[["Email", "email"], ["Phone", "phone"], ["Address", "address"], ["Emergency Contact", "emergency"]].map(([label, key]) => <ProfileField key={key} label={label} value={draft[key] || ""} editing={editing} onChange={(value) => setDraft((current) => ({ ...current, [key]: value }))} />)}</div></Panel>
-          <Panel title="Operational Qualifications" icon={ShieldCheck}><div className="profile-fields">{[["EMS Level", "ems"], ["Driver Status", "driver"], ["Current Shift", "shift"], ["Employment", "status"]].map(([label, key]) => <ProfileField key={key} label={label} value={draft[key] || ""} editing={editing} onChange={(value) => setDraft((current) => ({ ...current, [key]: value }))} />)}</div></Panel>
-          <Panel title="Certifications" icon={FileCheck2} action={<button className="text-button">View all</button>}><MiniTable columns={["Certification", "Expires", "Status"]} rows={selected.certifications || []} /></Panel>
-          <Panel title="Personnel Documents" icon={FileText} action={<button className="text-button"><Upload size={11} /> Upload</button>}><div className="document-list">{(selected.documents || []).map((document) => <button key={document}><FileText size={14} /><span>{document}</span><small>Open</small></button>)}</div></Panel>
-          <Panel title="Contact Actions" icon={Mail}><div className="contact-actions"><button><Mail size={15} /> Email</button><button><Phone size={15} /> Call</button><button><MapPin size={15} /> Station</button></div></Panel>
+  return <main className={`app-shell ${collapsed ? "nav-collapsed" : ""} ${mobileNav ? "mobile-nav-open" : ""} ${isHydrantsView ? "hydrants-view" : ""} ${isDemoModeActive() ? "demo-mode-shell" : ""}`}>
+    {isDemoModeActive() && <DemoModeBanner />}
+    {setupWizardOpen && !inPlatformScope && departmentId && (
+      <Suspense fallback={null}>
+      <DepartmentSetupWizard
+        key={departmentId}
+        departmentId={departmentId}
+        profile={profile}
+        settings={settings}
+        personnel={personnel}
+        setPersonnel={setPersonnel}
+        refreshDepartment={refreshDepartment}
+        user={user}
+        onClose={({ completed } = {}) => {
+          setSetupWizardOpen(false);
+          if (!completed) setSetupWizardDismissed(true);
+        }}
+      />
+      </Suspense>
+    )}
+    <TopBar
+          query={query}
+          setQuery={setQuery}
+          toggleMobileNav={() => setMobileNav(!mobileNav)}
+          profile={headerProfile}
+          membership={membership}
+          user={user}
+          onSignOut={signOut}
+          appView={effectiveAppView}
+          onSelectAdminView={handleSelectAdminView}
+          onSelectEmployeeView={handleSelectEmployeeView}
+          showAdminToggle={showAdminToggle}
+          showEmployeeToggle={showEmployeeToggle}
+          hideSearch={effectiveAppView === "employee"}
+          departmentId={departmentId}
+          isCreator={isCreator}
+          wideBrandLogo={showPlatformBrand}
+          tagline={headerTagline}
+        />
+        {effectiveAppView === "admin" ? (
+          <SideNav
+            current={current}
+            collapsed={collapsed}
+            setCollapsed={setCollapsed}
+            onNavigate={navigate}
+            groups={visibleNavGroups}
+          />
+        ) : (
+          <SideNav
+            current={employeeSection}
+            collapsed={collapsed}
+            setCollapsed={setCollapsed}
+            onNavigate={navigateEmployee}
+            groups={visibleEmployeeNavGroups}
+          />
+        )}
+        {mobileNav && <button className="mobile-scrim" type="button" aria-label="Close menu" onClick={() => setMobileNav(false)}><X size={24} /></button>}
+    <section className={`workspace ${isHydrantsView ? "workspace-hydrants" : ""}`}>
+      {canGoBack && effectiveAppView === "admin" && (
+        <div className="page-back-bar">
+          <button type="button" className="page-back-button" onClick={() => window.history.back()} title="Go back to the previous page">
+            <ChevronLeft size={16} aria-hidden="true" /> Back
+          </button>
         </div>
-      </section>
+      )}
+      {/* Module pages load on demand (see lazyPage). */}
+      <Suspense fallback={<PageLoading />}>{pageContent}</Suspense>
     </section>
-  </div>;
-}
-
-function ProfileField({ label, value, editing, onChange }) {
-  return <label><span>{label}</span>{editing ? <input value={value} onChange={(event) => onChange(event.target.value)} /> : <strong>{value}</strong>}</label>;
-}
-
-function CertificationsPage({ query }) {
-  const [records, setRecords] = useState(initialCertificationRecords);
-  const [filter, setFilter] = useState("All");
-  const [selected, setSelected] = useState(null);
-  const [uploading, setUploading] = useState(null);
-  const [message, setMessage] = useState("");
-  const filtered = records.filter((record) => (filter === "All" || record.status === filter || record.category === filter) && Object.values(record).join(" ").toLowerCase().includes(query.toLowerCase()));
-  function updateRenewal(id, renewal) {
-    setRecords((current) => current.map((record) => record.id === id ? { ...record, renewal, status: renewal === "Approved" ? "Active" : record.status } : record));
-    setMessage(`Renewal status updated to ${renewal}`);
-  }
-  function completeUpload() {
-    setRecords((current) => current.map((record) => record.id === uploading.id ? { ...record, document: `${record.type} Renewal.pdf`, renewal: "Submitted" } : record));
-    setMessage("Certification document uploaded and renewal submitted");
-    setUploading(null);
-  }
-  return <div className="module-page certifications-page">
-    <section className="module-heading"><div><span className="module-icon"><FileCheck2 size={22} /></span><div><h1>Certifications</h1><p>Expiration alerts, renewal status, uploaded credentials, and compliance review.</p></div></div><div className="heading-actions"><button className="secondary-button">Export Compliance</button><button className="primary-button" onClick={() => setUploading(records[0])}><UploadCloud size={14} /> Upload Certification</button></div></section>
-    <section className="cert-summary">{[["Expired", records.filter((r) => r.status === "Expired").length, "critical"], ["Due in 30 Days", records.filter((r) => r.days >= 0 && r.days <= 30).length, "critical"], ["Due in 60 Days", records.filter((r) => r.days > 30 && r.days <= 60).length, "warning"], ["Due in 90 Days", records.filter((r) => r.days > 60 && r.days <= 90).length, "info"], ["Active", records.filter((r) => r.status === "Active").length, "success"]].map(([label, value, tone]) => <button key={label} className={`cert-stat stat-${tone}`} onClick={() => setFilter(label === "Expired" ? "Expired" : label === "Active" ? "Active" : "All")}><strong>{value}</strong><span>{label}</span></button>)}</section>
-    {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}><X size={13} /></button></div>}
-    <section className="cert-toolbar"><div className="segmented-control">{["All", "EMS", "Fire", "Due Soon", "Expired"].map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}</div><span>{filtered.length} certifications shown</span></section>
-    <Panel title="Certification Compliance Records" icon={FileCheck2} action={<button className="text-button">Configure columns</button>}><div className="cert-table"><div className="cert-row cert-head"><span>Personnel</span><span>Certification</span><span>Category</span><span>Issue Date</span><span>Expiration</span><span>Days</span><span>Renewal</span><span>Status</span><span /></div>{filtered.map((record) => <div className="cert-row" key={record.id}><button className="link-button" onClick={() => setSelected(record)}>{record.person}</button><span>{record.type}</span><span>{record.category}</span><span>{record.issue}</span><span>{record.expires}</span><strong className={`days-${record.days < 0 ? "critical" : record.days <= 30 ? "critical" : record.days <= 90 ? "warning" : "neutral"}`}>{record.days < 0 ? `${Math.abs(record.days)} overdue` : record.days}</strong><select value={record.renewal} onChange={(event) => updateRenewal(record.id, event.target.value)}>{["Not Started", "In Progress", "Submitted", "Approved", "Overdue"].map((value) => <option key={value}>{value}</option>)}</select><Badge>{record.status}</Badge><button className="row-action" onClick={() => setUploading(record)}>{record.document ? "Replace" : "Upload"}</button></div>)}</div></Panel>
-    {selected && <Modal title={`${selected.person} · ${selected.type}`} onClose={() => setSelected(null)}><div className="cert-detail-grid">{[["Certification ID", selected.id], ["Category", selected.category], ["Issue Date", selected.issue], ["Expiration Date", selected.expires], ["Renewal Status", selected.renewal], ["Document", selected.document || "No document uploaded"]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div><div className="modal-actions"><button className="secondary-button" onClick={() => setSelected(null)}>Close</button><button className="primary-button" onClick={() => { setUploading(selected); setSelected(null); }}><UploadCloud size={14} /> Upload Renewal</button></div></Modal>}
-    {uploading && <Modal title="Upload Certification Document" onClose={() => setUploading(null)}><div className="upload-zone"><UploadCloud size={28} /><strong>{uploading.person} · {uploading.type}</strong><span>Drop a PDF or image credential here, or select a file.</span><input type="file" /></div><div className="upload-form"><label><span>Issue Date</span><input type="date" defaultValue="2026-06-07" /></label><label><span>Expiration Date</span><input type="date" defaultValue="2028-06-07" /></label></div><div className="modal-actions"><button className="secondary-button" onClick={() => setUploading(null)}>Cancel</button><button className="primary-button" onClick={completeUpload}><UploadCloud size={14} /> Upload & Submit</button></div></Modal>}
-  </div>;
-}
-
-function SchedulingPage() {
-  const [days, setDays] = useState(initialScheduleDays);
-  const [selectedId, setSelectedId] = useState(initialScheduleDays[1].id);
-  const [roster, setRoster] = useState(initialRoster);
-  const [leaveRequests, setLeaveRequests] = useState(initialLeaveRequests);
-  const [overtimeOffers, setOvertimeOffers] = useState(initialOvertimeOffers);
-  const [message, setMessage] = useState("");
-  const selectedDay = days.find((day) => day.id === selectedId) || days[0];
-  const vacancies = Math.max(selectedDay.minimum - selectedDay.staffed, 0);
-  const dayRoster = roster.filter((member) => member.shift === selectedDay.shift);
-  function updateApparatus(id, apparatus) {
-    setRoster((current) => current.map((member) => member.id === id ? { ...member, apparatus } : member));
-    setMessage("Apparatus assignment updated");
-  }
-  function decideLeave(id, status) {
-    setLeaveRequests((current) => current.map((request) => request.id === id ? { ...request, status } : request));
-    setMessage(`Leave request ${status.toLowerCase()}`);
-  }
-  function assignOvertime(id) {
-    const offer = overtimeOffers.find((item) => item.id === id);
-    if (!offer) return;
-    setOvertimeOffers((current) => current.map((item) => item.id === id ? { ...item, status: "Assigned" } : item));
-    setDays((current) => current.map((day) => day.date === offer.date && day.shift === offer.shift ? { ...day, staffed: day.staffed + 1, status: day.staffed + 1 >= day.minimum ? "Complete" : "Deficit" } : day));
-    setMessage(`${offer.position} overtime assigned for ${offer.date}`);
-  }
-  return <div className="module-page scheduling-page">
-    <section className="module-heading"><div><span className="module-icon"><CalendarDays size={22} /></span><div><h1>Scheduling</h1><p>A/B/C shift calendar, daily roster, apparatus assignments, leave, overtime, and minimum staffing.</p></div></div><div className="heading-actions"><button className="secondary-button">Print Roster</button><button className="primary-button"><CirclePlus size={14} /> Add Shift Note</button></div></section>
-    <section className="schedule-summary">{[["Selected Shift", selectedDay.shift], ["Staffed Today", selectedDay.staffed], ["Minimum Staffing", selectedDay.minimum], ["Open Vacancies", vacancies], ["Leave Today", selectedDay.leave]].map(([label, value]) => <div key={label} className={label === "Open Vacancies" && value > 0 ? "attention" : ""}><strong>{value}</strong><span>{label}</span></div>)}</section>
-    {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}><X size={13} /></button></div>}
-    <section className="schedule-calendar">{days.map((day) => <button key={day.id} className={day.id === selectedId ? "schedule-day selected" : "schedule-day"} onClick={() => setSelectedId(day.id)}><span>{day.weekday}</span><strong>{day.date}</strong><small>{day.shift}</small><Badge>{day.status}</Badge></button>)}</section>
-    <section className="schedule-workspace">
-      <Panel title={`${selectedDay.shift} Daily Roster`} icon={Users} action={<span className="panel-count">{dayRoster.length} assigned</span>}>
-        <div className="roster-table"><div className="roster-row roster-head"><span>Name</span><span>Rank</span><span>Apparatus</span><span>Position</span><span>Status</span></div>{dayRoster.map((member) => <div className="roster-row" key={member.id}><strong>{member.name}</strong><span>{member.rank}</span><select value={member.apparatus} onChange={(event) => updateApparatus(member.id, event.target.value)}>{["Battalion 1", "Engine 1", "Engine 2", "Engine 3", "Truck 3", "Rescue 1", "Leave"].map((unit) => <option key={unit}>{unit}</option>)}</select><span>{member.position}</span><Badge>{member.status}</Badge></div>)}</div>
-      </Panel>
-      <div className="schedule-side">
-        <Panel title="Minimum Staffing" icon={ShieldCheck}>
-          <div className="staffing-card"><div><strong>{selectedDay.staffed} / {selectedDay.minimum}</strong><span>{vacancies ? `${vacancies} position needs coverage` : "Minimum staffing met"}</span></div><div className="staffing-meter"><i style={{ width: `${Math.min(100, (selectedDay.staffed / selectedDay.minimum) * 100)}%` }} /></div><div className="staffing-requirements"><span>Command</span><b>1 / 1</b><span>Company Officers</span><b>4 / 4</b><span>Drivers</span><b>{vacancies ? "4 / 5" : "5 / 5"}</b><span>ALS Providers</span><b>{vacancies ? "5 / 6" : "6 / 6"}</b></div></div>
-        </Panel>
-        <Panel title="Leave Requests" icon={CalendarDays} action={<span className="panel-count">{leaveRequests.filter((item) => item.status === "Pending").length} pending</span>}>
-          <div className="request-list">{leaveRequests.map((request) => <div className="request-row" key={request.id}><div><strong>{request.person}</strong><span>{request.type} - {request.dates} - {request.hours}</span></div><Badge>{request.status}</Badge>{request.status === "Pending" && <div className="inline-actions"><button onClick={() => decideLeave(request.id, "Approved")}><Check size={13} /> Approve</button><button onClick={() => decideLeave(request.id, "Denied")}><X size={13} /> Deny</button></div>}</div>)}</div>
-        </Panel>
-      </div>
-      <Panel title="Overtime Coverage" icon={Clock3} action={<button className="text-button">Create vacancy</button>} className="full-span">
-        <div className="overtime-grid">{overtimeOffers.map((offer) => <div key={offer.id} className="overtime-card"><div><strong>{offer.date} - {offer.shift}</strong><span>{offer.position}</span></div><Badge>{offer.status}</Badge><small>{offer.applicants} available members</small><button className="row-action" disabled={offer.status === "Assigned"} onClick={() => assignOvertime(offer.id)}>{offer.status === "Assigned" ? "Assigned" : "Assign"}</button></div>)}</div>
-      </Panel>
-    </section>
-  </div>;
-}
-
-function ShiftTradesPage() {
-  const [trades, setTrades] = useState(initialTrades);
-  const [filter, setFilter] = useState("All");
-  const [showNew, setShowNew] = useState(false);
-  const [message, setMessage] = useState("");
-  const visibleTrades = trades.filter((trade) => filter === "All" || trade.status === filter);
-  function decideTrade(id, status) {
-    setTrades((current) => current.map((trade) => trade.id === id ? { ...trade, status } : trade));
-    setMessage(`Shift trade ${status.toLowerCase()}`);
-  }
-  function submitTrade() {
-    const next = { id: `TR-${400 + trades.length}`, requestedBy: "Chief J. Smith", give: "Jun 24 - B Shift", receive: "Jun 27 - B Shift", coverage: "M. Reed", submitted: "Jun 7", status: "Pending Review" };
-    setTrades((current) => [next, ...current]);
-    setShowNew(false);
-    setFilter("All");
-    setMessage("New shift trade request submitted for review");
-  }
-  return <div className="module-page trades-page">
-    <section className="module-heading"><div><span className="module-icon"><Activity size={22} /></span><div><h1>Shift Trades</h1><p>Member swap requests, coverage verification, officer review, and approval history.</p></div></div><div className="heading-actions"><button className="secondary-button">Export Trades</button><button className="primary-button" onClick={() => setShowNew(true)}><CirclePlus size={14} /> New Trade Request</button></div></section>
-    <section className="trade-summary">{["Pending Review", "Awaiting Member", "Approved", "Denied"].map((status) => <button key={status} className={`cert-stat stat-${toneFromStatus(status)}`} onClick={() => setFilter(status)}><strong>{trades.filter((trade) => trade.status === status).length}</strong><span>{status}</span></button>)}</section>
-    {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}><X size={13} /></button></div>}
-    <section className="cert-toolbar"><div className="segmented-control">{["All", "Pending Review", "Awaiting Member", "Approved", "Denied"].map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}</div><span>{visibleTrades.length} trade requests shown</span></section>
-    <Panel title="Shift Trade Review Queue" icon={Activity} action={<button className="text-button">Review policy</button>}>
-      <div className="trade-table"><div className="trade-row trade-head"><span>Requested By</span><span>Give</span><span>Receive</span><span>Coverage</span><span>Submitted</span><span>Status</span><span /></div>{visibleTrades.map((trade) => <div className="trade-row" key={trade.id}><strong>{trade.requestedBy}</strong><span>{trade.give}</span><span>{trade.receive}</span><span>{trade.coverage}</span><span>{trade.submitted}</span><Badge>{trade.status}</Badge><div className="inline-actions">{trade.status === "Pending Review" ? <><button onClick={() => decideTrade(trade.id, "Approved")}><Check size={13} /> Approve</button><button onClick={() => decideTrade(trade.id, "Denied")}><X size={13} /> Deny</button></> : <button onClick={() => setMessage(`${trade.id} opened for audit review`)}>Open</button>}</div></div>)}</div>
-    </Panel>
-    {showNew && <Modal title="New Shift Trade Request" onClose={() => setShowNew(false)}><div className="workflow-form"><label><span>Requesting Member</span><select><option>Chief J. Smith</option><option>R. Williams</option><option>M. Johnson</option></select></label><label><span>Shift to Give</span><select><option>Jun 24 - B Shift</option><option>Jun 16 - A Shift</option><option>Jun 19 - C Shift</option></select></label><label><span>Shift to Receive</span><select><option>Jun 27 - B Shift</option><option>Jun 22 - A Shift</option><option>Jun 29 - C Shift</option></select></label><label><span>Coverage Member</span><select><option>M. Reed</option><option>T. Brooks</option><option>J. Wade</option></select></label></div><div className="modal-actions"><button className="secondary-button" onClick={() => setShowNew(false)}>Cancel</button><button className="primary-button" onClick={submitTrade}><Check size={14} /> Submit for Review</button></div></Modal>}
-  </div>;
-}
-
-function FleetSummary({ items }) {
-  return <section className="fleet-summary">{items.map(([label, value, tone]) => <div key={label} className={`fleet-stat stat-${tone}`}><strong>{value}</strong><span>{label}</span></div>)}</section>;
-}
-
-function ApparatusPage() {
-  const [units, setUnits] = useState(initialApparatus);
-  const [selectedId, setSelectedId] = useState(initialApparatus[0].id);
-  const [workOrders, setWorkOrders] = useState(initialWorkOrders);
-  const [showWorkOrder, setShowWorkOrder] = useState(false);
-  const [message, setMessage] = useState("");
-  const selected = units.find((unit) => unit.id === selectedId) || units[0];
-  const unitOrders = workOrders.filter((order) => order.unit === selected.unit);
-  function updateStatus(status) {
-    setUnits((current) => current.map((unit) => unit.id === selected.id ? { ...unit, status } : unit));
-    setMessage(`${selected.unit} status updated to ${status}`);
-  }
-  function completeCheck(checkName) {
-    setUnits((current) => current.map((unit) => unit.id === selected.id ? { ...unit, checks: unit.checks.map(([name, status]) => name === checkName ? [name, "Complete"] : [name, status]) } : unit));
-    setMessage(`${checkName} marked complete`);
-  }
-  function createWorkOrder() {
-    setWorkOrders((current) => [{ id: `WO-${26050 + current.length}`, unit: selected.unit, issue: "New apparatus service request", category: "General", priority: "Medium", opened: "Jun 7", vendor: "Internal Fleet", cost: "Pending", status: "Open" }, ...current]);
-    setShowWorkOrder(false);
-    setMessage(`Work order created for ${selected.unit}`);
-  }
-  return <div className="module-page apparatus-page">
-    <section className="module-heading"><div><span className="module-icon"><Truck size={22} /></span><div><h1>Apparatus</h1><p>Unit readiness, daily checks, operating metrics, service history, and repair requests.</p></div></div><div className="heading-actions"><button className="secondary-button">Fleet Report</button><button className="primary-button" onClick={() => setShowWorkOrder(true)}><CirclePlus size={14} /> New Work Order</button></div></section>
-    <FleetSummary items={[["Total Units", units.length, "info"], ["In Service", units.filter((unit) => unit.status === "In Service").length, "success"], ["Out of Service", units.filter((unit) => unit.status === "Out of Service").length, "critical"], ["PM / Inspection Due", units.filter((unit) => /Due/.test(unit.status)).length, "warning"], ["Reserve", units.filter((unit) => unit.status === "Reserve").length, "neutral"]]} />
-    {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}><X size={13} /></button></div>}
-    <section className="fleet-workspace">
-      <Panel title="Fleet Units" icon={Truck} action={<span className="panel-count">{units.length} units</span>}><div className="unit-list">{units.map((unit) => <button key={unit.id} className={unit.id === selected.id ? "unit-row selected" : "unit-row"} onClick={() => setSelectedId(unit.id)}><span className="unit-icon"><Truck size={17} /></span><span><strong>{unit.unit}</strong><small>{unit.type} - {unit.station}</small></span><Badge>{unit.status}</Badge></button>)}</div></Panel>
-      <section className="fleet-detail">
-        <header className="profile-header"><div className="profile-identity"><span className="unit-icon large"><Truck size={24} /></span><div><h2>{selected.unit}</h2><p>{selected.year} {selected.type} - {selected.station}</p><div><Badge>{selected.status}</Badge><Badge tone="info">Operator: {selected.operator}</Badge></div></div></div><select className="status-select" value={selected.status} onChange={(event) => updateStatus(event.target.value)}>{["In Service", "Out of Service", "PM Due", "Reserve"].map((status) => <option key={status}>{status}</option>)}</select></header>
-        <section className="metric-strip">{[["Mileage", selected.mileage], ["Engine Hours", selected.engineHours], ["Pump Hours", selected.pumpHours], ["Fuel", selected.fuel], ["PM Due", selected.pmDue]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</section>
-        <div className="fleet-detail-grid">
-          <Panel title="Readiness Checks" icon={ClipboardCheck}><div className="check-list">{selected.checks.map(([name, status]) => <div key={name}><span>{name}</span><Badge>{status}</Badge>{status !== "Complete" && <button className="row-action" onClick={() => completeCheck(name)}>Complete</button>}</div>)}</div></Panel>
-          <Panel title="Open & Recent Work Orders" icon={Wrench} action={<button className="text-button" onClick={() => setShowWorkOrder(true)}>Add</button>}><div className="compact-orders">{unitOrders.length ? unitOrders.map((order) => <div key={order.id}><div><strong>{order.id} - {order.issue}</strong><span>{order.vendor} - {order.cost}</span></div><Badge>{order.status}</Badge></div>) : <p>No work orders for this unit.</p>}</div></Panel>
-          <Panel title="Operational Details" icon={Gauge}><div className="detail-pairs"><span>Assigned station</span><strong>{selected.station}</strong><span>Primary operator</span><strong>{selected.operator}</strong><span>Apparatus type</span><strong>{selected.type}</strong><span>Model year</span><strong>{selected.year}</strong></div></Panel>
-          <Panel title="Service Timeline" icon={Clock3}><div className="service-timeline"><div><i /><span><strong>Jun 7</strong> Daily readiness check submitted</span></div><div><i /><span><strong>May 28</strong> Preventive maintenance completed</span></div><div><i /><span><strong>Apr 14</strong> Annual hose inventory verified</span></div></div></Panel>
-        </div>
-      </section>
-    </section>
-    {showWorkOrder && <Modal title={`New Work Order - ${selected.unit}`} onClose={() => setShowWorkOrder(false)}><div className="workflow-form"><label><span>Unit</span><select><option>{selected.unit}</option></select></label><label><span>Priority</span><select><option>Medium</option><option>High</option><option>Low</option></select></label><label className="wide-field"><span>Issue Description</span><input defaultValue="New apparatus service request" /></label><label><span>Category</span><select><option>General</option><option>Pump</option><option>Electrical</option><option>PM</option></select></label><label><span>Assigned Vendor</span><select><option>Internal Fleet</option><option>Mid-South Apparatus</option></select></label></div><div className="modal-actions"><button className="secondary-button" onClick={() => setShowWorkOrder(false)}>Cancel</button><button className="primary-button" onClick={createWorkOrder}><Check size={14} /> Create Work Order</button></div></Modal>}
-  </div>;
-}
-
-function MaintenancePage() {
-  const [orders, setOrders] = useState(initialWorkOrders);
-  const [filter, setFilter] = useState("All");
-  const [showNew, setShowNew] = useState(false);
-  const [message, setMessage] = useState("");
-  const visibleOrders = orders.filter((order) => filter === "All" || order.status === filter);
-  function updateOrder(id, status) {
-    setOrders((current) => current.map((order) => order.id === id ? { ...order, status } : order));
-    setMessage(`Work order ${id} updated to ${status}`);
-  }
-  function addOrder() {
-    setOrders((current) => [{ id: `WO-${26050 + current.length}`, unit: "Brush 2", issue: "Scheduled preventive maintenance", category: "PM", priority: "Medium", opened: "Jun 7", vendor: "Internal Fleet", cost: "Pending", status: "Open" }, ...current]);
-    setShowNew(false);
-    setMessage("New maintenance work order created");
-  }
-  return <div className="module-page maintenance-page">
-    <section className="module-heading"><div><span className="module-icon"><Wrench size={22} /></span><div><h1>Maintenance</h1><p>Work-order queue, vendor coordination, repair costs, preventive maintenance, and completion tracking.</p></div></div><div className="heading-actions"><button className="secondary-button">Cost Report</button><button className="primary-button" onClick={() => setShowNew(true)}><CirclePlus size={14} /> New Work Order</button></div></section>
-    <FleetSummary items={[["Open Orders", orders.filter((order) => !/Complete/.test(order.status)).length, "info"], ["High Priority", orders.filter((order) => order.priority === "High").length, "critical"], ["Awaiting Parts", orders.filter((order) => order.status === "Awaiting Parts").length, "warning"], ["Scheduled", orders.filter((order) => order.status === "Scheduled").length, "info"], ["Completed", orders.filter((order) => order.status === "Complete").length, "success"]]} />
-    {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}><X size={13} /></button></div>}
-    <section className="cert-toolbar"><div className="segmented-control">{["All", "Open", "In Progress", "Awaiting Parts", "Scheduled", "Complete"].map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}</div><span>{visibleOrders.length} work orders shown</span></section>
-    <Panel title="Maintenance Work Orders" icon={Wrench} action={<button className="text-button">Configure columns</button>}><div className="work-order-table"><div className="work-order-row work-order-head"><span>Work Order</span><span>Unit</span><span>Issue</span><span>Category</span><span>Priority</span><span>Vendor</span><span>Cost</span><span>Status</span></div>{visibleOrders.map((order) => <div className="work-order-row" key={order.id}><strong>{order.id}</strong><strong>{order.unit}</strong><span>{order.issue}</span><span>{order.category}</span><Badge>{order.priority}</Badge><span>{order.vendor}</span><span>{order.cost}</span><select value={order.status} onChange={(event) => updateOrder(order.id, event.target.value)}>{["Open", "In Progress", "Awaiting Parts", "Scheduled", "Complete"].map((status) => <option key={status}>{status}</option>)}</select></div>)}</div></Panel>
-    <section className="maintenance-bottom"><Panel title="Upcoming Preventive Maintenance" icon={CalendarDays}><MiniTable columns={["Unit", "Service", "Due", "Status"]} rows={[["Truck 3", "Aerial inspection", "Jun 18", "Due Soon"], ["Brush 2", "Annual service", "Jun 21", "Upcoming"], ["Engine 1", "Oil and filters", "Aug 14", "Upcoming"]]} /></Panel><Panel title="Maintenance Spend" icon={BarChart3}><div className="spend-bars">{[["Repairs", "$12,840", "72%"], ["Preventive", "$6,420", "48%"], ["Tires", "$3,180", "31%"]].map(([label, value, width]) => <div key={label}><span>{label}</span><strong>{value}</strong><i><b style={{ width }} /></i></div>)}</div></Panel></section>
-    {showNew && <Modal title="New Maintenance Work Order" onClose={() => setShowNew(false)}><div className="workflow-form"><label><span>Unit</span><select><option>Brush 2</option><option>Engine 1</option><option>Truck 3</option></select></label><label><span>Priority</span><select><option>Medium</option><option>High</option><option>Low</option></select></label><label className="wide-field"><span>Issue Description</span><input defaultValue="Scheduled preventive maintenance" /></label><label><span>Category</span><select><option>PM</option><option>General</option><option>Electrical</option></select></label><label><span>Vendor</span><select><option>Internal Fleet</option><option>Mid-South Apparatus</option></select></label></div><div className="modal-actions"><button className="secondary-button" onClick={() => setShowNew(false)}>Cancel</button><button className="primary-button" onClick={addOrder}><Check size={14} /> Create Work Order</button></div></Modal>}
-  </div>;
-}
-
-function AssetsPage({ query }) {
-  const [assets, setAssets] = useState(initialAssets);
-  const [filter, setFilter] = useState("All");
-  const [showNew, setShowNew] = useState(false);
-  const [message, setMessage] = useState("");
-  const visibleAssets = assets.filter((asset) => (filter === "All" || asset.status === filter || asset.category === filter) && Object.values(asset).join(" ").toLowerCase().includes(query.toLowerCase()));
-  function toggleCustody(id) {
-    setAssets((current) => current.map((asset) => asset.id === id ? asset.assigned === "Unassigned" ? { ...asset, assigned: "Chief J. Smith", location: "Administration", status: "In Service" } : { ...asset, assigned: "Unassigned", location: "Station 1", status: "Available" } : asset));
-    const asset = assets.find((item) => item.id === id);
-    setMessage(asset.assigned === "Unassigned" ? `${asset.name} checked out` : `${asset.name} returned`);
-  }
-  function addAsset() {
-    setAssets((current) => [{ id: `AST-${1400 + current.length}`, name: "New Department Asset", category: "Equipment", serial: "Pending", location: "Station 1", assigned: "Unassigned", inspection: "Jun 7, 2027", value: "Pending", status: "Available" }, ...current]);
-    setShowNew(false);
-    setMessage("New asset added to inventory");
-  }
-  return <div className="module-page assets-page">
-    <section className="module-heading"><div><span className="module-icon"><PackageSearch size={22} /></span><div><h1>Assets</h1><p>Department equipment inventory, assignment custody, inspection dates, value, and repair status.</p></div></div><div className="heading-actions"><button className="secondary-button">Inventory Report</button><button className="primary-button" onClick={() => setShowNew(true)}><CirclePlus size={14} /> Add Asset</button></div></section>
-    <FleetSummary items={[["Total Assets", assets.length, "info"], ["In Service", assets.filter((asset) => asset.status === "In Service").length, "success"], ["Available", assets.filter((asset) => asset.status === "Available").length, "info"], ["Inspection Due", assets.filter((asset) => asset.status === "Inspection Due").length, "warning"], ["Out for Repair", assets.filter((asset) => asset.status === "Out for Repair").length, "critical"]]} />
-    {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}><X size={13} /></button></div>}
-    <section className="cert-toolbar"><div className="segmented-control">{["All", "Medical", "PPE", "In Service", "Available", "Inspection Due", "Out for Repair"].map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}</div><span>{visibleAssets.length} assets shown</span></section>
-    <Panel title="Asset Inventory & Custody" icon={PackageSearch} action={<button className="text-button">Scan barcode</button>}><div className="asset-table"><div className="asset-row asset-head"><span>Asset</span><span>Category</span><span>Serial</span><span>Location</span><span>Assigned To</span><span>Inspection</span><span>Value</span><span>Status</span><span /></div>{visibleAssets.map((asset) => <div className="asset-row" key={asset.id}><div><strong>{asset.name}</strong><small>{asset.id}</small></div><span>{asset.category}</span><span>{asset.serial}</span><span>{asset.location}</span><span>{asset.assigned}</span><span>{asset.inspection}</span><span>{asset.value}</span><Badge>{asset.status}</Badge><button className="row-action" onClick={() => toggleCustody(asset.id)}>{asset.assigned === "Unassigned" ? "Check Out" : "Return"}</button></div>)}</div></Panel>
-    {showNew && <Modal title="Add Department Asset" onClose={() => setShowNew(false)}><div className="workflow-form"><label><span>Asset Name</span><input defaultValue="New Department Asset" /></label><label><span>Category</span><select><option>Equipment</option><option>Medical</option><option>PPE</option><option>Electronics</option></select></label><label><span>Serial Number</span><input placeholder="Enter serial number" /></label><label><span>Initial Location</span><select><option>Station 1</option><option>Station 2</option><option>Station 3</option></select></label><label><span>Inspection Due</span><input type="date" defaultValue="2027-06-07" /></label><label><span>Purchase Value</span><input placeholder="$0.00" /></label></div><div className="modal-actions"><button className="secondary-button" onClick={() => setShowNew(false)}>Cancel</button><button className="primary-button" onClick={addAsset}><Check size={14} /> Add Asset</button></div></Modal>}
-  </div>;
-}
-
-function Modal({ title, onClose, children }) {
-  return <div className="modal-backdrop"><section className="workflow-modal"><header><strong>{title}</strong><button onClick={onClose}><X size={16} /></button></header><div className="modal-content">{children}</div></section></div>;
-}
-
-function ModulePage({ name, query }) {
-  const data = moduleData[name];
-  const Icon = data?.icon || FileText;
-  if (!data) return <PlaceholderPage name={name} />;
-  return <div className="module-page"><section className="module-heading"><div><span className="module-icon"><Icon size={22} /></span><div><h1>{name}</h1><p>{data.description}</p></div></div><div className="heading-actions"><button className="secondary-button">Export</button><button className="primary-button">Add record</button></div></section><section className="module-toolbar"><div className="toolbar-stat"><strong>{data.rows.length}</strong><span>Records shown</span></div><div className="toolbar-stat"><strong>{data.rows.filter((row) => /due|overdue|deficit|expired/i.test(row.join(" "))).length}</strong><span>Need attention</span></div><button className="filter-button">All statuses</button><button className="filter-button">All assignments</button></section><Panel title={`${name} Records`} icon={Icon} action={<button className="text-button">Configure columns</button>}><DataTable columns={data.columns} rows={data.rows} query={query} /></Panel></div>;
-}
-
-function PlaceholderPage({ name }) {
-  return <div className="module-page"><section className="placeholder-page"><span><HardHat size={30} /></span><h1>{name}</h1><p>This module is included in the RMS architecture and ready for its dedicated workflow in the next sprint.</p><button className="primary-button">Create module brief</button></section></div>;
+    {!isHydrantsView ? (
+      <PlatformFooter
+        departmentName={inPlatformScope ? platformConfig?.name : profile.name}
+        platformConfig={platformConfig}
+      />
+    ) : null}
+  </main>;
 }
 
 export default function App() {
-  const [current, setCurrent] = useState("Dashboard");
-  
-const [personnel, setPersonnel] = usePersistentState("hlfd-rms-personnel", personnelRecords);
-const [certifications, setCertifications] = usePersistentState("hlfd-rms-certifications", initialCertificationRecords);
-const [apparatus, setApparatus] = usePersistentState("hlfd-rms-apparatus", initialApparatus);
-const [workOrders, setWorkOrders] = usePersistentState("hlfd-rms-work-orders", initialWorkOrders);
-  
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileNav, setMobileNav] = useState(false);
-  const [query, setQuery] = useState("");
-  
-    function navigate(name) { setCurrent(name); setQuery(""); setMobileNav(false); }
-  return <main className={`app-shell ${collapsed ? "nav-collapsed" : ""} ${mobileNav ? "mobile-nav-open" : ""}`}>
-    <TopBar query={query} setQuery={setQuery} toggleMobileNav={() => setMobileNav(!mobileNav)} />
-    <SideNav current={current} collapsed={collapsed} setCollapsed={setCollapsed} onNavigate={navigate} />
-    {mobileNav && <button className="mobile-scrim" onClick={() => setMobileNav(false)}><X size={20} /></button>}
-    <section className="workspace">{current === "Dashboard" ? (
-  <Dashboard
-    onNavigate={navigate}
-    personnel={personnel}
-    certifications={certifications}
-    apparatus={apparatus}
-    workOrders={workOrders}
-  />
-) : current === "Personnel" ? (
-  <PersonnelPage
-    query={query}
-    records={personnel}
-    setRecords={setPersonnel}
-  />
-) : current === "Certifications" ? <CertificationsPage query={query} /> : current === "Scheduling" ? <SchedulingPage /> : current === "Shift Trades" ? <ShiftTradesPage /> : current === "Apparatus" ? <ApparatusPage /> : current === "Maintenance" ? <MaintenancePage /> : current === "Assets" ? <AssetsPage query={query} /> : <ModulePage name={current} query={query} />}</section>
-    <footer><span>System Status <i /> All Systems Operational</span><span>Last Data Sync: 11:32 AM</span><span>v2.4.1 <img src={departmentLogo} alt="" /> Horn Lake Fire Department</span></footer>
-  </main>;
+  const { authRequired, authLoading, membershipLoading, user, membership, isCreator } = useAuth();
+  const { ready, gatewayDepartmentId, gatewayError } = useTenant();
+  const twoFactor = useTwoFactorStatus();
+
+  if (isDemoEntryPath() && !authLoading) {
+    return <DemoEntryPage />;
+  }
+
+  if (
+    gatewayDepartmentId
+    && gatewayError
+    && !user
+    && !(typeof window !== "undefined" && isAlertDashboardPath(window.location.pathname))
+  ) {
+    return <GatewayNotFoundPage />;
+  }
+
+  if (!authRequired) return <Suspense fallback={<LoadingScreen />}><AppShell /></Suspense>;
+  // Wait for access to resolve everywhere, including the creator console: creator
+  // status comes from the server-side platformCreators record, which loads async.
+  if (authLoading || membershipLoading || !ready) {
+    return <LoadingScreen message="Loading department access..." />;
+  }
+  if (gatewayDepartmentId && gatewayError && !(typeof window !== "undefined" && isAlertDashboardPath(window.location.pathname))) {
+    return <GatewayNotFoundPage />;
+  }
+  if (!user) return isDemoModeActive() ? <DemoEntryPage /> : <LoginPage />;
+  // Two-factor before anything else: creators always, department admins after the deadline.
+  if (twoFactor.level === "required") {
+    if (twoFactor.sessionOk === null) return <LoadingScreen message="Checking sign-in..." />;
+    if (!twoFactor.sessionOk) {
+      return (
+        <TwoFactorScreen
+          enrolled={twoFactor.enrolled}
+          reason={isCreator
+            ? "Platform creator accounts must use two-factor login."
+            : "Department administrator accounts must use two-factor login."}
+        />
+      );
+    }
+  }
+  if (!membership && !isCreator) return <AccessDeniedPage userId={user?.uid} />;
+  return (
+    <>
+      <Suspense fallback={<LoadingScreen />}><AppShell /></Suspense>
+      {twoFactor.level === "grace" && twoFactor.sessionOk === false && (
+        <TwoFactorReminder daysLeft={twoFactor.daysLeft} enrolled={twoFactor.enrolled} />
+      )}
+    </>
+  );
 }

@@ -1,0 +1,418 @@
+/* Hydrant module — align with global RMS theme tokens (light + dark via html[data-theme]) */
+
+html,
+body {
+  background: var(--rms-bg-body);
+  color: var(--rms-text);
+  font-family: var(--rms-font-display);
+}
+
+.hydrant-module-root {
+  --hydrant-brand: var(--rms-brand);
+  --hydrant-brand-strong: #dc2626;
+  --hydrant-accent-bg: var(--rms-brand-soft);
+  background: var(--rms-bg-body);
+  color: var(--rms-text-body);
+}
+
+.hydrant-module-root .page-body {
+  background: var(--rms-bg-body);
+  color: var(--rms-text-body);
+  padding: 12px 14px;
+}
+
+/* Tabs */
+.hydrant-module-root .hydrant-work-tabs {
+  background: var(--rms-bg-surface);
+  border-bottom: 1px solid var(--rms-border-divider);
+  padding: 8px 12px 0;
+  gap: 6px;
+}
+
+.hydrant-module-root .hydrant-work-tabs button {
+  color: var(--rms-text-body);
+  background: var(--rms-bg-surface-2);
+  border: 1px solid var(--rms-border);
+  border-radius: var(--rms-radius-sm);
+  font-weight: 700;
+}
+
+.hydrant-module-root .hydrant-work-tabs button:hover {
+  background: var(--rms-bg-hover);
+  border-color: var(--rms-border-strong);
+}
+
+.hydrant-module-root .hydrant-work-tabs button.active {
+  color: #fff;
+  background: var(--hydrant-brand-strong);
+  border-color: var(--hydrant-brand-strong);
+}
+
+/* Panels & cards */
+.hydrant-module-root .crew-session-card,
+.hydrant-module-root .metric,
+.hydrant-module-root .list-panel,
+.hydrant-module-root .hydrant-card,
+.hydrant-module-root .form-panel,
+.hydrant-module-root .quick-card,
+.hydrant-module-root .empty-state,
+.hydrant-module-root .reports,
+.hydrant-module-root .nfpa-panel,
+.hydrant-module-root .calc-card,
+.hydrant-module-root .nfpa-selector,
+.hydrant-module-root .hydrant-info-card,
+.hydrant-module-root .hydrant-modal,
+.hydrant-module-root .edit-history,
+.hydrant-module-root .module-card,
+.hydrant-module-root .district-strip button,
+.hydrant-module-root .hydrant-inspection-summary div,
+.hydrant-module-root .daily-report-head,
+.hydrant-module-root .daily-report-stats div,
+.hydrant-module-root .daily-report-table {
+  color: var(--rms-text-strong);
+  background: var(--rms-bg-panel);
+  border-color: var(--rms-border);
+  box-shadow: var(--rms-shadow-sm);
+}
+
+.hydrant-module-root .panel-title,
+.hydrant-module-root .standards-title,
+.hydrant-module-root .module-card-header,
+.hydrant-module-root .flow-page-header,
+.hydrant-module-root .inspection-header,
+.hydrant-module-root .modal-header,
+.hydrant-module-root .info-card-top,
+.hydrant-module-root .code-popup-header {
+  color: #fff;
+  background: var(--hydrant-brand-strong);
+  border-bottom-color: var(--rms-border);
+}
+
+.hydrant-module-root .panel-title span,
+.hydrant-module-root .section-title span,
+.hydrant-module-root .panel-subtitle,
+.hydrant-module-root .status-line,
+.hydrant-module-root .hydrant-card span:not(.dot),
+.hydrant-module-root .quick-card span:not(.dot),
+.hydrant-module-root .small-detail-grid span,
+.hydrant-module-root .detail-grid span,
+.hydrant-module-root .edit-history span,
+.hydrant-module-root .standard-card span,
+.hydrant-module-root .daily-report-head span,
+.hydrant-module-root .daily-report-stats span,
+.hydrant-module-root .metric span,
+.hydrant-module-root .field span {
+  color: var(--rms-text-muted);
+}
+
+.hydrant-module-root .section-title {
+  border-bottom-color: var(--rms-border-divider);
+}
+
+.hydrant-module-root .section-title strong,
+.hydrant-module-root .panel-title strong {
+  color: var(--hydrant-brand-strong);
+}
+
+.hydrant-module-root .metric strong,
+.hydrant-module-root .hydrant-card strong,
+.hydrant-module-root .quick-card strong,
+.hydrant-module-root .small-detail-grid strong,
+.hydrant-module-root .detail-grid strong,
+.hydrant-module-root .edit-history strong,
+.hydrant-module-root .standard-card strong,
+.hydrant-module-root .daily-report-head strong,
+.hydrant-module-root .daily-report-stats strong,
+.hydrant-module-root .field,
+.hydrant-module-root .form-panel h2 {
+  color: var(--rms-text-strong);
+}
+
+.hydrant-module-root .metric svg {
+  color: #fff;
+  background: var(--hydrant-brand-strong);
+}
+
+/* Search & inputs */
+.hydrant-module-root .search-box {
+  background: var(--rms-bg-surface);
+  border-bottom-color: var(--rms-border-divider);
+}
+
+.hydrant-module-root .search-box svg {
+  color: var(--hydrant-brand-strong);
+}
+
+.hydrant-module-root input,
+.hydrant-module-root select,
+.hydrant-module-root textarea,
+.hydrant-module-root .crew-bar input,
+.hydrant-module-root .crew-bar select,
+.hydrant-module-root .search-box input,
+.hydrant-module-root .editor-grid input,
+.hydrant-module-root .editor-grid select,
+.hydrant-module-root .editor-grid textarea {
+  color: var(--rms-text-strong);
+  background: var(--rms-bg-input);
+  border-color: var(--rms-border);
+}
+
+.hydrant-module-root input::placeholder,
+.hydrant-module-root textarea::placeholder {
+  color: var(--rms-text-subtle);
+}
+
+.hydrant-module-root .crew-bar .field {
+  color: var(--rms-text-body);
+}
+
+.hydrant-module-root .crew-bar .field span {
+  color: var(--rms-text-muted);
+}
+
+/* Hydrant cards & lists */
+.hydrant-module-root .hydrant-card {
+  border-left-color: var(--rms-border-strong);
+}
+
+.hydrant-module-root .hydrant-card.selected {
+  background: var(--rms-primary-soft);
+  border-color: var(--hydrant-brand-strong);
+}
+
+.hydrant-module-root .card-facts span,
+.hydrant-module-root .small-detail-grid div,
+.hydrant-module-root .detail-grid > div,
+.hydrant-module-root .standard-card {
+  color: var(--rms-text-muted);
+  background: var(--rms-bg-surface-2);
+  border-color: var(--rms-border-subtle);
+}
+
+.hydrant-module-root .card-facts b,
+.hydrant-module-root .district-strip strong,
+.hydrant-module-root .hydrant-inspection-summary strong {
+  color: var(--rms-text-strong);
+}
+
+.hydrant-module-root .district-strip button.active {
+  background: var(--rms-brand-soft);
+  border-color: var(--hydrant-brand-strong);
+}
+
+.hydrant-module-root .district-strip span,
+.hydrant-module-root .hydrant-inspection-summary span {
+  color: var(--rms-text-muted);
+}
+
+.hydrant-module-root .mini-head,
+.hydrant-module-root .daily-report-row.table-head {
+  color: var(--hydrant-brand-strong);
+  background: var(--rms-bg-surface-2);
+}
+
+.hydrant-module-root .daily-report-row {
+  color: var(--rms-text-body);
+  border-bottom-color: var(--rms-border-divider);
+}
+
+.hydrant-module-root .daily-report-empty {
+  color: var(--rms-text-muted);
+}
+
+/* Map */
+.hydrant-module-root .map-panel {
+  background: var(--rms-bg-surface-2);
+  border-color: var(--rms-border);
+}
+
+.hydrant-module-root .map-legend {
+  color: var(--rms-text-body);
+  background: var(--rms-bg-elevated);
+  border: 1px solid var(--rms-border);
+}
+
+.hydrant-module-root .map-toolbar button {
+  color: var(--rms-text-strong);
+  background: var(--rms-bg-surface);
+  border: 1px solid var(--rms-border);
+  box-shadow: var(--rms-shadow-sm);
+}
+
+.hydrant-module-root .leaflet-container {
+  background: var(--rms-bg-surface-2);
+}
+
+/* Buttons */
+.hydrant-module-root .primary {
+  color: #fff;
+  background: var(--hydrant-brand-strong);
+}
+
+.hydrant-module-root .primary:hover:not(:disabled) {
+  background: var(--rms-brand);
+}
+
+.hydrant-module-root .secondary,
+.hydrant-module-root .button {
+  color: var(--rms-text-body);
+  background: var(--rms-bg-surface-2);
+  border: 1px solid var(--rms-border);
+}
+
+.hydrant-module-root .secondary:hover:not(:disabled),
+.hydrant-module-root .button:hover:not(:disabled) {
+  background: var(--rms-bg-hover);
+  color: var(--rms-text-strong);
+}
+
+.hydrant-module-root .text-button {
+  color: var(--rms-primary-solid);
+}
+
+/* Flow & form pages */
+.hydrant-module-root .flow-page .form-panel {
+  background: var(--rms-bg-panel);
+}
+
+.hydrant-module-root .flow-page .form-panel h2 {
+  color: var(--hydrant-brand-strong);
+}
+
+.hydrant-module-root .flow-page .panel-subtitle {
+  border-bottom-color: var(--rms-border-divider);
+}
+
+.hydrant-module-root .calc-card b {
+  color: var(--hydrant-brand-strong);
+}
+
+/* Inspection table */
+.hydrant-module-root .inspection-shell {
+  color: var(--rms-text-body);
+  background: var(--rms-bg-panel);
+  border-color: var(--rms-border);
+  box-shadow: var(--rms-shadow-md);
+}
+
+.hydrant-module-root .inspection-row {
+  border-bottom-color: var(--rms-border-divider);
+}
+
+.hydrant-module-root .inspection-row.table-head {
+  color: var(--rms-text-muted);
+  background: var(--rms-bg-surface-2);
+}
+
+.hydrant-module-root .inspection-row strong {
+  color: var(--rms-text-strong);
+}
+
+.hydrant-module-root .choice {
+  color: var(--rms-text-body);
+  background: var(--rms-bg-surface-2);
+  border-color: var(--rms-border);
+}
+
+.hydrant-module-root .choice.active {
+  color: #fff;
+  background: var(--rms-success);
+  border-color: var(--rms-success);
+}
+
+.hydrant-module-root .inspection-row input,
+.hydrant-module-root .inspection-row select,
+.hydrant-module-root .photo-upload {
+  color: var(--rms-text-strong);
+  background: var(--rms-bg-input);
+  border-color: var(--rms-border);
+}
+
+.hydrant-module-root .inspection-shell > .field span {
+  color: var(--rms-text-muted);
+}
+
+.hydrant-module-root .inspection-shell > .field textarea {
+  color: var(--rms-text-strong);
+  background: var(--rms-bg-input);
+  border-color: var(--rms-border);
+}
+
+.hydrant-module-root .inspection-actions {
+  background: var(--rms-bg-surface-2);
+  border-top: 1px solid var(--rms-border-divider);
+}
+
+/* Modals */
+.hydrant-module-root .modal-backdrop {
+  background: var(--rms-bg-scrim);
+  backdrop-filter: blur(2px);
+}
+
+.hydrant-module-root .search-box,
+.hydrant-module-root .info-card-actions,
+.hydrant-module-root .modal-actions {
+  background: var(--rms-bg-surface-2);
+  border-color: var(--rms-border-divider);
+}
+
+.hydrant-module-root .modal-header span:not(.dot),
+.hydrant-module-root .info-card-top span:not(.dot) {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.hydrant-module-root .icon-close {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Toast */
+.hydrant-module-root .toast {
+  color: #fff;
+  background: var(--rms-success);
+  box-shadow: var(--rms-shadow-md);
+}
+
+/* Session pill */
+.hydrant-module-root .session-pill {
+  color: var(--rms-text-muted);
+  background: var(--rms-bg-surface-2);
+}
+
+.hydrant-module-root .session-pill.active {
+  color: #166534;
+  background: #dcfce7;
+}
+
+html[data-theme="dark"] .hydrant-module-root .session-pill.active {
+  color: #bbf7d0;
+  background: rgba(22, 101, 52, 0.35);
+}
+
+/* Sync / settings module cards */
+.hydrant-module-root .setting-row span,
+.hydrant-module-root .integration-grid p {
+  color: var(--rms-text-muted);
+}
+
+.hydrant-module-root .integration-grid > div {
+  background: var(--rms-bg-surface-2);
+  border: 1px solid var(--rms-border);
+  border-radius: var(--rms-radius-sm);
+}
+
+.hydrant-module-root .theme-note {
+  color: var(--rms-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+  .hydrant-module-root .page-body {
+    padding: 8px 10px;
+  }
+
+  .hydrant-module-root .hydrant-work-tabs {
+    padding: 6px 8px 0;
+  }
+}

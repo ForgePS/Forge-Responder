@@ -1,0 +1,407 @@
+.alert-dashboard-page {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.alert-dashboard-page,
+.alert-dashboard {
+  min-height: 100vh;
+  height: 100vh;
+  background: #000;
+  color: #fff;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+}
+
+.alert-dashboard-firehouse {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  min-height: 100vh;
+  background: #000;
+}
+
+/* ── Banner header ── */
+.alert-firehouse-banner {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(280px, 2fr) minmax(220px, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 12px 18px 10px;
+  border-bottom: 2px solid #1f2937;
+  background: #000;
+}
+
+.alert-firehouse-banner-left {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+}
+
+.alert-firehouse-dispatched-label {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-style: italic;
+  text-decoration: underline;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.alert-firehouse-dispatched-time {
+  font-size: clamp(1.6rem, 2.4vw, 2.35rem);
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1.05;
+}
+
+.alert-firehouse-clear-pill {
+  display: inline-flex;
+  align-self: start;
+  margin-top: 4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #facc15;
+  color: #000;
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+.alert-firehouse-banner-center {
+  text-align: center;
+  display: grid;
+  gap: 2px;
+}
+
+.alert-firehouse-code {
+  font-size: clamp(2rem, 3.5vw, 3.2rem);
+  font-weight: 900;
+  font-style: italic;
+  color: #ef4444;
+  line-height: 1;
+}
+
+.alert-firehouse-address {
+  font-size: clamp(1.35rem, 2.2vw, 2rem);
+  font-weight: 800;
+  font-style: italic;
+  color: #facc15;
+  line-height: 1.1;
+}
+
+.alert-firehouse-units {
+  font-size: clamp(1rem, 1.6vw, 1.35rem);
+  font-weight: 800;
+  font-style: italic;
+  color: #4ade80;
+  letter-spacing: 0.03em;
+}
+
+.alert-firehouse-banner-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.alert-firehouse-logo {
+  height: 72px;
+  width: auto;
+  max-width: 120px;
+  object-fit: contain;
+}
+
+.alert-firehouse-weather {
+  text-align: right;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #e5e7eb;
+}
+
+.alert-firehouse-updated {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+/* ── Body: sidebar + 2×2 grid ── */
+.alert-firehouse-body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+  background: #000;
+}
+
+.alert-firehouse-sidebar {
+  border-right: 2px solid #1f2937;
+  padding: 12px 10px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.alert-firehouse-sidebar-title {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-style: italic;
+  text-decoration: underline;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.alert-firehouse-incident-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.alert-firehouse-incident-list li {
+  display: grid;
+  gap: 3px;
+  padding: 10px 10px 10px 12px;
+  border-left: 5px solid #dc2626;
+  background: #1f2937;
+  border-radius: 0 6px 6px 0;
+}
+
+.alert-firehouse-incident-list li.is-active {
+  background: #374151;
+  box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.35);
+}
+
+.alert-firehouse-incident-list li strong {
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-style: italic;
+  color: #fff;
+}
+
+.alert-firehouse-incident-list li span {
+  font-size: 0.82rem;
+  color: #d1d5db;
+  line-height: 1.3;
+}
+
+.alert-firehouse-incident-list li.is-empty {
+  border-left-color: #4b5563;
+  color: #9ca3af;
+}
+
+/* ── 2×2 quadrant grid ── */
+.alert-firehouse-quad-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 8px;
+  padding: 8px;
+  min-height: 0;
+  min-width: 0;
+}
+
+.alert-firehouse-quad-streetview {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.alert-firehouse-quad-satellite {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.alert-firehouse-quad-info {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.alert-firehouse-quad-route {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.alert-firehouse-quad {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.alert-firehouse-quad-info {
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 10px 12px;
+  gap: 8px;
+}
+
+.alert-firehouse-quad-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  font-style: italic;
+  text-decoration: underline;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.alert-firehouse-info-box {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  padding: 12px 14px;
+  overflow: auto;
+  min-height: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #e5e7eb;
+}
+
+.alert-firehouse-info-box p {
+  margin: 0;
+}
+
+.alert-firehouse-business {
+  margin: 0 0 8px !important;
+  color: #facc15;
+  font-weight: 700;
+}
+
+.alert-firehouse-map-host {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #0f172a;
+}
+
+.alert-firehouse-quad-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #9ca3af;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.alert-firehouse-quad-streetview .alert-firehouse-map-host,
+.alert-firehouse-quad-satellite .alert-firehouse-map-host,
+.alert-firehouse-quad-route .alert-firehouse-map-host {
+  z-index: 2;
+}
+
+.is-active .alert-firehouse-quad-streetview .alert-firehouse-quad-placeholder,
+.is-active .alert-firehouse-quad-satellite .alert-firehouse-quad-placeholder,
+.is-active .alert-firehouse-quad-route .alert-firehouse-quad-placeholder {
+  display: none;
+}
+
+.alert-firehouse-route-meta {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 3;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+/* ── Standby loading (minimal) ── */
+.alert-dashboard-standby {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  width: 100%;
+  padding: 24px;
+  background: #000;
+}
+
+.alert-dashboard-standby-card {
+  width: min(760px, 100%);
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 28px;
+}
+
+.alert-dashboard-standby-card h1 {
+  margin: 0 0 10px;
+  font-style: italic;
+  text-transform: uppercase;
+}
+
+.alert-dashboard-standby-meta {
+  color: #9ca3af;
+}
+
+.alert-dashboard-error-inline {
+  color: #fecaca;
+}
+
+.alert-dashboard-notice,
+.alert-dashboard-error {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  z-index: 20;
+}
+
+.alert-dashboard-notice {
+  background: rgba(30, 64, 175, 0.92);
+  color: #e5e7eb;
+}
+
+.alert-dashboard-error {
+  background: rgba(127, 29, 29, 0.92);
+}
+
+@media (max-width: 1100px) {
+  .alert-firehouse-banner {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .alert-firehouse-banner-left,
+  .alert-firehouse-banner-right {
+    justify-content: center;
+  }
+
+  .alert-firehouse-banner-right {
+    flex-direction: column;
+  }
+
+  .alert-firehouse-weather {
+    text-align: center;
+  }
+
+  .alert-firehouse-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .alert-firehouse-sidebar {
+    border-right: 0;
+    border-bottom: 2px solid #1f2937;
+    max-height: 180px;
+  }
+}

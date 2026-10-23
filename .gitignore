@@ -5,3 +5,33 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+_tmp_ifc_extract.txt
+scripts/ifc/out/
+!.env.example
+!.env.staging
+!.env.production
+
+# Local scratch / tokens / deploy logs
+tmp-*
+_tmp_*
+_deploy_*.log
+firestore-debug.log
+storage-debug.log
+ui-debug.log
+
+# Local data backups from admin scripts (may contain personal data)
+backups/
+inventory*.txt
+cleanup*.txt
+domains*.txt
+subscriptions*.txt
+
+# Firebase deploy cache
+.firebase/
+demo-rename*.txt
+
+# Fake emulator settings are safe to commit
+!.env.emulator
+!functions/.env.forge-rms-staging
+# Staging seed output (contains test login passwords)
+staging-seed.txt

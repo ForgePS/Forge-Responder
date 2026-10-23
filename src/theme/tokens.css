@@ -1,0 +1,151 @@
+/* Forge Academy / EduDash theme tokens for Forge RMS */
+
+:root,
+html[data-theme="light"] {
+  color-scheme: light;
+  --rms-bg-base: #eef2f6;
+  --rms-bg-body: #eef2f6;
+  --rms-bg-shell: #eef2f6;
+  --rms-bg-surface: #ffffff;
+  --rms-bg-surface-2: #f8f9fa;
+  --rms-bg-surface-3: #f3f4f6;
+  --rms-bg-hover: #e6f7f5;
+  --rms-bg-hover-2: #d9f2ef;
+  --rms-bg-input: #ffffff;
+  --rms-bg-elevated: #ffffff;
+  --rms-bg-footer: #ffffff;
+  --rms-bg-nav: #ffffff;
+  --rms-bg-topbar: #ffffff;
+  --rms-bg-panel: #ffffff;
+  --rms-bg-panel-header: #f8f9fa;
+  --rms-bg-kpi-a: #ffffff;
+  --rms-bg-kpi-b: #f8f9fa;
+  --rms-bg-modal: #ffffff;
+  --rms-bg-auth: #ffffff;
+  --rms-bg-scrim: rgba(33, 37, 41, 0.4);
+  --rms-border: rgba(209, 213, 219, 0.5);
+  --rms-border-strong: #d1d5db;
+  --rms-border-subtle: #e5e7eb;
+  --rms-border-divider: rgba(209, 213, 219, 0.5);
+  --rms-border-alpha: rgba(33, 37, 41, 0.08);
+  --rms-text: #212529;
+  --rms-text-strong: #212529;
+  --rms-text-body: #4b5563;
+  --rms-text-muted: #6c757d;
+  --rms-text-subtle: #9ca3af;
+  --rms-text-faint: #adb5bd;
+  --rms-text-inverse: #ffffff;
+  --rms-text-link: #25a194;
+  --rms-text-link-hover: #1c7f73;
+  --rms-primary: #25a194;
+  --rms-primary-solid: #25a194;
+  --rms-primary-hover: #1c7f73;
+  --rms-primary-soft: rgba(37, 161, 148, 0.12);
+  --rms-brand: #25a194;
+  --rms-brand-soft: rgba(37, 161, 148, 0.1);
+  --rms-accent: #25a194;
+  --rms-icon: #6b7280;
+  --rms-icon-active: #25a194;
+  --rms-success: #45b369;
+  --rms-warning: #ff9f29;
+  --rms-critical: #ef4a00;
+  --rms-shadow-sm: 0 4px 30px rgba(46, 45, 116, 0.05);
+  --rms-shadow-md: 0 6px 32px rgba(46, 45, 116, 0.08);
+  --rms-shadow-lg: 0 12px 40px rgba(46, 45, 116, 0.12);
+  --rms-blur: none;
+  --rms-shell-gradient: #eef2f6;
+  --rms-shell-glow-a: none;
+  --rms-shell-glow-b: none;
+  --rms-auth-gradient: linear-gradient(135deg, #eef2f6 0%, #e6f7f5 100%);
+  --rms-tagline-gradient: linear-gradient(90deg, #25a194, #3db9ab);
+  --rms-nav-active-bg: #e6f7f5;
+  --rms-nav-active-border: #25a194;
+  --rms-table-head: #f8f9fa;
+  --rms-mini-head: #f8f9fa;
+  --rms-chart-center: #ffffff;
+  --rms-donut-ring: conic-gradient(#45b369 0 87%, #ff9f29 87% 95%, #ef4a00 95%);
+  --rms-transition: 0.25s ease;
+  --rms-radius-sm: 6px;
+  --rms-radius-md: 8px;
+  --rms-radius-lg: 12px;
+  --rms-font-display: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --rms-bg-base: #111827;
+  --rms-bg-body: #111827;
+  --rms-bg-shell: #111827;
+  --rms-bg-surface: #1f2937;
+  --rms-bg-surface-2: #374151;
+  --rms-bg-surface-3: #1a2332;
+  --rms-bg-hover: rgba(37, 161, 148, 0.18);
+  --rms-bg-hover-2: rgba(37, 161, 148, 0.24);
+  --rms-bg-input: #1f2937;
+  --rms-bg-elevated: #1f2937;
+  --rms-bg-footer: #111827;
+  --rms-bg-nav: #1f2937;
+  --rms-bg-topbar: #1f2937;
+  --rms-bg-panel: #1f2937;
+  --rms-bg-panel-header: #1f2937;
+  --rms-bg-kpi-a: #1f2937;
+  --rms-bg-kpi-b: #374151;
+  --rms-bg-modal: #1f2937;
+  --rms-bg-auth: #1f2937;
+  --rms-bg-scrim: rgba(0, 0, 0, 0.65);
+  --rms-border: rgba(209, 213, 219, 0.16);
+  --rms-border-strong: rgba(209, 213, 219, 0.28);
+  --rms-border-subtle: rgba(209, 213, 219, 0.1);
+  --rms-border-divider: rgba(209, 213, 219, 0.12);
+  --rms-border-alpha: rgba(209, 213, 219, 0.12);
+  --rms-text: #f3f4f6;
+  --rms-text-strong: #ffffff;
+  --rms-text-body: #d1d5db;
+  --rms-text-muted: #9ca3af;
+  --rms-text-subtle: #9ca3af;
+  --rms-text-faint: #6b7280;
+  --rms-text-inverse: #ffffff;
+  --rms-text-link: #3db9ab;
+  --rms-text-link-hover: #66cbbf;
+  --rms-primary: #25a194;
+  --rms-primary-solid: #25a194;
+  --rms-primary-hover: #3db9ab;
+  --rms-primary-soft: rgba(37, 161, 148, 0.18);
+  --rms-brand: #25a194;
+  --rms-brand-soft: rgba(37, 161, 148, 0.16);
+  --rms-accent: #25a194;
+  --rms-icon: #d1d5db;
+  --rms-icon-active: #ffffff;
+  --rms-success: #45b369;
+  --rms-warning: #ff9f29;
+  --rms-critical: #ff7b42;
+  --rms-shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.24);
+  --rms-shadow-md: 0 18px 46px rgba(0, 0, 0, 0.32);
+  --rms-shadow-lg: 0 26px 70px rgba(0, 0, 0, 0.42);
+  --rms-blur: none;
+  --rms-shell-gradient: #111827;
+  --rms-shell-glow-a: none;
+  --rms-shell-glow-b: none;
+  --rms-auth-gradient: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+  --rms-tagline-gradient: linear-gradient(90deg, #25a194, #3db9ab);
+  --rms-nav-active-bg: rgba(37, 161, 148, 0.18);
+  --rms-nav-active-border: #25a194;
+  --rms-table-head: #1f2937;
+  --rms-mini-head: #1f2937;
+  --rms-chart-center: #1f2937;
+  --rms-donut-ring: conic-gradient(#45b369 0 87%, #ff9f29 87% 95%, #ff7b42 95%);
+}
+
+html {
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--rms-font-display);
+  font-weight: 400;
+  background: var(--rms-bg-body);
+  color: var(--rms-text);
+  transition: background-color var(--rms-transition), color var(--rms-transition);
+}

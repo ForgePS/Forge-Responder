@@ -1,0 +1,506 @@
+/* Horn Lake-style employee time sheet */
+
+.time-card-portal-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.time-card-sheet {
+  display: grid;
+  gap: 14px;
+  padding: 20px 18px;
+  border: 2px solid #111827;
+  border-radius: 2px;
+  background: #fff;
+  color: #111827;
+}
+
+.time-card-header {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.time-card-title {
+  margin: 0;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.time-card-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 2px 0 4px;
+}
+
+.time-card-logo {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+}
+
+.time-card-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px 40px;
+  width: 100%;
+  max-width: 720px;
+}
+
+.time-card-meta-field {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.time-card-meta-field > span {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.time-card-meta-field strong {
+  border-bottom: 1px solid #111827;
+  min-width: 180px;
+  min-height: 22px;
+  padding-bottom: 2px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.time-card-pay-period-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-card-pay-period-nav strong {
+  min-width: 0;
+  border-bottom: 1px solid #111827;
+}
+
+.time-card-nav-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  background: #f8fafc;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.time-card-save-note {
+  margin: 0;
+  color: #047857;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.time-card-week {
+  display: grid;
+  gap: 0;
+}
+
+.time-card-weekdays,
+.time-card-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.time-card-weekdays span {
+  padding: 6px 4px;
+  border: 1px solid #111827;
+  border-right: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f3f4f6;
+}
+
+.time-card-weekdays span:last-child,
+.time-card-week-grid .time-card-day:last-child {
+  border-right: 1px solid #111827;
+}
+
+.time-card-week + .time-card-week {
+  margin-top: -1px;
+}
+
+.time-card-week-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.time-card-weekdays,
+.time-card-week-grid {
+  min-width: 640px;
+}
+
+.time-card-day {
+  position: relative;
+  min-height: 88px;
+  border: 1px solid #111827;
+  border-top: 0;
+  border-right: 0;
+  background: #fff;
+}
+
+.time-card-day-pad {
+  background: #f9fafb;
+}
+
+.time-card-day.is-holiday {
+  background: #fffbeb;
+}
+
+.time-card-day.is-work .time-card-day-hours {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.time-card-day.is-leave .time-card-day-main,
+.time-card-day.is-leave .time-card-day-hours {
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.time-card-medic-box {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 36px;
+  height: 28px;
+  border: 1px solid #111827;
+  border-radius: 2px;
+  background: #fff;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 2px 4px;
+  box-sizing: border-box;
+  color: #111827;
+  -moz-appearance: textfield;
+}
+
+.time-card-medic-box-static {
+  display: inline-grid;
+  place-items: center;
+}
+
+.time-card-medic-box-empty {
+  display: block;
+  border-color: transparent;
+  background: transparent;
+}
+
+.time-card-medic-box::-webkit-outer-spin-button,
+.time-card-medic-box::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.time-card-day-main {
+  display: grid;
+  place-items: center;
+  min-height: 56px;
+  padding: 32px 8px 24px;
+  text-align: center;
+}
+
+.time-card-day-hours {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.time-card-day-holiday-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.time-card-day-date {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: #334155;
+}
+
+.time-card-summary-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.time-card-summary-row-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+
+.time-card-summary-cell {
+  display: grid;
+  gap: 4px;
+  align-content: end;
+}
+
+.time-card-summary-cell > span {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.time-card-summary-cell strong,
+.time-card-summary-cell input {
+  border-bottom: 1px solid #111827;
+  min-height: 22px;
+  padding-bottom: 2px;
+  font-size: 15px;
+  text-align: left;
+}
+
+.time-card-summary-cell input {
+  width: 100%;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+}
+
+.time-card-summary-cell.is-wide strong {
+  min-width: 100%;
+}
+
+.time-card-summary-grand {
+  margin-top: 2px;
+}
+
+.time-card-summary-grand > span,
+.time-card-summary-grand > strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.time-card-certify {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #cbd5e1;
+}
+
+.time-card-certify p {
+  margin: 0 0 14px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.time-card-signatures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.time-card-signatures label {
+  display: grid;
+  gap: 6px;
+}
+
+.time-card-signatures label span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.time-card-signatures input,
+.time-card-signature-line {
+  border: 0;
+  border-bottom: 1px solid #111827;
+  background: transparent;
+  min-height: 28px;
+  font-size: 14px;
+}
+
+.time-card-signature-line {
+  padding-bottom: 2px;
+}
+
+/* Bulk print panel */
+
+.time-card-bulk-print-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.time-card-bulk-print-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.time-card-bulk-print-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.time-card-bulk-print-controls label {
+  display: grid;
+  gap: 4px;
+}
+
+.time-card-bulk-print-controls label span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.time-card-bulk-print-stack {
+  display: grid;
+  gap: 24px;
+}
+
+.time-card-bulk-print-page {
+  break-inside: avoid;
+}
+
+html[data-theme="dark"] .time-card-sheet,
+:root:not([data-theme="light"]) .time-card-sheet {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+html[data-theme="dark"] .time-card-day,
+:root:not([data-theme="light"]) .time-card-day {
+  background: #111827;
+  border-color: #475569;
+}
+
+html[data-theme="dark"] .time-card-day.is-holiday,
+:root:not([data-theme="light"]) .time-card-day.is-holiday {
+  background: #1c1917;
+}
+
+html[data-theme="dark"] .time-card-weekdays span,
+:root:not([data-theme="light"]) .time-card-weekdays span {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+html[data-theme="dark"] .time-card-medic-box,
+:root:not([data-theme="light"]) .time-card-medic-box {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: #64748b;
+}
+
+html[data-theme="dark"] .time-card-day-date,
+:root:not([data-theme="light"]) .time-card-day-date {
+  color: #cbd5e1;
+}
+
+@media (max-width: 900px) {
+  .time-card-summary-row-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .time-card-weekdays span {
+    font-size: 9px;
+  }
+
+  .time-card-signatures {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .time-card-weekdays,
+  .time-card-week-grid {
+    min-width: 520px;
+  }
+
+  .time-card-meta-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .time-card-meta-field strong {
+    min-width: 0;
+    flex: 1;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .time-card-bulk-print-stack,
+  .time-card-bulk-print-stack * {
+    visibility: visible;
+  }
+
+  .time-card-bulk-print-toolbar {
+    display: none !important;
+  }
+
+  .time-card-bulk-print-panel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    gap: 0;
+  }
+
+  .time-card-bulk-print-stack {
+    gap: 0;
+  }
+
+  .time-card-bulk-print-page {
+    page-break-after: always;
+    break-after: page;
+    margin: 0;
+    padding: 0.35in 0.4in;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .time-card-bulk-print-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .time-card-sheet {
+    border-width: 1px;
+    padding: 0;
+    gap: 10px;
+  }
+
+  .time-card-nav-btn {
+    display: none;
+  }
+
+  .time-card-medic-box {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
