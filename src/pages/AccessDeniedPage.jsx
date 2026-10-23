@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { INACTIVE_DEPARTMENT_TEXT, useDepartmentStatus } from "../hooks/useDepartmentStatus.js";
 import { ShieldAlert } from "lucide-react";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 import { resolveDepartmentLogoUrl } from "../lib/brandAssets.js";
@@ -19,7 +20,7 @@ import { parseTenantSubdomain, platformOrigin } from "../lib/tenantDomains.js";
 
 export default function AccessDeniedPage({ userId = "" }) {
   const { profile, departmentId, gatewayDepartmentId, setDepartmentId } = useTenant();
-  const { user, signOut, recoverAccess, recoveryLoading, inviteError } = useAuth();
+  const { user, membership, signOut, recoverAccess, recoveryLoading, inviteError } = useAuth();
   const [recoveryMessage, setRecoveryMessage] = useState("");
   const [platformCreatorRecoverable, setPlatformCreatorRecoverable] = useState(false);
   const [changingTenant, setChangingTenant] = useState(false);
@@ -29,6 +30,10 @@ export default function AccessDeniedPage({ userId = "" }) {
   const canChangeTenant = !creatorConsoleEntry && !brandedHostLocked;
   const portalDepartmentId = gatewayDepartmentId || (isPlatformScope(departmentId) ? null : departmentId);
   const canRecover = canSelfRestoreMembership(user || {}) || platformCreatorRecoverable;
+  // A suspended or archived department refuses everyone, so say that rather than "not assigned".
+  const departmentStatus = useDepartmentStatus(portalDepartmentId || membership?.departmentId || "");
+  const inactive = !creatorConsoleEntry && INACTIVE_DEPARTMENT_TEXT[departmentStatus.reason];
+  const departmentLabel = departmentStatus.name || profile.shortName || profile.name;
 
   useEffect(() => {
     let cancelled = false;
@@ -96,18 +101,24 @@ export default function AccessDeniedPage({ userId = "" }) {
         <div className="auth-heading">
           <ShieldAlert size={22} />
           <div>
-            <h1>{creatorConsoleEntry ? "Creator access not provisioned" : "Access not assigned"}</h1>
-            <p>
-              Signed in as <strong>{user?.email}</strong>, but this account does not have access to{" "}
-              <strong>{creatorConsoleEntry ? "FORGE Creator Console" : (profile.shortName || profile.name)}</strong> yet.
-            </p>
+            <h1>{inactive ? inactive.title : creatorConsoleEntry ? "Creator access not provisioned" : "Access not assigned"}</h1>
+            {inactive ? (
+              <p><strong>{departmentLabel}</strong> {inactive.body}</p>
+            ) : (
+              <p>
+                Signed in as <strong>{user?.email}</strong>, but this account does not have access to{" "}
+                <strong>{creatorConsoleEntry ? "FORGE Creator Console" : departmentLabel}</strong> yet.
+              </p>
+            )}
           </div>
         </div>
 
         {inviteError && <div className="auth-error" role="alert">{inviteError}</div>}
 
         <p className="auth-help">
-          {creatorConsoleEntry
+          {inactive
+            ? "If you think this is a mistake, ask your department administrator to contact FORGE Public Safety."
+            : creatorConsoleEntry
             ? "Click Restore admin access below, or add your Account ID to platformCreators in Firebase Console."
             : canChangeTenant
               ? "If you selected the wrong tenant, use Change tenant below. Otherwise ask your department administrator to send you an invite link."

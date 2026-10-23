@@ -3669,3 +3669,18 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
 
 /* Staging / non-production marker (EnvironmentBadge) */
 .environment-badge { position: fixed; z-index: 1000; left: 12px; bottom: 12px; padding: 4px 10px; border-radius: 999px; background: #b45309; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+
+/* Account menu (header profile button) */
+.account-menu { position: relative; }
+.account-menu-list { position: absolute; z-index: 60; right: 0; top: calc(100% + 6px); min-width: 210px; display: grid; padding: 6px; border: 1px solid var(--rms-border); border-radius: 10px; background: var(--rms-bg-surface); box-shadow: 0 12px 30px rgba(2, 6, 23, 0.25); }
+.account-menu-list button { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 6px; background: transparent; color: var(--rms-text-strong); font-size: 14px; text-align: left; }
+.account-menu-list button:hover, .account-menu-list button:focus-visible { background: var(--rms-bg-hover); }
+.account-modal { max-width: 440px; }
+.auth-forgot { justify-self: start; padding: 0; font-size: 13px; }
+
+/* "Not saved" notice (SaveFailedNotice) */
+.save-failed-notice { position: fixed; z-index: 1100; right: 16px; bottom: 16px; width: min(440px, calc(100vw - 32px)); display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid #f59e0b; border-left-width: 4px; border-radius: 10px; background: var(--rms-bg-surface); color: var(--rms-text-strong); box-shadow: 0 12px 30px rgba(2, 6, 23, 0.3); }
+.save-failed-notice svg { flex: 0 0 auto; color: #d97706; margin-top: 2px; }
+.save-failed-notice div { flex: 1; display: grid; gap: 2px; }
+.save-failed-notice strong { font-size: 14px; }
+.save-failed-notice span { font-size: 13px; color: var(--rms-text-muted); }

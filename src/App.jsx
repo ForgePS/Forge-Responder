@@ -24,11 +24,13 @@ import { isPlatformScope } from "./lib/tenantPaths.js";
 import { useTenantPersistentState } from "./hooks/useTenantPersistentState.js";
 import { formatRoleLabel, membershipInitials } from "./lib/departmentMembership.js";
 import AccessDeniedPage from "./pages/AccessDeniedPage.jsx";
+import { useDepartmentStatus } from "./hooks/useDepartmentStatus.js";
 import DemoEntryPage from "./pages/DemoEntryPage.jsx";
 import DemoModeBanner from "./components/DemoModeBanner.jsx";
 import GatewayNotFoundPage from "./pages/GatewayNotFoundPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import TwoFactorScreen from "./components/security/TwoFactorScreen.jsx";
+import AccountMenu from "./components/security/AccountMenu.jsx";
 import TwoFactorReminder from "./components/security/TwoFactorReminder.jsx";
 import { useTwoFactorStatus } from "./hooks/useTwoFactorStatus.js";
 import { isDemoEntryPath, isDemoModeActive } from "./lib/demoMode.js";
@@ -113,7 +115,9 @@ import { normalizeEmployeePortalRules } from "./lib/employeePortalRules.js";
 import { normalizePayRules } from "./lib/payRules.js";
 import { normalizeDailyLogSettings } from "./lib/dailyLogSettings.js";
 const CreatorConsolePage = lazyPage(() => import("./pages/CreatorConsolePage.jsx"));
-import { ModulePage, AccessDeniedModule } from "./pages/ModulePage.jsx";
+import { ModulePage, AccessDeniedModule, ModuleNotIncluded } from "./pages/ModulePage.jsx";
+import { NAV_MODULE_MAP } from "./data/adminRegistry.js";
+import SaveFailedNotice from "./components/SaveFailedNotice.jsx";
 const CertificationsPage = lazyPage(() => import("./pages/CertificationsPage.jsx"));
 const SchedulingPage = lazyPage(() => import("./pages/SchedulingPage.jsx"));
 const TrainingPage = lazyPage(() => import("./pages/TrainingPage.jsx"));
@@ -637,11 +641,7 @@ function TopBar({
       <div className="command-time"><span><CalendarDays size={15} /> {dateLabel}</span><span><Clock3 size={15} /> {timeLabel}</span></div>
       {!hideSearch && <label className="global-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search personnel, apparatus, occupancies, training, inspections..." /></label>}
       <NotificationBell departmentId={departmentId} userId={user?.uid} />
-      <button className="profile-button" type="button" onClick={onSignOut} title="Sign out">
-        <span>{initials}</span>
-        <div><strong>{displayName}</strong><small>{roleLabel}</small></div>
-        <ChevronRight size={13} />
-      </button>
+      <AccountMenu initials={initials} displayName={displayName} roleLabel={roleLabel} onSignOut={onSignOut} />
     </div>
   </header>;
 }
@@ -1167,6 +1167,9 @@ function AppShell() {
     setEmployeeSection(name);
     setMobileNav(false);
   }
+  // A page whose module is switched off (reachable by a saved ?page= link) is not shown.
+  const blockedModuleKey = effectiveAppView === "employee" ? "" : NAV_MODULE_MAP[current] || "";
+  const moduleBlocked = Boolean(!inPlatformScope && blockedModuleKey && !isModuleEnabled(blockedModuleKey));
   const pageContent = effectiveAppView === "employee" ? (
     <EmployeePortalPage
       current={employeeSection}
@@ -1862,7 +1865,7 @@ function AppShell() {
         </div>
       )}
       {/* Module pages load on demand (see lazyPage). */}
-      <Suspense fallback={<PageLoading />}>{pageContent}</Suspense>
+      <Suspense fallback={<PageLoading />}>{moduleBlocked ? <ModuleNotIncluded name={current} /> : pageContent}</Suspense>
     </section>
     {!isHydrantsView ? (
       <PlatformFooter
@@ -1875,8 +1878,9 @@ function AppShell() {
 
 export default function App() {
   const { authRequired, authLoading, membershipLoading, user, membership, isCreator } = useAuth();
-  const { ready, gatewayDepartmentId, gatewayError } = useTenant();
+  const { ready, gatewayDepartmentId, gatewayError, departmentId: activeDepartmentId, isPlatformScope: platformScopeActive } = useTenant();
   const twoFactor = useTwoFactorStatus();
+  const departmentStatus = useDepartmentStatus(user && !isCreator && !platformScopeActive ? activeDepartmentId : "");
 
   if (isDemoEntryPath() && !authLoading) {
     return <DemoEntryPage />;
@@ -1916,9 +1920,12 @@ export default function App() {
     }
   }
   if (!membership && !isCreator) return <AccessDeniedPage userId={user?.uid} />;
+  // The rules refuse members of a suspended or archived department; say why.
+  if (!isCreator && departmentStatus.reason) return <AccessDeniedPage userId={user?.uid} />;
   return (
     <>
       <Suspense fallback={<LoadingScreen />}><AppShell /></Suspense>
+      <SaveFailedNotice />
       {twoFactor.level === "grace" && twoFactor.sessionOk === false && (
         <TwoFactorReminder daysLeft={twoFactor.daysLeft} enrolled={twoFactor.enrolled} />
       )}
