@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Activity, Check, CirclePlus, X } from "lucide-react";
 import {
   advanceShiftTradeApproval,
+  buildShiftTradeApprovalMeta,
+  buildShiftTradeLabel,
+  shiftLabelForDay,
   getPendingBattalionChiefs,
   inferShiftTradeStage,
   shiftTradeStatusDetail,
@@ -12,6 +15,10 @@ import {
   personHasActivityLogEntry,
 } from "../../lib/personnelActivityLog.js";
 import { findPersonnelForLeaveRequest } from "../../lib/leaveAccrualIntegration.js";
+import { defaultShiftRotation } from "../../data/defaultShiftRotation.js";
+import { shortDateLabel, uniqueRecordId } from "../../lib/recordIds.js";
+
+const blankTrade = { personnelId: "", giveDayId: "", receiveDayId: "", coverage: "" };
 
 function Badge({ children }) {
   return <span className="badge">{children}</span>;
@@ -44,9 +51,14 @@ function toneFromStatus(status) {
   return "info";
 }
 
-export default function ShiftTradesPanel({ trades = [], setTrades, personnel = [], setPersonnel }) {
+export default function ShiftTradesPanel({ trades = [], setTrades, personnel = [], setPersonnel, rotation = defaultShiftRotation }) {
   const [filter, setFilter] = useState("All");
   const [showNew, setShowNew] = useState(false);
+  const [tradeForm, setTradeForm] = useState(blankTrade);
+  const [formError, setFormError] = useState("");
+  const people = (Array.isArray(personnel) ? personnel : [])
+    .filter((person) => person?.name && !/inactive|separated|retired/i.test(person.status || ""))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
   const [message, setMessage] = useState("");
   const visibleTrades = trades.filter((trade) => filter === "All" || trade.status === filter);
 
@@ -92,21 +104,39 @@ export default function ShiftTradesPanel({ trades = [], setTrades, personnel = [
   }
 
   function submitTrade() {
+    const requester = people.find((person) => person.id === tradeForm.personnelId);
+    if (!requester) { setFormError("Choose the requesting member."); return; }
+    if (!tradeForm.giveDayId || !tradeForm.receiveDayId) { setFormError("Choose both the shift to give and the shift to receive."); return; }
+    if (!tradeForm.coverage) { setFormError("Choose the coverage member."); return; }
+    if (tradeForm.coverage === requester.name) { setFormError("The coverage member must be someone other than the requester."); return; }
+    const giveShift = shiftLabelForDay(tradeForm.giveDayId, rotation);
+    const receiveShift = shiftLabelForDay(tradeForm.receiveDayId, rotation);
+    const form = {
+      ...tradeForm,
+      give: buildShiftTradeLabel(tradeForm.giveDayId, giveShift),
+      receive: buildShiftTradeLabel(tradeForm.receiveDayId, receiveShift),
+      giveShift,
+      receiveShift,
+    };
     const next = {
-      id: `TR-${400 + trades.length}`,
-      requestedBy: "Chief J. Smith",
-      give: "Jun 24 - B Shift",
-      receive: "Jun 27 - B Shift",
-      coverage: "M. Reed",
-      submitted: "Jun 7",
-      status: "Awaiting Member",
-      approvalStage: "coverageMember",
-      assignedCoverageMember: "M. Reed",
-      assignedBattalionChiefs: [{ name: "Battalion Chief", shift: "B Shift" }],
-      battalionApprovals: [],
+      id: uniqueRecordId("TR"),
+      requestedBy: requester.name,
+      personnelId: requester.id,
+      give: form.give,
+      receive: form.receive,
+      giveDayId: form.giveDayId,
+      receiveDayId: form.receiveDayId,
+      giveShift,
+      receiveShift,
+      coverage: form.coverage,
+      submitted: shortDateLabel(),
+      submittedAt: new Date().toISOString(),
+      ...buildShiftTradeApprovalMeta(personnel, form, rotation),
     };
     setTrades((current) => [next, ...current]);
     setShowNew(false);
+    setTradeForm(blankTrade);
+    setFormError("");
     setFilter("All");
     setMessage("New shift trade request submitted — awaiting coverage member approval");
   }
@@ -195,10 +225,11 @@ export default function ShiftTradesPanel({ trades = [], setTrades, personnel = [
       {showNew ? (
         <Modal title="New Shift Trade Request" onClose={() => setShowNew(false)}>
           <div className="workflow-form">
-            <label><span>Requesting Member</span><select><option>Chief J. Smith</option><option>R. Williams</option><option>M. Johnson</option></select></label>
-            <label><span>Shift to Give</span><select><option>Jun 24 - B Shift</option><option>Jun 16 - A Shift</option><option>Jun 19 - C Shift</option></select></label>
-            <label><span>Shift to Receive</span><select><option>Jun 27 - B Shift</option><option>Jun 22 - A Shift</option><option>Jun 29 - C Shift</option></select></label>
-            <label><span>Coverage Member</span><select><option>M. Reed</option><option>T. Brooks</option><option>J. Wade</option></select></label>
+            {formError && <p className="form-error" role="alert">{formError}</p>}
+            <label><span>Requesting Member</span><select value={tradeForm.personnelId} onChange={(e) => setTradeForm({ ...tradeForm, personnelId: e.target.value })}><option value="">Choose a member</option>{people.map((person) => <option key={person.id} value={person.id}>{person.name}{person.shift ? ` (${person.shift})` : ""}</option>)}</select></label>
+            <label><span>Shift to Give</span><input type="date" value={tradeForm.giveDayId} onChange={(e) => setTradeForm({ ...tradeForm, giveDayId: e.target.value })} />{tradeForm.giveDayId && <small>{shiftLabelForDay(tradeForm.giveDayId, rotation)}</small>}</label>
+            <label><span>Shift to Receive</span><input type="date" value={tradeForm.receiveDayId} onChange={(e) => setTradeForm({ ...tradeForm, receiveDayId: e.target.value })} />{tradeForm.receiveDayId && <small>{shiftLabelForDay(tradeForm.receiveDayId, rotation)}</small>}</label>
+            <label><span>Coverage Member</span><select value={tradeForm.coverage} onChange={(e) => setTradeForm({ ...tradeForm, coverage: e.target.value })}><option value="">Choose a member</option>{people.filter((person) => person.id !== tradeForm.personnelId).map((person) => <option key={person.id} value={person.name}>{person.name}{person.shift ? ` (${person.shift})` : ""}</option>)}</select></label>
           </div>
           <div className="modal-actions">
             <button type="button" className="secondary-button" onClick={() => setShowNew(false)}>Cancel</button>

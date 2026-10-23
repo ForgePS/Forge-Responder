@@ -218,8 +218,9 @@ export default function NerisFireReportsPage({
       updateSelected(applyReviewAction(selected, { action: "submit", comments: "Marked complete by author" }));
       setMessage(`${selected.reportNumber} submitted for review`);
     } else if (selected.status === "Approved" || selected.status === "Ready for Submission") {
-      updateSelected({ status: "Submitted", submittedAt: new Date().toISOString() });
-      setMessage(`${selected.reportNumber} submitted to NERIS`);
+      if (!window.confirm(`FORGE doesn't send reports to NERIS yet. Have you submitted ${selected.reportNumber} in the NERIS portal? OK records it as submitted.`)) return;
+      updateSelected({ status: "Submitted", submittedAt: new Date().toISOString(), submissionMethod: "manual-neris-portal" });
+      setMessage(`${selected.reportNumber} recorded as submitted in the NERIS portal`);
     } else {
       saveReport();
     }
@@ -232,7 +233,7 @@ export default function NerisFireReportsPage({
       ...populated,
       status: selected.status === "Draft" ? "In Progress" : selected.status,
     });
-    setMessage("Auto-populated from CAD, scheduling, apparatus, occupancy, and weather sources.");
+    setMessage("Filled in what FORGE has on file: scheduling, apparatus, occupancy, preplan and hydrant records. Enter dispatch times and weather yourself.");
   }
 
   const statusCounts = useMemo(() => {

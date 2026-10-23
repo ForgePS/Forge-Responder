@@ -24,7 +24,7 @@ export default function NerisIntelligencePanel({
   const blocking = countBlockingErrors(validationIssues);
   const warnings = validationIssues.filter((i) => !i.blocking).length;
   const cad = workspace.cad || {};
-  const weather = workspace.weather?.dispatchWeather || {};
+  const weather = workspace.weather?.source === "weather-api-simulated" ? {} : workspace.weather?.dispatchWeather || {};
   const location = workspace.location || {};
   const personnel = workspace.personnel || [];
   const lastApproval = (workspace.approvals || []).slice(-1)[0];

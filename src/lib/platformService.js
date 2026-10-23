@@ -417,6 +417,21 @@ export async function registerPlatformDepartment(departmentId, profile = {}, opt
   const db = getFirestoreDb();
   if (!db || !departmentId) return null;
 
+  // Never build over an existing department, including archived ones: the batch below
+  // merges, so it would bring an archived department back with its old data.
+  const [registrySnap, profileSnap] = await Promise.all([
+    getDoc(doc(db, "platformDepartments", departmentId)),
+    getDoc(doc(db, "departments", departmentId, "profile", "main")),
+  ]);
+  if (registrySnap.exists() || profileSnap.exists()) {
+    const status = String(registrySnap.data()?.status || "").toLowerCase();
+    const error = new Error(["archived", "disabled"].includes(status)
+      ? `The ID "${departmentId}" belongs to an archived department (${registrySnap.data()?.name || departmentId}). Choose a different ID, or restore that department with scripts/archive-department.mjs --restore.`
+      : `A department with the ID "${departmentId}" already exists. Choose a different ID.`);
+    error.code = "department-exists";
+    throw error;
+  }
+
   const now = new Date().toISOString();
   const platformConfig = await loadPlatformConfig();
   const profileSubscription = normalizeSubscription(profile.subscription);

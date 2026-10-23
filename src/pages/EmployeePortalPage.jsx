@@ -79,6 +79,7 @@ import { resolveEmployeeVacancyDays, formatVacancyPickupSummary, buildVacancyPic
 import { hasPermission } from "../lib/permissions.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
+import { acknowledgementKeys, pendingForPerson, withAcknowledgement } from "../lib/documentAcknowledgement.js";
 import { loadDepartmentMembership } from "../lib/departmentMembership.js";
 
 const defaultLeaveForm = {
@@ -327,9 +328,14 @@ export default function EmployeePortalPage({
     return merged.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
   }, [training, academyTraining, membership, myPerson]);
 
+  const myAckIdentity = useMemo(() => ({
+    personnelId: myPerson?.id || membership?.personnelId || "",
+    uid: user?.uid || "",
+    name: myPerson?.name || membership?.displayName || user?.displayName || user?.email || "",
+  }), [myPerson, membership, user]);
   const myDocs = useMemo(
-    () => documents.filter((item) => item.acknowledgementStatus === "Pending"),
-    [documents]
+    () => pendingForPerson(documents, acknowledgementKeys(myAckIdentity)),
+    [documents, myAckIdentity]
   );
 
   const myLeave = useMemo(
@@ -617,7 +623,7 @@ export default function EmployeePortalPage({
       giveShift: tradeForm.giveShift,
       receiveShift: tradeForm.receiveShift,
       coverage: tradeForm.coverage,
-      submitted: "Today",
+      submitted: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       submittedAt: new Date().toISOString(),
       ...approvalMeta,
     };
@@ -741,7 +747,7 @@ export default function EmployeePortalPage({
     const doc = documents.find((item) => item.id === docId);
     if (!doc || !setDocuments) return;
     setDocuments((current) =>
-      current.map((item) => item.id === docId ? { ...item, acknowledgementStatus: "Acknowledged" } : item)
+      current.map((item) => item.id === docId ? withAcknowledgement(item, myAckIdentity) : item)
     );
     await logAction("approve", "Documents", `Document acknowledged: ${doc.title}`, docId);
     setMessage(`Acknowledged ${doc.title}`);

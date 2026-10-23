@@ -25,7 +25,7 @@ export default function InspectionOfflineConfigPanel() {
         <div className="panel-body">
           <p className="occupancy-muted">
             Download packs, mutation/attachment queues, conflict resolution, and editable device policy live under
-            Prevention → Offline & Sync. Attachment binary upload to Storage remains stubbed on sync.
+            Prevention → Offline & Sync. Attachments are uploaded to the inspection when the device syncs.
           </p>
         </div>
       </section>

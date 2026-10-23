@@ -666,14 +666,18 @@ export default function NerisIncidentWorkspace({
           <div className="neris-submission-panel">
             <p>Completion: <strong>{completionPercentage}%</strong></p>
             <p>Blocking errors: <strong>{validationIssues.filter((i) => i.blocking).length}</strong></p>
+            <p className="muted">FORGE doesn't send reports to NERIS automatically yet. Submit the report in the NERIS portal, then record the submission here.</p>
             {canEdit && !locked ? (
               <button
                 type="button"
                 className="primary-button"
                 disabled={validationIssues.some((i) => i.blocking)}
-                onClick={() => onUpdate({ status: "Submitted", submittedAt: new Date().toISOString() })}
+                onClick={() => {
+                  if (!window.confirm("FORGE doesn't send reports to NERIS yet. Have you submitted this report in the NERIS portal? OK records it as submitted.")) return;
+                  onUpdate({ status: "Submitted", submittedAt: new Date().toISOString(), submissionMethod: "manual-neris-portal" });
+                }}
               >
-                Submit to NERIS
+                Record NERIS Submission
               </button>
             ) : null}
             {validationIssues.some((i) => i.blocking) ? (

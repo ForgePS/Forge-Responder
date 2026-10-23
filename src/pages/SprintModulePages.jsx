@@ -10,6 +10,15 @@ import ObjectUploadField from "../components/ObjectUploadField.jsx";
 import ObjectLifecycleActions from "../components/ObjectLifecycleActions.jsx";
 import { buildDocumentLibraryPath } from "../lib/storagePaths.js";
 import { deleteFirebaseFile } from "../lib/firebaseClient.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import {
+  acknowledgementKeys,
+  acknowledgementLabel,
+  acknowledgementList,
+  hasAcknowledged,
+  requiresAcknowledgement,
+  withAcknowledgement,
+} from "../lib/documentAcknowledgement.js";
 import {
   archiveObject,
   isObjectArchived,
@@ -44,6 +53,13 @@ function FleetSummary({ items }) {
 }
 
 export function DocumentsPage({ query, records = [], setRecords, navLabel = "Documents", departmentId = "", canEdit = true }) {
+  const { user, membership } = useAuth();
+  const myAckIdentity = {
+    personnelId: membership?.personnelId || "",
+    uid: user?.uid || "",
+    name: membership?.displayName || user?.displayName || user?.email || "",
+  };
+  const myAckKeys = acknowledgementKeys(myAckIdentity);
   const category = documentCategoryMap[navLabel];
   const [filter, setFilter] = useState(category || "All");
   const [lifecycleView, setLifecycleView] = useState("active");
@@ -78,7 +94,15 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
   }, [visible, selectedId]);
 
   function acknowledge(id) {
-    setRecords((current) => current.map((item) => item.id === id ? { ...item, acknowledgementStatus: "Acknowledged" } : item));
+    setRecords((current) => current.map((item) => item.id === id ? withAcknowledgement(item, myAckIdentity) : item));
+  }
+
+  function setRequiresAcknowledgement(id, required) {
+    setRecords((current) => current.map((item) => item.id === id ? {
+      ...item,
+      requiresAcknowledgement: required ? "Yes" : "No",
+      acknowledgementStatus: required ? "Pending" : "Not Required",
+    } : item));
   }
 
   function patchRecord(id, mapper, successNotice) {
@@ -183,7 +207,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
               >
                 <strong>{item.title}</strong>
                 <small>{item.category} · v{item.version}</small>
-                <Badge>{isObjectArchived(item) ? "Archived" : item.acknowledgementStatus}</Badge>
+                <Badge>{isObjectArchived(item) ? "Archived" : acknowledgementLabel(item)}</Badge>
               </button>
             ))}
             {!visible.length ? <div className="empty-table">No documents in this view.</div> : null}
@@ -193,8 +217,10 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
           <Panel
             title="Document Detail"
             icon={BookOpen}
-            action={selected.acknowledgementStatus === "Pending" && isObjectVisibleInActiveList(selected) ? (
-              <button className="text-button" onClick={() => acknowledge(selected.id)}>Acknowledge</button>
+            action={requiresAcknowledgement(selected) && isObjectVisibleInActiveList(selected) && myAckKeys.length ? (
+              hasAcknowledged(selected, myAckKeys)
+                ? <span className="panel-count">You acknowledged this</span>
+                : <button className="text-button" onClick={() => acknowledge(selected.id)}>Acknowledge</button>
             ) : null}
           >
             <div className="cert-detail-grid">
@@ -204,7 +230,8 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
                 ["Effective", selected.effectiveDate],
                 ["Uploaded By", selected.uploadedBy],
                 ["File Type", selected.fileType],
-                ["Acknowledgement", selected.acknowledgementStatus],
+                ["Acknowledgement", acknowledgementLabel(selected)],
+                ["Acknowledged By", acknowledgementList(selected).map((entry) => entry.name).join(", ") || "No one yet"],
                 ["Lifecycle", isObjectArchived(selected) ? "Archived" : "Active"],
                 ["Tags", selected.tags],
                 ["Description", selected.description],
@@ -216,6 +243,16 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
               <a className="primary-button" href={selected.fileUrl} target="_blank" rel="noreferrer" style={{ marginTop: 12, display: "inline-flex" }}>
                 Open Document
               </a>
+            ) : null}
+            {canEdit && isObjectVisibleInActiveList(selected) ? (
+              <label className="inline-check" style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={requiresAcknowledgement(selected)}
+                  onChange={(event) => setRequiresAcknowledgement(selected.id, event.target.checked)}
+                />
+                <span>Everyone must acknowledge this document</span>
+              </label>
             ) : null}
             {canEdit ? (
               <div style={{ marginTop: 12 }}>

@@ -757,6 +757,7 @@ export default function SchedulingPage({
             setTrades={setShiftTrades}
             personnel={personnel}
             setPersonnel={setPersonnel}
+            rotation={rotation}
           />
         ) : null}
 

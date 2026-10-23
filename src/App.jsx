@@ -1490,7 +1490,7 @@ function AppShell() {
       )
       : <AccessDeniedModule name={current} />
   ) : current === "Maintenance" ? (
-    hasPermission(permissions, "viewApparatus") ? <MaintenancePage orders={workOrders} setOrders={setWorkOrders} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "viewApparatus") ? <MaintenancePage orders={workOrders} setOrders={setWorkOrders} units={apparatus} canEdit={canEditApparatus(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Assets" ? (
     hasPermission(permissions, "viewAssets") ? <AssetsPageConnected query={query} records={assets} setRecords={setAssets} canEdit={canEditAssets(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Hose Testing" ? (

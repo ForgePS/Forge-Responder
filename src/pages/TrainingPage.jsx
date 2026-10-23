@@ -2,12 +2,18 @@ import { useState } from "react";
 import { BookOpen, CalendarDays, Check, ShieldCheck, Trash2, X, CirclePlus } from "lucide-react";
 
 import { Badge, Panel, trainingCompliancePercent, Modal } from "../components/shell/ui.jsx";
+import { displayDate, todayIsoDate, uniqueRecordId } from "../lib/recordIds.js";
+
+const TRAINING_CATEGORIES = ["Fire", "EMS CE", "Driver", "Officer"];
+const blankTraining = () => ({ course: "", category: "Fire", date: todayIsoDate(), instructor: "", hours: "2", capacity: "12", notes: "" });
 
 export default function TrainingPage({ query, records = [], setRecords, canEdit = false }) {
   const safeRecords = Array.isArray(records) ? records : [];
   const [filter, setFilter] = useState("All");
   const [selected, setSelected] = useState(null);
   const [showNew, setShowNew] = useState(false);
+  const [form, setForm] = useState(blankTraining);
+  const [formError, setFormError] = useState("");
   const [message, setMessage] = useState("");
   const visibleRecords = safeRecords.filter((record) => {
     const matchesFilter = filter === "All" || record.category === filter || record.status === filter;
@@ -26,25 +32,31 @@ export default function TrainingPage({ query, records = [], setRecords, canEdit 
 
   function addTraining() {
     if (!canEdit || !setRecords) return;
+    const course = form.course.trim();
+    if (!course) { setFormError("Enter a class name."); return; }
+    if (!form.date) { setFormError("Choose a start date."); return; }
     const next = {
-      id: `TRN-${200 + safeRecords.length}`,
-      course: "New Training Event",
-      category: "Fire",
-      date: "Jun 14, 2026",
-      endDate: "Jun 14, 2026",
-      instructor: "Training Officer",
-      hours: 2,
+      id: uniqueRecordId("TRN"),
+      course,
+      category: form.category,
+      date: displayDate(form.date),
+      endDate: displayDate(form.date),
+      instructor: form.instructor.trim(),
+      hours: Number(form.hours) || 0,
       attendees: 0,
-      capacity: 12,
+      capacity: Number(form.capacity) || 0,
       completion: 0,
       expirationDate: "",
       status: "Scheduled",
       members: "All shifts",
-      notes: "Add objectives and attendance requirements."
+      notes: form.notes.trim(),
+      created_at: new Date().toISOString(),
     };
     setRecords((current) => [next, ...current]);
     setShowNew(false);
-    setMessage("Training event created");
+    setForm(blankTraining());
+    setFormError("");
+    setMessage(`${course} created`);
   }
 
   function deleteRecord(record) {
@@ -77,6 +89,6 @@ export default function TrainingPage({ query, records = [], setRecords, canEdit 
       </Panel>
     </section>
     {selected && <Modal title={selected.course} onClose={() => setSelected(null)}><div className="cert-detail-grid">{[["Training ID", selected.id], ["Category", selected.category], ["Instructor", selected.instructor], ["Start Date", selected.date], ["End Date", selected.endDate], ["Hours", selected.hours], ["Attendees", `${selected.attendees} / ${selected.capacity}`], ["Assigned Members", selected.members], ["Expiration", selected.expirationDate || "No expiration"], ["Status", selected.status], ["Notes", selected.notes]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div><div className="modal-actions"><button className="secondary-button" onClick={() => setSelected(null)}>Close</button>{canEdit ? <button type="button" className="secondary-button danger-button" onClick={() => deleteRecord(selected)}><Trash2 size={14} /> Delete</button> : null}{canEdit ? <button className="primary-button" onClick={() => { updateRecord(selected.id, { status: "Complete", completion: 100 }); setSelected(null); setMessage(`${selected.course} marked complete`); }}><Check size={14} /> Mark Complete</button> : null}</div></Modal>}
-    {showNew && canEdit && <Modal title="Add Training Event" onClose={() => setShowNew(false)}><div className="workflow-form"><label><span>Class Name</span><input defaultValue="New Training Event" /></label><label><span>Category</span><select><option>Fire</option><option>EMS CE</option><option>Driver</option><option>Officer</option></select></label><label><span>Start Date</span><input type="date" defaultValue="2026-06-14" /></label><label><span>Instructor</span><input defaultValue="Training Officer" /></label><label><span>Hours</span><input type="number" defaultValue="2" /></label></div><div className="modal-actions"><button className="secondary-button" onClick={() => setShowNew(false)}>Cancel</button><button className="primary-button" onClick={addTraining}><Check size={14} /> Create Event</button></div></Modal>}
+    {showNew && canEdit && <Modal title="Add Training Event" onClose={() => setShowNew(false)}><div className="workflow-form">{formError && <p className="form-error" role="alert">{formError}</p>}<label><span>Class Name</span><input value={form.course} placeholder="e.g. Ladder operations" onChange={(e) => setForm({ ...form, course: e.target.value })} /></label><label><span>Category</span><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{TRAINING_CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></label><label><span>Start Date</span><input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label><label><span>Instructor</span><input value={form.instructor} onChange={(e) => setForm({ ...form, instructor: e.target.value })} /></label><label><span>Hours</span><input type="number" min="0" step="0.5" value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })} /></label><label><span>Capacity</span><input type="number" min="0" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} /></label><label><span>Notes</span><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label></div><div className="modal-actions"><button className="secondary-button" onClick={() => setShowNew(false)}>Cancel</button><button className="primary-button" onClick={addTraining}><Check size={14} /> Create Event</button></div></Modal>}
   </div>;
 }

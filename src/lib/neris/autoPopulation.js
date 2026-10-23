@@ -79,21 +79,12 @@ export function autoPopulateReport(report = {}, sources = {}) {
     }
   }
 
-  if (!workspace.weather?.dispatchWeather && report.incidentDate) {
-    workspace.weather = {
-      ...(workspace.weather || {}),
-      dispatchWeather: simulateWeather(report.incidentDate, report.coordinates),
-      source: "weather-api-simulated",
-    };
-    autoPopulateSources["workspace.weather"] = "weather";
-  }
-
   if (!workspace.cad?.incidentNumber && report.reportNumber) {
     workspace.cad = {
       ...(workspace.cad || {}),
       incidentNumber: report.reportNumber,
       cadCallNumber: report.cadIncidentId || report.reportNumber,
-      dispatchTime: report.incidentDate ? `${report.incidentDate}T08:00` : "",
+      dispatchTime: workspace.cad?.dispatchTime || "",
       priority: workspace.cad?.priority || "Routine",
       alarmLevel: workspace.cad?.alarmLevel || "1",
       initialComments: workspace.cad?.initialComments || "",
@@ -162,24 +153,6 @@ function resolveStaffingForDate(incidentDate, sources) {
     role: slot.role || "Responder",
     source: "scheduling",
   }));
-}
-
-/** @param {string} dateStr @param {{ lat?: number, lng?: number } | undefined} coords */
-function simulateWeather(dateStr, coords) {
-  const seed = (dateStr + (coords?.lat || 0)).split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const tempF = 65 + (seed % 25);
-  const windMph = 3 + (seed % 15);
-  const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-  return {
-    temperature: `${tempF}°F`,
-    windSpeed: `${windMph} mph`,
-    windDirection: directions[seed % directions.length],
-    humidity: `${40 + (seed % 40)}%`,
-    visibility: "10 mi",
-    precipitation: seed % 5 === 0 ? "Light rain" : "None",
-    condition: seed % 5 === 0 ? "Overcast" : "Clear",
-    capturedAt: new Date().toISOString(),
-  };
 }
 
 /**

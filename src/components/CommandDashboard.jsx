@@ -5,6 +5,9 @@ import {
 import { useEffect, useState } from "react";
 import { normalizeTableRows } from "../lib/tableRows.js";
 import { buildDashboardMetrics, buildDashboardStaffingRows } from "../utils/dashboardMetrics.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { resolveEmployeePerson } from "../lib/employeePortalUtils.js";
+import { acknowledgementKeys } from "../lib/documentAcknowledgement.js";
 import { loadDepartmentHydrants, applyLocalHydrantOverrides } from "../lib/hydrantTenantService.js";
 import { currentHydrantYear } from "../lib/hydrantCompletionStats.js";
 import HydrantCompletionChart from "./HydrantCompletionChart.jsx";
@@ -84,6 +87,8 @@ export default function CommandDashboard({
     };
   }, [departmentId]);
 
+  const { user, membership } = useAuth();
+  const viewerPerson = resolveEmployeePerson(Array.isArray(personnel) ? personnel : [], membership, user);
   const metrics = buildDashboardMetrics({
     personnel,
     certifications,
@@ -95,7 +100,9 @@ export default function CommandDashboard({
     documents,
     scheduleDays,
     leaveRequests,
-    shiftTrades
+    shiftTrades,
+    // Documents waiting on the person looking at the dashboard.
+    acknowledgementKeys: acknowledgementKeys({ personnelId: viewerPerson?.id || membership?.personnelId, uid: user?.uid }),
   });
 
   const staffingRows = buildDashboardStaffingRows({
@@ -140,7 +147,7 @@ export default function CommandDashboard({
   ];
   if (metrics.pendingAcknowledgements) {
     actionRows.unshift({
-      title: "Policy acknowledgements pending",
+      title: "Documents for you to acknowledge",
       detail: `${metrics.pendingAcknowledgements} documents`,
       target: "SOGs / Policies",
     });
