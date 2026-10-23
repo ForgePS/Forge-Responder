@@ -47,12 +47,12 @@ export async function resolveGatewayDepartmentId(gatewayDepartmentId) {
   const snap = await getDoc(doc(db, "rmsGateways", gatewayId));
   if (snap.exists()) {
     const record = mapGatewayRecord(gatewayId, snap.data());
-    if (record.status === "disabled") return null;
+    if (["disabled", "archived"].includes(record.status)) return null;
     return record;
   }
 
   const departmentSnap = await getDoc(doc(db, "platformDepartments", gatewayId));
-  if (departmentSnap.exists() && departmentSnap.data()?.status !== "disabled") {
+  if (departmentSnap.exists() && !["disabled", "archived"].includes(departmentSnap.data()?.status)) {
     const dept = departmentSnap.data();
     return mapGatewayRecord(gatewayId, {
       gatewayId,

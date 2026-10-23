@@ -104,7 +104,8 @@ export async function listPlatformDepartments() {
           subscription: subscription.expirationDate ? subscription : null,
         };
       })
-      .filter((item) => item.status !== "disabled")
+      // Disabled and archived departments are out of the way (scripts/archive-department.mjs restores).
+      .filter((item) => !["disabled", "archived"].includes(item.status))
       .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
 
     if (departments.length) return departments;

@@ -240,8 +240,16 @@ export async function saveSubscriptionPlan(input, userId) {
 export async function listCustomerSubscriptions() {
   const db = requireDb();
   await ensureDefaultSubscriptionPlans();
-  const snap = await getDocs(subscriptionsCollection(db));
-  const rows = snap.docs.map((item) => mapSubscription(item.id, item.data())).filter(Boolean);
+  const [snap, registry] = await Promise.all([
+    getDocs(subscriptionsCollection(db)),
+    getDocs(collection(db, "platformDepartments")),
+  ]);
+  // Archived departments' subscriptions stay on record but out of the list.
+  const archived = new Set(registry.docs.filter((d) => d.data()?.status === "archived").map((d) => d.id));
+  const rows = snap.docs
+    .filter((item) => !archived.has(item.id))
+    .map((item) => mapSubscription(item.id, item.data()))
+    .filter(Boolean);
   return rows.sort((a, b) => a.departmentName.localeCompare(b.departmentName));
 }
 
