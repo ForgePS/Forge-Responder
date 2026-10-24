@@ -147,7 +147,9 @@ export default function CallShiftPanel({
   callShiftRules = [],
   canManage = false,
   onAssignResponse,
+  unitOptions = [],
 }) {
+  const [assignUnits, setAssignUnits] = useState({});
   const { user, membership } = useAuth();
   const { getOptions } = useDropdowns();
   const todayId = formatDayId(new Date());
@@ -683,11 +685,17 @@ export default function CallShiftPanel({
                             <span className={answer.response === "accepted" ? "badge badge-success" : "badge"}>{answer.response === "accepted" ? "Accepted" : "Declined"}</span>
                             <span>{answer.name || answer.personnelId}</span>
                             {isAssignedToCallShift(record, answer.personnelId) ? <span className="badge badge-success">Assigned</span> : null}
+                            {canManage && record.status === "active" && answer.response === "accepted" && !isAssignedToCallShift(record, answer.personnelId) && !record.apparatus ? (
+                              <select aria-label="Unit" value={assignUnits[record.id] || ""} onChange={(e) => setAssignUnits((current) => ({ ...current, [record.id]: e.target.value }))}>
+                                <option value="">Choose unit</option>
+                                {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+                              </select>
+                            ) : null}
                             {canManage && record.status === "active" && answer.response === "accepted" && !isAssignedToCallShift(record, answer.personnelId) ? (
-                              <button type="button" className="row-action" onClick={() => {
+                              <button type="button" className="row-action" disabled={!record.apparatus && !assignUnits[record.id]} onClick={() => {
                                 const person = personnel.find((p) => p.id === answer.personnelId);
                                 if (!person) return;
-                                if (onAssignResponse && onAssignResponse(person, record) === false) return;
+                                if (onAssignResponse && onAssignResponse(person, record, assignUnits[record.id]) === false) return;
                                 setCallShifts?.((current) => current.map((item) => (item.id === record.id ? withCallShiftAssigned(item, { personnelId: person.id, name: getPersonDisplayName(person), assignedBy: membership?.displayName || user?.email || "" }) : item)));
                               }}>Assign</button>
                             ) : null}
