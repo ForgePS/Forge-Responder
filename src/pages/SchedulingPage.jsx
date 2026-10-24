@@ -514,15 +514,22 @@ export default function SchedulingPage({
       return false;
     }
     if (!person || !dayId) return false;
-    // Don't double-book: skip anyone whose own shift works that day, or who is already rostered that day.
+    // Don't double-book: skip anyone already working that day. Platoon members who are
+    // off (leave, Kelly day, traded away) show as not on duty and can still be assigned.
     const dutyShift = String(shiftForDate(parseDayId(dayId), rotation) || "").trim();
-    const homeShift = String(person.shift || "").trim();
-    if (homeShift && dutyShift && homeShift === dutyShift) {
-      setMessage(`${getPersonDisplayName(person)} already works ${dutyShift} on ${dayId}, so they weren't added as overtime.`);
-      return false;
-    }
-    if (roster.some((member) => member.dayId === dayId && resolveRosterPersonnelId(member.id, member.personnelId) === person.id)) {
-      setMessage(`${getPersonDisplayName(person)} is already on the roster for ${dayId}.`);
+    const thatDay = buildDayRoster({
+      roster,
+      personnel,
+      selectedShift: dutyShift,
+      selectedDayId: dayId,
+      leaveRequests,
+      shiftTrades,
+      knownUnits: unitOptions,
+    });
+    const working = thatDay.some((member) => member.personnelId === person.id && !/leave|off|kelly|trade/i.test(member.status || ""));
+    const alreadyOvertime = roster.some((member) => member.dayId === dayId && member.isOvertime && resolveRosterPersonnelId(member.id, member.personnelId) === person.id);
+    if (working || alreadyOvertime) {
+      setMessage(`${getPersonDisplayName(person)} is already working on ${dayId}, so they weren't added again.`);
       return false;
     }
     const normalizedUnit = canonicalApparatusUnitName(unit || "") || "Unassigned";
