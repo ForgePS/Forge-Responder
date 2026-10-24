@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, ShieldCheck, Truck, Users, X, CirclePlus } from "lucide-react";
-import { buildMonthCalendar, formatDayId, parseDayId, resolveShiftRotation, shiftForDate, shiftShortLabel } from "../lib/shiftCalendar.js";
+import { buildMonthCalendar, formatDayId, parseDayId, resolveShiftRotation, shiftShortLabel } from "../lib/shiftCalendar.js";
 import { buildDayRoster, buildDayScheduleSnapshot, buildDayScopedRosterId, buildOvertimeRosterId, buildPartialSlotRosterId, buildWeekScheduleSnapshots, buildDefaultShiftTimes, calculateShiftDurationHours, DEFAULT_SHIFT_DURATION_HOURS, formatDurationLabel, normalizeShiftTime, resolveDayCoverageMetrics, resolveRosterPersonnelId } from "../lib/schedulingRoster.js";
 import { getPersonDisplayName } from "../lib/personnelSchema.js";
 import { canonicalApparatusUnitName } from "../lib/apparatusSchema.js";
@@ -10,6 +10,7 @@ import ShiftTradesPanel from "../components/scheduling/ShiftTradesPanel.jsx";
 import LeaveRequestsPanel from "../components/scheduling/LeaveRequestsPanel.jsx";
 import CallShiftPanel from "../components/scheduling/CallShiftPanel.jsx";
 import OvertimeOffersPanel from "../components/scheduling/OvertimeOffersPanel.jsx";
+import { checkOvertimeEligibility } from "../lib/overtimeEligibility.js";
 import ShiftCalendar from "../components/ShiftCalendar.jsx";
 import WeekRosterView from "../components/WeekRosterView.jsx";
 import AdminDailyRoster from "../components/admin/AdminDailyRoster.jsx";
@@ -514,25 +515,16 @@ export default function SchedulingPage({
       return false;
     }
     if (!person || !dayId) return false;
-    // Don't double-book: skip anyone already working that day. Platoon members who are
-    // off (leave, Kelly day, traded away) show as not on duty and can still be assigned.
-    const dutyShift = String(shiftForDate(parseDayId(dayId), rotation) || "").trim();
-    const thatDay = buildDayRoster({
-      roster,
-      personnel,
-      selectedShift: dutyShift,
-      selectedDayId: dayId,
-      leaveRequests,
-      shiftTrades,
-      knownUnits: unitOptions,
+    // Same rules as the roster: not already working or rostered that day, not on leave
+    // or traded away, and on a real unit so the roster shows and counts them.
+    const check = checkOvertimeEligibility({
+      person, dayId, unit, roster, personnel, rotation, leaveRequests, shiftTrades, knownUnits: unitOptions,
     });
-    const working = thatDay.some((member) => member.personnelId === person.id && !/leave|off|kelly|trade/i.test(member.status || ""));
-    const alreadyOvertime = roster.some((member) => member.dayId === dayId && member.isOvertime && resolveRosterPersonnelId(member.id, member.personnelId) === person.id);
-    if (working || alreadyOvertime) {
-      setMessage(`${getPersonDisplayName(person)} is already working on ${dayId}, so they weren't added again.`);
+    if (!check.ok) {
+      setMessage(check.reason);
       return false;
     }
-    const normalizedUnit = canonicalApparatusUnitName(unit || "") || "Unassigned";
+    const normalizedUnit = check.unit;
     const rosterId = buildOvertimeRosterId(person.id, dayId, normalizedUnit);
     setRoster((current) => (current.some((member) => member.id === rosterId) ? current : [...current, {
       id: rosterId,
@@ -577,6 +569,8 @@ export default function SchedulingPage({
     win.print();
   }
 
+  const [pickupUnits, setPickupUnits] = useState({});
+
   function decideVacancyPickup(id, status) {
     if (!setVacancyPickups) return;
     if (status === "Approved") {
@@ -586,7 +580,7 @@ export default function SchedulingPage({
         setMessage("Couldn't find this member's personnel record, so they weren't added to the roster.");
         return;
       }
-      if (!addOvertimeEntryForDay(person, request.dayId, request.apparatus)) return;
+      if (!addOvertimeEntryForDay(person, request.dayId, request.apparatus || pickupUnits[id])) return;
     }
     setVacancyPickups((current) => current.map((item) => (
       item.id === id
@@ -629,7 +623,13 @@ export default function SchedulingPage({
               <Badge>{request.status}</Badge>
               {actionable && canEditRoster && (
                 <div className="inline-actions">
-                  <button onClick={() => decideVacancyPickup(request.id, "Approved")}><Check size={13} /> Approve</button>
+                  {!request.apparatus ? (
+                    <select aria-label="Unit" value={pickupUnits[request.id] || ""} onChange={(e) => setPickupUnits((current) => ({ ...current, [request.id]: e.target.value }))}>
+                      <option value="">Choose unit</option>
+                      {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  ) : null}
+                  <button onClick={() => decideVacancyPickup(request.id, "Approved")} disabled={!request.apparatus && !pickupUnits[request.id]}><Check size={13} /> Approve</button>
                   <button onClick={() => decideVacancyPickup(request.id, "Denied")}><X size={13} /> Deny</button>
                 </div>
               )}
@@ -668,6 +668,7 @@ export default function SchedulingPage({
       openVacancies={selectedDaySnapshot.openVacancies || []}
       dutyShift={selectedDay?.shift || selectedDaySnapshot.shift || ""}
       personnel={personnel}
+      unitOptions={unitOptions}
       canEdit={canEditRoster && Boolean(setOvertimeOffers)}
       onAssign={assignOvertimeOffer}
       onMessage={setMessage}
@@ -856,8 +857,9 @@ export default function SchedulingPage({
             departmentId={departmentId}
             callShiftRules={callShiftRules}
             canManage={canManageCallShifts || canEditRoster}
-            onAssignResponse={(person, record) => {
-              const ok = addOvertimeEntryForDay(person, record.dayId, record.apparatus);
+            unitOptions={unitOptions}
+            onAssignResponse={(person, record, chosenUnit) => {
+              const ok = addOvertimeEntryForDay(person, record.dayId, record.apparatus || chosenUnit);
               if (ok) setMessage(`${getPersonDisplayName(person)} assigned to the ${record.dateLabel || record.dayId} shift and added to the roster.`);
               return ok;
             }}

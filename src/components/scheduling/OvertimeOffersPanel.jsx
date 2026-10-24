@@ -14,6 +14,7 @@ export default function OvertimeOffersPanel({
   openVacancies = [],
   dutyShift = "",
   personnel = [],
+  unitOptions = [],
   canEdit = false,
   onAssign,
   onMessage,
@@ -21,6 +22,8 @@ export default function OvertimeOffersPanel({
   const [creating, setCreating] = useState(false);
   const [assigningId, setAssigningId] = useState("");
   const [personId, setPersonId] = useState("");
+  const [unit, setUnit] = useState("");
+  const assigningOffer = offers.find((o) => o.id === assigningId) || null;
 
   const offDuty = useMemo(() => personnel
     .filter((p) => !/inactive|separated|retired/i.test(p.status || ""))
@@ -56,13 +59,14 @@ export default function OvertimeOffersPanel({
     const offer = offers.find((o) => o.id === assigningId);
     const person = personnel.find((p) => p.id === personId);
     if (!offer || !person) return;
-    const ok = onAssign?.(person, offer);
+    const ok = onAssign?.(person, { ...offer, apparatus: offer.apparatus || unit });
     if (ok === false) return;
     setOffers((current) => current.map((o) => (o.id === offer.id ? {
-      ...o, status: "Assigned", assignedPersonnelId: person.id, assignedName: getPersonDisplayName(person), assignedAt: new Date().toISOString(),
+      ...o, apparatus: o.apparatus || unit, status: "Assigned", assignedPersonnelId: person.id, assignedName: getPersonDisplayName(person), assignedAt: new Date().toISOString(),
     } : o)));
     setAssigningId("");
     setPersonId("");
+    setUnit("");
   }
 
   return (
@@ -116,10 +120,18 @@ export default function OvertimeOffersPanel({
                 {offDuty.map((p) => <option key={p.id} value={p.id}>{getPersonDisplayName(p)}{p.shift ? ` (${p.shift})` : ""}{p.rank ? ` · ${p.rank}` : ""}</option>)}
               </select>
             </label>
+            {assigningOffer && !assigningOffer.apparatus ? (
+              <label className="wide-field"><span>Unit</span>
+                <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+                  <option value="">Choose the unit they'll ride on</option>
+                  {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </label>
+            ) : null}
           </div>
           <div className="modal-actions">
             <button type="button" className="secondary-button" onClick={() => setAssigningId("")}>Cancel</button>
-            <button type="button" className="primary-button" disabled={!personId} onClick={assign}><Check size={14} /> Assign and add to roster</button>
+            <button type="button" className="primary-button" disabled={!personId || (assigningOffer && !assigningOffer.apparatus && !unit)} onClick={assign}><Check size={14} /> Assign and add to roster</button>
           </div>
         </Modal>
       ) : null}

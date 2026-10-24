@@ -1878,9 +1878,17 @@ function AppShell() {
 
 export default function App() {
   const { authRequired, authLoading, membershipLoading, user, membership, isCreator } = useAuth();
-  const { ready, gatewayDepartmentId, gatewayError, departmentId: activeDepartmentId, isPlatformScope: platformScopeActive } = useTenant();
+  const { ready, gatewayDepartmentId, gatewayError, departmentId: activeDepartmentId, isPlatformScope: platformScopeActive, setDepartmentId: setActiveDepartmentId } = useTenant();
   const twoFactor = useTwoFactorStatus();
-  const departmentStatus = useDepartmentStatus(user && !isCreator && !platformScopeActive ? activeDepartmentId : "");
+  const departmentStatus = useDepartmentStatus(user && !platformScopeActive ? activeDepartmentId : "");
+
+  // A creator whose remembered workspace has since been archived goes back to the
+  // FORGE platform workspace instead of editing a department that no longer exists.
+  useEffect(() => {
+    if (isCreator && departmentStatus.reason === "archived" && !platformScopeActive) {
+      setActiveDepartmentId?.(PLATFORM_SCOPE_ID);
+    }
+  }, [isCreator, departmentStatus.reason, platformScopeActive, setActiveDepartmentId]);
 
   if (isDemoEntryPath() && !authLoading) {
     return <DemoEntryPage />;
