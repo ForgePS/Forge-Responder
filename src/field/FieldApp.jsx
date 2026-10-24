@@ -12,6 +12,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { useTwoFactorStatus } from "../hooks/useTwoFactorStatus.js";
 import { isPlatformScope } from "../lib/tenantPaths.js";
+import { getFirebaseAuth } from "../lib/firebaseClient.js";
+import { completeSignInWithCode, isSecondFactorRequiredError, secondFactorResolver } from "../lib/twoFactor.js";
 import { buildAccessSnapshot, loadAccessSnapshot, saveAccessSnapshot } from "./fieldSession.js";
 import { requestPersistentStorage } from "./fieldDb.js";
 import { rmsPathFromFieldPath } from "./fieldPaths.js";
@@ -59,44 +61,96 @@ function Gate({ icon, title, children, actions }) {
   );
 }
 
+function signInMessage(err) {
+  const code = String(err?.code || "");
+  if (/invalid-credential|wrong-password|user-not-found|invalid-email/.test(code)) return "Email or password is wrong.";
+  if (code.includes("invalid-verification-code")) return "That code didn't work. Enter the current 6-digit code from your authenticator app.";
+  if (code.includes("too-many-requests")) return "Too many tries. Wait a few minutes and try again.";
+  if (code.includes("network-request-failed")) return "No connection. Sign in once you have signal.";
+  if (code.includes("user-disabled")) return "This account is turned off. Contact your administrator.";
+  return err?.message || "Sign-in failed.";
+}
+
 function SignIn() {
   const { signIn, authError } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [resolver, setResolver] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
   async function handleSubmit(event) {
     event.preventDefault();
     setBusy(true);
     setError("");
     try {
-      await signIn(email.trim(), password);
+      if (resolver) {
+        await completeSignInWithCode(resolver, code);
+      } else {
+        await signIn(email.trim(), password);
+      }
     } catch (err) {
-      setError(err?.message?.includes("auth/") ? "Email or password is wrong." : err?.message || "Sign-in failed.");
+      if (!resolver && isSecondFactorRequiredError(err)) {
+        // Accounts with two-factor login: ask for the authenticator code.
+        setResolver(secondFactorResolver(getFirebaseAuth(), err));
+        setError("");
+      } else {
+        setError(signInMessage(err));
+      }
     } finally {
       setBusy(false);
     }
   }
+
   return (
     <Gate
       icon={<Flame size={34} />}
-      title="Sign in to FORGE Field"
+      title={resolver ? "Enter your code" : "Sign in to FORGE Field"}
       actions={<a className="fa-btn fa-btn-ghost fa-btn-block" href={rmsPathFromFieldPath()}>Use the full RMS sign-in</a>}
     >
-      <p>Sign in once with signal. After that the app opens and saves records even with no connection.</p>
+      <p>
+        {resolver
+          ? "Open your authenticator app and enter the 6-digit code for FORGE Responder."
+          : "Sign in once with signal. After that the app opens and saves records even with no connection."}
+      </p>
       <form className="fa-signin" onSubmit={handleSubmit}>
-        <label className="fa-field">
-          <span className="fa-label">Email</span>
-          <input className="fa-input" type="email" autoComplete="username" inputMode="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        </label>
-        <label className="fa-field">
-          <span className="fa-label">Password</span>
-          <input className="fa-input" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-        </label>
+        {resolver ? (
+          <label className="fa-field">
+            <span className="fa-label">Authenticator code</span>
+            <input
+              className="fa-input fa-input-num"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={code}
+              onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
+              autoFocus
+              required
+            />
+          </label>
+        ) : (
+          <>
+            <label className="fa-field">
+              <span className="fa-label">Email</span>
+              <input className="fa-input" type="email" autoComplete="username" inputMode="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            </label>
+            <label className="fa-field">
+              <span className="fa-label">Password</span>
+              <input className="fa-input" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+            </label>
+          </>
+        )}
         {error || authError ? <div className="fa-error-text" role="alert">{error || authError}</div> : null}
-        <button type="submit" className="fa-btn fa-btn-primary fa-btn-block" disabled={busy}>
-          {busy ? <Loader2 size={20} className="fa-spin" /> : <LogIn size={20} />} Sign in
+        <button type="submit" className="fa-btn fa-btn-primary fa-btn-block" disabled={busy || (resolver && code.length !== 6)}>
+          {busy ? <Loader2 size={20} className="fa-spin" /> : <LogIn size={20} />} {resolver ? "Verify and sign in" : "Sign in"}
         </button>
+        {resolver ? (
+          <button type="button" className="fa-btn fa-btn-ghost fa-btn-block" onClick={() => { setResolver(null); setCode(""); setError(""); }}>
+            Back
+          </button>
+        ) : null}
       </form>
     </Gate>
   );
