@@ -356,24 +356,6 @@ export default function TrainingAcademiesPanel({
                 </button>
               </div>
 
-              {/* Phase 5/6 workflow placeholders */}
-              <div className="academy-workflow-shell">
-                <p className="muted small">Department workflows (capability-gated)</p>
-                <div className="academy-connection-card__actions">
-                  <button type="button" className="btn-secondary" disabled title={!connection.capabilities?.enrollmentSubmission ? "Enrollment submission not enabled" : "Scaffolding"}>
-                    Submit enrollment
-                  </button>
-                  <button type="button" className="btn-secondary" disabled title={!connection.capabilities?.enrollmentApproval ? "Enrollment approval not enabled" : "Scaffolding"}>
-                    Approve enrollment
-                  </button>
-                  <button type="button" className="btn-secondary" disabled title={!connection.capabilities?.paymentAuthorization ? "Payment authorization not enabled" : "Scaffolding"}>
-                    Authorize payment
-                  </button>
-                  <button type="button" className="btn-secondary" disabled title={!connection.capabilities?.rosterSync ? "Roster sync not enabled" : "Scaffolding"}>
-                    Submit roster
-                  </button>
-                </div>
-              </div>
             </li>
           ))}
         </ul>
@@ -499,7 +481,7 @@ export default function TrainingAcademiesPanel({
             <fieldset className="academy-provider-fields">
               <legend>CSV import</legend>
               <p className="muted small">
-                Upload preview, batch ID, and rollback are Phase 5 scaffolding. Configure notes for operators now.
+                CSV upload isn't available in the app yet. Use these notes to record how this academy's records are imported.
               </p>
               <label>
                 Import notes
@@ -509,9 +491,6 @@ export default function TrainingAcademiesPanel({
                   rows={3}
                 />
               </label>
-              <button type="button" className="btn-secondary" disabled>
-                Upload CSV (preview) — coming soon
-              </button>
             </fieldset>
           ) : null}
 

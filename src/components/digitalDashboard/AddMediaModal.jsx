@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from "react";
 import {
-  Atom,
   BarChart3,
   Camera,
   Clock3,
@@ -14,16 +13,13 @@ import {
   Images,
   Laptop,
   Link2,
-  MapPin,
   Megaphone,
   MessageSquare,
-  Monitor,
   MonitorUp,
   Plus,
   QrCode,
   Search,
   Settings,
-  Star,
   Table2,
   X,
 } from "lucide-react";
@@ -103,18 +99,13 @@ const SOURCE_CATEGORIES = [
   { id: "web", label: "Web", icon: Globe },
   { id: "gallery", label: "Gallery", icon: Images },
   { id: "social", label: "Social", icon: MessageSquare },
-  { id: "suite", label: "Select Suite", icon: Star },
-  { id: "signature", label: "Signature 360", icon: MapPin },
-  { id: "kiosks", label: "Kiosks", icon: Monitor },
   { id: "custom", label: "Custom", icon: Settings },
-  { id: "ai", label: "AI Toolkit", icon: Atom },
 ];
 
 const UPLOAD_METHODS = [
   { id: "upload", label: "File Upload" },
   { id: "web-server", label: "File From Web Server" },
   { id: "local-server", label: "File From Local Server" },
-  { id: "ftp", label: "Secure FTP" },
 ];
 
 const IMPORT_SOURCES = [
@@ -136,7 +127,7 @@ const CLOUD_LINK_HINTS = {
 
 const CATEGORY_PANEL_IDS = [
   "gallery", "web", "local", "social",
-  "favorites", "recent", "suite", "signature", "kiosks", "custom", "ai",
+  "favorites", "recent", "custom",
 ];
 
 const MICROSOFT_LINK_EXAMPLES = [
@@ -740,9 +731,7 @@ export default function AddMediaModal({
               ) : (
                 <div className="dd-import-panel">
                   <p>
-                    {uploadMethod === "ftp"
-                      ? "Enter Secure FTP credentials and remote path (coming soon — use path preview below)."
-                      : "Enter the full URL or network path to the file on your server."}
+                    Enter the full URL or network path to the file on your server.
                   </p>
                   <div className="dd-import-panel-row">
                     <input

@@ -472,7 +472,7 @@ function PreplanDetailWorkspace({
         </Field>
 
         <div className="template-section-card">
-          <strong><Map size={14} /> Symbol checklist (diagram MVP)</strong>
+          <strong><Map size={14} /> Symbol checklist</strong>
           <div className="occupancy-form-grid">
             {symbolChecklist.map((row) => (
               <label key={row.symbolId} className="occupancy-primary-toggle">

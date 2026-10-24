@@ -167,7 +167,7 @@ export default function PersonnelAcademyPanel({ person = null }) {
     setBusy(`sync-${connection.connectionId}`);
     try {
       await academySyncPerson(departmentId, connection.connectionId, { personId });
-      setNotice("Sync requested (connector scaffolding).");
+      setNotice("Sync requested.");
       await loadAcademyDetails(connection, links.find((l) => l.connectionId === connection.connectionId));
     } catch (err) {
       setError(err.message || "Sync failed.");
@@ -275,12 +275,6 @@ export default function PersonnelAcademyPanel({ person = null }) {
                       Unlink academy record
                     </button>
                   ) : null}
-                  <button type="button" className="btn-secondary" disabled title="Scaffolding">
-                    Review match
-                  </button>
-                  <button type="button" className="btn-secondary" disabled title="Scaffolding">
-                    Resolve conflict
-                  </button>
                 </div>
 
                 {detail ? (
@@ -293,7 +287,6 @@ export default function PersonnelAcademyPanel({ person = null }) {
                     <pre className="academy-json-preview">{JSON.stringify(detail.certificates, null, 2)}</pre>
                     <h5>Transcript</h5>
                     <pre className="academy-json-preview">{JSON.stringify(detail.transcript, null, 2)}</pre>
-                    <p className="muted small">Sponsorship / payment authorization UI is Phase 6 scaffolding.</p>
                   </div>
                 ) : null}
               </div>

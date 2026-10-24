@@ -43,7 +43,7 @@ export default function LocalSourcePanel({ localConfig, onConfigChange, onApply,
         {!activeTab.enabled ? (
           <div className="dd-source-placeholder">
             <strong>{activeTab.label}</strong>
-            <p>This local widget is coming soon.</p>
+            <p>This widget isn't available.</p>
           </div>
         ) : null}
 

@@ -107,7 +107,7 @@ export default function WebSourcePanel({ webConfig, onConfigChange, onApply, for
         {!activeTab.enabled ? (
           <div className="dd-source-placeholder">
             <strong>{activeTab.label}</strong>
-            <p>This web integration is coming soon.</p>
+            <p>This source isn't available.</p>
           </div>
         ) : null}
 

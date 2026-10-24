@@ -134,7 +134,7 @@ export default function FleetDashboardPage({ onNavigate, legacyApparatus = [] })
                 <div className="panel-body">
                   <p className="occupancy-muted">
                     Showing {metrics.total} asset{metrics.total === 1 ? "" : "s"} in the Fleet master collection.
-                    Classic Apparatus / Maintenance / Assets pages remain available until Phase 3 cutover.
+                    The classic Apparatus, Maintenance and Assets pages stay available until your department switches over to Fleet.
                   </p>
                 </div>
               </section>

@@ -1,3 +1,4 @@
+// Only sources that work are listed.
 export const GALLERY_TABS = [
   { id: "stock-photos", label: "Stock Photos", enabled: true },
   { id: "profiles", label: "Profiles", enabled: false },
@@ -10,7 +11,7 @@ export const GALLERY_TABS = [
   { id: "adobe-express", label: "Adobe Express", enabled: false, badge: "New" },
   { id: "trivia", label: "Trivia", enabled: false },
   { id: "reviews", label: "Reviews", enabled: false },
-];
+].filter((tab) => tab.enabled !== false);
 
 export const GALLERY_PROVIDERS = [
   { value: "pixabay", label: "Pixabay" },

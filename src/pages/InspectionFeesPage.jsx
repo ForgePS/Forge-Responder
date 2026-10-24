@@ -643,7 +643,7 @@ export default function InspectionFeesPage({
               {!payments.length ? (
                 <InspectionEmptyState
                   title="No payments recorded"
-                  description="Staff can record cash, check, card, or online-stub payments against invoices or fees."
+                  description="Staff can record cash, check, card, or online payments against invoices or fees."
                 />
               ) : (
                 <div className="personnel-list">

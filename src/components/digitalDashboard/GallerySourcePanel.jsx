@@ -187,7 +187,7 @@ export default function GallerySourcePanel({ galleryConfig, onConfigChange, onSe
       ) : (
         <div className="dd-gallery-placeholder">
           <strong>{activeTab.label}</strong>
-          <p>{activeTab.label} gallery integration is coming soon. Use Stock Photos for signage backgrounds today.</p>
+          <p>{activeTab.label} isn't available. Use Stock Photos for signage backgrounds.</p>
         </div>
       )}
     </div>

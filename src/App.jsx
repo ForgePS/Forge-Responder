@@ -230,7 +230,6 @@ const navGroups = [
   { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Uploads", Upload]] },
   { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay]] },
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
-  { label: "Future / Later", items: [["Incidents", AlertTriangle], ["EMS Reports", Ambulance], ["Compliance Export", Upload]] }
 ];
 
 // Every in-app page reachable from the menu, keyed by its URL slug (?page=...).
@@ -790,7 +789,8 @@ function AppShell() {
   }, [departmentId, platformConfig?.availablePreplanFeatures]);
 
   const visibleNavGroups = useMemo(() => {
-    const permissionFiltered = filterNavGroups(navGroups, permissions, { isCreator });
+    const permissionFiltered = filterNavGroups(navGroups, permissions, { isCreator })
+      .map((group) => (isCreator ? group : { ...group, items: (group.items || []).filter(([name]) => name !== "Fleet Hardening") }));
     const moduleFiltered = filterNavByEnabledModules(permissionFiltered, isModuleEnabled, {
       isCreator,
       isPlatformScope: inPlatformScope,
@@ -1469,10 +1469,7 @@ function AppShell() {
       ? <FleetVendorPortalPage onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
   ) : current === "Fleet Hardening" ? (
-    hasPermission(permissions, "manageFleetConfig")
-      || hasPermission(permissions, "manageSystemSettings")
-      || hasPermission(permissions, "viewFleetDashboard")
-      || isCreator
+    isCreator
       ? <FleetHardeningPage onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
   ) : current === "All Fleet Assets" ? (
@@ -1653,7 +1650,7 @@ function AppShell() {
           onNavigate={setCurrent}
           variant="nearby"
           title="Nearby Preplans"
-          description="Operational preplans for response (map overlay comes with Phase 5)."
+          description="Operational preplans for response."
         />
       )
       : <AccessDeniedModule name={current} />
