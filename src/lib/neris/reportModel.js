@@ -179,7 +179,8 @@ export function reportChecklist(report = {}) {
   if (arrival && clear && clear < arrival) add("order-clear", "response", "Clear is before arrival — check the times", false, true, true);
   (ws.units || []).forEach((unit, index) => {
     const name = unit.unitId || `Unit ${index + 1}`;
-    const uDispatch = time(unit.dispatchTime) || dispatch;
+    // Only the unit's own dispatch time: a unit already on scene (on-view) can arrive before CAD dispatch.
+    const uDispatch = time(unit.dispatchTime);
     const uArrival = time(unit.arrivalTime);
     const uClear = time(unit.clearTime);
     if (uDispatch && uArrival && uArrival < uDispatch) add(`order-arrival-${index}`, "response", `${name}: on-scene time is before dispatch — check the times`, false, true, true);
