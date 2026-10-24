@@ -74,3 +74,11 @@ test("a refusal or unreadable reply becomes a friendly error", async () => {
   await assert.rejects(draftNarrative(fakeClient({ stop_reason: "refusal", content: [] }), { report }), /couldn't write/i);
   await assert.rejects(draftNarrative(fakeClient({ stop_reason: "end_turn", content: [{ type: "text", text: "not json" }] }), { report }), /unreadable/i);
 });
+
+test("names after role words are removed from notes; ordinary words are kept", () => {
+  assert.equal(scrubFreeText("Patient Jane Doe was transported"), "Patient [name removed] was transported");
+  assert.equal(scrubFreeText("Caller: John Smith reports smoke"), "Caller: [name removed] reports smoke");
+  assert.equal(scrubFreeText("met homeowner Bob Lee at door"), "met homeowner [name removed] at door");
+  assert.equal(scrubFreeText("driver complained of neck pain"), "driver complained of neck pain");
+  assert.equal(scrubFreeText("E1 arrived, Patient refused"), "E1 arrived, Patient refused");
+});

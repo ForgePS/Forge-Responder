@@ -343,7 +343,7 @@ export function formatCallShiftStatus(record = {}) {
 export function isCallShiftOpenFor(record = {}, personnelId = "") {
   if (!personnelId || record.status !== "active") return false;
   const eligible = record.previewSnapshot?.eligible || [];
-  return !eligible.length || eligible.some((entry) => entry.personnelId === personnelId);
+  return eligible.some((entry) => entry.personnelId === personnelId);
 }
 
 export function callShiftResponseFor(record = {}, personnelId = "") {
@@ -357,8 +357,30 @@ export function withCallShiftResponse(record = {}, { personnelId, name, response
   return { ...record, responses, updatedAt: new Date().toISOString() };
 }
 
-/** Fill the broadcast with one member. */
+/** Members assigned so far (older records only have assignedPersonnelId). */
+export function callShiftAssignments(record = {}) {
+  if (Array.isArray(record.assignments) && record.assignments.length) return record.assignments;
+  return record.assignedPersonnelId ? [{ personnelId: record.assignedPersonnelId, name: record.assignedName || "", assignedAt: record.assignedAt || "" }] : [];
+}
+
+export function isAssignedToCallShift(record = {}, personnelId = "") {
+  return Boolean(personnelId) && callShiftAssignments(record).some((entry) => entry.personnelId === personnelId);
+}
+
+/** Assign one member; the broadcast is filled once every needed seat has someone. */
 export function withCallShiftAssigned(record = {}, { personnelId, name, assignedBy = "" }) {
   const now = new Date().toISOString();
-  return { ...record, status: "filled", assignedPersonnelId: personnelId, assignedName: name || "", assignedAt: now, assignedBy, updatedAt: now };
+  const assignments = callShiftAssignments(record).filter((entry) => entry.personnelId !== personnelId);
+  assignments.push({ personnelId, name: name || "", assignedAt: now, assignedBy });
+  const needed = Math.max(1, Number(record.positionsNeeded) || 1);
+  return {
+    ...record,
+    assignments,
+    status: assignments.length >= needed ? "filled" : record.status || "active",
+    assignedPersonnelId: personnelId,
+    assignedName: assignments.map((entry) => entry.name).filter(Boolean).join(", "),
+    assignedAt: now,
+    assignedBy,
+    updatedAt: now,
+  };
 }

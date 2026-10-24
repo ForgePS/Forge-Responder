@@ -103,7 +103,7 @@ export default function NerisAiNarrative({ report, departmentId, editable, onlin
         </div>
         {!online ? <p className="nr-note"><TriangleAlert size={14} /> You're offline. AI drafting needs a connection. You can still write it yourself or use a quick draft.</p> : null}
         {error ? <p className="nr-error" role="alert"><TriangleAlert size={14} /> {error}</p> : null}
-        <p className="nr-privacy"><ShieldCheck size={14} /> Names, phone numbers and emails are removed before anything is sent. Don't put patient names in your notes.</p>
+        <p className="nr-privacy"><ShieldCheck size={14} /> Crew and staff names on the report aren't sent. Phone numbers, emails, dates of birth, and names written after words like "patient" or "caller" are removed from your notes. Other names you type may still be sent, so leave patient and civilian names out of your notes.</p>
         {editable ? (
           <button type="button" className="nr-link" onClick={quickDraft} disabled={busy}>Quick draft without AI</button>
         ) : null}

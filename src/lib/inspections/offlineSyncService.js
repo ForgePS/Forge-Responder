@@ -291,7 +291,19 @@ export async function queueInspectionAttachment(departmentId, input = {}, actor 
 /**
  * Flush mutation + attachment queues. Attachments are uploaded to Storage and added to their inspection.
  */
+let syncInProgress = false;
+
 export async function syncInspectionOfflineQueue(departmentId, actor = {}) {
+  if (syncInProgress) return { synced: 0, conflicts: 0, failed: 0, attachments: 0, message: "A sync is already running." };
+  syncInProgress = true;
+  try {
+    return await runInspectionOfflineSync(departmentId, actor);
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+async function runInspectionOfflineSync(departmentId, actor = {}) {
   setInspectionSyncMeta(departmentId, { lastAttemptAt: nowIso(), lastError: "" });
   if (!isBrowserOnline()) {
     const message = "Device is offline — sync deferred.";
@@ -349,7 +361,8 @@ export async function syncInspectionOfflineQueue(departmentId, actor = {}) {
   }
 
   let attachments = 0;
-  for (const item of listInspectionAttachmentQueue(departmentId).filter((row) => row.status === "queued" || row.status === "failed")) {
+  // "uploading" here means an earlier sync was interrupted (page closed mid-upload): retry it.
+  for (const item of listInspectionAttachmentQueue(departmentId).filter((row) => ["queued", "failed", "uploading"].includes(row.status))) {
     updateInspectionAttachment(departmentId, item.id, { status: "uploading", attempts: (item.attempts || 0) + 1 });
     try {
       const blob = await readAttachmentBlob(item.id);

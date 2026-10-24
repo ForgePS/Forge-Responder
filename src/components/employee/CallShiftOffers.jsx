@@ -1,11 +1,12 @@
 import { BellRing, Check, X } from "lucide-react";
-import { callShiftResponseFor, isCallShiftOpenFor, withCallShiftResponse } from "../../lib/callShiftWorkflow.js";
+import { callShiftResponseFor, isAssignedToCallShift, isCallShiftOpenFor, withCallShiftResponse } from "../../lib/callShiftWorkflow.js";
+import { getPersonDisplayName } from "../../lib/personnelSchema.js";
 
 /** Employee Portal: shift broadcasts sent to me, with Accept / Decline. */
 export default function CallShiftOffers({ callShifts = [], setCallShifts, person, onResponded }) {
   const personnelId = person?.id || "";
   const mine = (Array.isArray(callShifts) ? callShifts : [])
-    .filter((record) => isCallShiftOpenFor(record, personnelId) || record.assignedPersonnelId === personnelId)
+    .filter((record) => isCallShiftOpenFor(record, personnelId) || isAssignedToCallShift(record, personnelId))
     .sort((a, b) => String(a.dayId || "").localeCompare(String(b.dayId || "")));
 
   if (!personnelId) return null;
@@ -13,7 +14,7 @@ export default function CallShiftOffers({ callShifts = [], setCallShifts, person
   function respond(record, response) {
     if (!setCallShifts) return;
     setCallShifts((current) => current.map((item) => (
-      item.id === record.id ? withCallShiftResponse(item, { personnelId, name: person.name || "", response }) : item
+      item.id === record.id ? withCallShiftResponse(item, { personnelId, name: getPersonDisplayName(person) || person.name || "", response }) : item
     )));
     onResponded?.(record, response);
   }
@@ -24,7 +25,7 @@ export default function CallShiftOffers({ callShifts = [], setCallShifts, person
       <div className="panel-body request-list">
         {mine.length ? mine.map((record) => {
           const answer = callShiftResponseFor(record, personnelId);
-          const assignedToMe = record.assignedPersonnelId === personnelId;
+          const assignedToMe = isAssignedToCallShift(record, personnelId);
           return (
             <div className="request-row" key={record.id}>
               <div>

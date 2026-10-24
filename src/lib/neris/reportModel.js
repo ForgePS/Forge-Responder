@@ -177,6 +177,14 @@ export function reportChecklist(report = {}) {
   const clear = time(cad.clearTime);
   if (dispatch && arrival && arrival < dispatch) add("order-arrival", "response", "Arrival is before dispatch — check the times", false, true, true);
   if (arrival && clear && clear < arrival) add("order-clear", "response", "Clear is before arrival — check the times", false, true, true);
+  (ws.units || []).forEach((unit, index) => {
+    const name = unit.unitId || `Unit ${index + 1}`;
+    const uDispatch = time(unit.dispatchTime) || dispatch;
+    const uArrival = time(unit.arrivalTime);
+    const uClear = time(unit.clearTime);
+    if (uDispatch && uArrival && uArrival < uDispatch) add(`order-arrival-${index}`, "response", `${name}: on-scene time is before dispatch — check the times`, false, true, true);
+    if (uClear && (uArrival || uDispatch) && uClear < (uArrival || uDispatch)) add(`order-clear-${index}`, "response", `${name}: clear time is before ${uArrival ? "on-scene" : "dispatch"} — check the times`, false, true, true);
+  });
   if (aidInvolved(report)) {
     add("aid-type", "response", "Mutual aid type", !isBlank(c.incident_aid_type));
     add("aid-dept", "response", "Mutual aid department", !isBlank(c.incident_aid_department_name));

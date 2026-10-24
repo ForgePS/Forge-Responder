@@ -25,13 +25,21 @@ function text(value, max = 600) {
   return out.trim().slice(0, max);
 }
 
-/** Remove phone numbers, emails, dates of birth and SSNs from free text. */
+/** Remove names after role words, phone numbers, emails, dates of birth and SSNs from free text. */
+// A capitalised name after a role word or title, e.g. "patient Jane Doe", "Mr. Smith", "Caller: John".
+// Role words match in any case; the name itself must be capitalised so ordinary words are left alone.
+const ROLE_WORDS = ["patient", "pt", "caller", "driver", "passenger", "owner", "occupant", "resident", "tenant", "victim", "witness", "complainant", "subject", "homeowner", "manager", "mr", "mrs", "ms", "miss", "dr"];
+const ROLE_PATTERN = ROLE_WORDS.map((w) => [w, w[0].toUpperCase() + w.slice(1), w.toUpperCase()].join("|")).join("|");
+const NAMED_ROLE = new RegExp(String.raw`\b(${ROLE_PATTERN})\.?(\s*[:#-]\s*|\s+)([A-Z][a-zA-Z'’-]+(?:\s+[A-Z][a-zA-Z'’-]+){0,2})`, "g");
+
 function scrubFreeText(value, max = 1500) {
   return text(value, max)
     .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "[email removed]")
     .replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[removed]")
     .replace(/(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g, "[phone removed]")
-    .replace(/\b(DOB|D\.O\.B\.?|date of birth)\s*[:#-]?\s*\S+/gi, "[DOB removed]");
+    .replace(/\b(DOB|D\.O\.B\.?|date of birth)\s*[:#-]?\s*\S+/gi, "[DOB removed]")
+    // Names last, so "Patient DOB: ..." is handled by the date-of-birth rule first.
+    .replace(NAMED_ROLE, (match, role, sep) => `${role}${sep}[name removed]`);
 }
 
 function compact(object) {
@@ -196,6 +204,17 @@ async function reserveDailyUse(db, departmentId) {
   });
 }
 
+/** Give back a reservation made by reserveDailyUse (the draft failed). */
+async function releaseDailyUse(db, departmentId) {
+  const day = new Date().toISOString().slice(0, 10);
+  const ref = db.doc(`platformAiUsage/${departmentId}_${day}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const count = Number(snap.data()?.narrativeDrafts || 0);
+    if (count > 0) tx.set(ref, { narrativeDrafts: count - 1, updatedAt: new Date().toISOString() }, { merge: true });
+  });
+}
+
 /**
  * Draft a narrative. `client` is an Anthropic SDK client.
  * @returns {Promise<{narrative: string, missing: string[], model: string}>}
@@ -245,5 +264,6 @@ module.exports = {
   buildUserMessage,
   draftNarrative,
   reserveDailyUse,
+  releaseDailyUse,
   scrubFreeText,
 };

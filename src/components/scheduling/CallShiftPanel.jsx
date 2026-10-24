@@ -15,6 +15,8 @@ import {
   formatCallShiftStatus,
   listCallShiftHistory,
   withCallShiftAssigned,
+  isAssignedToCallShift,
+  callShiftAssignments,
   resolveCallShiftLengthHours,
 } from "../../lib/callShiftWorkflow.js";
 import { formatDayId } from "../../lib/shiftCalendar.js";
@@ -680,7 +682,8 @@ export default function CallShiftPanel({
                           <li key={answer.personnelId}>
                             <span className={answer.response === "accepted" ? "badge badge-success" : "badge"}>{answer.response === "accepted" ? "Accepted" : "Declined"}</span>
                             <span>{answer.name || answer.personnelId}</span>
-                            {canManage && record.status === "active" && answer.response === "accepted" ? (
+                            {isAssignedToCallShift(record, answer.personnelId) ? <span className="badge badge-success">Assigned</span> : null}
+                            {canManage && record.status === "active" && answer.response === "accepted" && !isAssignedToCallShift(record, answer.personnelId) ? (
                               <button type="button" className="row-action" onClick={() => {
                                 const person = personnel.find((p) => p.id === answer.personnelId);
                                 if (!person) return;
@@ -692,6 +695,7 @@ export default function CallShiftPanel({
                         ))}
                       </ul>
                     ) : record.status === "active" ? <small>No responses yet.</small> : null}
+                    {Number(record.positionsNeeded) > 1 ? <small>{callShiftAssignments(record).length} of {record.positionsNeeded} seats filled</small> : null}
                     {canManage && record.status === "active" ? (
                       <button type="button" className="text-button" onClick={() => {
                         if (!window.confirm("Cancel this shift broadcast?")) return;

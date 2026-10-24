@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, ShieldCheck, Truck, Users, X, CirclePlus } from "lucide-react";
-import { buildMonthCalendar, formatDayId, parseDayId, resolveShiftRotation, shiftShortLabel } from "../lib/shiftCalendar.js";
+import { buildMonthCalendar, formatDayId, parseDayId, resolveShiftRotation, shiftForDate, shiftShortLabel } from "../lib/shiftCalendar.js";
 import { buildDayRoster, buildDayScheduleSnapshot, buildDayScopedRosterId, buildOvertimeRosterId, buildPartialSlotRosterId, buildWeekScheduleSnapshots, buildDefaultShiftTimes, calculateShiftDurationHours, DEFAULT_SHIFT_DURATION_HOURS, formatDurationLabel, normalizeShiftTime, resolveDayCoverageMetrics, resolveRosterPersonnelId } from "../lib/schedulingRoster.js";
 import { getPersonDisplayName } from "../lib/personnelSchema.js";
 import { canonicalApparatusUnitName } from "../lib/apparatusSchema.js";
@@ -514,6 +514,17 @@ export default function SchedulingPage({
       return false;
     }
     if (!person || !dayId) return false;
+    // Don't double-book: skip anyone whose own shift works that day, or who is already rostered that day.
+    const dutyShift = String(shiftForDate(parseDayId(dayId), rotation) || "").trim();
+    const homeShift = String(person.shift || "").trim();
+    if (homeShift && dutyShift && homeShift === dutyShift) {
+      setMessage(`${getPersonDisplayName(person)} already works ${dutyShift} on ${dayId}, so they weren't added as overtime.`);
+      return false;
+    }
+    if (roster.some((member) => member.dayId === dayId && resolveRosterPersonnelId(member.id, member.personnelId) === person.id)) {
+      setMessage(`${getPersonDisplayName(person)} is already on the roster for ${dayId}.`);
+      return false;
+    }
     const normalizedUnit = canonicalApparatusUnitName(unit || "") || "Unassigned";
     const rosterId = buildOvertimeRosterId(person.id, dayId, normalizedUnit);
     setRoster((current) => (current.some((member) => member.id === rosterId) ? current : [...current, {

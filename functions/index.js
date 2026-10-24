@@ -1148,6 +1148,7 @@ exports.draftNerisNarrative = onCall(
       }).catch(() => undefined);
       return result;
     } catch (error) {
+      await nerisNarrative.releaseDailyUse(db, departmentId).catch(() => undefined);
       if (error instanceof HttpsError) throw error;
       if (error instanceof AnthropicClient.RateLimitError) {
         throw new HttpsError("resource-exhausted", "The AI service is busy. Try again in a minute.");
