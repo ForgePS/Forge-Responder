@@ -15,6 +15,7 @@ export default function ApparatusPage({
   canEdit = false,
   legacyWritesLocked = false,
   onOpenFleetAssets,
+  onOpenFleetReport,
 }) {
   const { getOptions } = useDropdowns();
   const [selectedId, setSelectedId] = useState(units[0]?.id || "");
@@ -86,7 +87,7 @@ export default function ApparatusPage({
     setMessage("New apparatus created — update details and save");
   }
   return <div className="module-page apparatus-page">
-    <section className="module-heading"><div><span className="module-icon"><Truck size={22} /></span><div><h1>Apparatus</h1><p>Unit readiness, daily checks, operating metrics, service history, and repair requests.</p></div></div><div className="heading-actions">{canEdit && <button type="button" className="secondary-button" onClick={addUnit}><CirclePlus size={14} /> Add Unit</button>}<button className="secondary-button">Fleet Report</button><button className="primary-button" onClick={() => setShowWorkOrder(true)}><CirclePlus size={14} /> New Work Order</button></div></section>
+    <section className="module-heading"><div><span className="module-icon"><Truck size={22} /></span><div><h1>Apparatus</h1><p>Unit readiness, daily checks, operating metrics, service history, and repair requests.</p></div></div><div className="heading-actions">{canEdit && <button type="button" className="secondary-button" onClick={addUnit}><CirclePlus size={14} /> Add Unit</button>}{onOpenFleetReport ? <button type="button" className="secondary-button" onClick={onOpenFleetReport}>Fleet Report</button> : null}{canEdit ? <button className="primary-button" onClick={() => setShowWorkOrder(true)}><CirclePlus size={14} /> New Work Order</button> : null}</div></section>
     {legacyWritesLocked ? (
       <div className="warning-banner" role="status">
         Classic Apparatus list edits are locked after Fleet migration cutover.

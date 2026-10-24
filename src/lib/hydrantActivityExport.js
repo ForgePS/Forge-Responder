@@ -421,6 +421,22 @@ export function downloadHydrantDetailCsv(filename, rows = [], columnIds = null) 
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Flatten the department hydrant list into CSV-ready rows (browser export).
+ * Drops embedded photo/file data so the CSV stays small and readable.
+ */
+export function hydrantsToCsvRows(hydrants = []) {
+  return (hydrants || []).filter(Boolean).map((hydrant) => {
+    const row = {};
+    Object.entries(hydrant).forEach(([key, value]) => {
+      if (/photo|file_?data|image/i.test(key)) return;
+      if (typeof value === "string" && value.startsWith("data:")) return;
+      row[key] = value;
+    });
+    return row;
+  });
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")

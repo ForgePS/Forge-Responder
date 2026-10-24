@@ -17,6 +17,8 @@ let db;
 const auth = (uid, email) => ({ uid, token: { email, name: uid } });
 // Signed in with a two-factor code (creators need one for creator powers).
 const auth2fa = (uid, email) => ({ uid, token: { email, name: uid, firebase: { sign_in_second_factor: "totp" } } });
+// Signed in with a verified email address (required to accept invites).
+const verified = (uid, email) => ({ uid, token: { email, name: uid, email_verified: true } });
 const req = (authCtx, data) => ({ auth: authCtx, data });
 const ADMIN = auth("admin-a", "chief@a.gov");
 const MEMBER = auth("member-a", "ff@a.gov");
@@ -142,6 +144,47 @@ describe("createInvite", () => {
     );
   });
 
+  it("does not count expired pending invites against the user limit", async () => {
+    await db.doc("platformSubscriptionPlans/tiny").set({ maxPortalUsers: 3 });
+    await db.doc(`platformSubscriptions/${A}`).set({ status: "active", planId: "tiny" });
+    // 2 active members + 1 pending invite = full...
+    const stale = await invites.createInvite(db, req(ADMIN, { departmentId: A, email: "one@a.gov", roleIds: ["firefighter"], sendEmail: false }));
+    // ...until that invite expires; then its seat is free again.
+    await db.doc(`invites/${stale.inviteId}`).update({ expiresAt: Timestamp.fromMillis(Date.now() - 1000) });
+    const fresh = await invites.createInvite(db, req(ADMIN, { departmentId: A, email: "two@a.gov", roleIds: ["firefighter"], sendEmail: false }));
+    assert.equal((await db.doc(`invites/${fresh.inviteId}`).get()).data().status, "pending");
+  });
+
+  it("lets an admin resend an invite when all seats are in use", async () => {
+    await db.doc("platformSubscriptionPlans/tiny").set({ maxPortalUsers: 3 });
+    await db.doc(`platformSubscriptions/${A}`).set({ status: "active", planId: "tiny" });
+    // 2 active members + 1 pending invite = 3 seats used.
+    const first = await invites.createInvite(db, req(ADMIN, { departmentId: A, email: "one@a.gov", roleIds: ["firefighter"], sendEmail: false }));
+    // Resending to the same email replaces the old invite, so it needs no extra seat.
+    const resent = await invites.createInvite(db, req(ADMIN, { departmentId: A, email: "one@a.gov", roleIds: ["firefighter"], sendEmail: false }));
+    assert.notEqual(resent.inviteId, first.inviteId);
+    const old = (await db.doc(`invites/${first.inviteId}`).get()).data();
+    assert.equal(old.status, "revoked");
+    assert.equal(old.revokedReason, "replaced");
+    assert.equal((await db.doc(`invites/${resent.inviteId}`).get()).data().status, "pending");
+    // A different email still can't take a seat.
+    await expectHttpsError(
+      invites.createInvite(db, req(ADMIN, { departmentId: A, email: "two@a.gov", roleIds: ["firefighter"], sendEmail: false })),
+      "resource-exhausted"
+    );
+  });
+
+  it("lets an admin resend an expired invite when all seats are in use", async () => {
+    await db.doc("platformSubscriptionPlans/tiny").set({ maxPortalUsers: 3 });
+    await db.doc(`platformSubscriptions/${A}`).set({ status: "active", planId: "tiny" });
+    await invites.createInvite(db, req(ADMIN, { departmentId: A, email: "one@a.gov", roleIds: ["firefighter"], sendEmail: false }));
+    const stale = await invites.createInvite(db, req(ADMIN, { departmentId: A, email: "one@a.gov", roleIds: ["firefighter"], sendEmail: false }));
+    await db.doc(`invites/${stale.inviteId}`).update({ expiresAt: Timestamp.fromMillis(Date.now() - 1000) });
+    const resent = await invites.createInvite(db, req(ADMIN, { departmentId: A, email: "one@a.gov", roleIds: ["firefighter"], sendEmail: false }));
+    assert.equal((await db.doc(`invites/${resent.inviteId}`).get()).data().status, "pending");
+    assert.equal((await db.doc(`invites/${stale.inviteId}`).get()).data().status, "revoked");
+  });
+
   it("refuses invites for suspended departments", async () => {
     await db.doc(`platformSubscriptions/${A}`).set({ status: "suspended", planId: "pilot" });
     await expectHttpsError(
@@ -159,7 +202,7 @@ describe("acceptInvite", () => {
 
   it("creates an active membership for the invited email", async () => {
     const { token, inviteId } = await makeInvite();
-    const result = await invites.acceptInvite(db, req(auth("new-uid", "NEW@a.gov"), { token }));
+    const result = await invites.acceptInvite(db, req(verified("new-uid", "NEW@a.gov"), { token }));
     assert.equal(result.departmentId, A);
 
     const membership = (await db.doc(`departments/${A}/users/new-uid`).get()).data();
@@ -171,33 +214,47 @@ describe("acceptInvite", () => {
 
   it("is idempotent for the same user", async () => {
     const { token } = await makeInvite();
-    await invites.acceptInvite(db, req(auth("new-uid", "new@a.gov"), { token }));
-    const again = await invites.acceptInvite(db, req(auth("new-uid", "new@a.gov"), { token }));
+    await invites.acceptInvite(db, req(verified("new-uid", "new@a.gov"), { token }));
+    const again = await invites.acceptInvite(db, req(verified("new-uid", "new@a.gov"), { token }));
     assert.equal(again.alreadyAccepted, true);
   });
 
   it("rejects a different email address", async () => {
     const { token } = await makeInvite();
-    await expectHttpsError(invites.acceptInvite(db, req(auth("other", "other@a.gov"), { token })), "permission-denied");
+    await expectHttpsError(invites.acceptInvite(db, req(verified("other", "other@a.gov"), { token })), "permission-denied");
     assert.equal((await db.doc(`departments/${A}/users/other`).get()).exists, false);
   });
 
   it("rejects a second user after the invite is used", async () => {
     const { token } = await makeInvite();
-    await invites.acceptInvite(db, req(auth("new-uid", "new@a.gov"), { token }));
-    await expectHttpsError(invites.acceptInvite(db, req(auth("someone-else", "new@a.gov"), { token })), "failed-precondition");
+    await invites.acceptInvite(db, req(verified("new-uid", "new@a.gov"), { token }));
+    await expectHttpsError(invites.acceptInvite(db, req(verified("someone-else", "new@a.gov"), { token })), "failed-precondition");
   });
 
   it("rejects expired, revoked and unknown invites", async () => {
     const expired = await makeInvite("e@a.gov");
     await db.doc(`invites/${expired.inviteId}`).update({ expiresAt: Timestamp.fromMillis(Date.now() - 1000) });
-    await expectHttpsError(invites.acceptInvite(db, req(auth("e", "e@a.gov"), { token: expired.token })), "deadline-exceeded");
+    await expectHttpsError(invites.acceptInvite(db, req(verified("e", "e@a.gov"), { token: expired.token })), "deadline-exceeded");
 
     const revoked = await makeInvite("r@a.gov");
     await invites.revokeInvite(db, req(ADMIN, { inviteId: revoked.inviteId }));
-    await expectHttpsError(invites.acceptInvite(db, req(auth("r", "r@a.gov"), { token: revoked.token })), "failed-precondition");
+    await expectHttpsError(invites.acceptInvite(db, req(verified("r", "r@a.gov"), { token: revoked.token })), "failed-precondition");
 
-    await expectHttpsError(invites.acceptInvite(db, req(auth("x", "x@a.gov"), { token: "not-a-real-token" })), "not-found");
+    await expectHttpsError(invites.acceptInvite(db, req(verified("x", "x@a.gov"), { token: "not-a-real-token" })), "not-found");
+  });
+
+  it("refuses a user whose email address is not verified", async () => {
+    const { token, inviteId } = await makeInvite();
+    await expectHttpsError(invites.acceptInvite(db, req(auth("new-uid", "new@a.gov"), { token })), "failed-precondition");
+    await expectHttpsError(
+      invites.acceptInvite(db, req({ uid: "new-uid", token: { email: "new@a.gov", email_verified: false } }, { token })),
+      "failed-precondition"
+    );
+    assert.equal((await db.doc(`departments/${A}/users/new-uid`).get()).exists, false);
+    assert.equal((await db.doc(`invites/${inviteId}`).get()).data().status, "pending");
+    // Once verified, the same invite works.
+    await invites.acceptInvite(db, req(verified("new-uid", "new@a.gov"), { token }));
+    assert.equal((await db.doc(`departments/${A}/users/new-uid`).get()).data().status, "active");
   });
 
   it("requires sign-in", async () => {

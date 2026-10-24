@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, HelpCircle, ImageIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, ImageIcon } from "lucide-react";
 import {
   buildLocalMediaFromConfig,
   DEFAULT_LOCAL_CONFIG,
@@ -159,7 +159,6 @@ export default function LocalSourcePanel({ localConfig, onConfigChange, onApply,
                 <ImageIcon size={16} />
                 Preview
               </button>
-              <button type="button" className="dd-action-button dd-help-button"><HelpCircle size={15} />Help</button>
             </div>
           </>
         ) : null}

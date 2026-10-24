@@ -64,7 +64,7 @@ function buildSmsBody(message = "", record = {}) {
     record.dateLabel || record.dayId || "",
     record.position && record.position !== "Any" ? `Role: ${record.position}` : "",
     custom,
-    "Reply in the employee portal or contact your supervisor.",
+    "Accept or decline in the FORGE Employee Portal (Open Vacancies), or call your supervisor.",
   ].filter(Boolean);
 
   const body = parts.join(" · ");
@@ -1172,3 +1172,9 @@ exports.draftNerisNarrative = onCall(
     }
   }
 );
+
+// Hydrant app: email the daily activity CSV built in the browser.
+const { sendDailyActivityEmail } = require("./lib/hydrantActivityEmail");
+const { sendTextEmail } = require("./lib/mailer");
+exports.sendHydrantDailyActivityEmail = onCall({ secrets: EMAIL_SECRETS }, (request) =>
+  sendDailyActivityEmail(admin.firestore(), request, { sendTextEmail }));

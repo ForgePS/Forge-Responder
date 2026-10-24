@@ -17,6 +17,7 @@ import {
 import { findPersonnelForLeaveRequest } from "../../lib/leaveAccrualIntegration.js";
 import { defaultShiftRotation } from "../../data/defaultShiftRotation.js";
 import { shortDateLabel, uniqueRecordId } from "../../lib/recordIds.js";
+import { exportCsv } from "../../utils/dashboardMetrics.js";
 
 const blankTrade = { personnelId: "", giveDayId: "", receiveDayId: "", coverage: "" };
 
@@ -148,7 +149,7 @@ export default function ShiftTradesPanel({ trades = [], setTrades, personnel = [
           Member swap requests go to the coverage member first, then both affected Battalion Chiefs for approval.
         </p>
         <div className="heading-actions">
-          <button type="button" className="secondary-button">Export Trades</button>
+          <button type="button" className="secondary-button" disabled={!visibleTrades.length} onClick={() => exportCsv(`shift-trades-${new Date().toISOString().slice(0, 10)}.csv`, visibleTrades.map((t) => ({ Request: t.id, "Requested by": t.requestedBy, Giving: t.give, Receiving: t.receive, Coverage: t.coverage, Submitted: t.submitted, Status: t.status })))}>Export Trades</button>
           <button type="button" className="primary-button" onClick={() => setShowNew(true)}>
             <CirclePlus size={14} /> New Trade Request
           </button>
@@ -188,7 +189,7 @@ export default function ShiftTradesPanel({ trades = [], setTrades, personnel = [
         </div>
         <span>{visibleTrades.length} trade requests shown</span>
       </section>
-      <Panel title="Shift Trade Review Queue" icon={Activity} action={<button type="button" className="text-button">Review policy</button>}>
+      <Panel title="Shift Trade Review Queue" icon={Activity} >
         <div className="trade-table">
           <div className="trade-row trade-head">
             <span>Requested By</span><span>Give</span><span>Receive</span><span>Coverage</span><span>Submitted</span><span>Status</span><span />

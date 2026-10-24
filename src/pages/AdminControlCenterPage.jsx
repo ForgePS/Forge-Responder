@@ -19,7 +19,7 @@ import { ensureDefaultRoles } from "../lib/roleService.js";
 
 function AdminSectionPill({ id, label, icon: Icon, isOpen, onToggle, children }) {
   return (
-    <section className={`admin-section${isOpen ? " is-open" : ""}`}>
+    <section id={id} className={`admin-section${isOpen ? " is-open" : ""}`}>
       <button
         type="button"
         className={`admin-section-pill${isOpen ? " is-open" : ""}`}
@@ -204,6 +204,11 @@ export default function AdminControlCenterPage({
             personnel={personnel}
             onOpenPersonnelProfile={onOpenPersonnelProfile}
             onOpenEmployeeProfile={onOpenEmployeeProfile}
+            onInviteSomeone={() => {
+              setPermissionsView("users");
+              setOpenSections((current) => new Set([...current, "permissions"]));
+              requestAnimationFrame(() => document.getElementById("permissions")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+            }}
           />
         </AdminSectionPill>
 

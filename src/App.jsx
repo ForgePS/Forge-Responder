@@ -1189,6 +1189,8 @@ function AppShell() {
       setShiftTrades={setShiftTrades}
       vacancyPickups={vacancyPickups}
       setVacancyPickups={setVacancyPickups}
+      callShifts={callShifts}
+      setCallShifts={setCallShifts}
       setPersonnel={setPersonnel}
       scheduleDays={scheduleDays}
       roster={roster}
@@ -1360,6 +1362,7 @@ function AppShell() {
         }
         legacyWritesLocked={fleetCutover.legacyApparatusWritesLocked}
         onOpenFleetAssets={() => setCurrent("All Fleet Assets")}
+        onOpenFleetReport={hasPermission(permissions, "viewFleetReporting") || isCreator ? () => setCurrent("Reporting & Automation") : undefined}
       />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Fleet Dashboard" ? (
@@ -1494,7 +1497,7 @@ function AppShell() {
   ) : current === "Assets" ? (
     hasPermission(permissions, "viewAssets") ? <AssetsPageConnected query={query} records={assets} setRecords={setAssets} canEdit={canEditAssets(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Hose Testing" ? (
-    hasPermission(permissions, "viewApparatus") ? <HoseTestingPage query={query} records={hoseTests} setRecords={setHoseTests} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "viewApparatus") ? <HoseTestingPage query={query} records={hoseTests} setRecords={setHoseTests} apparatus={apparatus} canEdit={canEditApparatus(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Occupancies" ? (
     hasPermission(permissions, "viewInspections") ? (
       <OccupanciesMasterPage
@@ -1797,7 +1800,7 @@ function AppShell() {
       || isCreator
       ? <HydrantDamageAnalyticsPage onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
-  ) : <ModulePage name={current} query={query} />;
+  ) : <ModulePage name={current} />;
 
   return <main className={`app-shell ${collapsed ? "nav-collapsed" : ""} ${mobileNav ? "mobile-nav-open" : ""} ${isHydrantsView ? "hydrants-view" : ""} ${isDemoModeActive() ? "demo-mode-shell" : ""}`}>
     {isDemoModeActive() && <DemoModeBanner />}

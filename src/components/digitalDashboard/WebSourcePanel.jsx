@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, HelpCircle, ImageIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, ImageIcon } from "lucide-react";
 import {
   buildWebMediaFromConfig,
   DEFAULT_WEB_CONFIG,
@@ -139,7 +139,6 @@ export default function WebSourcePanel({ webConfig, onConfigChange, onApply, for
                 <ImageIcon size={16} />
                 Preview
               </button>
-              <button type="button" className="dd-action-button dd-help-button"><HelpCircle size={15} />Help</button>
             </div>
           </>
         ) : null}

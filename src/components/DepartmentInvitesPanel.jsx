@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, MailPlus, X } from "lucide-react";
+import { Copy, MailPlus, RefreshCw, X } from "lucide-react";
 import {
   createInvite,
   inviteErrorMessage,
@@ -33,6 +33,7 @@ export default function DepartmentInvitesPanel({ departmentId, roles = [], onMes
   const [lastInvite, setLastInvite] = useState(null);
   const [pending, setPending] = useState([]);
   const [pendingError, setPendingError] = useState("");
+  const [resendingId, setResendingId] = useState("");
 
   const assignableRoles = roles.filter((role) => role.id !== "creator");
 
@@ -93,6 +94,29 @@ export default function DepartmentInvitesPanel({ departmentId, roles = [], onMes
       onMessage?.("Invite link copied");
     } catch {
       window.prompt("Copy this invite link:", url);
+    }
+  }
+
+  async function handleResend(invite) {
+    setError("");
+    setResendingId(invite.id);
+    try {
+      const result = await createInvite({
+        departmentId,
+        email: invite.email,
+        displayName: invite.displayName || "",
+        roleIds: invite.roleIds || [],
+        personnelId: invite.personnelId || "",
+        sendEmail: true,
+      });
+      setLastInvite({ ...result, email: invite.email });
+      onMessage?.(`New invite sent to ${invite.email}. It expires on ${formatDate(result.expiresAt)}.`);
+      await loadPending();
+      onInvitesChanged?.();
+    } catch (resendError) {
+      onMessage?.(`Couldn't resend the invite to ${invite.email}: ${inviteErrorMessage(resendError)}`);
+    } finally {
+      setResendingId("");
     }
   }
 
@@ -177,16 +201,29 @@ export default function DepartmentInvitesPanel({ departmentId, roles = [], onMes
         {pending.length > 0 && (
           <ul>
             {pending.map((invite) => (
-              <li key={invite.id}>
+              <li key={invite.id} style={invite.expired ? { color: "var(--rms-text-muted)" } : undefined}>
                 <span>
                   <strong>{invite.displayName || invite.email}</strong>
                   {invite.displayName && <> · {invite.email}</>}
                   {" · "}{(invite.roleIds || []).join(", ")}
-                  {" · expires "}{formatDate(invite.expiresAt)}
+                  {invite.expired
+                    ? <>{" · "}<em>Expired</em>{" "}{formatDate(invite.expiresAt)}</>
+                    : <>{" · expires "}{formatDate(invite.expiresAt)}</>}
                 </span>
-                <button className="text-button" type="button" onClick={() => handleRevoke(invite)} aria-label={`Cancel invite for ${invite.email}`}>
-                  <X size={14} /> Cancel
-                </button>
+                <span>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => handleResend(invite)}
+                    disabled={Boolean(resendingId)}
+                    aria-label={`Resend invite to ${invite.email}`}
+                  >
+                    <RefreshCw size={14} /> {resendingId === invite.id ? "Resending..." : "Resend"}
+                  </button>
+                  <button className="text-button" type="button" onClick={() => handleRevoke(invite)} aria-label={`Cancel invite for ${invite.email}`}>
+                    <X size={14} /> Cancel
+                  </button>
+                </span>
               </li>
             ))}
           </ul>

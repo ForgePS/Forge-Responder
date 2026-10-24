@@ -353,16 +353,7 @@ export function PreplansPage({ query, records = [], setRecords }) {
   );
 }
 
-export function HoseTestingPage({ records = [], setRecords, query }) {
-  const visible = records.filter((item) => Object.values(item).join(" ").toLowerCase().includes(query.toLowerCase()));
-  return (
-    <div className="module-page">
-      <section className="module-heading"><div><span className="module-icon"><Gauge size={22} /></span><div><h1>Hose Testing</h1><p>Hose inventory test records, due dates, and failure tracking by apparatus.</p></div></div></section>
-      <FleetSummary items={[["Sections", records.length, "info"], ["Current", records.filter((r) => r.status === "Current").length, "success"], ["Due Soon", records.filter((r) => r.status === "Due Soon").length, "warning"], ["Overdue", records.filter((r) => r.status === "Overdue").length, "critical"]]} />
-      <Panel title="Hose Test Records" icon={Gauge}><div className="work-order-table"><div className="work-order-row work-order-head"><span>Apparatus</span><span>Section</span><span>Last Test</span><span>Next Due</span><span>Result</span><span>Status</span></div>{visible.map((item) => <div className="work-order-row" key={item.id}><strong>{item.apparatus}</strong><span>{item.section}</span><span>{item.lastTest}</span><span>{item.nextDue}</span><span>{item.result}</span><Badge>{item.status}</Badge></div>)}</div></Panel>
-    </div>
-  );
-}
+export { default as HoseTestingPage } from "./HoseTestingPage.jsx";
 
 export function AnalyticsPage({
   personnel, certifications, training, apparatus, workOrders, assets, inspections, scheduleDays

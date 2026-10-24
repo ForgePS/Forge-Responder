@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildDepartmentGatewayUrl } from "../lib/gatewayRouting.js";
-import { Check, RotateCcw } from "lucide-react";
+import { Check, RotateCcw, UserMinus } from "lucide-react";
 import PermissionGroupGrid from "./PermissionGroupGrid.jsx";
 import PersonnelLinkField from "./PersonnelLinkField.jsx";
 import DepartmentInvitesPanel from "./DepartmentInvitesPanel.jsx";
@@ -9,7 +9,7 @@ import { useTenant } from "../context/TenantContext.jsx";
 import { CREATOR_PERMISSIONS } from "../data/creatorPermissions.js";
 import { isPlatformBootstrapEmail } from "../lib/platformBootstrap.js";
 import { writeAuditLog } from "../lib/auditService.js";
-import { listRecords, updateRecord } from "../lib/firestoreService.js";
+import { deleteRecord, listRecords, updateRecord } from "../lib/firestoreService.js";
 import { ensureDefaultRoles, loadRolesMap } from "../lib/roleService.js";
 import {
   buildUserPermissionOverrides,
@@ -43,6 +43,7 @@ export default function UserPermissionsEditor({
   const [draft, setDraft] = useState({ roleIds: [], personnelId: "", permissions: {} });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const selectedUser = useMemo(
     () => users.find((item) => item.id === selectedUserId) || null,
@@ -219,6 +220,50 @@ export default function UserPermissionsEditor({
     }
   }
 
+  async function removeSelectedUser() {
+    if (!departmentId || !selectedUser || isSelf || isCreatorUser) return;
+    const name = selectedUser.displayName || selectedUser.email || selectedUser.id;
+    const confirmed = window.confirm(
+      `Remove ${name} from this department?\n\nThey will no longer be able to sign in to this department. Their personnel record and past reports are kept. You can invite them again later.`
+    );
+    if (!confirmed) return;
+    setRemoving(true);
+    try {
+      await deleteRecord(departmentId, "users", selectedUser.id);
+      try {
+        await writeAuditLog(departmentId, {
+          action: "delete",
+          module: "Users",
+          recordId: selectedUser.id,
+          summary: `Removed ${name}${selectedUser.email && selectedUser.email !== name ? ` (${selectedUser.email})` : ""} from the department`,
+          actorUid: authUser?.uid,
+          actorName: authMembership?.displayName || authUser?.email
+        });
+      } catch (auditError) {
+        console.warn("Failed to write audit log for user removal", auditError);
+      }
+      const remaining = users.filter((item) => item.id !== selectedUser.id);
+      setUsers(remaining);
+      if (remaining.length) {
+        setSelectedUserId(remaining[0].id);
+        setDraft(buildUserDraft(remaining[0], rolesById));
+      } else {
+        setSelectedUserId("");
+        setDraft({ roleIds: [], personnelId: "", permissions: {} });
+      }
+      onMessage?.(`Removed ${name} from the department.`);
+    } catch (error) {
+      console.error("Failed to remove user from department", error);
+      onMessage?.(
+        error?.code === "permission-denied"
+          ? `You don't have permission to remove ${name}. Only department admins can remove people.`
+          : `Couldn't remove ${name}. Please try again.`
+      );
+    } finally {
+      setRemoving(false);
+    }
+  }
+
   if (loading) {
     return <p className="auth-help">Loading users...</p>;
   }
@@ -255,7 +300,17 @@ export default function UserPermissionsEditor({
           <button className="secondary-button" type="button" onClick={resetToRoleDefaults} disabled={isCreatorUser || saving}>
             <RotateCcw size={14} /> Reset to role defaults
           </button>
-          <button className="primary-button" type="button" onClick={saveUserPermissions} disabled={saving || !selectedUser}>
+          {selectedUser && !isSelf && !isCreatorUser && (
+            <button
+              className="secondary-button danger-button"
+              type="button"
+              onClick={removeSelectedUser}
+              disabled={saving || removing}
+            >
+              <UserMinus size={14} /> {removing ? "Removing..." : "Remove from department"}
+            </button>
+          )}
+          <button className="primary-button" type="button" onClick={saveUserPermissions} disabled={saving || removing || !selectedUser}>
             <Check size={14} /> {saving ? "Saving..." : "Save user"}
           </button>
         </div>

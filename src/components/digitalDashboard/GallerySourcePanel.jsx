@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, HelpCircle, ImageIcon, LoaderCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, ImageIcon, LoaderCircle } from "lucide-react";
 import {
   DEFAULT_GALLERY_CONFIG,
   fetchGalleryStockPhotos,
@@ -162,10 +162,6 @@ export default function GallerySourcePanel({ galleryConfig, onConfigChange, onSe
             <button type="button" className="dd-action-button dd-gallery-preview-btn" onClick={handlePreview} disabled={loading}>
               {loading ? <LoaderCircle size={16} className="dd-spin" /> : <ImageIcon size={16} />}
               Preview
-            </button>
-            <button type="button" className="dd-action-button dd-help-button">
-              <HelpCircle size={15} />
-              Help
             </button>
           </div>
 

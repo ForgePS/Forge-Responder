@@ -54,9 +54,11 @@ import {
   downloadHydrantDetailCsv,
   filterHydrantDetailExportRows,
   HYDRANT_DETAIL_EXPORT_COLUMNS,
+  hydrantsToCsvRows,
   loadHydrantDetailExportRows,
   openHydrantDetailPrintReport,
 } from "../lib/hydrantActivityExport.js";
+import { parseRecipientList, sendHydrantDailyActivityEmail } from "../lib/hydrantActivityEmailService.js";
 import HydrantImportTemplatesPanel from "../components/hydrants/HydrantImportTemplatesPanel.jsx";
 import { HYDRANT_DAMAGE_PRESELECT_KEY } from "../lib/hydrantDamage/paths.js";
 import {
@@ -1874,17 +1876,33 @@ function Reports({
     setEmails("");
   }
   async function emailCsv() {
+    const recipients = parseRecipientList(emails);
+    if (!recipients.length) {
+      setMessage("Add at least one recipient email address.");
+      return;
+    }
+    if (recipients.length > 10) {
+      setMessage("Send to at most 10 recipients at a time.");
+      return;
+    }
+    const summary = `${activityCounts.total} hydrant(s) done for ${date}: ${activityCounts.inspections} inspection(s), ${activityCounts.flowTests} flow test(s).`;
     setMessage("Sending...");
     try {
-      const res = await fetch("/api/daily-activity/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date, emails }) });
-      const data = await res.json();
-      setMessage(data.message || (data.ok ? "Daily activity request handled" : data.error || "Email failed"));
-    } catch {
-      const recipients = emails.split(/[;,\n]/).map((x) => x.trim()).filter(Boolean).join(",");
+      await sendHydrantDailyActivityEmail({
+        departmentId: hydrantDepartmentId,
+        departmentName,
+        date,
+        emails: recipients,
+        csv: rowsToCsv(reportRows),
+        summary,
+      });
+      setMessage(`Daily activity for ${date} emailed to ${recipients.length} recipient(s).`);
+    } catch (error) {
+      console.error(error);
       const subject = encodeURIComponent(`${departmentName} daily activity ${date}`);
-      const body = encodeURIComponent("The app could not reach the email service from this device. Please attach the exported Daily Activity CSV.");
-      window.location.href = `mailto:${recipients}?subject=${subject}&body=${body}`;
-      setMessage("Email service unavailable. Opened your mail app; attach the exported CSV.");
+      const body = encodeURIComponent(`${summary}\n\nThe app could not send this email. Please attach the Daily Activity CSV (Download Daily Activity).`);
+      window.location.href = `mailto:${recipients.join(",")}?subject=${subject}&body=${body}`;
+      setMessage(`Email failed (${error?.message || "email service unavailable"}). Opened your mail app instead; download and attach the Daily Activity CSV.`);
     }
   }
   function exportDailyActivity() {
@@ -1894,6 +1912,23 @@ function Reports({
   function exportHydrants() {
     downloadCsv("hydrants.csv", readLocalJson("overrides", []));
     setMessage("Exported locally edited hydrant records.");
+  }
+  function exportAllHydrants() {
+    const rows = hydrantsToCsvRows(hydrants);
+    if (!rows.length) {
+      setMessage("No hydrants loaded to export.");
+      return;
+    }
+    downloadCsv(`hydrants-${today()}.csv`, rows);
+    setMessage(`Downloaded ${rows.length} hydrant records.`);
+  }
+  function exportRawDailyActivity() {
+    if (!activityRows.length) {
+      setMessage(`No activity records found for ${date}.`);
+      return;
+    }
+    downloadCsv(`daily-activity-records-${date}.csv`, hydrantsToCsvRows(activityRows.map(inspectionForFirebase)));
+    setMessage(`Downloaded ${activityRows.length} activity record(s) for ${date}.`);
   }
   function toggleColumn(columnId) {
     setSelectedColumns((current) => (
@@ -2121,10 +2156,10 @@ function Reports({
       <hr className="detail-export-divider" />
 
       <div className="report-actions">
-        <a className="button" href="/api/hydrants/export"><Download size={16} /> Hydrants CSV</a>
+        <button className="button" onClick={exportAllHydrants}><Download size={16} /> Hydrants CSV</button>
         <button className="button" onClick={exportDailyActivity}><Download size={16} /> Download Daily Activity</button>
         <button className="button" onClick={exportHydrants}><Download size={16} /> Local Hydrant Edits</button>
-        <a className="button" href={`/api/daily-activity/export?date=${date}`}><Download size={16} /> Server Daily CSV</a>
+        <button className="button" onClick={exportRawDailyActivity}><Download size={16} /> All Activity Records ({date})</button>
         <a className="button" href="/sample-daily-activity-report.csv"><Download size={16} /> Sample Daily Activity</a>
       </div>
       <div className="daily-report-head">
@@ -2201,6 +2236,19 @@ function SettingsPage() {
   );
 }
 
+// Summarized daily activity (local + department cloud records) built in the browser.
+async function downloadDailyActivityCsv(departmentId, date = today()) {
+  const localRows = dailyActivityRows(date);
+  let rows = localRows;
+  try {
+    const cloudRows = await loadTenantHydrantCollection(departmentId || hydrantDepartmentId, "dailyActivity", []);
+    rows = mergeRecords(localRows, cloudRows.filter((row) => activityRowDate(row) === date));
+  } catch (error) {
+    console.error(error);
+  }
+  downloadCsv(`daily-activity-${date}.csv`, summarizedDailyActivityRows(rows));
+}
+
 function SyncImportPage({ departmentId, departmentName, hydrantCount, onImported }) {
   return (
     <>
@@ -2254,7 +2302,7 @@ function SyncImportPage({ departmentId, departmentName, hydrantCount, onImported
         </div>
         <div className="report-actions">
           <a className="button" href="/sample-daily-activity-report.csv"><Download size={16} /> Sample Activity CSV</a>
-          <a className="button" href="/api/daily-activity/export"><Download size={16} /> Today's Activity CSV</a>
+          <button className="button" onClick={() => downloadDailyActivityCsv(departmentId)}><Download size={16} /> Today's Activity CSV</button>
         </div>
       </div>
       </section>
@@ -2534,15 +2582,6 @@ function PreFirePlansDatabase() {
         writeLocalJson("preFirePlans", loaded);
       })
       .catch(() => {});
-    fetch("/api/pre-fire-plans")
-      .then((res) => res.ok ? res.json() : Promise.reject(new Error("Pre-fire plans unavailable")))
-      .then((data) => {
-        if (!mounted) return;
-        const loaded = data.plans || [];
-        setPlans(loaded);
-        writeLocalJson("preFirePlans", loaded);
-      })
-      .catch(() => {});
     return () => { mounted = false; };
   }, []);
 
@@ -2595,12 +2634,6 @@ function PreFirePlansDatabase() {
     writeLocalJson("preFirePlans", next);
     try {
       await saveTenantHydrantCollectionRecord(hydrantDepartmentId, "preFirePlans", saved.id, saved);
-      const res = await fetch("/api/pre-fire-plans", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(saved) });
-      const data = await res.json();
-      if (res.ok && data.plans) {
-        setPlans(data.plans);
-        writeLocalJson("preFirePlans", data.plans);
-      }
     } catch {}
     setQuery(saved.address === "Address not detected" ? "" : saved.address);
     setPlanFile(null);
@@ -2618,7 +2651,6 @@ function PreFirePlansDatabase() {
     writeLocalJson("preFirePlans", next);
     try {
       await deleteTenantHydrantCollectionRecord(hydrantDepartmentId, "preFirePlans", plan.id);
-      await fetch(`/api/pre-fire-plans/${encodeURIComponent(plan.id)}`, { method: "DELETE" });
     } catch {}
     if (form.id === plan.id) {
       setPlanFile(null);
@@ -3207,7 +3239,7 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
 
 function InspectionDivisionPage({ setTab }) {
   const path = window.location.pathname.toLowerCase();
-  const initialPopup = path.includes("fire-inspection-form") ? "inspection" : path.includes("burn-permit") ? "burn" : null;
+  const initialPopup = path.includes("fire-inspection-form") ? "inspection" : null;
   const [popup, setPopup] = useState(initialPopup);
   const inspectionFormUrl = "https://form.jotform.com/260886407564063";
 
@@ -3224,10 +3256,6 @@ function InspectionDivisionPage({ setTab }) {
             <button className="inspection-division-card" onClick={() => setPopup("inspection")}>
               <ClipboardCheck size={24} />
               <span><b>Fire Inspection Form</b><em>Open</em></span>
-            </button>
-            <button className="inspection-division-card" onClick={() => setPopup("burn")}>
-              <Flame size={24} />
-              <span><b>Burn Permit</b><em>Coming Soon</em></span>
             </button>
           </section>
           <section className="inspection-card-group">
@@ -3263,34 +3291,6 @@ function InspectionDivisionPage({ setTab }) {
             <div className="code-popup-actions">
               <button className="secondary" onClick={() => setPopup(null)}>Done</button>
               <button className="primary" onClick={() => window.open(inspectionFormUrl, "_blank", "noopener,noreferrer")?.focus?.()}><ExternalLink size={16} /> Source</button>
-            </div>
-          </article>
-        </div>
-      )}
-      {popup === "burn" && (
-        <div className="modal-backdrop code-popup-backdrop" role="presentation" onClick={() => setPopup(null)}>
-          <article className="code-popup info-popup" role="dialog" aria-modal="true" aria-labelledby="burn-permit-title" onClick={(event) => event.stopPropagation()}>
-            <div className="code-popup-header">
-              <span>Burn Permit</span>
-              <button className="icon-close" onClick={() => setPopup(null)}>Close</button>
-            </div>
-            <div className="code-popup-body">
-              <h2 id="burn-permit-title">Burn Permit</h2>
-              <p>This section is under development.</p>
-              <div className="code-popup-facts">
-                <div><strong>Status</strong><span>Coming Soon</span></div>
-                <div><strong>Division</strong><span>Inspection Division</span></div>
-                <div><strong>Use</strong><span>Permit workflow</span></div>
-              </div>
-              <section className="code-popup-section">
-                <strong>Planned Workflow</strong>
-                {["Applicant information and burn location.", "Permit conditions, dates, and approval status.", "Inspection Division review before final issue."].map((item) => (
-                  <span key={item}><CheckCircle2 size={16} />{item}</span>
-                ))}
-              </section>
-            </div>
-            <div className="code-popup-actions">
-              <button className="primary" onClick={() => setPopup(null)}>Done</button>
             </div>
           </article>
         </div>

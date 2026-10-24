@@ -3688,3 +3688,17 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
 /* Inline form error (modals and forms) */
 .form-error { margin: 0 0 8px; padding: 8px 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.12); color: #dc2626; font-size: 13px; grid-column: 1 / -1; }
 :root[data-theme="dark"] .form-error { color: #fca5a5; }
+
+/* Overtime: pick an open seat to post */
+.overtime-vacancy-list { display: grid; gap: 8px; }
+.overtime-vacancy-option { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--rms-border-strong, #d1d5db); background: var(--rms-bg-surface, #fff); color: var(--rms-text-strong, #212529); font: inherit; cursor: pointer; }
+.overtime-vacancy-option:hover { border-color: var(--rms-primary, #25a194); background: var(--rms-bg-hover, #e6f7f5); }
+.overtime-vacancy-option span { font-size: 13px; color: var(--rms-text-muted, #6c757d); }
+
+/* Call-shift responses (scheduler history) and offers (Employee Portal) */
+.call-shift-responses { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; gap: 6px; }
+.call-shift-responses li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.call-shift-offers { margin-bottom: 16px; }
+.call-shift-offers .panel-header strong { display: inline-flex; align-items: center; gap: 6px; }
+.call-shift-offers .inline-actions button.active { background: var(--rms-primary, #25a194); color: #fff; border-color: transparent; }
+.employee-apparatus-check { display: grid; gap: 8px; }

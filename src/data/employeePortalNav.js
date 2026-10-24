@@ -42,7 +42,6 @@ export const employeePortalNavGroups = [
     label: "Requests",
     items: [
       ["Open Vacancies", UserPlus],
-      ["Assigned Tasks", ClipboardCheck],
       ["Apparatus Checks", Truck],
       ["Maintenance Issues", Wrench],
     ],

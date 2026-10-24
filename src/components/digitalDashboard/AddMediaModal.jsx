@@ -11,7 +11,6 @@ import {
   Globe,
   HardDrive,
   Heart,
-  HelpCircle,
   Images,
   Laptop,
   Link2,
@@ -549,7 +548,6 @@ export default function AddMediaModal({
         <header className="dd-add-media-header">
           <h3>{isEdit ? "Edit Media" : "Add Media"}</h3>
           <div className="dd-add-media-header-actions">
-            <button type="button" className="dd-icon-button" aria-label="Help"><HelpCircle size={18} /></button>
             <button type="button" className="dd-icon-button" onClick={onClose} aria-label="Close"><X size={18} /></button>
           </div>
         </header>
@@ -872,10 +870,7 @@ export default function AddMediaModal({
         </div>
 
         <footer className="dd-add-media-footer">
-          <button type="button" className="dd-action-button dd-help-button" aria-label="Help">
-            <HelpCircle size={15} />
-            Help
-          </button>
+          <span />
           <div className="dd-add-media-footer-actions">
             <button type="button" className="dd-action-button" onClick={onClose} disabled={uploading}>Cancel</button>
             <button

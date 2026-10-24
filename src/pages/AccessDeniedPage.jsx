@@ -17,6 +17,7 @@ import { loadPlatformCreator } from "../lib/platformService.js";
 import { isPlatformScope } from "../lib/tenantPaths.js";
 import { FORGE_CREATOR_CONSOLE_URL } from "../lib/platformUrls.js";
 import { parseTenantSubdomain, platformOrigin } from "../lib/tenantDomains.js";
+import InviteVerificationNotice from "../components/InviteVerificationNotice.jsx";
 
 export default function AccessDeniedPage({ userId = "" }) {
   const { profile, departmentId, gatewayDepartmentId, setDepartmentId } = useTenant();
@@ -114,6 +115,7 @@ export default function AccessDeniedPage({ userId = "" }) {
         </div>
 
         {inviteError && <div className="auth-error" role="alert">{inviteError}</div>}
+        <InviteVerificationNotice />
 
         <p className="auth-help">
           {inactive

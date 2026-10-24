@@ -3,6 +3,7 @@ import { BookOpen, CalendarDays, Check, ShieldCheck, Trash2, X, CirclePlus } fro
 
 import { Badge, Panel, trainingCompliancePercent, Modal } from "../components/shell/ui.jsx";
 import { displayDate, todayIsoDate, uniqueRecordId } from "../lib/recordIds.js";
+import { exportCsv } from "../utils/dashboardMetrics.js";
 
 const TRAINING_CATEGORIES = ["Fire", "EMS CE", "Driver", "Officer"];
 const blankTraining = () => ({ course: "", category: "Fire", date: todayIsoDate(), instructor: "", hours: "2", capacity: "12", notes: "" });
@@ -69,7 +70,7 @@ export default function TrainingPage({ query, records = [], setRecords, canEdit 
   }
 
   return <div className="module-page training-page">
-    <section className="module-heading"><div><span className="module-icon"><BookOpen size={22} /></span><div><h1>Training</h1><p>Training events, attendance, hours, EMS CE, fire training, and department compliance tracking.</p></div></div><div className="heading-actions"><button className="secondary-button">Export Training</button>{canEdit ? <button className="primary-button" onClick={() => setShowNew(true)}><CirclePlus size={14} /> Add Training</button> : null}</div></section>
+    <section className="module-heading"><div><span className="module-icon"><BookOpen size={22} /></span><div><h1>Training</h1><p>Training events, attendance, hours, EMS CE, fire training, and department compliance tracking.</p></div></div><div className="heading-actions"><button className="secondary-button" disabled={!visibleRecords.length} onClick={() => exportCsv(`training-${todayIsoDate()}.csv`, visibleRecords.map((r) => ({ "Training event": r.course, Category: r.category, "Start date": r.date, "End date": r.endDate, Instructor: r.instructor, Hours: r.hours, Attendees: r.attendees, Capacity: r.capacity, "Completion %": r.completion, Status: r.status, Members: r.members, Notes: r.notes })))}>Export Training</button>{canEdit ? <button className="primary-button" onClick={() => setShowNew(true)}><CirclePlus size={14} /> Add Training</button> : null}</div></section>
     <section className="training-hero">
       <div><span>Training Hub</span><h2>Department Training Dashboard</h2><p className="muted">Manage upcoming classes, compliance items, and completion progress from one page.</p></div>
       <div className="training-score"><small>Average Completion</small><strong>{averageCompletion}%</strong></div>

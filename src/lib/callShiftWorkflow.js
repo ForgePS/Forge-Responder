@@ -336,3 +336,29 @@ export function formatCallShiftStatus(record = {}) {
   if (record.status === "expired") return "Expired";
   return `Active · Tier ${record.currentTier || 1}`;
 }
+
+// ---- Responses from members (Employee Portal) and assignment (scheduler) ----
+
+/** Whether this member was sent this broadcast and it's still open. */
+export function isCallShiftOpenFor(record = {}, personnelId = "") {
+  if (!personnelId || record.status !== "active") return false;
+  const eligible = record.previewSnapshot?.eligible || [];
+  return !eligible.length || eligible.some((entry) => entry.personnelId === personnelId);
+}
+
+export function callShiftResponseFor(record = {}, personnelId = "") {
+  return (record.responses || []).find((entry) => entry.personnelId === personnelId) || null;
+}
+
+/** Record a member's accept/decline (replaces an earlier answer). */
+export function withCallShiftResponse(record = {}, { personnelId, name, response }) {
+  const responses = (record.responses || []).filter((entry) => entry.personnelId !== personnelId);
+  responses.push({ personnelId, name: name || "", response, respondedAt: new Date().toISOString() });
+  return { ...record, responses, updatedAt: new Date().toISOString() };
+}
+
+/** Fill the broadcast with one member. */
+export function withCallShiftAssigned(record = {}, { personnelId, name, assignedBy = "" }) {
+  const now = new Date().toISOString();
+  return { ...record, status: "filled", assignedPersonnelId: personnelId, assignedName: name || "", assignedAt: now, assignedBy, updatedAt: now };
+}

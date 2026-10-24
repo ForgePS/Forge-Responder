@@ -18,12 +18,13 @@ import {
   applyPlatformToDepartmentSettings,
   normalizePlatformConfig,
 } from "./platformInheritance.js";
-import { DEMO_DEPARTMENT_ID, isDemoDepartment, isPlatformScope } from "./tenantPaths.js";
+import { DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isDemoDepartment, isPlatformScope } from "./tenantPaths.js";
 import { ensureDefaultRoles } from "./roleService.js";
 import { defaultSubscriptionDates, normalizeSubscription } from "./subscriptionUtils.js";
 import { normalizeDepartmentStateId } from "./departmentBranchUtils.js";
 import { GHOST_DEPARTMENT_IDS, RESERVED_GATEWAY_PATHS } from "./gatewayRouting.js";
 import { disabledModulesFor } from "./moduleAccess.js";
+import { writeAuditLog } from "./auditService.js";
 
 async function resolveDepartmentRegistryProfile(departmentId) {
   if (isDemoDepartment(departmentId)) {
@@ -104,7 +105,8 @@ export async function listPlatformDepartments() {
           subscription: subscription.expirationDate ? subscription : null,
         };
       })
-      // Disabled and archived departments are out of the way (scripts/archive-department.mjs restores).
+      // Disabled and archived departments are out of the way (restore archived ones
+      // from Archived departments in the Creator Console).
       .filter((item) => !["disabled", "archived"].includes(item.status))
       .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
 
@@ -114,6 +116,69 @@ export async function listPlatformDepartments() {
     console.error("Failed to list platform departments", error);
     return defaultDepartmentRegistry();
   }
+}
+
+function archivedAtMillis(item = {}) {
+  const millis = new Date(item.archivedAt || item.updatedAt || 0).getTime();
+  return Number.isFinite(millis) ? millis : 0;
+}
+
+/** Archived departments (status "archived"), newest archive first. Creator Console only. */
+export async function listArchivedPlatformDepartments() {
+  const db = getFirestoreDb();
+  if (!db) return [];
+  const snap = await getDocs(collection(db, "platformDepartments"));
+  return snap.docs
+    .map((item) => ({ id: item.id, ...item.data() }))
+    .filter((item) => item.status === "archived")
+    .sort((a, b) => archivedAtMillis(b) - archivedAtMillis(a));
+}
+
+/**
+ * Brings an archived department back (same as scripts/archive-department.mjs --restore):
+ * registry status returns to what it was before archiving (or "active"), its
+ * address record (rmsGateways) is re-enabled, and a platform audit entry is written.
+ * Data was never deleted by archiving, so nothing else needs to change.
+ */
+export async function restorePlatformDepartment(departmentId, user = null) {
+  const db = getFirestoreDb();
+  if (!db || !departmentId) throw new Error("Firestore is not configured.");
+
+  const registryRef = doc(db, "platformDepartments", departmentId);
+  const gatewayRef = doc(db, "rmsGateways", departmentId);
+  const [registrySnap, gatewaySnap] = await Promise.all([getDoc(registryRef), getDoc(gatewayRef)]);
+  if (!registrySnap.exists()) {
+    throw new Error(`Department "${departmentId}" was not found.`);
+  }
+  const registry = registrySnap.data() || {};
+  const now = new Date().toISOString();
+  const nextStatus = registry.previousStatus && registry.previousStatus !== "archived"
+    ? registry.previousStatus
+    : "active";
+
+  await setDoc(registryRef, { status: nextStatus, restoredAt: now, updatedAt: now }, { merge: true });
+  if (gatewaySnap.exists()) {
+    await setDoc(gatewayRef, {
+      status: gatewaySnap.data()?.previousStatus || "active",
+      updatedAt: now,
+    }, { merge: true });
+  }
+
+  try {
+    await writeAuditLog(PLATFORM_SCOPE_ID, {
+      action: "department.restored",
+      module: "Creator Console",
+      recordId: departmentId,
+      summary: `Restored ${registry.name || departmentId} from the archive`,
+      actorUid: user?.uid || "",
+      actorName: user?.displayName || user?.email || "",
+    });
+  } catch (error) {
+    console.warn("Failed to write audit log for department restore", error);
+  }
+
+  notifyDepartmentsChanged();
+  return { id: departmentId, status: nextStatus };
 }
 
 /**
@@ -426,7 +491,7 @@ export async function registerPlatformDepartment(departmentId, profile = {}, opt
   if (registrySnap.exists() || profileSnap.exists()) {
     const status = String(registrySnap.data()?.status || "").toLowerCase();
     const error = new Error(["archived", "disabled"].includes(status)
-      ? `The ID "${departmentId}" belongs to an archived department (${registrySnap.data()?.name || departmentId}). Choose a different ID, or restore that department with scripts/archive-department.mjs --restore.`
+      ? `The ID "${departmentId}" belongs to an archived department (${registrySnap.data()?.name || departmentId}). Choose a different ID, or restore it from Archived departments in the Creator Console.`
       : `A department with the ID "${departmentId}" already exists. Choose a different ID.`);
     error.code = "department-exists";
     throw error;

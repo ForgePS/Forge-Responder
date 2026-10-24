@@ -164,7 +164,7 @@ export default function PersonnelListView({
   return (
     <div className="personnel-firstdue-list">
       <nav className="personnel-breadcrumb" aria-label="Breadcrumb">
-        <button type="button" className="personnel-breadcrumb-link">Personnel</button>
+        <span className="personnel-breadcrumb-link">Personnel</span>
         <span>/</span>
         <strong>Personnel List</strong>
       </nav>
