@@ -5,6 +5,17 @@
  */
 
 let waitingWorker = null;
+
+/**
+ * The service worker only controls the field app's own address (/field or
+ * /<department>/field), so the desktop RMS never goes through it. Files the
+ * field page loads (/assets/...) still pass through it, which is what makes
+ * the field app work offline.
+ */
+export function fieldScope() {
+  return window.location.pathname.replace(/\/+$/, "") || "/field";
+}
+
 let registering = null;
 const updateListeners = new Set();
 
@@ -24,7 +35,12 @@ async function register() {
   if (import.meta.env.DEV || !("serviceWorker" in navigator)) return null;
   const onUpdateReady = () => updateListeners.forEach((listener) => listener());
   try {
-    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    // Early test builds registered for the whole site; remove those.
+    const existing = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(existing
+      .filter((reg) => new URL(reg.scope).pathname === "/")
+      .map((reg) => reg.unregister().catch(() => false)));
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: fieldScope() });
     const notify = (worker) => {
       waitingWorker = worker;
       onUpdateReady();
@@ -66,6 +82,6 @@ export function activateUpdate() {
 /** True once the app files are stored for offline use. */
 export async function isOfflineReady() {
   if (!("serviceWorker" in navigator)) return false;
-  const registration = await navigator.serviceWorker.getRegistration("/");
+  const registration = await navigator.serviceWorker.getRegistration(fieldScope());
   return Boolean(registration?.active);
 }

@@ -6,6 +6,9 @@
 const VERSION = "__VERSION__";
 const PRECACHE = "forge-field-" + VERSION;
 const RUNTIME = "forge-field-runtime";
+// Map tiles and pre-fire plan files viewed online, kept for offline use.
+const EXTERNAL = "forge-field-external";
+const EXTERNAL_MAX_ENTRIES = 1200;
 const PRECACHE_URLS = __PRECACHE_URLS__;
 const SHELL_URL = "/index.html";
 const RUNTIME_MAX_ENTRIES = 250;
@@ -20,7 +23,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const names = await caches.keys();
     await Promise.all(names
-      .filter((name) => name.startsWith("forge-field-") && name !== PRECACHE && name !== RUNTIME)
+      .filter((name) => name.startsWith("forge-field-") && name !== PRECACHE && name !== RUNTIME && name !== EXTERNAL)
       .map((name) => caches.delete(name)));
     await self.clients.claim();
   })());
@@ -40,6 +43,30 @@ async function trimRuntime() {
   const keys = await cache.keys();
   if (keys.length <= RUNTIME_MAX_ENTRIES) return;
   await Promise.all(keys.slice(0, keys.length - RUNTIME_MAX_ENTRIES).map((key) => cache.delete(key)));
+}
+
+async function trimExternal() {
+  const cache = await caches.open(EXTERNAL);
+  const keys = await cache.keys();
+  if (keys.length <= EXTERNAL_MAX_ENTRIES) return;
+  await Promise.all(keys.slice(0, keys.length - EXTERNAL_MAX_ENTRIES).map((key) => cache.delete(key)));
+}
+
+/** Map tiles and stored files: the saved copy first, otherwise the network (and keep a copy). */
+async function handleExternal(request) {
+  const cached = await caches.match(request, { ignoreVary: true });
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response && (response.ok || response.type === "opaque")) {
+    const copy = response.clone();
+    caches.open(EXTERNAL).then((cache) => cache.put(request, copy)).then(trimExternal).catch(() => null);
+  }
+  return response;
+}
+
+function isExternalCacheable(url) {
+  if (url.hostname === "server.arcgisonline.com") return true;
+  return url.hostname === "firebasestorage.googleapis.com" && url.searchParams.get("alt") === "media";
 }
 
 function timeout(ms) {
@@ -99,7 +126,10 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return; // Firestore, Auth, fonts: untouched
+  if (url.origin !== self.location.origin) {
+    if (isExternalCacheable(url)) event.respondWith(handleExternal(request));
+    return; // Firestore, Auth, fonts: untouched
+  }
   if (url.pathname.startsWith("/__/") || url.pathname.startsWith("/api/")) return;
   if (url.pathname === "/sw.js") return;
 

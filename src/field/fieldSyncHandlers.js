@@ -19,7 +19,7 @@ import {
   saveTenantHydrantCollectionRecord,
   saveTenantHydrantRecord,
 } from "../lib/hydrantTenantService.js";
-import { buildFlowTestStatusPatch, inspectionStatusPatch, nfpaColorNameForClass } from "../lib/hydrantStatusSync.js";
+import { buildFlowTestStatusPatch, flowCodeForClass, inspectionStatusPatch, nfpaColorNameForClass } from "../lib/hydrantStatusSync.js";
 import { createHydrantDamageReport } from "../lib/hydrantDamage/damageReportService.js";
 import { HYDRANT_DAMAGE_REPORTS_COLLECTION } from "../lib/hydrantDamage/paths.js";
 import {
@@ -37,6 +37,20 @@ import { blobGet } from "./fieldDb.js";
 import { FieldConflictError, FieldRejectedError } from "./fieldErrors.js";
 import { threeWayMerge, isSameOrNewerDate } from "./fieldMerge.js";
 import { refItems } from "./fieldRefData.js";
+import { summarizeCheckoff } from "./checkoffModel.js";
+import { CHECKOFFS_COLLECTION, PREPLAN_FIELD_UPDATES_COLLECTION } from "./fieldAdminService.js";
+import {
+  createPreplan,
+  getPreplan,
+  getPreplanRevision,
+  registerPreplanFile,
+  startPreplanRevision,
+  updatePreplan,
+  updatePreplanRevision,
+} from "../lib/inspections/preplanService.js";
+import { localDate } from "./fieldValidation.js";
+import { completeInspection, getInspectionRecord, saveInspectionDraft } from "../lib/inspections/inspectionWorkflow.js";
+import { createViolation } from "../lib/inspections/violationService.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -62,6 +76,7 @@ async function uploadAttachments(record, ctx, folder) {
     await ctx.setAttachments(attachments);
   }
   return attachments.map((attachment) => ({
+    id: attachment.id,
     name: attachment.name,
     url: attachment.uploaded.downloadUrl,
     storagePath: attachment.uploaded.storagePath,
@@ -176,15 +191,19 @@ async function syncHydrantInspection(record, ctx) {
   const photos = record.attachments?.length ? await uploadAttachments(record, ctx, "hydrant-inspections") : [];
   const inspectedAt = `${data.date}T12:00:00.000Z`;
   const id = hydrantFirebaseDocId("inspection", hydrant.location_id, hydrant.hydrant_id, inspectedAt);
-  const checklist = data.checklist.map((row) => ({
-    item: row.item,
-    result: row.result,
-    notes: row.notes || "",
-    repair_needed: row.result === "No" ? "Yes" : "No",
-    photo_name: "",
-    photo_url: "",
-    photo_storage_path: "",
-  }));
+  const photoById = new Map(photos.map((photo) => [photo.id, photo]));
+  const checklist = data.checklist.map((row) => {
+    const first = (row.photoIds || []).map((id) => photoById.get(id)).find(Boolean);
+    return {
+      item: row.item,
+      result: row.result,
+      notes: row.notes || "",
+      repair_needed: row.repair_needed || (row.result === "No" ? "Yes" : "No"),
+      photo_name: first?.name || "",
+      photo_url: first?.url || "",
+      photo_storage_path: first?.storagePath || "",
+    };
+  });
   const payload = {
     id,
     location_id: hydrant.location_id,
@@ -231,7 +250,13 @@ async function syncFlowTest(record, ctx) {
     residual_psi: data.residualPsi,
     notes: data.notes || "",
   };
-  const synced = buildFlowTestStatusPatch(hydrant, { status: hydrant.status || "In Service" }, { ...form, status: hydrant.status || "In Service" }, data.flowGpm);
+  const info = data.info || {};
+  const status = info.status || hydrant.status || "In Service";
+  const [latitude, longitude] = String(info.gps || "").split(",").map((part) => part.trim());
+  const withOverride = (patch) => (data.nfpaOverride
+    ? { ...patch, nfpa_class: data.nfpaOverride, flow_result: flowCodeForClass(data.nfpaOverride), nfpa_color: nfpaColorNameForClass(data.nfpaOverride) }
+    : patch);
+  const synced = withOverride(buildFlowTestStatusPatch(hydrant, { status }, { ...form, status }, data.flowGpm));
   const test = {
     ...form,
     id,
@@ -241,7 +266,7 @@ async function syncFlowTest(record, ctx) {
     flow_result: synced.flow_result,
     location_id: hydrant.location_id,
     hydrant_id: hydrant.hydrant_id,
-    district: hydrant.district || "",
+    district: info.district ?? hydrant.district ?? "",
     tested_at: testedAt,
     tested_by: data.testedBy,
     shift: data.shift,
@@ -255,8 +280,12 @@ async function syncFlowTest(record, ctx) {
     await ctx.markStep("flowTest");
   }
   const warning = await patchHydrantSummary(ctx, hydrant, (current) => {
-    const patch = buildFlowTestStatusPatch(current, { status: current.status || "In Service" }, { ...form, status: current.status || "In Service" }, data.flowGpm);
+    const nextStatus = info.status || current.status || "In Service";
+    const patch = withOverride(buildFlowTestStatusPatch(current, { status: nextStatus }, { ...form, status: nextStatus }, data.flowGpm));
     return {
+      ...(info.district !== undefined ? { district: info.district } : {}),
+      ...(info.provider ? { provider: info.provider, water_assoc: info.provider } : {}),
+      ...(latitude && longitude ? { latitude, lat: latitude, longitude, lon: longitude } : {}),
       status: patch.status,
       discharge_size: form.discharge_size,
       pitot_psi: form.pitot_psi,
@@ -557,7 +586,303 @@ async function syncIncident(record, ctx) {
   return { serverIds: { reportId: saved.id, reportNumber: saved.reportNumber }, base: snapshotBase };
 }
 
+/* -------------------------------- check-offs ------------------------------ */
+
+async function syncCheckoff(record, ctx) {
+  const data = record.data;
+  const list = data.list;
+  const done = summarizeCheckoff(list, data.entries || {}, localDate(new Date(data.completedAt || record.savedAt)));
+  const id = `CO-${record.localId}`;
+  await createRecord(ctx.departmentId, CHECKOFFS_COLLECTION, id, {
+    id,
+    listId: list.id,
+    listName: list.name,
+    kind: list.kind,
+    target: list.target,
+    items: done.items,
+    counts: done.counts,
+    restock: done.restock,
+    restockNeeded: done.restock.length > 0,
+    result: done.result,
+    notes: data.notes || "",
+    shift: data.shift || "",
+    performedBy: data.performedBy || ctx.actor.actorName,
+    performedByUid: ctx.uid,
+    performedAt: data.completedAt || record.savedAt,
+    source: "field-app",
+  });
+  return { serverIds: { checkoffId: id } };
+}
+
+/* -------------------------------- inspections ----------------------------- */
+
+const INSPECTION_EXTRA_PATHS = ["summary", "internalNotes", "result"];
+
+async function syncInspection(record, ctx) {
+  const data = record.data;
+  const inspectionId = data.inspectionId;
+  const server = await getInspectionRecord(ctx.departmentId, inspectionId);
+  if (!server) throw new FieldRejectedError("This inspection no longer exists in the RMS.");
+  const completedByUs = server.status === "completed" && server.completedBy === ctx.actor.actorName && ctx.steps.completed;
+  if (server.lockedAt || server.status === "archived" || (server.status === "completed" && !completedByUs)) {
+    if (!completedByUs) throw new FieldRejectedError("This inspection was completed or locked in the RMS. Your field entry is kept here.");
+  }
+
+  // Merge answers per item with what changed on the server since download.
+  const answerKeys = [...new Set([...Object.keys(data.answers || {}), ...Object.keys(record.base?.answers || {})])];
+  const paths = [...answerKeys.map((key) => `answers.${key}`), ...INSPECTION_EXTRA_PATHS];
+  const serverView = { answers: server.answers || {}, summary: server.summary, internalNotes: server.internalNotes, result: server.result };
+  const changedOnServer = record.base && String(server.updatedAt || "") !== String(record.base.updatedAt || "") && server.updatedBy !== ctx.actor.actorName;
+  let merged = data;
+  if (changedOnServer) {
+    const result = threeWayMerge(record.base, data, serverView, paths);
+    if (result.conflicts.length) {
+      throw new FieldConflictError("Someone else changed this inspection after you started.", {
+        conflicts: result.conflicts,
+        server: Object.fromEntries(result.conflicts.map((conflict) => [conflict.path, conflict.server])),
+        merged: result.merged,
+      });
+    }
+    merged = { ...data, ...result.merged, answers: { ...(result.merged.answers || {}) } };
+  }
+
+  const photos = record.attachments?.length ? await uploadAttachments(record, ctx, `inspection-photos/${inspectionId}`) : [];
+
+  if (!completedByUs) {
+    const payload = {
+      answers: merged.answers || {},
+      summary: merged.summary || "",
+      internalNotes: merged.internalNotes || "",
+      result: merged.result || "",
+      reinspectionRequired: Boolean(data.reinspectionRequired) || /reinspection/i.test(merged.result || ""),
+      nextReinspectionAt: data.nextReinspectionAt || "",
+    };
+    if (data.finish) {
+      await completeInspection(ctx.departmentId, inspectionId, payload, ctx.actor);
+      await ctx.markStep("completed");
+    } else {
+      await saveInspectionDraft(ctx.departmentId, inspectionId, payload, ctx.actor);
+    }
+  }
+  if (photos.length) {
+    await updateRecord(ctx.departmentId, "inspections", inspectionId, { fieldPhotos: photos });
+  }
+
+  const violationIds = [];
+  for (const violation of data.violations || []) {
+    await createViolation(ctx.departmentId, {
+      id: violation.id,
+      inspectionId,
+      catalogItemId: violation.catalogItemId || "",
+      name: violation.name,
+      codeCitation: violation.codeCitation || "",
+      severity: violation.severity || "moderate",
+      description: violation.description || "",
+      correctiveAction: violation.correctiveAction || "",
+      locationOnProperty: violation.locationOnProperty || "",
+      evidence: photos.map((photo) => ({ type: "photo", url: photo.url, storagePath: photo.storagePath, name: photo.name, addedBy: ctx.actor.actorName })),
+    }, ctx.actor);
+    violationIds.push(violation.id);
+  }
+
+  const fresh = await getInspectionRecord(ctx.departmentId, inspectionId);
+  return {
+    serverIds: { inspectionId, violationIds },
+    base: fresh ? { answers: fresh.answers || {}, summary: fresh.summary, internalNotes: fresh.internalNotes, result: fresh.result, updatedAt: fresh.updatedAt } : record.base,
+    keepSteps: false,
+  };
+}
+
+/* ------------------------------ pre-fire plans ---------------------------- */
+
+const EDITABLE_REVISION_STATUSES = new Set(["draft", "returned", "in_progress", "rejected"]);
+
+async function registerPlanPhotos(ctx, planId, photos) {
+  for (const photo of photos) {
+    await registerPreplanFile(ctx.departmentId, {
+      id: `PPF-${photo.storagePath.split("/").pop().slice(0, 40).replace(/[^A-Za-z0-9-]/g, "")}`,
+      preplanId: planId,
+      category: "photo",
+      fileName: photo.name,
+      mimeType: "image/jpeg",
+      storagePath: photo.storagePath,
+      downloadUrl: photo.url,
+      description: "Added from FORGE Field",
+    }, ctx.actor);
+  }
+}
+
+async function syncPlanUpdate(record, ctx) {
+  const data = record.data;
+  const photos = record.attachments?.length ? await uploadAttachments(record, ctx, "pre-fire-plans/field-updates") : [];
+  const id = `PFU-${record.localId}`;
+  await createRecord(ctx.departmentId, PREPLAN_FIELD_UPDATES_COLLECTION, id, {
+    id,
+    planSource: data.planSource,
+    planId: data.planId,
+    planName: data.planName,
+    address: data.address,
+    section: data.section || "",
+    note: data.note,
+    photos,
+    status: "pending",
+    submittedBy: data.submittedBy || ctx.actor.actorName,
+    submittedByUid: ctx.uid,
+    submittedAt: record.savedAt || record.createdAt,
+    source: "field-app",
+  });
+  return { serverIds: { updateId: id } };
+}
+
+function legacyPlanRecord(data, photos, existingPhotos = []) {
+  const plan = data.plan || {};
+  return {
+    id: data.planId,
+    businessName: plan.businessName || plan.name || "",
+    address: plan.address || "",
+    address_key: String(plan.address || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(),
+    occupancyType: plan.occupancyType || "",
+    contactName: plan.contactName || "",
+    contactPhone: plan.contactPhone || "",
+    hazards: plan.hazards || "",
+    utilities: plan.utilities || "",
+    fireProtection: plan.fireProtection || "",
+    hydrants: plan.hydrants || "",
+    notes: plan.notes || "",
+    photos: [...existingPhotos, ...photos],
+    updated_at: new Date().toISOString(),
+    source: "field-app",
+  };
+}
+
+async function syncPlanCreate(record, ctx) {
+  const data = record.data;
+  const photos = record.attachments?.length ? await uploadAttachments(record, ctx, `pre-fire-plans/${data.planId}`) : [];
+  if (data.source === "legacy") {
+    await saveTenantHydrantCollectionRecord(ctx.departmentId, "preFirePlans", data.planId, legacyPlanRecord(data, photos));
+    return { serverIds: { planId: data.planId } };
+  }
+  if (!ctx.steps.created && !(await getPreplan(ctx.departmentId, data.planId))) {
+    await createPreplan(ctx.departmentId, {
+      id: data.planId,
+      address: data.plan.address,
+      occupancyName: data.plan.name,
+      riskLevel: data.plan.riskLevel || "Moderate",
+      responsibleStation: data.plan.station || "",
+      sectionAnswers: data.sectionAnswers || {},
+      notes: "Created in FORGE Field",
+    }, ctx.actor);
+    await updatePreplan(ctx.departmentId, data.planId, { facilityName: data.plan.name }, ctx.actor).catch(() => null);
+  }
+  await ctx.markStep("created");
+  if (photos.length && !ctx.steps.photos) {
+    await registerPlanPhotos(ctx, data.planId, photos);
+    await ctx.markStep("photos");
+  }
+  return { serverIds: { planId: data.planId } };
+}
+
+async function syncPlanEdit(record, ctx) {
+  const data = record.data;
+  const photos = record.attachments?.length ? await uploadAttachments(record, ctx, `pre-fire-plans/${data.planId}`) : [];
+
+  if (data.source === "legacy") {
+    const rows = await getRecord(ctx.departmentId, "preFirePlans", data.planId);
+    const paths = Object.keys(data.plan || {}).map((key) => `plan.${key}`);
+    const serverView = rows ? { plan: Object.fromEntries(Object.keys(data.plan || {}).map((key) => [key, rows[key] || ""])) } : null;
+    const { merged, conflicts } = threeWayMerge(record.base, data, serverView, paths);
+    if (conflicts.length) {
+      throw new FieldConflictError("Someone else changed this plan after you started.", { conflicts, server: Object.fromEntries(conflicts.map((c) => [c.path, c.server])), merged });
+    }
+    const next = { ...data, plan: { ...(data.plan || {}), ...(merged.plan || {}) } };
+    await saveTenantHydrantCollectionRecord(ctx.departmentId, "preFirePlans", data.planId, legacyPlanRecord(next, photos, rows?.photos || []));
+    return { serverIds: { planId: data.planId }, base: { plan: next.plan, updatedAt: new Date().toISOString() } };
+  }
+
+  const plan = await getPreplan(ctx.departmentId, data.planId);
+  if (!plan) throw new FieldRejectedError("This pre-fire plan no longer exists in the RMS.");
+  let revision = await getPreplanRevision(ctx.departmentId, plan.currentRevisionId);
+  // Published plans get a new draft revision; it goes through approval in the RMS.
+  if (!revision || !EDITABLE_REVISION_STATUSES.has(String(revision.status || "").toLowerCase())) {
+    if (!ctx.steps.revisionId) {
+      const started = await startPreplanRevision(ctx.departmentId, data.planId, ctx.actor);
+      await ctx.markStep("revisionId", started?.revision?.id || started?.id || true);
+    }
+    const fresh = await getPreplan(ctx.departmentId, data.planId);
+    revision = await getPreplanRevision(ctx.departmentId, fresh.currentRevisionId);
+  }
+  const answerKeys = [...new Set([...Object.keys(data.sectionAnswers || {}), ...Object.keys(record.base?.sectionAnswers || {})])];
+  const paths = answerKeys.map((key) => `sectionAnswers.${key}`);
+  const { merged, conflicts } = threeWayMerge(record.base, data, { sectionAnswers: revision?.sectionAnswers || {} }, paths);
+  if (conflicts.length) {
+    throw new FieldConflictError("Someone else changed this plan after you started.", { conflicts, server: Object.fromEntries(conflicts.map((c) => [c.path, c.server])), merged });
+  }
+  await updatePreplanRevision(ctx.departmentId, revision.id, { sectionAnswers: { ...(revision.sectionAnswers || {}), ...(merged.sectionAnswers || {}) } }, ctx.actor);
+  const mainPatch = {};
+  if (data.plan?.address && data.plan.address !== plan.address) mainPatch.address = data.plan.address;
+  if (data.plan?.riskLevel && data.plan.riskLevel !== plan.riskLevel) mainPatch.riskLevel = data.plan.riskLevel;
+  if (Object.keys(mainPatch).length) await updatePreplan(ctx.departmentId, data.planId, mainPatch, ctx.actor);
+  if (photos.length && !ctx.steps.photos) {
+    await registerPlanPhotos(ctx, data.planId, photos);
+    await ctx.markStep("photos");
+  }
+  const saved = await getPreplanRevision(ctx.departmentId, revision.id);
+  return {
+    serverIds: { planId: data.planId, revisionId: revision.id },
+    base: { plan: { address: data.plan?.address || "", riskLevel: data.plan?.riskLevel || "" }, sectionAnswers: saved?.sectionAnswers || {}, updatedAt: saved?.updatedAt || "" },
+  };
+}
+
+/* ------------------------------- hydrant info ----------------------------- */
+
+const HYDRANT_EDIT_PATHS = ["status", "district", "address", "gps", "provider", "hydrant_type", "issue", "notes"].map((key) => `fields.${key}`);
+
+async function syncHydrantEdit(record, ctx) {
+  const data = record.data;
+  const current = await serverHydrant(ctx, data.hydrant);
+  const serverFields = {
+    status: current.status || "In Service",
+    district: current.district || "",
+    address: current.address || current.location || "",
+    gps: (current.latitude ?? current.lat) && (current.longitude ?? current.lon) ? `${current.latitude ?? current.lat}, ${current.longitude ?? current.lon}` : "",
+    provider: current.provider || current.water_assoc || "",
+    hydrant_type: current.hydrant_type || "",
+    issue: current.issue || "",
+    notes: current.notes || "",
+  };
+  const { merged, conflicts } = threeWayMerge(record.base, data, { fields: serverFields }, HYDRANT_EDIT_PATHS);
+  if (conflicts.length) {
+    throw new FieldConflictError("Someone else changed this hydrant after you started.", { conflicts, server: Object.fromEntries(conflicts.map((c) => [c.path, c.server])), merged });
+  }
+  const fields = merged.fields || {};
+  const [latitude, longitude] = String(fields.gps || "").split(",").map((part) => part.trim());
+  const patch = {
+    status: fields.status,
+    district: fields.district,
+    address: fields.address,
+    location: fields.address,
+    provider: fields.provider,
+    water_assoc: fields.provider,
+    hydrant_type: fields.hydrant_type,
+    issue: fields.issue,
+    notes: fields.notes,
+    ...(latitude && longitude ? { latitude, lat: latitude, longitude, lon: longitude } : {}),
+    edited_by: data.editedBy || ctx.actor.actorName,
+    edited_shift: data.shift || "",
+    edited_date: localDate(new Date(record.savedAt || Date.now())),
+    edit_source: "Field hydrant info",
+  };
+  await saveTenantHydrantRecord(ctx.departmentId, mergeHydrantUpdate(current, patch));
+  return { serverIds: { hydrantId: hydrantFirebaseDocId(data.hydrant.location_id, data.hydrant.hydrant_id) }, base: { fields } };
+}
+
 export const SYNC_HANDLERS = {
+  hydrantEdit: syncHydrantEdit,
+  planUpdate: syncPlanUpdate,
+  planCreate: syncPlanCreate,
+  planEdit: syncPlanEdit,
+  checkoff: syncCheckoff,
+  inspection: syncInspection,
   truckCheck: syncTruckCheck,
   hoseTest: syncHoseTest,
   hydrantInspection: syncHydrantInspection,

@@ -13,43 +13,14 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { launchChrome, openPage, sleep } from "./cdp.mjs";
+import { HELPERS } from "./helpers.mjs";
 
 const BASE = process.argv[2] || "http://localhost:4180";
 const SHOTS = process.argv[3] || join(tmpdir(), "forge-field-e2e-shots");
 const PHOTO = process.argv[4] || fileURLToPath(new URL("../../public/field-icon-512.png", import.meta.url));
 const RUN = Date.now().toString(36).slice(-5).toUpperCase();
 
-const HELPERS = `
-window.__f = {
-  norm: (s) => String(s || "").replace(/\\s+/g, " ").trim(),
-  q(sel, root = document) { return [...root.querySelectorAll(sel)]; },
-  visible(el) { return el && el.getClientRects().length > 0; },
-  byText(sel, text, root = document) {
-    const t = text.toLowerCase();
-    const all = this.q(sel, root).filter((el) => this.visible(el));
-    return all.find((el) => this.norm(el.textContent).toLowerCase() === t)
-      || all.find((el) => this.norm(el.textContent).toLowerCase().startsWith(t))
-      || all.find((el) => this.norm(el.textContent).toLowerCase().includes(t));
-  },
-  click(text, sel = "button, a") { const el = this.byText(sel, text); if (!el) throw new Error("no clickable: " + text); el.click(); return true; },
-  field(label) { return this.q(".fa-field").filter((f) => this.visible(f)).find((f) => { const l = f.querySelector(".fa-label"); return l && this.norm(l.textContent).toLowerCase().startsWith(label.toLowerCase()); }); },
-  set(el, v) { const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, "value").set.call(el, v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); return true; },
-  fill(label, v) { const f = this.field(label); if (!f) throw new Error("no field " + label); const el = f.querySelector("input, textarea"); return this.set(el, v); },
-  openPicker(label) { const f = this.field(label); if (!f) throw new Error("no field " + label); f.querySelector(".fa-picker-btn").click(); return true; },
-  sheetPick(text) { const row = this.byText(".fa-sheet-row", text); if (!row) throw new Error("no sheet row " + text); row.click(); return true; },
-  sheetFirst(n = 1) { const rows = this.q(".fa-sheet-list .fa-sheet-row:not(.is-custom)").filter((r) => this.visible(r)); rows.slice(0, n).forEach((r) => r.click()); return rows.length; },
-  sheetSearch(v) { const input = document.querySelector(".fa-sheet .fa-search input"); return this.set(input, v); },
-  seg(itemLabel, option) {
-    const item = this.q(".fa-check-item").find((el) => this.norm(el.querySelector(".fa-check-label")?.textContent).toLowerCase().startsWith(itemLabel.toLowerCase()));
-    if (!item) throw new Error("no check item " + itemLabel);
-    const btn = this.byText(".fa-seg-btn", option, item); if (!btn) throw new Error("no option " + option); btn.click(); return true;
-  },
-  segIn(fieldLabel, option) { const f = this.field(fieldLabel); const btn = this.byText(".fa-seg-btn, .fa-chip", option, f); if (!btn) throw new Error("no option " + option + " in " + fieldLabel); btn.click(); return true; },
-  text() { return this.norm((document.querySelector(".fa-app") || document.body).innerText); },
-  pill() { return this.norm(document.querySelector(".fa-sync-pill")?.innerText); },
-};
-true;
-`;
+
 
 const log = (...args) => console.log(new Date().toISOString().slice(11, 19), ...args);
 const results = [];
@@ -184,6 +155,11 @@ async function main() {
     // 8. Hydrants: inspection, flow test, damage.
     await act(`__f.click("Hydrants")`, 400);
     await page.waitFor(`/RV 1/.test(__f.text())`, { label: "hydrant list" });
+    if (await f(`/set your shift/i.test(__f.text())`)) {
+      await act(`__f.openPicker("Shift")`, 300);
+      await act(`__f.sheetPick("A Shift")`, 300);
+      await act(`__f.click("Set shift")`, 500);
+    }
     await act(`(() => __f.set(document.querySelector(".fa-search input"), "RV 103"))()`, 300);
     await act(`__f.click("RV 103", ".fa-row")`, 400);
     await snap("hydrant-detail");
@@ -192,7 +168,7 @@ async function main() {
     await act(`__f.seg("Caps Present", "Problem")`, 200);
     await act(`(() => { const item = __f.q(".fa-check-item").find((el) => el.innerText.startsWith("Caps Present")); return __f.set(item.querySelector("textarea"), "Steamer cap missing"); })()`);
     await snap("hydrant-inspection");
-    await act(`__f.click("Save inspection")`, 800);
+    await act(`__f.click("Complete inspection")`, 800);
     await page.waitFor(`/Flow test/.test(__f.text())`, { label: "back on hydrant detail" });
     await act(`__f.click("Flow test")`, 400);
     await act(`__f.fill("Static", "72")`);

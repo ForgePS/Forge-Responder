@@ -4,6 +4,7 @@ import { useField, useRecordForm } from "../fieldContext.jsx";
 import { refItems } from "../fieldRefData.js";
 import { latestSentCopy } from "../fieldRecords.js";
 import { localDate, validateDailyLog } from "../fieldValidation.js";
+import { requiredFieldErrors } from "../fieldAppConfig.js";
 import { buildDailyLogId } from "../../lib/dailyLogSchema.js";
 import { formatAutoLockLabel, isDailyLogLocked, resolveAutoLockAt } from "../../lib/dailyLogLock.js";
 import { Banner, ErrorSummary, Field, PickerButton, PickerSheet, Screen, Section, TextArea, formatDay } from "../ui.jsx";
@@ -17,7 +18,8 @@ function describe(data) {
 }
 
 export default function DailyLogFormScreen({ params = {} }) {
-  const { refData, snapshot, recent, caps, back, navigate, records } = useField();
+  const { refData, snapshot, recent, caps, back, navigate, records, rulesFor } = useField();
+  const rules = rulesFor("dailyLog");
   const downloaded = params.logId ? refItems(refData, "dailyLogs").find((log) => log.id === params.logId) : null;
   const sent = params.logId ? latestSentCopy(records, "dailyLog", params.logId, downloaded?.updatedAt) : null;
   const serverLog = sent
@@ -33,7 +35,13 @@ export default function DailyLogFormScreen({ params = {} }) {
       : { id: "", date: localDate(), shift: recent.shift || snapshot.assignedShift || "", apparatus: recent.unit || "", crew: [], notes: "" },
     base: serverLog ? { crew: serverLog.crew || [], notes: serverLog.notes || "", updatedAt: serverLog.updatedAt } : null,
     describe,
-    validate: validateDailyLog,
+    validate: (data) => ({
+      ...validateDailyLog(data),
+      ...requiredFieldErrors(rules, [
+        { field: "crew", value: data.crew, message: "Add the crew." },
+        { field: "notes", value: data.notes, message: "Add notes." },
+      ]),
+    }),
   });
   const { data, update, errors, submit, saving, existingStatus } = form;
   const personnel = refItems(refData, "personnel");
@@ -98,7 +106,7 @@ export default function DailyLogFormScreen({ params = {} }) {
             <UnitField label="Unit" required value={data.apparatus} onChange={(value) => update({ apparatus: value })} error={errors.apparatus} />
           </>
         ) : null}
-        <Field label="Crew" error={errors.crew}>
+        {rules.show("crew") ? <Field label="Crew" required={rules.required("crew")} error={errors.crew}>
           {data.crew?.length ? (
             <div className="fa-chips">
               {data.crew.map((name) => (
@@ -116,10 +124,12 @@ export default function DailyLogFormScreen({ params = {} }) {
               ) : null}
             </div>
           ) : null}
-        </Field>
-        <Field label="Notes" error={errors.notes} hint={!readOnly && lockLabel ? `Locks ${lockLabel}` : ""}>
-          <TextArea value={data.notes} onChange={(value) => update({ notes: value })} placeholder="Training, station duties, equipment issues, visitors…" rows={6} disabled={readOnly} />
-        </Field>
+        </Field> : null}
+        {rules.show("notes") ? (
+          <Field label="Notes" required={rules.required("notes")} error={errors.notes} hint={!readOnly && lockLabel ? `Locks ${lockLabel}` : ""}>
+            <TextArea value={data.notes} onChange={(value) => update({ notes: value })} placeholder="Training, station duties, equipment issues, visitors…" rows={6} disabled={readOnly} />
+          </Field>
+        ) : null}
       </Section>
       <PickerSheet
         open={sheet === "shift"}

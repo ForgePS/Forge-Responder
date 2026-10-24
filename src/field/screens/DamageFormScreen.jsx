@@ -3,6 +3,7 @@ import { FileWarning } from "lucide-react";
 import { useField, useRecordForm } from "../fieldContext.jsx";
 import { unitOptions } from "../fieldRefData.js";
 import { localDate, validateDamageForm } from "../fieldValidation.js";
+import { requiredFieldErrors } from "../fieldAppConfig.js";
 import { Banner, ErrorSummary, Field, PhotoStrip, PickerButton, PickerSheet, Screen, Section, TextArea, TextInput, formatDay } from "../ui.jsx";
 
 function describe(data) {
@@ -13,7 +14,8 @@ function describe(data) {
 }
 
 export default function DamageFormScreen({ params = {} }) {
-  const { refData, snapshot, recent, back, caps } = useField();
+  const { refData, snapshot, recent, back, caps, rulesFor } = useField();
+  const rules = rulesFor("damageForm");
   const [sheet, setSheet] = useState(false);
   const form = useRecordForm({
     kind: "damageForm",
@@ -26,7 +28,11 @@ export default function DamageFormScreen({ params = {} }) {
       submittedBy: snapshot.displayName,
     },
     describe,
-    validate: validateDamageForm,
+    validate: (data, photos = []) => ({
+      ...(rules.required("photos") && !photos.length ? { photos: "Add a photo of the damage." } : {}),
+      ...requiredFieldErrors(rules, [{ field: "equipment", value: data.equipment, message: "Name the equipment." }]),
+      ...validateDamageForm(data),
+    }),
   });
   const { data, update, errors, submit, saving, attachments, addPhoto, removePhoto } = form;
   const locations = [...new Set([...(snapshot.profile?.stations || []), ...unitOptions(refData)])].map((value) => ({ value, label: value }));
@@ -56,18 +62,24 @@ export default function DamageFormScreen({ params = {} }) {
         <Field label="Station or unit" required error={errors.location}>
           <PickerButton value={data.location} placeholder="Where is the damaged item?" onClick={() => setSheet(true)} error={errors.location} />
         </Field>
-        <Field label="Equipment" hint="e.g. bay door, SCBA bottle, rear compartment door">
-          <TextInput value={data.equipment} onChange={(value) => update({ equipment: value })} placeholder="What item?" />
-        </Field>
+        {rules.show("equipment") ? (
+          <Field label="Equipment" required={rules.required("equipment")} error={errors.equipment} hint="e.g. bay door, SCBA bottle, rear compartment door">
+            <TextInput value={data.equipment} onChange={(value) => update({ equipment: value })} placeholder="What item?" />
+          </Field>
+        ) : null}
         <Field label="What is damaged and how?" required error={errors.description}>
           <TextArea value={data.description} onChange={(value) => update({ description: value })} placeholder="Describe the damage" rows={4} />
         </Field>
-        <Field label="Photos">
-          <PhotoStrip attachments={attachments} onAdd={addPhoto} onRemove={removePhoto} />
-        </Field>
-        <Field label="Submitted by">
-          <TextInput value={data.submittedBy} onChange={(value) => update({ submittedBy: value })} />
-        </Field>
+        {rules.show("photos") ? (
+          <Field label="Photos" required={rules.required("photos")} error={errors.photos}>
+            <PhotoStrip attachments={attachments} onAdd={addPhoto} onRemove={removePhoto} />
+          </Field>
+        ) : null}
+        {rules.show("submittedBy") ? (
+          <Field label="Submitted by">
+            <TextInput value={data.submittedBy} onChange={(value) => update({ submittedBy: value })} />
+          </Field>
+        ) : null}
       </Section>
       <PickerSheet
         open={sheet}

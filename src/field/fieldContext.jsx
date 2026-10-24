@@ -112,8 +112,10 @@ export function useRecordForm({ kind, localId: initialLocalId, initialData, desc
       const attachment = await storeAttachment(blob, file.name || "photo.jpg");
       dirtyRef.current = true;
       setAttachments((current) => [...current, attachment]);
+      return attachment;
     } catch (error) {
       toast(error?.message || "That photo couldn't be saved on this device.", "warn");
+      return null;
     }
   }, [toast]);
 
@@ -129,7 +131,7 @@ export function useRecordForm({ kind, localId: initialLocalId, initialData, desc
       latest.current = { ...latest.current, data: finalize(latest.current.data) };
       setData(latest.current.data);
     }
-    const problems = validate ? validate(latest.current.data) : {};
+    const problems = validate ? validate(latest.current.data, latest.current.attachments) : {};
     setErrors(problems);
     if (Object.keys(problems).length) {
       focusFirstError();

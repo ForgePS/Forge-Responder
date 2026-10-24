@@ -597,3 +597,44 @@ describe("storage", () => {
     await assertSucceeds(uploadString(ref(creator().storage(), "platform/branding/logo.png"), "x"));
   });
 });
+
+describe("FORGE Field settings and records", () => {
+  it("only department admins change FORGE Field settings; members can read them", async () => {
+    await assertSucceeds(setDoc(doc(adminA().firestore(), `departments/${A}/settings/fieldApp`), { appName: "Field", workflows: {} }));
+    await assertSucceeds(getDoc(doc(memberA().firestore(), `departments/${A}/settings/fieldApp`)));
+    await assertFails(setDoc(doc(memberA().firestore(), `departments/${A}/settings/fieldApp`), { appName: "Hacked" }));
+    await assertFails(setDoc(doc(memberB().firestore(), `departments/${A}/settings/fieldApp`), { appName: "Other dept" }));
+  });
+
+  it("members keep editing other settings docs as before", async () => {
+    await assertSucceeds(setDoc(doc(memberA().firestore(), `departments/${A}/settings/main`), { dailyLogSettings: { shiftChangeTime: "07:00" } }, { merge: true }));
+  });
+
+  it("check-off lists are admin-only to write, readable by members", async () => {
+    await assertSucceeds(setDoc(doc(adminA().firestore(), `departments/${A}/fieldCheckoffLists/EMS-1`), { name: "Jump bag", items: [] }));
+    await assertSucceeds(getDoc(doc(memberA().firestore(), `departments/${A}/fieldCheckoffLists/EMS-1`)));
+    await assertFails(setDoc(doc(memberA().firestore(), `departments/${A}/fieldCheckoffLists/EMS-2`), { name: "Mine", items: [] }));
+    await assertFails(deleteDoc(doc(adminA().firestore(), `departments/${A}/fieldCheckoffLists/EMS-1`)));
+  });
+
+  it("members submit check-offs as themselves; admins mark them restocked", async () => {
+    const member = memberA().firestore();
+    await assertSucceeds(setDoc(doc(member, `departments/${A}/fieldCheckoffs/CO-1`), { performedByUid: "member-a", result: "Needs restock" }));
+    await assertSucceeds(setDoc(doc(member, `departments/${A}/fieldCheckoffs/CO-1`), { performedByUid: "member-a", result: "Needs restock", notes: "retry" }, { merge: true }));
+    await assertFails(setDoc(doc(member, `departments/${A}/fieldCheckoffs/CO-2`), { performedByUid: "someone-else" }));
+    await assertFails(updateDoc(doc(member, `departments/${A}/fieldCheckoffs/CO-1`), { restockedAt: "now" }));
+    await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/fieldCheckoffs/CO-1`), { restockedAt: "now", restockedBy: "Chief" }));
+    await assertFails(updateDoc(doc(adminA().firestore(), `departments/${A}/fieldCheckoffs/CO-1`), { result: "All OK" }));
+    await assertFails(getDoc(doc(memberB().firestore(), `departments/${A}/fieldCheckoffs/CO-1`)));
+  });
+
+  it("plan updates are submitted as pending by the sender and reviewed by plan editors", async () => {
+    const member = memberA().firestore();
+    await assertSucceeds(setDoc(doc(member, `departments/${A}/fieldPlanUpdates/PFU-1`), { submittedByUid: "member-a", status: "pending", note: "Knox box moved" }));
+    await assertFails(setDoc(doc(member, `departments/${A}/fieldPlanUpdates/PFU-2`), { submittedByUid: "member-a", status: "applied" }));
+    await assertFails(setDoc(doc(member, `departments/${A}/fieldPlanUpdates/PFU-3`), { submittedByUid: "someone-else", status: "pending" }));
+    await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/fieldPlanUpdates/PFU-1`), { status: "applied", reviewedBy: "Chief", reviewedAt: "now" }));
+    await assertFails(updateDoc(doc(adminA().firestore(), `departments/${A}/fieldPlanUpdates/PFU-1`), { note: "rewritten" }));
+    await assertFails(deleteDoc(doc(adminA().firestore(), `departments/${A}/fieldPlanUpdates/PFU-1`)));
+  });
+});

@@ -3,6 +3,7 @@ import { Plus, X } from "lucide-react";
 import { useField, useRecordForm } from "../fieldContext.jsx";
 import { refItems, unitOptions } from "../fieldRefData.js";
 import { localDate, validateHoseTest } from "../fieldValidation.js";
+import { requiredFieldErrors } from "../fieldAppConfig.js";
 import { ErrorSummary, Field, PickerButton, PickerSheet, Screen, Section, Segmented, TextArea, cx, formatDay } from "../ui.jsx";
 
 function describe(data) {
@@ -18,7 +19,8 @@ const LENGTHS = ["50 ft", "100 ft", "Pony"];
 const PRESSURES = ["200 psi", "250 psi", "300 psi"];
 
 export default function HoseTestScreen({ params = {} }) {
-  const { refData, recent, snapshot, back } = useField();
+  const { refData, recent, snapshot, back, rulesFor } = useField();
+  const rules = rulesFor("hoseTest");
   const inventory = refItems(refData, "hoseInventory");
   const testedThisYear = useMemo(() => new Set(refItems(refData, "hoseTests").map((row) => String(row.hoseId || "").toUpperCase())), [refData]);
   const shifts = snapshot.profile?.shifts || [];
@@ -38,7 +40,13 @@ export default function HoseTestScreen({ params = {} }) {
       notes: "",
     },
     describe,
-    validate: validateHoseTest,
+    validate: (data) => ({
+      ...requiredFieldErrors(rules, [
+        { field: "apparatus", value: data.apparatus, message: "Pick the apparatus." },
+        { field: "notes", value: data.notes, message: "Add notes." },
+      ]),
+      ...validateHoseTest(data),
+    }),
   });
   const { data, update, errors, submit, saving } = form;
   const [typed, setTyped] = useState("");
@@ -101,19 +109,25 @@ export default function HoseTestScreen({ params = {} }) {
         <Field label="Tested by" required error={errors.testedBy}>
           <PickerButton value={data.testedBy} onClick={() => setSheet("testedBy")} />
         </Field>
-        <Field label="Apparatus">
-          <PickerButton value={data.apparatus} placeholder="Any apparatus" onClick={() => setSheet("apparatus")} />
-        </Field>
+        {rules.show("apparatus") ? (
+          <Field label="Apparatus" required={rules.required("apparatus")} error={errors.apparatus}>
+            <PickerButton value={data.apparatus} placeholder="Any apparatus" onClick={() => setSheet("apparatus")} error={errors.apparatus} />
+          </Field>
+        ) : null}
         <Field label="Hose size">
           <Segmented value={data.diameter} options={DIAMETERS} onChange={(value) => update({ diameter: value })} columns={4} />
         </Field>
         <div className="fa-grid-2">
-          <Field label="Length">
-            <Segmented value={data.length} options={LENGTHS} onChange={(value) => update({ length: value })} columns={3} />
-          </Field>
-          <Field label="Test pressure">
-            <Segmented value={data.pressure} options={PRESSURES} onChange={(value) => update({ pressure: value })} columns={3} />
-          </Field>
+          {rules.show("length") ? (
+            <Field label="Length">
+              <Segmented value={data.length} options={LENGTHS} onChange={(value) => update({ length: value })} columns={3} />
+            </Field>
+          ) : null}
+          {rules.show("pressure") ? (
+            <Field label="Test pressure">
+              <Segmented value={data.pressure} options={PRESSURES} onChange={(value) => update({ pressure: value })} columns={3} />
+            </Field>
+          ) : null}
         </div>
       </Section>
 
@@ -170,9 +184,11 @@ export default function HoseTestScreen({ params = {} }) {
             onChange={(value) => update({ result: value })}
           />
         </Field>
-        <Field label={data.result === "Failed" ? "Why did it fail?" : "Notes"} required={data.result === "Failed"} error={errors.notes}>
-          <TextArea value={data.notes} onChange={(value) => update({ notes: value })} placeholder={data.result === "Failed" ? "Leak at coupling, jacket damage…" : "Optional"} />
-        </Field>
+        {rules.show("notes") || data.result === "Failed" ? (
+          <Field label={data.result === "Failed" ? "Why did it fail?" : "Notes"} required={data.result === "Failed" || rules.required("notes")} error={errors.notes}>
+            <TextArea value={data.notes} onChange={(value) => update({ notes: value })} placeholder={data.result === "Failed" ? "Leak at coupling, jacket damage…" : "Optional"} />
+          </Field>
+        ) : null}
       </Section>
 
       <PickerSheet

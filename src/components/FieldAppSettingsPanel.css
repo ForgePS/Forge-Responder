@@ -1,0 +1,185 @@
+/* Admin → FORGE Field (desktop RMS). Uses the RMS theme tokens. */
+
+.fa-admin {
+  display: grid;
+  gap: 12px;
+}
+
+.fa-admin .department-config-nav {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.fa-admin-spacer {
+  flex: 1;
+}
+
+.fa-admin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.fa-admin-savebar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.fa-admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--rms-border);
+  border-radius: 8px;
+}
+
+.fa-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.fa-admin-table th,
+.fa-admin-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rms-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.fa-admin-table th {
+  background: var(--rms-bg-panel-header);
+  color: var(--rms-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fa-admin-table input:not([type="checkbox"]):not([type="radio"]),
+.fa-admin-table select {
+  width: 100%;
+  min-height: 29px;
+  padding: 0 7px;
+  border: 1px solid var(--rms-border);
+  border-radius: 4px;
+  background: var(--rms-bg-input);
+  color: var(--rms-text-strong);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.fa-admin-table .fa-admin-num {
+  width: 72px;
+}
+
+.fa-admin-center {
+  text-align: center !important;
+}
+
+.fa-admin-actions {
+  white-space: nowrap;
+}
+
+.fa-admin-click {
+  cursor: pointer;
+}
+
+.fa-admin-click:hover {
+  background: var(--rms-bg-hover);
+}
+
+.fa-admin-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fa-admin-chip {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--rms-border-strong);
+  background: var(--rms-bg-surface);
+  color: var(--rms-text-body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.fa-admin-chip.is-on {
+  border-color: var(--rms-primary);
+  background: var(--rms-primary-soft);
+  color: var(--rms-primary-hover);
+  font-weight: 700;
+}
+
+.fa-admin-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fa-admin-subrow {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.fa-admin-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--rms-border);
+  border-radius: 8px;
+  background: var(--rms-bg-surface);
+}
+
+.fa-admin-card.is-alert {
+  border-color: var(--rms-warning);
+}
+
+.fa-admin-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--rms-bg-surface-3);
+  color: var(--rms-text-body);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fa-admin-badge.is-alert {
+  background: rgba(255, 159, 41, 0.18);
+  color: #9a5b00;
+}
+
+.fa-admin-restock {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+}
+
+.fa-admin-note {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.fa-admin-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fa-admin-photos img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--rms-border);
+}
+
+.fa-admin-fields,
+.fa-admin-lists,
+.fa-admin-results {
+  display: grid;
+  gap: 10px;
+}

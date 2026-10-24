@@ -4,6 +4,7 @@ import { useField, useRecordForm } from "../fieldContext.jsx";
 import { refItems, unitOptions } from "../fieldRefData.js";
 import { latestSentCopy } from "../fieldRecords.js";
 import { localDate, localDateTime, validateIncident } from "../fieldValidation.js";
+import { requiredFieldErrors } from "../fieldAppConfig.js";
 import { EMS_CHIEF_COMPLAINTS, INCIDENT_DISCIPLINES } from "../../lib/neris/picklists.js";
 import { Banner, Chips, ErrorSummary, Field, PickerButton, PickerSheet, Screen, Section, Stepper, TextArea, TextInput, formatDay } from "../ui.jsx";
 
@@ -87,7 +88,8 @@ function TimeField({ label, value, onChange, error }) {
 }
 
 export default function IncidentFormScreen({ params = {} }) {
-  const { refData, recent, back, records } = useField();
+  const { refData, recent, back, records, rulesFor } = useField();
+  const rules = rulesFor("incident");
   const downloaded = params.reportId ? refItems(refData, "incidents").find((report) => report.id === params.reportId) : null;
   const sent = params.reportId ? latestSentCopy(records, "incident", params.reportId, downloaded?.updatedAt) : null;
   const serverReport = sent ? { ...(downloaded || {}), ...sent.base, id: params.reportId, reportNumber: sent.data.reportNumber } : downloaded;
@@ -98,7 +100,17 @@ export default function IncidentFormScreen({ params = {} }) {
     initialData: initial,
     base: serverReport ? fromServer(serverReport) : null,
     describe,
-    validate: validateIncident,
+    validate: (data) => ({
+      ...validateIncident(data),
+      ...requiredFieldErrors(rules, [
+        { field: "cadNumber", value: data.workspace?.cad?.incidentNumber, message: "Enter the CAD / incident number." },
+        { field: "disciplines", value: data.disciplines, message: "Pick at least one." },
+        { field: "times", errorKey: "dispatchTime", value: data.workspace?.cad?.dispatchTime, message: "Enter the dispatch time." },
+        { field: "units", value: data.workspace?.units, message: "Add the units." },
+        { field: "crew", value: data.workspace?.personnel, message: "Add the crew." },
+        { field: "narrative", value: data.workspace?.narrative?.body, message: "Write the narrative." },
+      ]),
+    }),
   });
   const { data, update, errors, submit, saving } = form;
   const [sheet, setSheet] = useState("");
@@ -158,41 +170,46 @@ export default function IncidentFormScreen({ params = {} }) {
           <Field label="Date" required error={errors.incidentDate}>
             <input className="fa-input" type="date" value={data.incidentDate} max={localDate()} onChange={(event) => update({ incidentDate: event.target.value })} />
           </Field>
-          <Field label="CAD / incident #">
-            <TextInput value={cad.incidentNumber} onChange={(value) => setWorkspace("cad", { incidentNumber: value })} inputMode="text" autoCapitalize="characters" />
-          </Field>
+          {rules.show("cadNumber") ? (
+            <Field label="CAD / incident #" required={rules.required("cadNumber")} error={errors.cadNumber}>
+              <TextInput value={cad.incidentNumber} onChange={(value) => setWorkspace("cad", { incidentNumber: value })} inputMode="text" autoCapitalize="characters" />
+            </Field>
+          ) : null}
         </div>
-        <Field label="Disciplines">
-          <Chips values={data.disciplines} options={INCIDENT_DISCIPLINES.map((row) => ({ value: row.value, label: row.label }))} onChange={(values) => update({ disciplines: values })} />
-        </Field>
+        {rules.show("disciplines") ? (
+          <Field label="Disciplines" required={rules.required("disciplines")} error={errors.disciplines}>
+            <Chips values={data.disciplines} options={INCIDENT_DISCIPLINES.map((row) => ({ value: row.value, label: row.label }))} onChange={(values) => update({ disciplines: values })} />
+          </Field>
+        ) : null}
       </Section>
 
-      <Section title="Times">
-        <TimeField label="Dispatched" value={cad.dispatchTime} onChange={(value) => setWorkspace("cad", { dispatchTime: value })} />
+      {rules.show("times") ? <Section title="Times">
+        <TimeField label="Dispatched" value={cad.dispatchTime} onChange={(value) => setWorkspace("cad", { dispatchTime: value })} error={errors.dispatchTime} />
         <TimeField label="On scene" value={cad.arrivalTime} onChange={(value) => setWorkspace("cad", { arrivalTime: value })} error={errors.arrivalTime} />
         <TimeField label="Cleared" value={cad.clearTime} onChange={(value) => setWorkspace("cad", { clearTime: value })} error={errors.clearTime} />
-      </Section>
+      </Section> : null}
 
-      <Section title="Units & crew">
-        <div className="fa-chips">
+      {rules.show("units") || rules.show("crew") ? <Section title="Units & crew">
+        {errors.units || errors.crew ? <div className="fa-error-text" data-error="1">{errors.units || errors.crew}</div> : null}
+        {rules.show("units") ? <div className="fa-chips">
           {(data.workspace?.units || []).map((unit) => (
             <button key={unit.unitId} type="button" className="fa-chip is-active" onClick={() => setWorkspace("units", data.workspace.units.filter((row) => row.unitId !== unit.unitId))} aria-label={`Remove ${unit.unitId}`}>
               {unit.unitId} <Trash2 size={15} />
             </button>
           ))}
           <button type="button" className="fa-chip" onClick={() => setSheet("units")}><Plus size={16} /> Units</button>
-        </div>
-        <div className="fa-chips">
+        </div> : null}
+        {rules.show("crew") ? <div className="fa-chips">
           {(data.workspace?.personnel || []).map((person) => (
             <button key={person.personnelId || person.name} type="button" className="fa-chip is-active" onClick={() => setWorkspace("personnel", data.workspace.personnel.filter((row) => row.name !== person.name))} aria-label={`Remove ${person.name}`}>
               {person.name} <Trash2 size={15} />
             </button>
           ))}
           <button type="button" className="fa-chip" onClick={() => setSheet("crew")}><Users size={16} /> Crew</button>
-        </div>
-      </Section>
+        </div> : null}
+      </Section> : null}
 
-      {isEms ? (
+      {isEms && rules.show("patients") ? (
         <Section title="Patients">
           <div className="fa-grid-2">
             <Field label="Number of patients" error={errors.patientCount}>
@@ -206,9 +223,13 @@ export default function IncidentFormScreen({ params = {} }) {
         </Section>
       ) : null}
 
-      <Section title="Narrative">
-        <TextArea value={data.workspace?.narrative?.body} onChange={(value) => setWorkspace("narrative", { body: value })} placeholder="What you found, what you did, outcome" rows={6} />
-      </Section>
+      {rules.show("narrative") ? (
+        <Section title="Narrative">
+          <Field required={rules.required("narrative")} error={errors.narrative}>
+            <TextArea value={data.workspace?.narrative?.body} onChange={(value) => setWorkspace("narrative", { body: value })} placeholder="What you found, what you did, outcome" rows={6} />
+          </Field>
+        </Section>
+      ) : null}
 
       <PickerSheet
         open={sheet === "type"}

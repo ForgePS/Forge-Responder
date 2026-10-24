@@ -9,6 +9,12 @@ export const FORM_FOR_KIND = {
   damageForm: "damageForm",
   dailyLog: "dailyLogForm",
   incident: "incidentForm",
+  checkoff: "checkoffForm",
+  inspection: "inspectionForm",
+  planUpdate: "planUpdate",
+  planCreate: "planEdit",
+  planEdit: "planEdit",
+  hydrantEdit: "hydrantEdit",
 };
 
 export const KIND_LABELS = {
@@ -20,4 +26,10 @@ export const KIND_LABELS = {
   damageForm: "Damage form",
   dailyLog: "Daily log",
   incident: "Incident report",
+  checkoff: "Check-off",
+  inspection: "Inspection",
+  planUpdate: "Plan update",
+  planCreate: "New pre-fire plan",
+  planEdit: "Pre-fire plan edit",
+  hydrantEdit: "Hydrant info",
 };

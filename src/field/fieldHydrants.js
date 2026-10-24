@@ -77,3 +77,69 @@ export function hydrantStatusTone(hydrant = {}) {
   if (/limited|restricted|repair|damaged/.test(status)) return "warn";
   return "ok";
 }
+
+/* ---------------- same status rules as the desktop hydrant pages ---------------- */
+
+export const HYDRANT_PRIVATE_COLOR = "#5b21b6";
+
+export function isPrivateHydrant(hydrant = {}) {
+  return /P$/i.test(String(hydrant.hydrant_id || hydrant.official_hydrant_id || "").trim())
+    || /private/i.test(String(hydrant.status || ""));
+}
+
+export function isOutOfServiceHydrant(hydrant = {}) {
+  const status = String(hydrant.status || "").toLowerCase();
+  const flow = String(hydrant.flow_result || "").trim().toUpperCase();
+  return status.includes("out") || flow === "OOS";
+}
+
+export function isCheckedThisYear(hydrant = {}, year = String(new Date().getFullYear())) {
+  if (isPrivateHydrant(hydrant) || isOutOfServiceHydrant(hydrant)) return true;
+  return String(hydrant.checked_year || "") === year || String(hydrant.last_checked || "").startsWith(year);
+}
+
+export function isDueThisYear(hydrant = {}) {
+  return !isPrivateHydrant(hydrant) && !isOutOfServiceHydrant(hydrant) && !isCheckedThisYear(hydrant);
+}
+
+export function checkedLabel(hydrant = {}) {
+  const year = String(new Date().getFullYear());
+  if (isPrivateHydrant(hydrant)) return "Private — do not test";
+  if (isOutOfServiceHydrant(hydrant)) return "Out of service";
+  return isCheckedThisYear(hydrant) ? `Checked ${year}` : `Due ${year}`;
+}
+
+const FLOW_COLORS = { B: "#2563eb", G: "#16a34a", O: "#f97316", R: "#dc2626" };
+const CLASS_COLORS = { "Class AA": "#2563eb", "Class A": "#16a34a", "Class B": "#f97316", "Class C": "#dc2626" };
+
+export function hydrantFlowColor(hydrant = {}) {
+  if (isPrivateHydrant(hydrant)) return HYDRANT_PRIVATE_COLOR;
+  if (isOutOfServiceHydrant(hydrant)) return "#050505";
+  return CLASS_COLORS[hydrant.nfpa_class] || FLOW_COLORS[String(hydrant.flow_result || "").toUpperCase()] || "#64748b";
+}
+
+export function hydrantDistrict(hydrant = {}) {
+  return String(hydrant.district || "").trim() || "Unassigned";
+}
+
+/** Districts with hydrant counts, numeric order, "Unassigned" last. */
+export function districtCounts(hydrants = []) {
+  const counts = new Map();
+  hydrants.forEach((hydrant) => {
+    const district = hydrantDistrict(hydrant);
+    counts.set(district, (counts.get(district) || 0) + 1);
+  });
+  return [...counts.entries()]
+    .sort(([a], [b]) => (a === "Unassigned") - (b === "Unassigned") || a.localeCompare(b, undefined, { numeric: true }))
+    .map(([district, count]) => ({ district, count }));
+}
+
+export function hydrantSummary(hydrants = []) {
+  return {
+    total: hydrants.length,
+    checked: hydrants.filter((hydrant) => !isPrivateHydrant(hydrant) && !isOutOfServiceHydrant(hydrant) && isCheckedThisYear(hydrant)).length,
+    due: hydrants.filter(isDueThisYear).length,
+    outOfService: hydrants.filter(isOutOfServiceHydrant).length,
+    private: hydrants.filter(isPrivateHydrant).length,
+  };
+}

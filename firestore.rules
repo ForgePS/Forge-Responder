@@ -412,7 +412,8 @@ service cloud.firestore {
         "preplanTemplateVersions", "preplanTemplates", "preplanVerifications", "preplans",
         "profile", "public", "roles", "settings",
         "users", "violationCatalog", "violations", "waterCompanies",
-        "waterCompanyContacts", "waterDistricts"
+        "waterCompanyContacts", "waterDistricts",
+        "fieldCheckoffLists", "fieldCheckoffs", "fieldPlanUpdates"
       ];
     }
 
@@ -438,9 +439,48 @@ service cloud.firestore {
       }
       match /settings/{document} {
         allow read: if canAccessDepartment(departmentId);
-        allow create: if canAccessDepartment(departmentId);
+        // FORGE Field settings (workflows, fields, logo) are admin-only.
+        allow create: if canAccessDepartment(departmentId)
+          && (document != "fieldApp" || isDepartmentAdmin(departmentId));
         allow update: if canAccessDepartment(departmentId)
-          && (isPlatformCreator() || (subscriptionFieldUnchanged() && enabledModulesUnchanged()));
+          && (isPlatformCreator() || (subscriptionFieldUnchanged() && enabledModulesUnchanged()))
+          && (document != "fieldApp" || isDepartmentAdmin(departmentId));
+      }
+      // FORGE Field: EMS unit / supply closet check-off lists (built by admins)
+      // and the counts crews submit from the field.
+      match /fieldCheckoffLists/{listId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create, update: if isDepartmentAdmin(departmentId);
+        allow delete: if false;
+      }
+      match /fieldCheckoffs/{checkoffId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if canAccessDepartment(departmentId)
+          && request.resource.data.get("performedByUid", "") == request.auth.uid;
+        // A retried sync rewrites the same check-off; admins mark it restocked.
+        allow update: if (canAccessDepartment(departmentId)
+            && resource.data.get("performedByUid", "") == request.auth.uid
+            && request.resource.data.get("performedByUid", "") == request.auth.uid
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["restockedAt", "restockedBy"]))
+          || (isDepartmentAdmin(departmentId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["restockedAt", "restockedBy", "updatedAt"]));
+        allow delete: if false;
+      }
+      // Pre-fire plan updates sent from the field for review.
+      match /fieldPlanUpdates/{updateId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if canAccessDepartment(departmentId)
+          && request.resource.data.get("submittedByUid", "") == request.auth.uid
+          && request.resource.data.get("status", "") == "pending";
+        allow update: if canAccessDepartment(departmentId)
+          && (
+            (resource.data.get("submittedByUid", "") == request.auth.uid
+              && request.resource.data.get("status", "") == "pending"
+              && request.resource.data.get("submittedByUid", "") == request.auth.uid)
+            || (isDepartmentAdmin(departmentId) || canWriteModule(departmentId, "preplans"))
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "reviewNote", "reviewedAt", "reviewedBy", "updatedAt"])
+          );
+        allow delete: if false;
       }
       // A list is either one record holding an items array (older), or a header
       // { storage: "items" } with each item in lists/{listKey}/items/{itemId}.

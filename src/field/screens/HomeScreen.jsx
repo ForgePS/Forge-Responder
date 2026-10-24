@@ -2,7 +2,11 @@ import { useMemo } from "react";
 import {
   AlertTriangle,
   BookOpen,
+  Building,
   ChevronRight,
+  ClipboardList,
+  PackageOpen,
+  Stethoscope,
   ClipboardCheck,
   Droplets,
   FileWarning,
@@ -65,6 +69,14 @@ export default function HomeScreen() {
     + records.filter((record) => record.kind === "hoseTest" && record.status !== "synced").reduce((sum, record) => sum + (record.data?.hoseIds?.length || 0), 0);
   const drafts = records.filter((record) => record.status === "draft");
   const todaysLogs = refItems(refData, "dailyLogs").filter((log) => log.date === today);
+  const checkoffLists = refItems(refData, "checkoffLists");
+  const emsLists = checkoffLists.filter((list) => list.kind === "ems");
+  const supplyLists = checkoffLists.filter((list) => list.kind === "supply");
+  const doneToday = (kind) => new Set(records
+    .filter((record) => record.kind === "checkoff" && record.status !== "draft" && record.data?.list?.kind === kind && record.data?.completedAt && localDate(new Date(record.data.completedAt)) === today)
+    .map((record) => record.data.listId)).size;
+  const assignedInspections = refItems(refData, "inspections");
+  const planCount = refItems(refData, "preplans").length + refItems(refData, "legacyPlans").length;
   const noData = !refData.fetchedAt;
 
   const tiles = [
@@ -75,6 +87,38 @@ export default function HomeScreen() {
       detail: assets.length ? `${checkedToday.size} of ${assets.length} units checked today` : "Daily apparatus check",
       onClick: () => navigate("truckCheck"),
       tone: "red",
+    },
+    caps.emsCheckoff && emsLists.length > 0 && {
+      key: "ems",
+      icon: <Stethoscope size={30} />,
+      title: "EMS unit check-off",
+      detail: `${doneToday("ems")} of ${emsLists.length} done today`,
+      onClick: () => navigate("checkoffs", { kind: "ems" }),
+      tone: "red",
+    },
+    caps.supplyCheckoff && supplyLists.length > 0 && {
+      key: "supply",
+      icon: <PackageOpen size={30} />,
+      title: "Supply closet check-off",
+      detail: `${supplyLists.length} list${supplyLists.length === 1 ? "" : "s"} · counts and expirations`,
+      onClick: () => navigate("checkoffs", { kind: "supply" }),
+      tone: "teal",
+    },
+    caps.inspections && {
+      key: "inspections",
+      icon: <ClipboardList size={30} />,
+      title: "Inspections",
+      detail: assignedInspections.length ? `${assignedInspections.length} assigned to you` : "None assigned right now",
+      onClick: () => navigate("inspections"),
+      tone: "violet",
+    },
+    caps.preFirePlans && {
+      key: "plans",
+      icon: <Building size={30} />,
+      title: "Pre-fire plans",
+      detail: planCount ? `${planCount} plans on this device` : "Find a plan by address or nearest",
+      onClick: () => navigate("plans"),
+      tone: "amber",
     },
     (caps.hydrants || caps.hydrantDamage) && {
       key: "hydrants",

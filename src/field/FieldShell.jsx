@@ -16,7 +16,9 @@ import {
 import { FieldContext } from "./fieldContext.jsx";
 import { fieldCapabilities } from "./fieldSession.js";
 import { listRecords, subscribeRecords, summarizeRecords } from "./fieldRecords.js";
-import { loadRecent, loadRefData, refreshRefData } from "./fieldRefData.js";
+import { loadRecent, loadRefData, refConfig, refreshRefData } from "./fieldRefData.js";
+import { formFieldRules } from "./fieldAppConfig.js";
+import { loadCrewSession, saveCrewSession } from "./fieldCrew.js";
 import { getSyncState, startSync, stopSync, subscribeSync, syncNow } from "./fieldSync.js";
 import { activateUpdate, subscribeUpdateReady } from "./registerFieldSW.js";
 import { cx } from "./ui.jsx";
@@ -35,6 +37,10 @@ import DailyLogScreen from "./screens/DailyLogScreen.jsx";
 import DailyLogFormScreen from "./screens/DailyLogFormScreen.jsx";
 import IncidentsScreen from "./screens/IncidentsScreen.jsx";
 import IncidentFormScreen from "./screens/IncidentFormScreen.jsx";
+import { CheckoffFormScreen, CheckoffListsScreen } from "./screens/CheckoffScreens.jsx";
+import { InspectionFormScreen, InspectionsScreen } from "./screens/InspectionScreens.jsx";
+import { PlanEditScreen, PlanUpdateScreen, PlanViewScreen, PlansScreen } from "./screens/PlanScreens.jsx";
+import HydrantEditScreen from "./screens/HydrantEditScreen.jsx";
 
 const SCREENS = {
   home: HomeScreen,
@@ -52,6 +58,15 @@ const SCREENS = {
   dailyLogForm: DailyLogFormScreen,
   incidents: IncidentsScreen,
   incidentForm: IncidentFormScreen,
+  checkoffs: CheckoffListsScreen,
+  checkoffForm: CheckoffFormScreen,
+  inspections: InspectionsScreen,
+  inspectionForm: InspectionFormScreen,
+  plans: PlansScreen,
+  planView: PlanViewScreen,
+  planEdit: PlanEditScreen,
+  planUpdate: PlanUpdateScreen,
+  hydrantEdit: HydrantEditScreen,
 };
 
 const REF_REFRESH_MS = 20 * 60_000;
@@ -108,15 +123,18 @@ function readScreenFromHistory() {
 }
 
 export default function FieldShell({ snapshot, online, accessLive }) {
-  const caps = useMemo(() => fieldCapabilities(snapshot), [snapshot]);
   const [route, setRoute] = useState(readScreenFromHistory);
   const [refData, setRefData] = useState({ parts: {}, fetchedAt: "" });
+  const config = useMemo(() => refConfig(refData), [refData]);
+  const caps = useMemo(() => fieldCapabilities(snapshot, config), [snapshot, config]);
+  const rulesFor = useCallback((form) => formFieldRules(config, form, snapshot.roleIds || []), [config, snapshot.roleIds]);
   const [refLoading, setRefLoading] = useState(false);
   const [refError, setRefError] = useState("");
   const [records, setRecords] = useState([]);
   const [recent, setRecent] = useState({});
   const [sync, setSync] = useState(getSyncState);
   const [toasts, setToasts] = useState([]);
+  const [crew, setCrewState] = useState(null);
   const [updateReady, setUpdateReady] = useState(false);
   const refRef = useRef(refData);
   const capsRef = useRef(caps);
@@ -177,6 +195,16 @@ export default function FieldShell({ snapshot, online, accessLive }) {
 
   /* ------------------------------ reference data ------------------------------ */
   useEffect(() => {
+    loadCrewSession(snapshot.departmentId).then(setCrewState).catch(() => null);
+  }, [snapshot.departmentId]);
+
+  const setCrew = useCallback(async (session) => {
+    const saved = await saveCrewSession(snapshot.departmentId, session);
+    setCrewState(saved);
+    return saved;
+  }, [snapshot.departmentId]);
+
+  useEffect(() => {
     loadRefData(snapshot.departmentId).then(setRefData).catch(() => null);
     loadRecent(snapshot.departmentId).then(setRecent).catch(() => null);
   }, [snapshot.departmentId]);
@@ -189,7 +217,7 @@ export default function FieldShell({ snapshot, online, accessLive }) {
     setRefLoading(true);
     setRefError("");
     try {
-      const { data, failed } = await refreshRefData({ departmentId: snapshot.departmentId, caps: capsRef.current, actor });
+      const { data, failed } = await refreshRefData({ departmentId: snapshot.departmentId, snapshot: snapRef.current, actor });
       setRefData(data);
       if (failed.length) setRefError(`Some data didn't update (${failed.join(", ")}). The saved copy is used.`);
       else if (!quiet) toast("Field data updated");
@@ -233,14 +261,20 @@ export default function FieldShell({ snapshot, online, accessLive }) {
     if (online) syncNow();
   }, [online]);
 
-  // After records reach the server, refresh the downloaded copies (throttled).
+  // After records reach the server, refresh the downloaded copies (at most every 15 s).
   const syncedCount = records.filter((row) => row.status === "synced").length;
   const lastSyncedRefresh = useRef(0);
+  const syncedRefreshTimer = useRef(0);
   useEffect(() => {
-    if (!syncedCount || !online || Date.now() - lastSyncedRefresh.current < 60_000) return;
-    lastSyncedRefresh.current = Date.now();
-    refresh({ quiet: true });
-  }, [syncedCount]);
+    if (!syncedCount || !online) return undefined;
+    const wait = Math.max(2_000, 15_000 - (Date.now() - lastSyncedRefresh.current));
+    window.clearTimeout(syncedRefreshTimer.current);
+    syncedRefreshTimer.current = window.setTimeout(() => {
+      lastSyncedRefresh.current = Date.now();
+      refresh({ quiet: true });
+    }, wait);
+    return () => window.clearTimeout(syncedRefreshTimer.current);
+  }, [syncedCount, online]);
 
   /* ------------------------------- app updates -------------------------------- */
   useEffect(() => subscribeUpdateReady(() => setUpdateReady(true)), []);
@@ -251,6 +285,10 @@ export default function FieldShell({ snapshot, online, accessLive }) {
   const contextValue = useMemo(() => ({
     snapshot,
     caps,
+    config,
+    rulesFor,
+    crew,
+    setCrew,
     online,
     refData,
     refLoading,
@@ -265,7 +303,7 @@ export default function FieldShell({ snapshot, online, accessLive }) {
     back,
     toast,
     actor,
-  }), [snapshot, caps, online, refData, refLoading, refError, refresh, records, counts, recent, sync, navigate, back, toast, actor]);
+  }), [snapshot, caps, config, rulesFor, crew, setCrew, online, refData, refLoading, refError, refresh, records, counts, recent, sync, navigate, back, toast, actor]);
 
   const isTab = TAB_ROOTS.has(route.name);
 
@@ -274,12 +312,12 @@ export default function FieldShell({ snapshot, online, accessLive }) {
       <div className="fa-app">
         <header className="fa-topbar">
           <button type="button" className="fa-brand" onClick={() => goTab("home")} aria-label="Home">
-            {snapshot.logoUrl && !snapshot.logoUrl.includes("forge-logo")
-              ? <img src={snapshot.logoUrl} alt="" />
+            {(config?.logoUrl || (snapshot.logoUrl && !snapshot.logoUrl.includes("forge-logo")))
+              ? <img src={config?.logoUrl || snapshot.logoUrl} alt="" />
               : <span className="fa-brand-mark" aria-hidden="true"><Flame size={22} /></span>}
             <span className="fa-brand-text">
               <strong>{snapshot.departmentName}</strong>
-              <small>FORGE Field</small>
+              <small>{config?.appName || "FORGE Field"}</small>
             </span>
           </button>
           <SyncPill online={online} sync={sync} counts={counts} onClick={() => goTab("activity")} />
