@@ -24,11 +24,13 @@ import { isPlatformScope } from "./lib/tenantPaths.js";
 import { useTenantPersistentState } from "./hooks/useTenantPersistentState.js";
 import { formatRoleLabel, membershipInitials } from "./lib/departmentMembership.js";
 import AccessDeniedPage from "./pages/AccessDeniedPage.jsx";
+import { useDepartmentStatus } from "./hooks/useDepartmentStatus.js";
 import DemoEntryPage from "./pages/DemoEntryPage.jsx";
 import DemoModeBanner from "./components/DemoModeBanner.jsx";
 import GatewayNotFoundPage from "./pages/GatewayNotFoundPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import TwoFactorScreen from "./components/security/TwoFactorScreen.jsx";
+import AccountMenu from "./components/security/AccountMenu.jsx";
 import TwoFactorReminder from "./components/security/TwoFactorReminder.jsx";
 import { useTwoFactorStatus } from "./hooks/useTwoFactorStatus.js";
 import { isDemoEntryPath, isDemoModeActive } from "./lib/demoMode.js";
@@ -113,7 +115,9 @@ import { normalizeEmployeePortalRules } from "./lib/employeePortalRules.js";
 import { normalizePayRules } from "./lib/payRules.js";
 import { normalizeDailyLogSettings } from "./lib/dailyLogSettings.js";
 const CreatorConsolePage = lazyPage(() => import("./pages/CreatorConsolePage.jsx"));
-import { ModulePage, AccessDeniedModule } from "./pages/ModulePage.jsx";
+import { ModulePage, AccessDeniedModule, ModuleNotIncluded } from "./pages/ModulePage.jsx";
+import { NAV_MODULE_MAP } from "./data/adminRegistry.js";
+import SaveFailedNotice from "./components/SaveFailedNotice.jsx";
 const CertificationsPage = lazyPage(() => import("./pages/CertificationsPage.jsx"));
 const SchedulingPage = lazyPage(() => import("./pages/SchedulingPage.jsx"));
 const TrainingPage = lazyPage(() => import("./pages/TrainingPage.jsx"));
@@ -226,7 +230,6 @@ const navGroups = [
   { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Uploads", Upload]] },
   { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay]] },
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
-  { label: "Future / Later", items: [["Incidents", AlertTriangle], ["EMS Reports", Ambulance], ["Compliance Export", Upload]] }
 ];
 
 // Every in-app page reachable from the menu, keyed by its URL slug (?page=...).
@@ -637,11 +640,7 @@ function TopBar({
       <div className="command-time"><span><CalendarDays size={15} /> {dateLabel}</span><span><Clock3 size={15} /> {timeLabel}</span></div>
       {!hideSearch && <label className="global-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search personnel, apparatus, occupancies, training, inspections..." /></label>}
       <NotificationBell departmentId={departmentId} userId={user?.uid} />
-      <button className="profile-button" type="button" onClick={onSignOut} title="Sign out">
-        <span>{initials}</span>
-        <div><strong>{displayName}</strong><small>{roleLabel}</small></div>
-        <ChevronRight size={13} />
-      </button>
+      <AccountMenu initials={initials} displayName={displayName} roleLabel={roleLabel} onSignOut={onSignOut} />
     </div>
   </header>;
 }
@@ -790,7 +789,8 @@ function AppShell() {
   }, [departmentId, platformConfig?.availablePreplanFeatures]);
 
   const visibleNavGroups = useMemo(() => {
-    const permissionFiltered = filterNavGroups(navGroups, permissions, { isCreator });
+    const permissionFiltered = filterNavGroups(navGroups, permissions, { isCreator })
+      .map((group) => (isCreator ? group : { ...group, items: (group.items || []).filter(([name]) => name !== "Fleet Hardening") }));
     const moduleFiltered = filterNavByEnabledModules(permissionFiltered, isModuleEnabled, {
       isCreator,
       isPlatformScope: inPlatformScope,
@@ -1167,6 +1167,9 @@ function AppShell() {
     setEmployeeSection(name);
     setMobileNav(false);
   }
+  // A page whose module is switched off (reachable by a saved ?page= link) is not shown.
+  const blockedModuleKey = effectiveAppView === "employee" ? "" : NAV_MODULE_MAP[current] || "";
+  const moduleBlocked = Boolean(!inPlatformScope && blockedModuleKey && !isModuleEnabled(blockedModuleKey));
   const pageContent = effectiveAppView === "employee" ? (
     <EmployeePortalPage
       current={employeeSection}
@@ -1186,6 +1189,8 @@ function AppShell() {
       setShiftTrades={setShiftTrades}
       vacancyPickups={vacancyPickups}
       setVacancyPickups={setVacancyPickups}
+      callShifts={callShifts}
+      setCallShifts={setCallShifts}
       setPersonnel={setPersonnel}
       scheduleDays={scheduleDays}
       roster={roster}
@@ -1357,6 +1362,7 @@ function AppShell() {
         }
         legacyWritesLocked={fleetCutover.legacyApparatusWritesLocked}
         onOpenFleetAssets={() => setCurrent("All Fleet Assets")}
+        onOpenFleetReport={hasPermission(permissions, "viewFleetReporting") || isCreator ? () => setCurrent("Reporting & Automation") : undefined}
       />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Fleet Dashboard" ? (
@@ -1463,10 +1469,7 @@ function AppShell() {
       ? <FleetVendorPortalPage onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
   ) : current === "Fleet Hardening" ? (
-    hasPermission(permissions, "manageFleetConfig")
-      || hasPermission(permissions, "manageSystemSettings")
-      || hasPermission(permissions, "viewFleetDashboard")
-      || isCreator
+    isCreator
       ? <FleetHardeningPage onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
   ) : current === "All Fleet Assets" ? (
@@ -1487,11 +1490,11 @@ function AppShell() {
       )
       : <AccessDeniedModule name={current} />
   ) : current === "Maintenance" ? (
-    hasPermission(permissions, "viewApparatus") ? <MaintenancePage orders={workOrders} setOrders={setWorkOrders} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "viewApparatus") ? <MaintenancePage orders={workOrders} setOrders={setWorkOrders} units={apparatus} canEdit={canEditApparatus(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Assets" ? (
     hasPermission(permissions, "viewAssets") ? <AssetsPageConnected query={query} records={assets} setRecords={setAssets} canEdit={canEditAssets(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Hose Testing" ? (
-    hasPermission(permissions, "viewApparatus") ? <HoseTestingPage query={query} records={hoseTests} setRecords={setHoseTests} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "viewApparatus") ? <HoseTestingPage query={query} records={hoseTests} setRecords={setHoseTests} apparatus={apparatus} canEdit={canEditApparatus(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Occupancies" ? (
     hasPermission(permissions, "viewInspections") ? (
       <OccupanciesMasterPage
@@ -1647,7 +1650,7 @@ function AppShell() {
           onNavigate={setCurrent}
           variant="nearby"
           title="Nearby Preplans"
-          description="Operational preplans for response (map overlay comes with Phase 5)."
+          description="Operational preplans for response."
         />
       )
       : <AccessDeniedModule name={current} />
@@ -1794,7 +1797,7 @@ function AppShell() {
       || isCreator
       ? <HydrantDamageAnalyticsPage onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
-  ) : <ModulePage name={current} query={query} />;
+  ) : <ModulePage name={current} />;
 
   return <main className={`app-shell ${collapsed ? "nav-collapsed" : ""} ${mobileNav ? "mobile-nav-open" : ""} ${isHydrantsView ? "hydrants-view" : ""} ${isDemoModeActive() ? "demo-mode-shell" : ""}`}>
     {isDemoModeActive() && <DemoModeBanner />}
@@ -1862,7 +1865,7 @@ function AppShell() {
         </div>
       )}
       {/* Module pages load on demand (see lazyPage). */}
-      <Suspense fallback={<PageLoading />}>{pageContent}</Suspense>
+      <Suspense fallback={<PageLoading />}>{moduleBlocked ? <ModuleNotIncluded name={current} /> : pageContent}</Suspense>
     </section>
     {!isHydrantsView ? (
       <PlatformFooter
@@ -1875,8 +1878,9 @@ function AppShell() {
 
 export default function App() {
   const { authRequired, authLoading, membershipLoading, user, membership, isCreator } = useAuth();
-  const { ready, gatewayDepartmentId, gatewayError } = useTenant();
+  const { ready, gatewayDepartmentId, gatewayError, departmentId: activeDepartmentId, isPlatformScope: platformScopeActive } = useTenant();
   const twoFactor = useTwoFactorStatus();
+  const departmentStatus = useDepartmentStatus(user && !isCreator && !platformScopeActive ? activeDepartmentId : "");
 
   if (isDemoEntryPath() && !authLoading) {
     return <DemoEntryPage />;
@@ -1916,9 +1920,12 @@ export default function App() {
     }
   }
   if (!membership && !isCreator) return <AccessDeniedPage userId={user?.uid} />;
+  // The rules refuse members of a suspended or archived department; say why.
+  if (!isCreator && departmentStatus.reason) return <AccessDeniedPage userId={user?.uid} />;
   return (
     <>
       <Suspense fallback={<LoadingScreen />}><AppShell /></Suspense>
+      <SaveFailedNotice />
       {twoFactor.level === "grace" && twoFactor.sessionOk === false && (
         <TwoFactorReminder daysLeft={twoFactor.daysLeft} enrolled={twoFactor.enrolled} />
       )}

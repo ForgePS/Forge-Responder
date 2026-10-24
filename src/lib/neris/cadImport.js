@@ -268,7 +268,7 @@ export function refreshCadInfo(report) {
     ...existing,
     incidentNumber: existing.incidentNumber || report.reportNumber || "",
     cadCallNumber: existing.cadCallNumber || report.cadIncidentId || report.reportNumber || "",
-    dispatchTime: existing.dispatchTime || (report.incidentDate ? `${report.incidentDate}T08:00` : ""),
+    dispatchTime: existing.dispatchTime || "",
     priority: existing.priority || "Routine",
     alarmLevel: existing.alarmLevel || "1",
   };

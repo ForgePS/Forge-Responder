@@ -14,6 +14,9 @@ import {
   DEFAULT_CALL_SHIFT_TIERS,
   formatCallShiftStatus,
   listCallShiftHistory,
+  withCallShiftAssigned,
+  isAssignedToCallShift,
+  callShiftAssignments,
   resolveCallShiftLengthHours,
 } from "../../lib/callShiftWorkflow.js";
 import { formatDayId } from "../../lib/shiftCalendar.js";
@@ -143,6 +146,7 @@ export default function CallShiftPanel({
   departmentId = "",
   callShiftRules = [],
   canManage = false,
+  onAssignResponse,
 }) {
   const { user, membership } = useAuth();
   const { getOptions } = useDropdowns();
@@ -672,6 +676,32 @@ export default function CallShiftPanel({
                       </small>
                     ) : null}
                     {record.message ? <p>{record.message}</p> : null}
+                    {(record.responses || []).length ? (
+                      <ul className="call-shift-responses">
+                        {record.responses.map((answer) => (
+                          <li key={answer.personnelId}>
+                            <span className={answer.response === "accepted" ? "badge badge-success" : "badge"}>{answer.response === "accepted" ? "Accepted" : "Declined"}</span>
+                            <span>{answer.name || answer.personnelId}</span>
+                            {isAssignedToCallShift(record, answer.personnelId) ? <span className="badge badge-success">Assigned</span> : null}
+                            {canManage && record.status === "active" && answer.response === "accepted" && !isAssignedToCallShift(record, answer.personnelId) ? (
+                              <button type="button" className="row-action" onClick={() => {
+                                const person = personnel.find((p) => p.id === answer.personnelId);
+                                if (!person) return;
+                                if (onAssignResponse && onAssignResponse(person, record) === false) return;
+                                setCallShifts?.((current) => current.map((item) => (item.id === record.id ? withCallShiftAssigned(item, { personnelId: person.id, name: getPersonDisplayName(person), assignedBy: membership?.displayName || user?.email || "" }) : item)));
+                              }}>Assign</button>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : record.status === "active" ? <small>No responses yet.</small> : null}
+                    {Number(record.positionsNeeded) > 1 ? <small>{callShiftAssignments(record).length} of {record.positionsNeeded} seats filled</small> : null}
+                    {canManage && record.status === "active" ? (
+                      <button type="button" className="text-button" onClick={() => {
+                        if (!window.confirm("Cancel this shift broadcast?")) return;
+                        setCallShifts?.((current) => current.map((item) => (item.id === record.id ? { ...item, status: "cancelled", updatedAt: new Date().toISOString() } : item)));
+                      }}>Cancel broadcast</button>
+                    ) : null}
                   </div>
                   <span className="call-shift-history-meta">
                     {record.previewSnapshot?.eligible?.length || 0} eligible

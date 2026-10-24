@@ -79,6 +79,7 @@ export function normalizeInspectionWorkflowRecord(raw = {}, departmentId = "") {
     totalViolationCount: Number(data.totalViolationCount) || 0,
     reinspectionRequired: Boolean(data.reinspectionRequired),
     nextReinspectionAt: data.nextReinspectionAt || "",
+    attachments: Array.isArray(data.attachments) ? data.attachments : [],
     feeTotal: Number(data.feeTotal) || 0,
     balanceDue: Number(data.balanceDue) || 0,
     recordVersion: Number(data.recordVersion) || 1,
@@ -91,6 +92,14 @@ export function normalizeInspectionWorkflowRecord(raw = {}, departmentId = "") {
     completedBy: data.completedBy || "",
     approvedBy: data.approvedBy || "",
   };
+}
+
+/** Add an uploaded file (photo, signature, document) to an inspection. */
+export async function addInspectionAttachment(departmentId, inspectionId, attachment, audit = {}) {
+  const existing = await getInspectionRecord(departmentId, inspectionId);
+  if (!existing) throw new Error(`Inspection ${inspectionId} not found.`);
+  const attachments = (existing.attachments || []).filter((item) => item.id !== attachment.id);
+  return saveInspectionPatch(departmentId, inspectionId, { attachments: [...attachments, attachment] }, audit, `Added ${attachment.kind || "attachment"} ${attachment.fileName || ""}`);
 }
 
 export function getInspectionResultOptions() {

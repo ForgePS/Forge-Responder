@@ -35,6 +35,7 @@ export default function RecordCollectionEditor({
   personnel = [],
   onOpenPersonnelProfile,
   onOpenEmployeeProfile,
+  onInviteSomeone,
 }) {
   const { departmentId } = useTenant();
   const { user, membership, isCreator } = useAuth();
@@ -210,6 +211,7 @@ export default function RecordCollectionEditor({
         saving={saving}
         onUpdateCell={updateCell}
         onAddRecord={addRow}
+        onInviteSomeone={onInviteSomeone}
         onRemoveRecord={removeRow}
         onSave={saveRecords}
       />

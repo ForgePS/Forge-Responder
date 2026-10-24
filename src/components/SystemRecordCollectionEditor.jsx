@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Check, CirclePlus, Trash2 } from "lucide-react";
+import { Check, CirclePlus, Mail, Trash2 } from "lucide-react";
 import AdminCellEditor from "./AdminCellEditor.jsx";
 import { adminColumnClass, getRowReactKey } from "../lib/adminCellUtils.js";
 import { formatColumnLabel, getFieldType, splitRecordColumns } from "../lib/adminFieldSchema.js";
@@ -42,6 +42,7 @@ export default function SystemRecordCollectionEditor({
   onAddRecord,
   onRemoveRecord,
   onSave,
+  onInviteSomeone,
 }) {
   const config = useMemo(() => getRecordEditorConfig(collectionName), [collectionName]);
   const autoSelectFirst = config.autoSelectFirst !== false;
@@ -90,6 +91,7 @@ export default function SystemRecordCollectionEditor({
   const compactFields = config.compactFields.filter((column) => fields.includes(column));
   const detailFields = fields.filter((column) => !compactFields.includes(column));
   const deleteProtected = selectedRow && config.protectDelete?.(selectedRow);
+  const inviteOnly = Boolean(config.inviteOnly);
 
   function handleAddRecord() {
     const nextKey = onAddRecord?.();
@@ -178,9 +180,17 @@ export default function SystemRecordCollectionEditor({
         </label>
 
         <div className="system-record-actions">
-          <button className="secondary-button" type="button" onClick={handleAddRecord} disabled={loading || saving}>
-            <CirclePlus size={14} /> {config.newRecordLabel}
-          </button>
+          {inviteOnly ? (
+            onInviteSomeone && (
+              <button className="secondary-button" type="button" onClick={onInviteSomeone} disabled={loading || saving}>
+                <Mail size={14} /> {config.inviteLabel || "Invite someone"}
+              </button>
+            )
+          ) : (
+            <button className="secondary-button" type="button" onClick={handleAddRecord} disabled={loading || saving}>
+              <CirclePlus size={14} /> {config.newRecordLabel}
+            </button>
+          )}
           <button
             className="secondary-button danger-button"
             type="button"
@@ -196,15 +206,26 @@ export default function SystemRecordCollectionEditor({
       </div>
 
       <p className="auth-help">{config.helpText}</p>
+      {inviteOnly && config.inviteNote && (
+        <p className="auth-help">{config.inviteNote}</p>
+      )}
 
       {loading ? (
         <p className="auth-help">{config.loadingText}</p>
       ) : !rows.length ? (
         <div className="system-record-empty">
           <p className="empty-table">{config.emptyLabel}</p>
-          <button className="primary-button" type="button" onClick={handleAddRecord}>
-            <CirclePlus size={14} /> {config.createFirstLabel}
-          </button>
+          {inviteOnly ? (
+            onInviteSomeone && (
+              <button className="primary-button" type="button" onClick={onInviteSomeone}>
+                <Mail size={14} /> {config.inviteLabel || "Invite someone"}
+              </button>
+            )
+          ) : (
+            <button className="primary-button" type="button" onClick={handleAddRecord}>
+              <CirclePlus size={14} /> {config.createFirstLabel}
+            </button>
+          )}
         </div>
       ) : !selectedEntry ? (
         <div className="system-record-empty system-record-select-prompt">

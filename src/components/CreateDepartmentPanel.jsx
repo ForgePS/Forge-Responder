@@ -39,6 +39,9 @@ export default function CreateDepartmentPanel({
   const [error, setError] = useState("");
   const [firstAdminInvite, setFirstAdminInvite] = useState(null);
   const [domainNotice, setDomainNotice] = useState("");
+  // Department ID whose web address registration failed (enables "Try again").
+  const [domainRetryId, setDomainRetryId] = useState("");
+  const [domainRetrying, setDomainRetrying] = useState(false);
 
   const existingIds = useMemo(
     () => departments.map((item) => item.id),
@@ -60,6 +63,22 @@ export default function CreateDepartmentPanel({
       }
       return next;
     });
+  }
+
+  async function retryDomainSetup() {
+    if (!domainRetryId) return;
+    setDomainRetrying(true);
+    try {
+      const status = await registerDepartmentDomain(domainRetryId);
+      setDomainRetryId("");
+      setDomainNotice(describeDomainStatus(status));
+    } catch (domainError) {
+      setDomainNotice(
+        `The web address still could not be set up: ${domainError?.message || "unknown error"}`
+      );
+    } finally {
+      setDomainRetrying(false);
+    }
   }
 
   async function handleCreate(event) {
@@ -116,11 +135,15 @@ export default function CreateDepartmentPanel({
 
       // Register <department>.forgeresponder.com (best effort; can be retried).
       setDomainNotice("");
+      setDomainRetryId("");
       registerDepartmentDomain(idCheck.id)
         .then((status) => setDomainNotice(describeDomainStatus(status)))
-        .catch((domainError) => setDomainNotice(
-          `Department created, but its subdomain could not be registered yet: ${domainError?.message || "unknown error"}`
-        ));
+        .catch((domainError) => {
+          setDomainRetryId(idCheck.id);
+          setDomainNotice(
+            `Department created, but its web address could not be set up yet: ${domainError?.message || "unknown error"}`
+          );
+        });
 
       // Invite the department's first administrator (Fire Chief role).
       const firstAdminEmail = form.firstAdminEmail.trim();
@@ -279,7 +302,24 @@ export default function CreateDepartmentPanel({
 
       {error && <p className="create-department-error">{error}</p>}
 
-      {domainNotice && <p className="auth-help" role="status">{domainNotice}</p>}
+      {domainNotice && (
+        <p className="auth-help" role="status">
+          {domainNotice}
+          {domainRetryId && (
+            <>
+              {" "}
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={retryDomainSetup}
+                disabled={domainRetrying}
+              >
+                {domainRetrying ? "Trying again..." : "Try again"}
+              </button>
+            </>
+          )}
+        </p>
+      )}
 
       {firstAdminInvite?.error && (
         <p className="create-department-error">

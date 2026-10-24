@@ -27,6 +27,7 @@ import { useTenant } from "../context/TenantContext.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 import { getFirebaseAuth } from "../lib/firebaseClient.js";
 import { completeSignInWithCode, isSecondFactorRequiredError, secondFactorResolver } from "../lib/twoFactor.js";
+import { accountErrorMessage, requestPasswordReset } from "../lib/accountService.js";
 import { clearPendingInviteToken, inviteErrorMessage, previewInvite, readPendingInviteToken } from "../lib/inviteService.js";
 import { parseTenantSubdomain, platformOrigin, tenantOrigin, useTenantSubdomains } from "../lib/tenantDomains.js";
 
@@ -158,6 +159,19 @@ export default function LoginPage() {
     if (window.location.pathname.replace(/\/$/, "") !== "") {
       window.history.replaceState({}, "", "/");
       window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }
+
+  const [resetNotice, setResetNotice] = useState("");
+
+  async function handleForgotPassword() {
+    setError("");
+    setResetNotice("");
+    try {
+      await requestPasswordReset(email);
+      setResetNotice(`If an account exists for ${email.trim()}, a password reset link is on its way. Check your inbox (and spam).`);
+    } catch (resetError) {
+      setError(accountErrorMessage(resetError));
     }
   }
 
@@ -328,6 +342,12 @@ export default function LoginPage() {
               <span>Password</span>
               <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 6 characters" required />
             </label>
+            {mode === "signin" && (
+              <button className="text-button auth-forgot" type="button" onClick={handleForgotPassword}>
+                Forgot password?
+              </button>
+            )}
+            {resetNotice && <div className="success-banner" role="status">{resetNotice}</div>}
             {error && <div className="auth-error">{error}</div>}
             <button className="primary-button auth-submit" type="submit" disabled={submitting}>
               {submitting ? "Please wait..." : mode === "signin" ? "Sign In" : "Create Account"}

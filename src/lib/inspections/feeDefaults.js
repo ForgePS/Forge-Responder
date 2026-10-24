@@ -52,7 +52,7 @@ export const PAYMENT_METHODS = [
   { id: "check", label: "Check" },
   { id: "card", label: "Card" },
   { id: "ach", label: "ACH / e-check" },
-  { id: "online_stub", label: "Online (stub)" },
+  { id: "online_stub", label: "Online" },
   { id: "other", label: "Other" },
 ];
 

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Database, Flame, KeyRound, LayoutGrid, Settings, ShieldCheck, Wand2, X } from "lucide-react";
+import { ChevronDown, Database, KeyRound, LayoutGrid, Settings, ShieldCheck, Wand2, X } from "lucide-react";
 import DataEditorPanel from "../components/DataEditorPanel.jsx";
 import DepartmentConfigPanel from "../components/DepartmentConfigPanel.jsx";
-import NerisFieldSettingsPanel from "../components/NerisFieldSettingsPanel.jsx";
 import GoogleApisIntegrationPanel from "../components/digitalDashboard/GoogleApisIntegrationPanel.jsx";
 import Active911IntegrationPanel from "../components/digitalDashboard/Active911IntegrationPanel.jsx";
 import DamageFormJotformIntegrationPanel from "../components/digitalDashboard/DamageFormJotformIntegrationPanel.jsx";
@@ -20,7 +19,7 @@ import { ensureDefaultRoles } from "../lib/roleService.js";
 
 function AdminSectionPill({ id, label, icon: Icon, isOpen, onToggle, children }) {
   return (
-    <section className={`admin-section${isOpen ? " is-open" : ""}`}>
+    <section id={id} className={`admin-section${isOpen ? " is-open" : ""}`}>
       <button
         type="button"
         className={`admin-section-pill${isOpen ? " is-open" : ""}`}
@@ -53,7 +52,6 @@ export default function AdminControlCenterPage({
   const canConfigureDamageForm = isCreator
     || hasPermission(permissions, "manageSystemSettings")
     || hasPermission(permissions, "accessAdminRms");
-  const canConfigureNerisFields = canConfigureDamageForm;
   const canViewAcademyIntegrations = isCreator
     || hasPermission(permissions, "academyIntegrationsView");
   const canManageAcademyIntegrations = isCreator
@@ -155,16 +153,6 @@ export default function AdminControlCenterPage({
         </AdminSectionPill>
 
         <AdminSectionPill
-          id="neris-fields"
-          label="NERIS Field Settings"
-          icon={Flame}
-          isOpen={isOpen("neris-fields")}
-          onToggle={toggleSection}
-        >
-          <NerisFieldSettingsPanel onMessage={setMessage} canConfigure={canConfigureNerisFields} />
-        </AdminSectionPill>
-
-        <AdminSectionPill
           id="google-apis"
           label="Integrations & API Keys"
           icon={KeyRound}
@@ -216,6 +204,11 @@ export default function AdminControlCenterPage({
             personnel={personnel}
             onOpenPersonnelProfile={onOpenPersonnelProfile}
             onOpenEmployeeProfile={onOpenEmployeeProfile}
+            onInviteSomeone={() => {
+              setPermissionsView("users");
+              setOpenSections((current) => new Set([...current, "permissions"]));
+              requestAnimationFrame(() => document.getElementById("permissions")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+            }}
           />
         </AdminSectionPill>
 

@@ -121,7 +121,7 @@ export default function PreplanOperationalPage({
                 <p className="occupancy-muted">QR codes are disabled for this department.</p>
               ) : (
                 <p className="occupancy-muted">
-                  Authenticated QR tokens are managed from the preplan detail workspace (Phase 5).
+                  QR codes are managed from each preplan's detail page.
                   Tokens are hashed at rest; raw IDs are never used as scan credentials.
                 </p>
               )}

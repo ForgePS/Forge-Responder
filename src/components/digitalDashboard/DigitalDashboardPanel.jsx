@@ -6,7 +6,6 @@ import {
   ExternalLink,
   Film,
   LayoutGrid,
-  LayoutTemplate,
   MonitorPlay,
   Pencil,
   Play,
@@ -56,7 +55,6 @@ const VIEWS = [
   { id: "displays", label: "Devices", icon: Tv },
   { id: "media", label: "Media", icon: Film },
   { id: "playlists", label: "Playlists", icon: MonitorPlay },
-  { id: "layouts", label: "Layouts", icon: LayoutTemplate },
   { id: "schedules", label: "Publish", icon: CloudUpload },
   { id: "alerts", label: "Alert Dashboard", icon: Siren },
   { id: "integrations", label: "Integrations", icon: Plug },
@@ -718,27 +716,6 @@ export default function DigitalDashboardPanel({
               onAction={canEdit && !playlists.length ? () => setModal({ type: "playlist", form: defaultPlaylistForm() }) : undefined}
             />
           )}
-          </div>
-        </section>
-      ) : null}
-
-      {view === "layouts" ? (
-        <section className="dd-panel dd-library-panel">
-          <DigitalDashboardLibraryBar
-            title="Layout Library"
-            count={0}
-            search={libraryQuery}
-            onSearchChange={setLibraryQuery}
-            searchPlaceholder="Search layouts…"
-            addLabel="Add Layout"
-            onAdd={() => {}}
-            canEdit={false}
-          />
-          <div className="dd-panel-body">
-            <EmptyState
-              title="Layout templates coming soon"
-              detail="Zone-based screen layouts and multi-region templates will let you mirror station boards, lobby tickers, and training room displays."
-            />
           </div>
         </section>
       ) : null}

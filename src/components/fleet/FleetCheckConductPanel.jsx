@@ -34,8 +34,10 @@ export default function FleetCheckConductPanel({
   onCompleted,
   onMessage,
   onError,
+  allowConduct = false,
 }) {
-  const canConduct = canConductFleetChecks(permissions, isCreator);
+  // The Employee Portal lets any member run a daily check on a unit.
+  const canConduct = allowConduct || canConductFleetChecks(permissions, isCreator);
   const [templates, setTemplates] = useState([]);
   const [templateId, setTemplateId] = useState("");
   const [check, setCheck] = useState(null);

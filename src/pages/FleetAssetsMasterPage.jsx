@@ -178,7 +178,7 @@ export default function FleetAssetsMasterPage({
     <FleetPermissionGate allowed={canView}>
       <FleetModuleLayout
         title="All Fleet Assets"
-        description="Authoritative fleet master records. Classic Apparatus list remains until Phase 3 cutover."
+        description="Authoritative fleet master records. The classic Apparatus list stays available until your department switches over to Fleet."
         activeNavName="All Fleet Assets"
         onNavigate={onNavigate}
         actions={canEdit ? (

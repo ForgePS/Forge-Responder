@@ -50,7 +50,7 @@ export const DEFAULT_DEVICE_POLICY = {
   autoSyncOnReconnect: true,
   encryptSensitiveFlag: true,
   requireWifiForAttachments: false,
-  notes: "Staff-mediated offline MVP. Local storage is used for drafts and queues; full encryption depends on browser support.",
+  notes: "Drafts, queues and attachments are kept on this device until the next sync. Encryption at rest depends on the device and browser.",
 };
 
 export function getDownloadPackTypes() {

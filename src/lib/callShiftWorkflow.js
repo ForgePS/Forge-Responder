@@ -336,3 +336,51 @@ export function formatCallShiftStatus(record = {}) {
   if (record.status === "expired") return "Expired";
   return `Active · Tier ${record.currentTier || 1}`;
 }
+
+// ---- Responses from members (Employee Portal) and assignment (scheduler) ----
+
+/** Whether this member was sent this broadcast and it's still open. */
+export function isCallShiftOpenFor(record = {}, personnelId = "") {
+  if (!personnelId || record.status !== "active") return false;
+  const eligible = record.previewSnapshot?.eligible || [];
+  return eligible.some((entry) => entry.personnelId === personnelId);
+}
+
+export function callShiftResponseFor(record = {}, personnelId = "") {
+  return (record.responses || []).find((entry) => entry.personnelId === personnelId) || null;
+}
+
+/** Record a member's accept/decline (replaces an earlier answer). */
+export function withCallShiftResponse(record = {}, { personnelId, name, response }) {
+  const responses = (record.responses || []).filter((entry) => entry.personnelId !== personnelId);
+  responses.push({ personnelId, name: name || "", response, respondedAt: new Date().toISOString() });
+  return { ...record, responses, updatedAt: new Date().toISOString() };
+}
+
+/** Members assigned so far (older records only have assignedPersonnelId). */
+export function callShiftAssignments(record = {}) {
+  if (Array.isArray(record.assignments) && record.assignments.length) return record.assignments;
+  return record.assignedPersonnelId ? [{ personnelId: record.assignedPersonnelId, name: record.assignedName || "", assignedAt: record.assignedAt || "" }] : [];
+}
+
+export function isAssignedToCallShift(record = {}, personnelId = "") {
+  return Boolean(personnelId) && callShiftAssignments(record).some((entry) => entry.personnelId === personnelId);
+}
+
+/** Assign one member; the broadcast is filled once every needed seat has someone. */
+export function withCallShiftAssigned(record = {}, { personnelId, name, assignedBy = "" }) {
+  const now = new Date().toISOString();
+  const assignments = callShiftAssignments(record).filter((entry) => entry.personnelId !== personnelId);
+  assignments.push({ personnelId, name: name || "", assignedAt: now, assignedBy });
+  const needed = Math.max(1, Number(record.positionsNeeded) || 1);
+  return {
+    ...record,
+    assignments,
+    status: assignments.length >= needed ? "filled" : record.status || "active",
+    assignedPersonnelId: personnelId,
+    assignedName: assignments.map((entry) => entry.name).filter(Boolean).join(", "),
+    assignedAt: now,
+    assignedBy,
+    updatedAt: now,
+  };
+}

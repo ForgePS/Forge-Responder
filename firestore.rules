@@ -82,9 +82,11 @@ service cloud.firestore {
         || data.get("roleIds", []).hasAny(["creator"]);
     }
 
+    // Department admins may change someone's role(s), but never to or from the
+    // platform "creator" role or flag.
     function platformFlagsUnchanged() {
       return request.resource.data.get("isPlatformCreator", false) == resource.data.get("isPlatformCreator", false)
-        && request.resource.data.get("role", "") == resource.data.get("role", "")
+        && (request.resource.data.get("role", "") == "creator") == (resource.data.get("role", "") == "creator")
         && request.resource.data.get("roleIds", []).hasAny(["creator"]) == resource.data.get("roleIds", []).hasAny(["creator"]);
     }
 

@@ -1,3 +1,4 @@
+import { pendingForPerson } from "../lib/documentAcknowledgement.js";
 import {
   formatDayId,
   parseDayId,
@@ -77,7 +78,8 @@ export function buildDashboardMetrics({
   documents = [],
   scheduleDays = [],
   leaveRequests = [],
-  shiftTrades = []
+  shiftTrades = [],
+  acknowledgementKeys: ackKeys = []
 }) {
   const activePersonnel = personnel.filter((p) => p.status === "Active").length;
   const onDuty = personnel.filter((p) => p.status === "Active").length;
@@ -94,9 +96,9 @@ export function buildDashboardMetrics({
     workOrders.filter((w) => w.status !== "Complete").length +
     leaveRequests.filter((r) => r.status === "Pending").length +
     shiftTrades.filter((t) => /pending|awaiting/i.test(t.status || "")).length +
-    documents.filter((d) => d.acknowledgementStatus === "Pending").length +
+    pendingForPerson(documents, ackKeys).length +
     assets.filter((a) => a.status === "Inspection Due").length;
-  const pendingAcknowledgements = documents.filter((d) => d.acknowledgementStatus === "Pending").length;
+  const pendingAcknowledgements = pendingForPerson(documents, ackKeys).length;
   const assetInspectionsDue = assets.filter((a) => a.status === "Inspection Due" || isDueWithinDays(a.inspection, 30)).length;
 
   return {

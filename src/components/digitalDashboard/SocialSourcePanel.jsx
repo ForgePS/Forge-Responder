@@ -1,4 +1,4 @@
-import { HelpCircle, ImageIcon } from "lucide-react";
+import { ImageIcon } from "lucide-react";
 import { formatNewMediaTitle } from "../../lib/digitalDashboardGallery.js";
 import {
   buildSocialMediaFromConfig,
@@ -56,7 +56,6 @@ export default function SocialSourcePanel({ socialConfig, onConfigChange, onAppl
             <ImageIcon size={16} />
             Preview
           </button>
-          <button type="button" className="dd-action-button dd-help-button"><HelpCircle size={15} />Help</button>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, ShieldCheck, Truck, Users, X, CirclePlus } from "lucide-react";
-import { buildMonthCalendar, formatDayId, parseDayId, resolveShiftRotation, shiftShortLabel } from "../lib/shiftCalendar.js";
+import { buildMonthCalendar, formatDayId, parseDayId, resolveShiftRotation, shiftForDate, shiftShortLabel } from "../lib/shiftCalendar.js";
 import { buildDayRoster, buildDayScheduleSnapshot, buildDayScopedRosterId, buildOvertimeRosterId, buildPartialSlotRosterId, buildWeekScheduleSnapshots, buildDefaultShiftTimes, calculateShiftDurationHours, DEFAULT_SHIFT_DURATION_HOURS, formatDurationLabel, normalizeShiftTime, resolveDayCoverageMetrics, resolveRosterPersonnelId } from "../lib/schedulingRoster.js";
 import { getPersonDisplayName } from "../lib/personnelSchema.js";
 import { canonicalApparatusUnitName } from "../lib/apparatusSchema.js";
@@ -9,6 +9,7 @@ import { vacancyPickupStatusDetail } from "../lib/vacancyPickupWorkflow.js";
 import ShiftTradesPanel from "../components/scheduling/ShiftTradesPanel.jsx";
 import LeaveRequestsPanel from "../components/scheduling/LeaveRequestsPanel.jsx";
 import CallShiftPanel from "../components/scheduling/CallShiftPanel.jsx";
+import OvertimeOffersPanel from "../components/scheduling/OvertimeOffersPanel.jsx";
 import ShiftCalendar from "../components/ShiftCalendar.jsx";
 import WeekRosterView from "../components/WeekRosterView.jsx";
 import AdminDailyRoster from "../components/admin/AdminDailyRoster.jsx";
@@ -506,16 +507,80 @@ export default function SchedulingPage({
     );
   }
 
-  function assignOvertime(id) {
-    const offer = overtimeOffers.find((item) => item.id === id);
-    if (!offer) return;
-    setOvertimeOffers((current) => current.map((item) => item.id === id ? { ...item, status: "Assigned" } : item));
-    setDays((current) => current.map((day) => day.date === offer.date && day.shift === offer.shift ? { ...day, staffed: day.staffed + 1, status: day.staffed + 1 >= day.minimum ? "Complete" : "Deficit" } : day));
-    setMessage(`${offer.position} overtime assigned for ${offer.date}`);
+  /** Put a member on a given day's roster as overtime (used by overtime offers and approved pickups). */
+  function addOvertimeEntryForDay(person, dayId, unit) {
+    if (!setRoster || !rosterLoaded) {
+      setMessage(!setRoster ? "Roster is read-only" : "Roster is still loading — try again in a moment");
+      return false;
+    }
+    if (!person || !dayId) return false;
+    // Don't double-book: skip anyone whose own shift works that day, or who is already rostered that day.
+    const dutyShift = String(shiftForDate(parseDayId(dayId), rotation) || "").trim();
+    const homeShift = String(person.shift || "").trim();
+    if (homeShift && dutyShift && homeShift === dutyShift) {
+      setMessage(`${getPersonDisplayName(person)} already works ${dutyShift} on ${dayId}, so they weren't added as overtime.`);
+      return false;
+    }
+    if (roster.some((member) => member.dayId === dayId && resolveRosterPersonnelId(member.id, member.personnelId) === person.id)) {
+      setMessage(`${getPersonDisplayName(person)} is already on the roster for ${dayId}.`);
+      return false;
+    }
+    const normalizedUnit = canonicalApparatusUnitName(unit || "") || "Unassigned";
+    const rosterId = buildOvertimeRosterId(person.id, dayId, normalizedUnit);
+    setRoster((current) => (current.some((member) => member.id === rosterId) ? current : [...current, {
+      id: rosterId,
+      personnelId: person.id,
+      dayId,
+      name: getPersonDisplayName(person),
+      rank: person.rank,
+      shift: person.shift,
+      apparatus: normalizedUnit,
+      position: person.position || (person.driver === "Approved" ? "Driver" : person.ems || "Firefighter"),
+      status: "On Duty",
+      isOvertime: true,
+    }]));
+    return true;
+  }
+
+  function assignOvertimeOffer(person, offer) {
+    if (!offer.dayId) {
+      setMessage("This older overtime offer has no date on file. Cancel it and post the seat again with “Create vacancy”.");
+      return false;
+    }
+    const ok = addOvertimeEntryForDay(person, offer.dayId, offer.apparatus);
+    if (ok) setMessage(`${getPersonDisplayName(person)} assigned overtime on ${offer.date}${offer.apparatus ? ` (${offer.apparatus})` : ""} and added to the roster`);
+    return ok;
+  }
+
+  function printRoster() {
+    const esc = (value) => String(value ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+    const rows = [...dayRoster]
+      .sort((a, b) => String(a.apparatus || "").localeCompare(String(b.apparatus || "")) || String(a.name || "").localeCompare(String(b.name || "")))
+      .map((m) => `<tr><td>${esc(m.apparatus || "Unassigned")}</td><td>${esc(m.name)}</td><td>${esc(m.rank)}</td><td>${esc(m.position)}</td><td>${esc([m.shiftStartTime, m.shiftEndTime].filter(Boolean).join("–"))}${m.isOvertime ? " (OT)" : ""}</td></tr>`)
+      .join("");
+    const title = `${departmentName || "Daily"} roster — ${selectedDaySnapshot.date || selectedId} — ${selectedDay?.shift || ""}`;
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) {
+      setMessage("Allow pop-ups for this site to print the roster.");
+      return;
+    }
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:system-ui,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 4px}p{margin:0 0 16px;color:#555}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f3f4f6}</style></head><body><h1>${esc(title)}</h1><p>Staffed ${esc(dayCoverage.staffed)} of ${esc(dayCoverage.minimum)} · printed ${esc(new Date().toLocaleString())}</p><table><thead><tr><th>Unit</th><th>Name</th><th>Rank</th><th>Position</th><th>Hours</th></tr></thead><tbody>${rows || '<tr><td colspan="5">No one rostered.</td></tr>'}</tbody></table></body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
   }
 
   function decideVacancyPickup(id, status) {
     if (!setVacancyPickups) return;
+    if (status === "Approved") {
+      const request = vacancyPickups.find((item) => item.id === id);
+      const person = personnel.find((p) => p.id === request?.personnelId);
+      if (!request || !person) {
+        setMessage("Couldn't find this member's personnel record, so they weren't added to the roster.");
+        return;
+      }
+      if (!addOvertimeEntryForDay(person, request.dayId, request.apparatus)) return;
+    }
     setVacancyPickups((current) => current.map((item) => (
       item.id === id
         ? {
@@ -526,7 +591,7 @@ export default function SchedulingPage({
         }
         : item
     )));
-    setMessage(`Vacancy pickup request ${status.toLowerCase()}.`);
+    setMessage(status === "Approved" ? "Pickup approved — the member is on that day's roster." : `Vacancy pickup request ${status.toLowerCase()}.`);
   }
 
   const pendingVacancyCount = vacancyPickups.filter((item) => /pending/i.test(item.status || "")).length;
@@ -590,13 +655,20 @@ export default function SchedulingPage({
   );
 
   const overtimePanel = (
-    <Panel title="Overtime Coverage" icon={Clock3} action={<button className="text-button">Create vacancy</button>}>
-      <div className="overtime-grid">{overtimeOffers.map((offer) => <div key={offer.id} className="overtime-card"><div><strong>{offer.date} - {offer.shift}</strong><span>{offer.position}</span></div><Badge>{offer.status}</Badge><small>{offer.applicants} available members</small><button className="row-action" disabled={offer.status === "Assigned"} onClick={() => assignOvertime(offer.id)}>{offer.status === "Assigned" ? "Assigned" : "Assign"}</button></div>)}</div>
-    </Panel>
+    <OvertimeOffersPanel
+      offers={overtimeOffers}
+      setOffers={setOvertimeOffers}
+      openVacancies={selectedDaySnapshot.openVacancies || []}
+      dutyShift={selectedDay?.shift || selectedDaySnapshot.shift || ""}
+      personnel={personnel}
+      canEdit={canEditRoster && Boolean(setOvertimeOffers)}
+      onAssign={assignOvertimeOffer}
+      onMessage={setMessage}
+    />
   );
 
   return <div className="module-page scheduling-page">
-    <section className="module-heading"><div><span className="module-icon"><CalendarDays size={22} /></span><div><h1>Scheduling</h1><p>Visual shift calendar, daily apparatus roster, leave, overtime, shift trades, and daily staffing.</p></div></div><div className="heading-actions"><button className="secondary-button">Print Roster</button><button className="primary-button"><CirclePlus size={14} /> Add Shift Note</button></div></section>
+    <section className="module-heading"><div><span className="module-icon"><CalendarDays size={22} /></span><div><h1>Scheduling</h1><p>Visual shift calendar, daily apparatus roster, leave, overtime, shift trades, and daily staffing.</p></div></div><div className="heading-actions"><button type="button" className="secondary-button" onClick={printRoster}>Print Roster</button></div></section>
     <section className="schedule-summary">
       {scheduleStats.map(({ label, value, tone, icon: Icon }) => (
         <div key={label} className={`schedule-stat stat-${tone}`}>
@@ -757,6 +829,7 @@ export default function SchedulingPage({
             setTrades={setShiftTrades}
             personnel={personnel}
             setPersonnel={setPersonnel}
+            rotation={rotation}
           />
         ) : null}
 
@@ -776,6 +849,11 @@ export default function SchedulingPage({
             departmentId={departmentId}
             callShiftRules={callShiftRules}
             canManage={canManageCallShifts || canEditRoster}
+            onAssignResponse={(person, record) => {
+              const ok = addOvertimeEntryForDay(person, record.dayId, record.apparatus);
+              if (ok) setMessage(`${getPersonDisplayName(person)} assigned to the ${record.dateLabel || record.dayId} shift and added to the roster.`);
+              return ok;
+            }}
           />
         ) : null}
 

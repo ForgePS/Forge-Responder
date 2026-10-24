@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from "react";
 import {
-  Atom,
   BarChart3,
   Camera,
   Clock3,
@@ -11,20 +10,16 @@ import {
   Globe,
   HardDrive,
   Heart,
-  HelpCircle,
   Images,
   Laptop,
   Link2,
-  MapPin,
   Megaphone,
   MessageSquare,
-  Monitor,
   MonitorUp,
   Plus,
   QrCode,
   Search,
   Settings,
-  Star,
   Table2,
   X,
 } from "lucide-react";
@@ -104,18 +99,13 @@ const SOURCE_CATEGORIES = [
   { id: "web", label: "Web", icon: Globe },
   { id: "gallery", label: "Gallery", icon: Images },
   { id: "social", label: "Social", icon: MessageSquare },
-  { id: "suite", label: "Select Suite", icon: Star },
-  { id: "signature", label: "Signature 360", icon: MapPin },
-  { id: "kiosks", label: "Kiosks", icon: Monitor },
   { id: "custom", label: "Custom", icon: Settings },
-  { id: "ai", label: "AI Toolkit", icon: Atom },
 ];
 
 const UPLOAD_METHODS = [
   { id: "upload", label: "File Upload" },
   { id: "web-server", label: "File From Web Server" },
   { id: "local-server", label: "File From Local Server" },
-  { id: "ftp", label: "Secure FTP" },
 ];
 
 const IMPORT_SOURCES = [
@@ -137,7 +127,7 @@ const CLOUD_LINK_HINTS = {
 
 const CATEGORY_PANEL_IDS = [
   "gallery", "web", "local", "social",
-  "favorites", "recent", "suite", "signature", "kiosks", "custom", "ai",
+  "favorites", "recent", "custom",
 ];
 
 const MICROSOFT_LINK_EXAMPLES = [
@@ -549,7 +539,6 @@ export default function AddMediaModal({
         <header className="dd-add-media-header">
           <h3>{isEdit ? "Edit Media" : "Add Media"}</h3>
           <div className="dd-add-media-header-actions">
-            <button type="button" className="dd-icon-button" aria-label="Help"><HelpCircle size={18} /></button>
             <button type="button" className="dd-icon-button" onClick={onClose} aria-label="Close"><X size={18} /></button>
           </div>
         </header>
@@ -742,9 +731,7 @@ export default function AddMediaModal({
               ) : (
                 <div className="dd-import-panel">
                   <p>
-                    {uploadMethod === "ftp"
-                      ? "Enter Secure FTP credentials and remote path (coming soon — use path preview below)."
-                      : "Enter the full URL or network path to the file on your server."}
+                    Enter the full URL or network path to the file on your server.
                   </p>
                   <div className="dd-import-panel-row">
                     <input
@@ -872,10 +859,7 @@ export default function AddMediaModal({
         </div>
 
         <footer className="dd-add-media-footer">
-          <button type="button" className="dd-action-button dd-help-button" aria-label="Help">
-            <HelpCircle size={15} />
-            Help
-          </button>
+          <span />
           <div className="dd-add-media-footer-actions">
             <button type="button" className="dd-action-button" onClick={onClose} disabled={uploading}>Cancel</button>
             <button

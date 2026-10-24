@@ -312,7 +312,7 @@ export async function runInspectionAutomation(departmentId, automationId, option
   const stamp = nowIso();
   const message = dryRun
     ? `Dry run: would ${automation.action} for ${matched.length} match(es)`
-    : `Executed ${automation.action} for ${matched.length} match(es) (action delivery stubbed)`;
+    : `Executed ${automation.action} for ${matched.length} match(es) (logged only; delivery not connected yet)`;
 
   const runId = newId("ARUN");
   const run = normalizeAutomationRun({

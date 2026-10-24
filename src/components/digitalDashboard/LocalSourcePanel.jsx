@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, HelpCircle, ImageIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, ImageIcon } from "lucide-react";
 import {
   buildLocalMediaFromConfig,
   DEFAULT_LOCAL_CONFIG,
@@ -43,7 +43,7 @@ export default function LocalSourcePanel({ localConfig, onConfigChange, onApply,
         {!activeTab.enabled ? (
           <div className="dd-source-placeholder">
             <strong>{activeTab.label}</strong>
-            <p>This local widget is coming soon.</p>
+            <p>This widget isn't available.</p>
           </div>
         ) : null}
 
@@ -159,7 +159,6 @@ export default function LocalSourcePanel({ localConfig, onConfigChange, onApply,
                 <ImageIcon size={16} />
                 Preview
               </button>
-              <button type="button" className="dd-action-button dd-help-button"><HelpCircle size={15} />Help</button>
             </div>
           </>
         ) : null}

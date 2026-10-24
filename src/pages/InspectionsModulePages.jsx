@@ -405,6 +405,18 @@ function InspectionWorkspace({
         <Field label="Internal notes">
           <textarea rows={2} value={internalNotes} disabled={!editable} onChange={(e) => setInternalNotes(e.target.value)} />
         </Field>
+        {(record.attachments || []).length ? (
+          <Field label="Attachments">
+            <ul className="inspection-attachment-list">
+              {record.attachments.map((item) => (
+                <li key={item.id}>
+                  <a href={item.downloadUrl} target="_blank" rel="noreferrer">{item.fileName || item.kind}</a>
+                  <small className="occupancy-muted"> {item.kind}{item.note ? ` · ${item.note}` : ""}</small>
+                </li>
+              ))}
+            </ul>
+          </Field>
+        ) : null}
         {record.historicalSnapshot?.capturedAt ? (
           <p className="occupancy-muted">
             Historical snapshot locked {new Date(record.historicalSnapshot.capturedAt).toLocaleString()}

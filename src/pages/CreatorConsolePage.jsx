@@ -5,6 +5,7 @@ import PlatformAuditLogPanel from "../components/platform/PlatformAuditLogPanel.
 import PlatformSecurityPanel from "../components/platform/PlatformSecurityPanel.jsx";
 import CreateDepartmentPanel from "../components/CreateDepartmentPanel.jsx";
 import DepartmentBranchesPanel from "../components/DepartmentBranchesPanel.jsx";
+import ArchivedDepartmentsPanel from "../components/ArchivedDepartmentsPanel.jsx";
 import CreatorWorkspaceHero from "../components/CreatorWorkspaceHero.jsx";
 import PlatformSubscriptionsPanel from "../components/PlatformSubscriptionsPanel.jsx";
 import InternalEmailBoard from "../components/InternalEmailBoard.jsx";
@@ -57,6 +58,8 @@ export default function CreatorConsolePage() {
   const [departments, setDepartments] = useState([]);
   const [message, setMessage] = useState("");
   const [highlightCreate, setHighlightCreate] = useState(false);
+  // Bumped on "Refresh department list" so the archived list reloads too.
+  const [archivedRefreshKey, setArchivedRefreshKey] = useState(0);
   const workspaceChangeSourceRef = useRef("init");
   const createPanelRef = useRef(null);
 
@@ -277,11 +280,25 @@ export default function CreatorConsolePage() {
               workspaceId={workspaceId}
               inPlatformWorkspace={inPlatformWorkspace}
               isCreator={isCreator}
-              onReload={reload}
+              onReload={() => {
+                setArchivedRefreshKey((current) => current + 1);
+                return reload();
+              }}
               onOpenDepartment={openDepartment}
               onManageSubscriptions={() => setTab("subscriptions")}
               onSetSubscriptionDates={openDepartmentSubscriptions}
             />
+            {isCreator && (
+              <ArchivedDepartmentsPanel
+                user={user}
+                refreshKey={archivedRefreshKey}
+                onMessage={setMessage}
+                onRestored={async () => {
+                  await reload();
+                  await refreshDepartment();
+                }}
+              />
+            )}
           </Panel>
         </section>
       )}

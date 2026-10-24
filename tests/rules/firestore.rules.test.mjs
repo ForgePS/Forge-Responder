@@ -329,11 +329,18 @@ describe("department admins", () => {
     await assertSucceeds(setDoc(doc(db, `departments/${A}/users/new-user`), membership("new-user", A)));
   });
 
+  it("can change someone's role, including promoting to Fire Chief", async () => {
+    const db = adminA().firestore();
+    await assertSucceeds(updateDoc(doc(db, `departments/${A}/users/member-a`), { role: "department_admin", roleIds: ["fireChief"] }));
+    await assertSucceeds(updateDoc(doc(db, `departments/${A}/users/member-a`), { role: "captain", roleIds: ["captain"] }));
+  });
+
   it("cannot grant platform-creator flags", async () => {
     const db = adminA().firestore();
     await assertFails(setDoc(doc(db, `departments/${A}/users/new-user`), membership("new-user", A, { role: "creator", roleIds: ["creator"] })));
     await assertFails(updateDoc(doc(db, `departments/${A}/users/member-a`), { isPlatformCreator: true }));
     await assertFails(updateDoc(doc(db, `departments/${A}/users/member-a`), { roleIds: ["creator"] }));
+    await assertFails(updateDoc(doc(db, `departments/${A}/users/member-a`), { role: "creator" }));
   });
 
   it("cannot manage another department's members", async () => {

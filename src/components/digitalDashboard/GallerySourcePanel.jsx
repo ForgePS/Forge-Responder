@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, HelpCircle, ImageIcon, LoaderCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, ImageIcon, LoaderCircle } from "lucide-react";
 import {
   DEFAULT_GALLERY_CONFIG,
   fetchGalleryStockPhotos,
@@ -163,10 +163,6 @@ export default function GallerySourcePanel({ galleryConfig, onConfigChange, onSe
               {loading ? <LoaderCircle size={16} className="dd-spin" /> : <ImageIcon size={16} />}
               Preview
             </button>
-            <button type="button" className="dd-action-button dd-help-button">
-              <HelpCircle size={15} />
-              Help
-            </button>
           </div>
 
           {previewNote ? <p className="dd-gallery-note">{previewNote}</p> : null}
@@ -191,7 +187,7 @@ export default function GallerySourcePanel({ galleryConfig, onConfigChange, onSe
       ) : (
         <div className="dd-gallery-placeholder">
           <strong>{activeTab.label}</strong>
-          <p>{activeTab.label} gallery integration is coming soon. Use Stock Photos for signage backgrounds today.</p>
+          <p>{activeTab.label} isn't available. Use Stock Photos for signage backgrounds.</p>
         </div>
       )}
     </div>

@@ -48,6 +48,7 @@ import {
   captureInviteTokenFromUrl,
   clearPendingInviteToken,
   inviteErrorMessage,
+  isEmailNotVerifiedInviteError,
   isTerminalInviteError,
   readPendingInviteToken
 } from "../lib/inviteService.js";
@@ -67,6 +68,8 @@ export function AuthProvider({ children }) {
   const [rolesById, setRolesById] = useState({});
   const [inviteNotice, setInviteNotice] = useState("");
   const [inviteError, setInviteError] = useState("");
+  // The invite was refused only because the account's email isn't verified yet.
+  const [inviteNeedsVerification, setInviteNeedsVerification] = useState(false);
   const [authLoading, setAuthLoading] = useState(firebaseEnabled);
   const [membershipLoading, setMembershipLoading] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -112,7 +115,7 @@ export function AuthProvider({ children }) {
   // membership) and point the app at that department before loading access.
   async function redeemPendingInvite(nextUser) {
     const token = readPendingInviteToken();
-    if (!token || !nextUser?.uid) return;
+    if (!token || !nextUser?.uid) return false;
     try {
       const result = await acceptInvite(token);
       clearPendingInviteToken();
@@ -121,12 +124,43 @@ export function AuthProvider({ children }) {
         persistGatewayContext(result.departmentId, result.departmentId);
       }
       setInviteError("");
+      setInviteNeedsVerification(false);
       setInviteNotice(result?.departmentName ? `Welcome to ${result.departmentName}.` : "Invite accepted.");
+      return true;
     } catch (error) {
       console.warn("Invite could not be accepted", error);
-      // Keep the token for a wrong-account error so they can sign in with the right email.
+      // Keep the token for a wrong-account or unverified-email error so they can fix it and retry.
       if (isTerminalInviteError(error)) clearPendingInviteToken();
+      setInviteNeedsVerification(isEmailNotVerifiedInviteError(error));
       setInviteError(inviteErrorMessage(error));
+      return false;
+    }
+  }
+
+  /**
+   * After the person clicks the verification link: refresh the account (and its
+   * ID token, which carries email_verified) and redeem the pending invite again.
+   * Returns { verified, accepted }.
+   */
+  async function retryPendingInvite() {
+    const currentUser = getFirebaseAuth()?.currentUser || user;
+    if (!currentUser) return { verified: false, accepted: false };
+    await currentUser.reload();
+    if (!currentUser.emailVerified) {
+      setInviteError("Your email address isn't verified yet. Open the verification link we emailed you, then try again.");
+      return { verified: false, accepted: false };
+    }
+    await currentUser.getIdToken(true);
+    setMembershipLoading(true);
+    try {
+      const accepted = await redeemPendingInvite(currentUser);
+      if (accepted) await hydrateAccess(currentUser);
+      return { verified: true, accepted };
+    } catch (error) {
+      console.error("Failed to load department membership after accepting invite", error);
+      return { verified: true, accepted: true };
+    } finally {
+      setMembershipLoading(false);
     }
   }
 
@@ -449,10 +483,12 @@ export function AuthProvider({ children }) {
       patchMembership,
       inviteNotice,
       inviteError,
+      inviteNeedsVerification,
+      retryPendingInvite,
       dismissInviteNotice: () => setInviteNotice(""),
       authRequired: firebaseEnabled
     }),
-    [user, membership, permissions, rolesById, isCreator, authLoading, membershipLoading, authError, recoveryLoading, patchMembership, inviteNotice, inviteError]
+    [user, membership, permissions, rolesById, isCreator, authLoading, membershipLoading, authError, recoveryLoading, patchMembership, inviteNotice, inviteError, inviteNeedsVerification]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
