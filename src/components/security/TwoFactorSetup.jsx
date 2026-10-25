@@ -63,7 +63,12 @@ export default function TwoFactorSetup({ onCancel }) {
     setBusy(true);
     setError("");
     try {
-      await sendVerificationEmail(user);
+      const result = await sendVerificationEmail();
+      if (result.status === "already_verified") {
+        setBusy(false);
+        await checkVerified();
+        return;
+      }
       setVerifySent(true);
     } catch (sendError) {
       setError(setupErrorMessage(sendError));
