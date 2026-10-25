@@ -8,14 +8,22 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { sendVerificationEmail, continueUrlFor } = require("../../functions/lib/emailVerification.js");
 
+// Firestore stand-in; transactions run one at a time, like Firestore's retries.
 function fakeDb() {
   const docs = new Map();
+  const write = (path, value) => docs.set(path, { ...(docs.get(path) || {}), ...value });
+  let queue = Promise.resolve();
   return {
     docs,
-    doc: (path) => ({
-      get: async () => ({ data: () => docs.get(path) }),
-      set: async (value) => docs.set(path, { ...(docs.get(path) || {}), ...value }),
-    }),
+    doc: (path) => ({ path, set: async (value) => write(path, value) }),
+    runTransaction(fn) {
+      const run = queue.then(() => fn({
+        get: async (ref) => ({ data: () => docs.get(ref.path) }),
+        set: (ref, value) => write(ref.path, value),
+      }));
+      queue = run.catch(() => {});
+      return run;
+    },
   };
 }
 
@@ -77,6 +85,14 @@ describe("sendVerificationEmail", () => {
     assert.equal(sent.length, 1);
   });
 
+  it("sends only one email when requests arrive at the same time", async () => {
+    const db = fakeDb();
+    const auth = fakeAuth({ email: "a@b.co", emailVerified: false });
+    const results = await Promise.allSettled(Array.from({ length: 10 }, () => sendVerificationEmail(db, auth, req())));
+    assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
+    assert.equal(sent.length, 1);
+  });
+
   it("still sends a link when the continue URL isn't authorized", async () => {
     const auth = fakeAuth({ email: "a@b.co", emailVerified: false }, { rejectContinueUrl: true });
     await sendVerificationEmail(fakeDb(), auth, req({ continueUrl: "https://01002.forgeresponder.com/" }));
@@ -85,14 +101,20 @@ describe("sendVerificationEmail", () => {
     assert.equal(sent.length, 1);
   });
 
-  it("reports an error and allows a retry when the mailer fails", async () => {
+  it("reports an error and allows an immediate retry when the mailer fails", async () => {
     globalThis.fetch = async () => ({ ok: false, status: 500, text: async () => "down" });
     const db = fakeDb();
     await assert.rejects(
       sendVerificationEmail(db, fakeAuth({ email: "a@b.co", emailVerified: false }), req()),
       (e) => e.code === "unavailable",
     );
-    assert.equal(db.docs.size, 0);
+    assert.equal(db.docs.get("emailVerificationRequests/u1").lastSentAt, null);
+    globalThis.fetch = async (url, init) => {
+      sent.push({ url, body: JSON.parse(init.body) });
+      return { ok: true, text: async () => "" };
+    };
+    const retry = await sendVerificationEmail(db, fakeAuth({ email: "a@b.co", emailVerified: false }), req());
+    assert.equal(retry.status, "sent");
   });
 
   it("requires sign-in", async () => {
