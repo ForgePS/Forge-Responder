@@ -8,7 +8,7 @@
  * it (`secrets: [resendApiKey]`) so it is present in process.env.
  * EMAIL_FROM sets the sender; its domain must be verified in Resend.
  */
-const DEFAULT_FROM = "FORGE Responder <noreply@forgeresponder.com>";
+const DEFAULT_FROM = "Forge Public Safety <noreply@forgeresponder.com>";
 
 function cleanList(list = []) {
   return [...new Set(list.map((e) => String(e || "").trim().toLowerCase()).filter(Boolean))];
@@ -38,7 +38,7 @@ async function sendViaSendGrid({ apiKey, fromEmail, to, cc, subject, text }) {
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       personalizations: [personalization],
-      from: { email: fromEmail, name: "FORGE Responder" },
+      from: { email: fromEmail, name: "Forge Public Safety" },
       subject,
       content: [{ type: "text/plain", value: text }],
     }),
