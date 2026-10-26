@@ -196,6 +196,10 @@ export default function LoginPage() {
         // Password was right; this account uses two-factor: ask for the code.
         setCodeResolver(secondFactorResolver(getFirebaseAuth(), submitError));
         setCode("");
+      } else if (submitError?.code === "auth/email-already-in-use") {
+        // Returning to an invite link after signing up: switch to sign-in.
+        setMode("signin");
+        setError("You already have an account with this email. Enter your password and sign in.");
       } else {
         setError(authErrorMessage(submitError));
       }
