@@ -7,7 +7,8 @@
  *   --email=<email>   who to remove (required)
  *   --apply           make the change:
  *                       - platformCreators/<uid>: status "removed" (kept for the audit trail)
- *                       - department logins: isPlatformCreator cleared; a "creator" role becomes "member"
+ *                       - department logins: isPlatformCreator cleared; a "creator" role becomes "member";
+ *                         "creator" removed from roleIds (read-only if nothing else is left)
  *                       - signs them out everywhere (revokes refresh tokens)
  *                       - writes a platformAuditLogs entry
  *
@@ -63,8 +64,10 @@ async function main() {
     const membership = await dept.collection("users").doc(user.uid).get();
     if (!membership.exists) continue;
     const data = membership.data() || {};
-    const isCreatorLogin = data.isPlatformCreator === true || data.role === "creator";
-    console.log(`  ${dept.id}: role "${data.role || "(none)"}"${data.isPlatformCreator ? ", isPlatformCreator" : ""}${isCreatorLogin ? "  <- creator flag" : ""}`);
+    const roleIds = Array.isArray(data.roleIds) ? data.roleIds : [];
+    // Permission checks read roleIds first, so a "creator" entry there still grants creator access.
+    const isCreatorLogin = data.isPlatformCreator === true || data.role === "creator" || roleIds.includes("creator");
+    console.log(`  ${dept.id}: role "${data.role || "(none)"}", roleIds [${roleIds.join(", ")}]${data.isPlatformCreator ? ", isPlatformCreator" : ""}${isCreatorLogin ? "  <- creator access" : ""}`);
     if (isCreatorLogin) flagged.push({ ref: membership.ref, deptId: dept.id, data });
   }
 
@@ -86,12 +89,14 @@ async function main() {
     console.log("Creator record set to removed.");
   }
   for (const { ref, deptId, data } of flagged) {
+    const roleIds = (Array.isArray(data.roleIds) ? data.roleIds : []).filter((id) => id !== "creator");
     await ref.set({
       isPlatformCreator: false,
       ...(data.role === "creator" ? { role: "member" } : {}),
+      roleIds: roleIds.length ? roleIds : ["readOnly"],
       updatedAt: now,
     }, { merge: true });
-    console.log(`Cleared creator flag on ${deptId}.`);
+    console.log(`Removed creator access on ${deptId} (roleIds now [${(roleIds.length ? roleIds : ["readOnly"]).join(", ")}]).`);
   }
   await auth.revokeRefreshTokens(user.uid);
   console.log("Signed out of all sessions.");
