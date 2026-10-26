@@ -18,7 +18,7 @@ function setupErrorMessage(error) {
     return "Two-factor login isn't switched on for FORGE Responder yet. Contact FORGE Public Safety.";
   }
   if (code === "auth/too-many-requests") return "Too many attempts. Wait a few minutes and try again.";
-  if (code === "functions/resource-exhausted") return "A verification email was sent recently. Wait a minute and try again.";
+  if (code === "functions/resource-exhausted") return error.message || "A verification email was sent recently. Wait a minute and try again.";
   return error?.message || "Something went wrong. Try again.";
 }
 

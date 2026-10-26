@@ -117,6 +117,17 @@ describe("sendVerificationEmail", () => {
     assert.equal(retry.status, "sent");
   });
 
+  it("explains Firebase's per-address limit and frees the cooldown", async () => {
+    const db = fakeDb();
+    const auth = fakeAuth({ email: "a@b.co", emailVerified: false });
+    auth.generateEmailVerificationLink = async () => {
+      throw new Error('Raw server response: "{"error":{"message":"TOO_MANY_ATTEMPTS_TRY_LATER"}}"');
+    };
+    await assert.rejects(sendVerificationEmail(db, auth, req()), (e) => e.code === "resource-exhausted" && /about an hour/.test(e.message));
+    assert.equal(db.docs.get("emailVerificationRequests/u1").lastSentAt, null);
+    assert.equal(sent.length, 0);
+  });
+
   it("requires sign-in", async () => {
     await assert.rejects(sendVerificationEmail(fakeDb(), fakeAuth({}), { data: {} }), (e) => e.code === "unauthenticated");
   });

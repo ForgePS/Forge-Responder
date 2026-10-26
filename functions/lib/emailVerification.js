@@ -27,10 +27,21 @@ function continueUrlFor(pageUrl) {
   }
 }
 
+function isFirebaseRateLimit(error) {
+  return /TOO_MANY_ATTEMPTS_TRY_LATER/.test(String(error?.message || ""));
+}
+
 async function generateLink(adminAuth, email, continueUrl) {
   try {
     return await adminAuth.generateEmailVerificationLink(email, { url: continueUrl });
   } catch (error) {
+    // Firebase limits how many links one address can get; it clears on its own.
+    if (isFirebaseRateLimit(error)) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "Too many verification emails were requested for this address. Wait about an hour, then try once."
+      );
+    }
     // The continue URL's domain must be on Firebase's authorized list; if it
     // isn't, still send a working link (it just won't return to this page).
     if (error?.code === "auth/unauthorized-continue-uri" || error?.code === "auth/invalid-continue-uri") {
