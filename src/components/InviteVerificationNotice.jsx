@@ -30,9 +30,11 @@ export default function InviteVerificationNotice() {
     } catch (error) {
       console.warn("Could not send verification email", error);
       setStatus(
-        error?.code === "functions/resource-exhausted" || error?.code === "auth/too-many-requests"
-          ? "A verification email was sent recently. Check your inbox (and spam folder), or wait a few minutes and try again."
-          : "We couldn't send the verification email. Please try again in a moment."
+        error?.code === "functions/resource-exhausted"
+          ? `${error.message} Check your inbox and spam folder too.`
+          : error?.code === "auth/too-many-requests"
+            ? "A verification email was sent recently. Check your inbox (and spam folder), or wait a few minutes and try again."
+            : "We couldn't send the verification email. Please try again in a moment."
       );
     } finally {
       setSending(false);

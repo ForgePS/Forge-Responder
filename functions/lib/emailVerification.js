@@ -11,21 +11,37 @@ const { safeAppOrigin } = require("./invites");
 
 const COOLDOWN_MS = 60 * 1000;
 
-/** The page to return to after the link is clicked, limited to our own hosts. */
+/**
+ * The page to return to after the link is clicked, limited to our own hosts.
+ * Keeps only an ?invite= token, so a pending invite is accepted on return.
+ */
 function continueUrlFor(pageUrl) {
   try {
     const url = new URL(String(pageUrl || ""));
     const origin = safeAppOrigin(url.origin);
-    return origin === url.origin ? `${origin}${url.pathname}` : `${origin}/`;
+    const invite = url.searchParams.get("invite");
+    const query = invite ? `?invite=${encodeURIComponent(invite)}` : "";
+    return origin === url.origin ? `${origin}${url.pathname}${query}` : `${origin}/${query}`;
   } catch {
     return `${safeAppOrigin("")}/`;
   }
+}
+
+function isFirebaseRateLimit(error) {
+  return /TOO_MANY_ATTEMPTS_TRY_LATER/.test(String(error?.message || ""));
 }
 
 async function generateLink(adminAuth, email, continueUrl) {
   try {
     return await adminAuth.generateEmailVerificationLink(email, { url: continueUrl });
   } catch (error) {
+    // Firebase limits how many links one address can get; it clears on its own.
+    if (isFirebaseRateLimit(error)) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "Too many verification emails were requested for this address. Wait about an hour, then try once."
+      );
+    }
     // The continue URL's domain must be on Firebase's authorized list; if it
     // isn't, still send a working link (it just won't return to this page).
     if (error?.code === "auth/unauthorized-continue-uri" || error?.code === "auth/invalid-continue-uri") {
