@@ -6,7 +6,6 @@
  */
 import {
   EmailAuthProvider,
-  sendEmailVerification,
   TotpMultiFactorGenerator,
   getMultiFactorResolver,
   multiFactor,
@@ -59,11 +58,6 @@ export async function startAuthenticatorSetup(user) {
 export async function finishAuthenticatorSetup(user, secret, code, displayName = "Authenticator app") {
   const assertion = TotpMultiFactorGenerator.assertionForEnrollment(secret, String(code).trim());
   await multiFactor(user).enroll(assertion, displayName);
-}
-
-/** Firebase only allows two-factor on accounts with a verified email address. */
-export async function sendVerificationEmail(user) {
-  await sendEmailVerification(user, { url: `${window.location.origin}${window.location.pathname}` });
 }
 
 /** Re-reads the account; true once the email link has been clicked. */

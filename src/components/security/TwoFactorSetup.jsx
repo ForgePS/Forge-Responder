@@ -6,9 +6,9 @@ import {
   confirmPassword,
   emailNowVerified,
   finishAuthenticatorSetup,
-  sendVerificationEmail,
   startAuthenticatorSetup,
 } from "../../lib/twoFactor.js";
+import { sendVerificationEmail } from "../../lib/emailVerification.js";
 
 function setupErrorMessage(error) {
   const code = error?.code || "";
@@ -18,6 +18,7 @@ function setupErrorMessage(error) {
     return "Two-factor login isn't switched on for FORGE Responder yet. Contact FORGE Public Safety.";
   }
   if (code === "auth/too-many-requests") return "Too many attempts. Wait a few minutes and try again.";
+  if (code === "functions/resource-exhausted") return "A verification email was sent recently. Wait a minute and try again.";
   return error?.message || "Something went wrong. Try again.";
 }
 
@@ -62,7 +63,12 @@ export default function TwoFactorSetup({ onCancel }) {
     setBusy(true);
     setError("");
     try {
-      await sendVerificationEmail(user);
+      const result = await sendVerificationEmail();
+      if (result.status === "already_verified") {
+        setBusy(false);
+        await checkVerified();
+        return;
+      }
       setVerifySent(true);
     } catch (sendError) {
       setError(setupErrorMessage(sendError));

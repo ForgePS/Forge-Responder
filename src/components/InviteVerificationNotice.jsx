@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MailCheck, RefreshCw } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { sendVerificationEmail } from "../lib/twoFactor.js";
+import { sendVerificationEmail } from "../lib/emailVerification.js";
 
 /**
  * Shown when an invite was refused only because the signed-in account's email
@@ -20,12 +20,17 @@ export default function InviteVerificationNotice() {
     setSending(true);
     setStatus("");
     try {
-      await sendVerificationEmail(user);
+      const result = await sendVerificationEmail();
+      if (result.status === "already_verified") {
+        setSending(false);
+        await handleRetry();
+        return;
+      }
       setStatus(`Verification email sent to ${user.email}. Open the link in it, then come back and click "I've verified — try again".`);
     } catch (error) {
       console.warn("Could not send verification email", error);
       setStatus(
-        error?.code === "auth/too-many-requests"
+        error?.code === "functions/resource-exhausted" || error?.code === "auth/too-many-requests"
           ? "A verification email was sent recently. Check your inbox (and spam folder), or wait a few minutes and try again."
           : "We couldn't send the verification email. Please try again in a moment."
       );
