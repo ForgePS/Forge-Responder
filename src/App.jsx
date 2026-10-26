@@ -295,17 +295,37 @@ function persistJson(key, value) {
   }
 }
 
+function navGroupHasHeader(group) {
+  return Boolean(group.label) || groupHasNavTree(group) || (group.items?.length || 0) > 1;
+}
+
+/** Accordion: every headed section closed except `openKey`. */
+function onlySectionOpen(groups, openKey) {
+  const next = {};
+  groups.forEach((group, index) => {
+    if (!navGroupHasHeader(group)) return;
+    const key = navSectionKey(group, index);
+    next[key] = key !== openKey;
+  });
+  return next;
+}
+
 function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGroups }) {
   const [collapsedSections, setCollapsedSections] = useState(readCollapsedNavSections);
   const [collapsedNested, setCollapsedNested] = useState(readCollapsedNestedNav);
+  const lastRouteRef = useRef("");
 
   useEffect(() => {
     const activeIndex = groups.findIndex((group) => groupContainsRoute(group, current));
     if (activeIndex < 0) return;
+    // Only when the page changes, so a section opened by hand isn't closed when the menu re-renders.
+    if (lastRouteRef.current === current) return;
+    lastRouteRef.current = current;
     const key = navSectionKey(groups[activeIndex], activeIndex);
     setCollapsedSections((prev) => {
-      if (!prev[key]) return prev;
-      const next = { ...prev, [key]: false };
+      const next = onlySectionOpen(groups, key);
+      const same = Object.keys(next).every((k) => Boolean(prev[k]) === next[k]);
+      if (same) return prev;
       persistJson(NAV_SECTIONS_STORAGE_KEY, next);
       return next;
     });
@@ -332,15 +352,23 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
 
   function toggleSection(key) {
     setCollapsedSections((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
+      const opening = Boolean(prev[key]);
+      const next = opening ? onlySectionOpen(groups, key) : { ...prev, [key]: true };
       persistJson(NAV_SECTIONS_STORAGE_KEY, next);
       return next;
     });
   }
 
-  function toggleNested(id) {
+  // Sub-groups (e.g. under Prevention): opening one closes its siblings.
+  function toggleNested(id, siblingIds = []) {
     setCollapsedNested((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
+      const isClosed = prev[id] === undefined ? true : Boolean(prev[id]);
+      const next = { ...prev, [id]: !isClosed };
+      if (isClosed) {
+        for (const sibling of siblingIds) {
+          if (sibling !== id) next[sibling] = true;
+        }
+      }
       persistJson(NAV_NESTED_STORAGE_KEY, next);
       return next;
     });
@@ -360,6 +388,7 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
   }
 
   function renderNavTree(nodes, depth = 0) {
+    const siblingBranchIds = (nodes || []).filter((node) => isNavBranch(node)).map((node) => node.id || node.label);
     return (nodes || []).map((node) => {
       if (isNavBranch(node)) {
         const branchId = node.id || node.label;
@@ -381,7 +410,7 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
                 aria-expanded={!isBranchCollapsed}
                 aria-controls={`nav-branch-${branchId}`}
                 id={`nav-branch-btn-${branchId}`}
-                onClick={() => toggleNested(branchId)}
+                onClick={() => toggleNested(branchId, siblingBranchIds)}
               >
                 <BranchIcon size={15} aria-hidden />
                 <span>{navNodeLabel(node)}</span>
@@ -439,7 +468,7 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
           const key = navSectionKey(group, index);
           const title = navSectionTitle(group, index);
           const isSectionCollapsed = Boolean(collapsedSections[key]);
-          const showHeader = Boolean(group.label) || groupHasNavTree(group) || (group.items?.length || 0) > 1;
+          const showHeader = navGroupHasHeader(group);
           const sectionHasActive = groupContainsRoute(group, current);
 
           return (
