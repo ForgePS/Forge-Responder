@@ -117,6 +117,11 @@ export function AuthProvider({ children }) {
     const token = readPendingInviteToken();
     if (!token || !nextUser?.uid) return false;
     try {
+      // Returning from the verification link: the saved sign-in may predate it.
+      if (!nextUser.emailVerified && typeof nextUser.reload === "function") {
+        await nextUser.reload();
+        if (nextUser.emailVerified) await nextUser.getIdToken(true);
+      }
       const result = await acceptInvite(token);
       clearPendingInviteToken();
       if (result?.departmentId) {

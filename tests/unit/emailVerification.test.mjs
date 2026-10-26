@@ -127,4 +127,12 @@ describe("continueUrlFor", () => {
     assert.equal(continueUrlFor("https://01002.forgeresponder.com/login"), "https://01002.forgeresponder.com/login");
     assert.equal(continueUrlFor("https://evil.example/phish"), "https://app.forgeresponder.com/");
   });
+
+  it("keeps only the invite token from the query", () => {
+    assert.equal(
+      continueUrlFor("https://01002.forgeresponder.com/?invite=abc123&next=https://evil.example"),
+      "https://01002.forgeresponder.com/?invite=abc123",
+    );
+    assert.equal(continueUrlFor("https://evil.example/?invite=abc"), "https://app.forgeresponder.com/?invite=abc");
+  });
 });

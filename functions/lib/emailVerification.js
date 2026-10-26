@@ -11,12 +11,17 @@ const { safeAppOrigin } = require("./invites");
 
 const COOLDOWN_MS = 60 * 1000;
 
-/** The page to return to after the link is clicked, limited to our own hosts. */
+/**
+ * The page to return to after the link is clicked, limited to our own hosts.
+ * Keeps only an ?invite= token, so a pending invite is accepted on return.
+ */
 function continueUrlFor(pageUrl) {
   try {
     const url = new URL(String(pageUrl || ""));
     const origin = safeAppOrigin(url.origin);
-    return origin === url.origin ? `${origin}${url.pathname}` : `${origin}/`;
+    const invite = url.searchParams.get("invite");
+    const query = invite ? `?invite=${encodeURIComponent(invite)}` : "";
+    return origin === url.origin ? `${origin}${url.pathname}${query}` : `${origin}/${query}`;
   } catch {
     return `${safeAppOrigin("")}/`;
   }
