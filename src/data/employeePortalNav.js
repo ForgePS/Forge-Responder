@@ -70,7 +70,7 @@ const PORTAL_ITEM_MODULES = {
 
 export function filterEmployeePortalNav(
   groups = employeePortalNavGroups,
-  { canViewInternalEmail = true, canViewDailyLog = true, isModuleEnabled = () => true } = {}
+  { canViewInternalEmail = true, canViewDailyLog = true, isModuleEnabled = () => true, academyConnected = false } = {}
 ) {
   return groups
     .map((group) => ({
@@ -78,6 +78,8 @@ export function filterEmployeePortalNav(
       items: group.items.filter(([name]) => {
         if (name === "Messages" && !canViewInternalEmail) return false;
         if (name === "Daily Log" && !canViewDailyLog) return false;
+        // Nothing to open until the department connects an Academy.
+        if (name === "Academy Class Schedule" && !academyConnected) return false;
         const moduleKey = PORTAL_ITEM_MODULES[name];
         return !moduleKey || isModuleEnabled(moduleKey);
       }),

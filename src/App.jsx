@@ -817,6 +817,7 @@ function AppShell() {
     };
   }, [departmentId, platformConfig?.availablePreplanFeatures]);
 
+  const academyConnected = Boolean(settings?.academy?.connected);
   const visibleNavGroups = useMemo(() => {
     const permissionFiltered = filterNavGroups(navGroups, permissions, { isCreator })
       .map((group) => (isCreator ? group : { ...group, items: (group.items || []).filter(([name]) => name !== "Fleet Hardening") }));
@@ -829,8 +830,13 @@ function AppShell() {
       isCreator,
       isPlatformCreator: Boolean(membership?.isPlatformCreator),
     });
-    return filterNavGroupsByPreplanFeatures(codeFiltered, preplanFeatures || {}, { isCreator });
-  }, [permissions, isCreator, isModuleEnabled, inPlatformScope, membership?.isPlatformCreator, codeLibraryAccess, preplanFeatures]);
+    const preplanFiltered = filterNavGroupsByPreplanFeatures(codeFiltered, preplanFeatures || {}, { isCreator });
+    // Academy Class Schedule only when the department has an Academy connected.
+    return academyConnected ? preplanFiltered : preplanFiltered.map((group) => ({
+      ...group,
+      items: (group.items || []).filter(([name]) => name !== "Academy Class Schedule"),
+    }));
+  }, [permissions, isCreator, isModuleEnabled, inPlatformScope, membership?.isPlatformCreator, codeLibraryAccess, preplanFeatures, academyConnected]);
   const canViewInternalEmail = hasPermission(permissions, "viewInternalEmail");
   const canViewDailyLog = hasPermission(permissions, "viewDailyLog");
   const visibleEmployeeNavGroups = useMemo(
@@ -838,8 +844,9 @@ function AppShell() {
       canViewInternalEmail,
       canViewDailyLog,
       isModuleEnabled,
+      academyConnected,
     }),
-    [canViewInternalEmail, canViewDailyLog, isModuleEnabled]
+    [canViewInternalEmail, canViewDailyLog, isModuleEnabled, academyConnected]
   );
   const showAdminToggle = canAccessAdminRms(permissions, isCreator);
   const showEmployeeToggle = canAccessEmployeePortal(permissions);

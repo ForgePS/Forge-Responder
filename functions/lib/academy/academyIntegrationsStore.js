@@ -93,6 +93,20 @@ async function getActiveConnections(db, departmentId) {
   return all.filter((c) => c.enabled && !["disconnected", "not_connected", "suspended"].includes(c.status));
 }
 
+/**
+ * Members can't read connections (server-only), so keep a simple flag in the
+ * department settings: the menu shows "Academy Class Schedule" only when true.
+ */
+async function refreshAcademyNavFlag(db, departmentId) {
+  if (!departmentId) return false;
+  const connected = (await getActiveConnections(db, departmentId)).length > 0;
+  await db.doc(`departments/${departmentId}/settings/main`).set(
+    { academy: { connected, updatedAt: new Date().toISOString() } },
+    { merge: true },
+  );
+  return connected;
+}
+
 function validateProviderType(providerType) {
   if (!PROVIDER_TYPES.includes(providerType)) {
     throw new Error(`Unsupported providerType: ${providerType}`);
@@ -243,6 +257,7 @@ module.exports = {
   getConnection,
   getPrimaryConnection,
   getActiveConnections,
+  refreshAcademyNavFlag,
   upsertConnection,
   setPrimaryConnection,
   patchConnectionStatus,
