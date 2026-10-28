@@ -30,6 +30,7 @@ const {
   ensureSettings,
   loadSettings,
   saveDamageFormSubmission,
+  saveSetup: saveJotformDamageSetupRecord,
   validateWebhookToken,
 } = require("./lib/jotformDamageStore");
 const { fetchJotformSubmissionPdf, resolveReportId, buildPublicPdfUrls } = require("./lib/jotformDamagePdf");
@@ -508,13 +509,42 @@ exports.getJotformDamageSetup = onCall(
     const { departmentId = "" } = request.data || {};
     await assertDepartmentAccess(db, departmentId, request.auth);
 
-    const settings = await ensureSettings(db, departmentId);
+    return jotformSetupResponse(departmentId, await ensureSettings(db, departmentId));
+  }
+);
+
+function jotformSetupResponse(departmentId, settings = {}) {
+  const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || admin.app().options.projectId;
+  return {
+    formUrl: settings.formUrl || "",
+    formId: settings.formId || "",
+    formTitle: settings.formTitle || "Damage Form",
+    apiKeyConfigured: Boolean(settings.apiKey),
+    // The webhook link carries the token, so only admins get it.
+    webhookUrl: "",
+    lastSubmissionAt: settings.lastSubmissionAt || "",
+  };
+}
+
+/** Admins only: everything the setup screen needs, including the webhook link. */
+exports.saveJotformDamageSetup = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const db = admin.firestore();
+    const { departmentId = "", formUrl, formTitle, apiKey, removeApiKey = false, readOnly = false } = request.data || {};
+    await invites.assertDepartmentAdmin(db, departmentId, request.auth);
+    let settings;
+    try {
+      settings = readOnly
+        ? await ensureSettings(db, departmentId)
+        : await saveJotformDamageSetupRecord(db, departmentId, { formUrl, formTitle, apiKey, removeApiKey });
+    } catch (error) {
+      if (error.code === "invalid-argument") throw new HttpsError("invalid-argument", error.message);
+      throw error;
+    }
     const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || admin.app().options.projectId;
     return {
-      formUrl: settings.formUrl || "",
-      formId: settings.formId || "",
-      formTitle: settings.formTitle || "Damage Form",
-      apiKeyConfigured: Boolean(settings.apiKey),
+      ...jotformSetupResponse(departmentId, settings),
       webhookUrl: buildWebhookUrl(projectId, departmentId, settings.webhookToken),
     };
   }

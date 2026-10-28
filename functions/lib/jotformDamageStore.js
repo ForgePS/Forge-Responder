@@ -8,29 +8,104 @@ function extractJotformId(formUrl = "") {
   return match ? match[1] : "";
 }
 
+const SECRET_FIELDS = ["apiKey", "webhookToken"];
+
 function settingsRef(db, departmentId) {
   return db.doc(`departments/${departmentId}/settings/${SETTINGS_DOC_ID}`);
 }
 
+function secretsRef(db, departmentId) {
+  return db.doc(`departments/${departmentId}/integrations/${SETTINGS_DOC_ID}`);
+}
+
+/**
+ * Public settings merged with the server-only secrets. Older departments kept the
+ * API key and webhook token in the member-readable settings doc; move them on read.
+ */
 async function loadSettings(db, departmentId) {
-  const snap = await settingsRef(db, departmentId).get();
-  return snap.exists ? snap.data() : null;
+  const [publicSnap, secretSnap] = await Promise.all([
+    settingsRef(db, departmentId).get(),
+    secretsRef(db, departmentId).get(),
+  ]);
+  if (!publicSnap.exists && !secretSnap.exists) return null;
+  const publicData = publicSnap.exists ? publicSnap.data() || {} : {};
+  const secrets = secretSnap.exists ? { ...(secretSnap.data() || {}) } : {};
+
+  const legacy = SECRET_FIELDS.filter((field) => publicData[field]);
+  if (legacy.length) {
+    const { FieldValue } = require("firebase-admin/firestore");
+    for (const field of legacy) {
+      if (!secrets[field]) secrets[field] = publicData[field];
+    }
+    await secretsRef(db, departmentId).set(
+      { ...pick(secrets, SECRET_FIELDS), updatedAt: new Date().toISOString() },
+      { merge: true },
+    );
+    await settingsRef(db, departmentId).set(
+      Object.fromEntries(legacy.map((field) => [field, FieldValue.delete()])),
+      { merge: true },
+    );
+  }
+
+  const merged = { ...publicData, ...pick(secrets, SECRET_FIELDS) };
+  return merged;
+}
+
+function isJotformUrl(value) {
+  try {
+    const { protocol, hostname } = new URL(value);
+    return protocol === "https:" && (hostname === "jotform.com" || hostname.endsWith(".jotform.com"));
+  } catch {
+    return false;
+  }
+}
+
+function pick(source = {}, fields = []) {
+  return Object.fromEntries(fields.filter((field) => source[field]).map((field) => [field, source[field]]));
 }
 
 async function ensureSettings(db, departmentId) {
-  const ref = settingsRef(db, departmentId);
-  const snap = await ref.get();
-  if (snap.exists) return snap.data();
+  const existing = await loadSettings(db, departmentId);
+  if (existing?.webhookToken) return existing;
 
-  const payload = {
-    formUrl: "",
-    formId: "",
-    formTitle: "Damage Form",
-    webhookToken: crypto.randomUUID(),
+  const webhookToken = crypto.randomUUID();
+  await secretsRef(db, departmentId).set({ webhookToken, updatedAt: new Date().toISOString() }, { merge: true });
+  if (!existing) {
+    await settingsRef(db, departmentId).set({
+      formUrl: "",
+      formId: "",
+      formTitle: "Damage Form",
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  }
+  return { formUrl: "", formId: "", formTitle: "Damage Form", ...(existing || {}), webhookToken };
+}
+
+/** Admin save: form URL/title to the settings doc; API key to the server-only doc. */
+async function saveSetup(db, departmentId, { formUrl = "", formTitle = "", apiKey = "", removeApiKey = false } = {}) {
+  await ensureSettings(db, departmentId);
+  const url = String(formUrl || "").trim();
+  if (url && !isJotformUrl(url)) {
+    const error = new Error("Enter the form's JotForm link (it starts with https://form.jotform.com/ or https://www.jotform.com/).");
+    error.code = "invalid-argument";
+    throw error;
+  }
+  await settingsRef(db, departmentId).set({
+    formUrl: url,
+    formId: extractJotformId(url),
+    formTitle: String(formTitle || "").trim() || "Damage Form",
     updatedAt: new Date().toISOString(),
-  };
-  await ref.set(payload, { merge: true });
-  return payload;
+  }, { merge: true });
+
+  const key = String(apiKey || "").trim();
+  if (key || removeApiKey) {
+    const { FieldValue } = require("firebase-admin/firestore");
+    await secretsRef(db, departmentId).set(
+      { apiKey: removeApiKey ? FieldValue.delete() : key, updatedAt: new Date().toISOString() },
+      { merge: true },
+    );
+  }
+  return loadSettings(db, departmentId);
 }
 
 function formatAnswerValue(value) {
@@ -238,6 +313,8 @@ async function saveDamageFormSubmission(db, departmentId, body = {}) {
   const recordId = `jf-${parsed.submissionId}`;
   const ref = db.doc(`departments/${departmentId}/damageForms/${recordId}`);
   await ref.set(parsed, { merge: true });
+  // Lets the setup screen show "Receiving submissions" instead of just "form saved".
+  await settingsRef(db, departmentId).set({ lastSubmissionAt: new Date().toISOString() }, { merge: true });
   return { id: recordId, ...parsed };
 }
 
@@ -256,6 +333,7 @@ module.exports = {
   extractJotformId,
   formatAnswerValue,
   loadSettings,
+  saveSetup,
   parseJotformWebhookBody,
   pickSubmitter,
   buildTitle,

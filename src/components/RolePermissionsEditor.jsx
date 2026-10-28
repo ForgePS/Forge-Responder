@@ -6,6 +6,7 @@ import { useTenant } from "../context/TenantContext.jsx";
 import PermissionGroupGrid from "./PermissionGroupGrid.jsx";
 import { CREATOR_PERMISSIONS } from "../data/creatorPermissions.js";
 import { writeAuditLog } from "../lib/auditService.js";
+import { isLockedAdminPermission, saveErrorMessage, withLockedAdminPermissions } from "../lib/adminGuards.js";
 import { listRecords, updateRecord } from "../lib/firestoreService.js";
 import {
   createDepartmentRole,
@@ -77,6 +78,10 @@ export default function RolePermissionsEditor({ onMessage }) {
 
   function togglePermission(roleId, permissionKey) {
     if (roleId === "creator") return;
+    if (isLockedAdminPermission(roleId, permissionKey)) {
+      onMessage?.("Fire Chief and IT Admin always keep user and system-settings access, so nobody gets locked out of System Admin.", "error");
+      return;
+    }
     setDrafts((current) => ({
       ...current,
       [roleId]: {
@@ -91,6 +96,7 @@ export default function RolePermissionsEditor({ onMessage }) {
     setDrafts((current) => {
       const next = { ...current[roleId] };
       for (const key of keys) {
+        if (isLockedAdminPermission(roleId, key)) continue;
         next[key] = enabled;
       }
       return { ...current, [roleId]: next };
@@ -114,7 +120,7 @@ export default function RolePermissionsEditor({ onMessage }) {
       const role = roleMap[roleId];
       const permissions = roleId === "creator"
         ? { ...CREATOR_PERMISSIONS }
-        : clonePermissions(drafts[roleId]);
+        : withLockedAdminPermissions(roleId, clonePermissions(drafts[roleId]));
       const meta = roleMeta[roleId] || {};
 
       await updateRecord(departmentId, "roles", roleId, {
@@ -151,7 +157,7 @@ export default function RolePermissionsEditor({ onMessage }) {
       onMessage?.(`Saved permissions for ${updatedRole.name}`);
     } catch (error) {
       console.error("Failed to save role permissions", error);
-      onMessage?.("Failed to save role permissions");
+      onMessage?.(saveErrorMessage(error), "error");
     } finally {
       setSavingRoleId("");
     }
@@ -165,7 +171,7 @@ export default function RolePermissionsEditor({ onMessage }) {
       for (const role of roles) {
         const permissions = role.id === "creator"
           ? { ...CREATOR_PERMISSIONS }
-          : clonePermissions(drafts[role.id]);
+          : withLockedAdminPermissions(role.id, clonePermissions(drafts[role.id]));
         const meta = roleMeta[role.id] || {};
         const payload = {
           name: String(meta.name || role.name || role.id).trim() || role.id,
@@ -191,7 +197,7 @@ export default function RolePermissionsEditor({ onMessage }) {
       onMessage?.(`Saved permissions for ${savedRoles.length} roles`);
     } catch (error) {
       console.error("Failed to save all role permissions", error);
-      onMessage?.("Failed to save all role permissions");
+      onMessage?.(saveErrorMessage(error), "error");
     } finally {
       setSavingAll(false);
     }

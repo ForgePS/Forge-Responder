@@ -58,7 +58,14 @@ export default function AdminControlCenterPage({
     || hasPermission(permissions, "academyIntegrationsManage");
   const [openSections, setOpenSections] = useState(() => new Set());
   const [permissionsView, setPermissionsView] = useState("roles");
-  const [message, setMessage] = useState("");
+  const [banner, setBanner] = useState({ text: "", tone: "success" });
+  const message = banner.text;
+  // Panels call onMessage(text) or onMessage(text, "error"); older failure messages are recognised by wording.
+  function setMessage(text, tone) {
+    const value = String(text || "");
+    const isError = tone === "error" || (!tone && /^(failed|couldn't|could not|can't|cannot|save failed|unable)/i.test(value));
+    setBanner({ text: value, tone: isError ? "error" : "success" });
+  }
   const [loading, setLoading] = useState(true);
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditFilter, setAuditFilter] = useState("All");
@@ -123,7 +130,7 @@ export default function AdminControlCenterPage({
       </section>
 
       {message && (
-        <div className="success-banner">
+        <div className={banner.tone === "error" ? "error-banner" : "success-banner"} role={banner.tone === "error" ? "alert" : "status"}>
           {message}
           <button type="button" onClick={() => setMessage("")}><X size={13} /></button>
         </div>

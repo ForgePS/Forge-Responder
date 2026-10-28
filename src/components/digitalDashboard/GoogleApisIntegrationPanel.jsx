@@ -145,6 +145,9 @@ export default function GoogleApisIntegrationPanel({
         removeKeys: [fieldId],
       });
       setStatus(next);
+      if (fieldId === "mapsJsApiKey") {
+        await savePublicAlertDashboardDoc(departmentId, { mapsJsApiKey: "" }).catch(() => {});
+      }
       setNotice(`Removed ${API_FIELDS.find((item) => item.id === fieldId)?.label || "API key"}.`);
     } catch (err) {
       setError(err.message || "Could not remove key.");
@@ -160,6 +163,7 @@ export default function GoogleApisIntegrationPanel({
     setError("");
     try {
       await clearGoogleApisConfig(departmentId);
+      await savePublicAlertDashboardDoc(departmentId, { mapsJsApiKey: "" }).catch(() => {});
       setStatus({ configured: false, keys: {} });
       setForm({
         mapsJsApiKey: "",

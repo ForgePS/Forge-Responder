@@ -438,10 +438,18 @@ service cloud.firestore {
                request.resource.data.get("stations", []).size(), resource.data.get("stations", []).size());
         allow delete: if canAccessDepartment(departmentId);
       }
+      // Department settings: admins change them. A member may only seed a missing
+      // settings/main on first load and save distribution groups (the app checks
+      // manageInternalEmail). Secrets live in integrations/, never here.
       match /settings/{document} {
         allow read: if canAccessDepartment(departmentId);
-        allow create: if canAccessDepartment(departmentId);
-        allow update: if canAccessDepartment(departmentId)
+        allow create: if isDepartmentAdmin(departmentId)
+          || (document == "main" && canAccessDepartment(departmentId));
+        allow update: if (
+            isDepartmentAdmin(departmentId)
+            || (canAccessDepartment(departmentId) && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(["internalEmailGroups", "departmentId", "updatedAt"]))
+          )
           && (isPlatformCreator() || (subscriptionFieldUnchanged() && enabledModulesUnchanged()));
       }
       // A list is either one record holding an items array (older), or a header
@@ -1051,7 +1059,7 @@ service cloud.firestore {
         allow read: if canAccessDepartment(departmentId);
         allow create: if canAccessDepartment(departmentId);
         allow update: if canAccessDepartment(departmentId);
-        allow delete: if false;
+        allow delete: if isDepartmentAdmin(departmentId);
       }
       match /waterCompanies/{companyId} {
         allow read: if canAccessDepartment(departmentId);

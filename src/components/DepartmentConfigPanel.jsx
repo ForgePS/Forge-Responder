@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { ADMIN_MODULE_OPTIONS } from "../data/adminRegistry.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { isValidTimezone } from "../lib/timezone.js";
 import { useTenant } from "../context/TenantContext.jsx";
 import { writeAuditLog } from "../lib/auditService.js";
 import { getFirestoreDb } from "../lib/firebaseClient.js";
@@ -47,6 +48,23 @@ const emptyProfileForm = {
 function toCommaField(value) {
   if (Array.isArray(value)) return value.join(", ");
   return String(value ?? "");
+}
+
+const US_TIMEZONES = [
+  ["America/New_York", "Eastern"],
+  ["America/Chicago", "Central"],
+  ["America/Denver", "Mountain"],
+  ["America/Phoenix", "Arizona (no daylight saving)"],
+  ["America/Los_Angeles", "Pacific"],
+  ["America/Anchorage", "Alaska"],
+  ["Pacific/Honolulu", "Hawaii"],
+  ["America/Puerto_Rico", "Atlantic (Puerto Rico)"],
+];
+
+function timezoneOptions(current = "") {
+  const value = String(current || "").trim();
+  if (!value || US_TIMEZONES.some(([zone]) => zone === value) || !isValidTimezone(value)) return US_TIMEZONES;
+  return [...US_TIMEZONES, [value, value]];
 }
 
 function parseCommaList(value) {
@@ -142,9 +160,10 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
 
   const visibleSections = useMemo(
     () => DEPARTMENT_CONFIG_SECTIONS.filter((section) => (
-      section.id !== "subscription" || canViewSubscription
+      (section.id !== "subscription" || canViewSubscription)
+      && (section.id !== "academy" || isCreator)
     )),
-    [canViewSubscription]
+    [canViewSubscription, isCreator]
   );
 
   useEffect(() => {
@@ -180,7 +199,7 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
         contactEmail: profileForm.contactEmail.trim(),
         contactPhone: profileForm.contactPhone.trim(),
         address: profileForm.address.trim(),
-        timezone: profileForm.timezone.trim(),
+        timezone: isValidTimezone(profileForm.timezone.trim()) ? profileForm.timezone.trim() : "America/Chicago",
         stations: stationNamesFromDetails(normalizedStations),
         stationDetails: normalizedStations,
         shifts: parseCommaList(profileForm.shifts),
@@ -197,6 +216,8 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
         // Display-only: the effective module list comes from the server's entitlements.
         enabledModules: _effectiveModules,
         disabledModules: _disabledModules,
+        // Hub settings are only saved by a platform creator (merge keeps the stored copy).
+        forgeAcademy: _forgeAcademy,
         ...storedSettings
       } = settings || {};
       const settingsPayload = {
@@ -213,13 +234,15 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
         schedulingSettings: canManageOperations
           ? normalizeSchedulingSettings(schedulingSettings, fleetUnits)
           : normalizeSchedulingSettings(settings.schedulingSettings, fleetUnits),
-        forgeAcademy: {
-          hubEnabled: forgeAcademy.hubEnabled !== false,
-          hubBaseUrl: String(forgeAcademy.hubBaseUrl || "").trim().replace(/\/$/, ""),
-          hubBearerToken: String(forgeAcademy.hubBearerToken || "").trim(),
-          hubSecret: String(forgeAcademy.hubSecret || "").trim(),
-          forgeDepartmentId: String(forgeAcademy.forgeDepartmentId || "").trim(),
-        },
+        ...(isCreator ? {
+          forgeAcademy: {
+            hubEnabled: forgeAcademy.hubEnabled !== false,
+            hubBaseUrl: String(forgeAcademy.hubBaseUrl || "").trim().replace(/\/$/, ""),
+            hubBearerToken: String(forgeAcademy.hubBearerToken || "").trim(),
+            hubSecret: String(forgeAcademy.hubSecret || "").trim(),
+            forgeDepartmentId: String(forgeAcademy.forgeDepartmentId || "").trim(),
+          },
+        } : {}),
         updatedAt: new Date().toISOString()
       };
 
@@ -305,7 +328,13 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
             <label><span>Contact Email</span><input value={profileForm.contactEmail} onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })} /></label>
             <label><span>Contact Phone</span><input value={profileForm.contactPhone} onChange={(e) => setProfileForm({ ...profileForm, contactPhone: e.target.value })} /></label>
             <label className="wide-field"><span>Address</span><input value={profileForm.address} onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })} /></label>
-            <label><span>Timezone</span><input value={profileForm.timezone} onChange={(e) => setProfileForm({ ...profileForm, timezone: e.target.value })} /></label>
+            <label><span>Timezone</span>
+              <select value={profileForm.timezone || "America/Chicago"} onChange={(e) => setProfileForm({ ...profileForm, timezone: e.target.value })}>
+                {timezoneOptions(profileForm.timezone).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
             <label className="wide-field"><span>Shifts (comma-separated)</span><input value={profileForm.shifts} onChange={(e) => setProfileForm({ ...profileForm, shifts: e.target.value })} /></label>
           </div>
         ) : null}

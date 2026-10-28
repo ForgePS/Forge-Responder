@@ -17,6 +17,7 @@ import {
   getRoleBasedPermissions
 } from "../lib/userPermissions.js";
 import { normalizeRoleIds } from "../lib/permissions.js";
+import { isAdminMembershipRoles, saveErrorMessage } from "../lib/adminGuards.js";
 
 function buildUserDraft(userRecord = {}, rolesById = {}) {
   const roleIds = normalizeRoleIds(userRecord);
@@ -114,6 +115,7 @@ export default function UserPermissionsEditor({
       );
       const nextMembership = { ...membership, permissions: overrides };
       return {
+        ...current,
         roleIds: nextRoleIds,
         permissions: getEffectiveUserPermissions(nextMembership, rolesById)
       };
@@ -145,10 +147,11 @@ export default function UserPermissionsEditor({
   function resetToRoleDefaults() {
     if (!selectedUser) return;
     const membership = { ...selectedUser, roleIds: draft.roleIds, permissions: {} };
-    setDraft({
+    setDraft((current) => ({
+      ...current,
       roleIds: draft.roleIds,
       permissions: getRoleBasedPermissions(membership, rolesById)
-    });
+    }));
   }
 
   async function saveUserPermissions() {
@@ -165,6 +168,10 @@ export default function UserPermissionsEditor({
       if (isSelf && !(authMembership?.isPlatformCreator || authMembership?.role === "creator")) {
         permissions = {};
         if (!roleIds.length) roleIds = ["fireChief"];
+        if (isAdminMembershipRoles(authMembership) && !isAdminMembershipRoles({ roleIds })) {
+          onMessage?.("You can't remove your own administrator role. Ask another administrator to change it.", "error");
+          return;
+        }
       }
 
       if (isSelf && (authMembership?.isPlatformCreator || authMembership?.role === "creator" || isPlatformBootstrapEmail(authUser?.email))) {
@@ -214,7 +221,7 @@ export default function UserPermissionsEditor({
       onMessage?.(`Saved permissions for ${selectedUser.displayName || selectedUser.email}`);
     } catch (error) {
       console.error("Failed to save user permissions", error);
-      onMessage?.("Failed to save user permissions");
+      onMessage?.(saveErrorMessage(error), "error");
     } finally {
       setSaving(false);
     }

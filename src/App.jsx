@@ -21,6 +21,7 @@ import {
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import { useTenant } from "./context/TenantContext.jsx";
 import { isPlatformScope } from "./lib/tenantPaths.js";
+import { isValidTimezone } from "./lib/timezone.js";
 import { useTenantPersistentState } from "./hooks/useTenantPersistentState.js";
 import { formatRoleLabel, membershipInitials } from "./lib/departmentMembership.js";
 import AccessDeniedPage from "./pages/AccessDeniedPage.jsx";
@@ -618,7 +619,7 @@ function TopBar({
   const initials = membershipInitials(membership, user);
   const displayName = membership?.displayName || user?.displayName || user?.email || "User";
   const roleLabel = formatRoleLabel(membership?.role || "member", membership);
-  const { dateLabel, timeLabel } = useLiveClock(profile.timezone || "America/Chicago");
+  const { dateLabel, timeLabel } = useLiveClock(isValidTimezone(profile.timezone) ? profile.timezone : "America/Chicago");
   const brandTitle = profile.displayTitle || profile.name || defaultPlatformConfig.platformTitle;
   const brandSubtitle = profile.shortName || profile.name;
 

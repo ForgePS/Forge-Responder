@@ -16,6 +16,7 @@ import {
   withStableRowKeys
 } from "../lib/adminCellUtils.js";
 import { orderColumns } from "../lib/adminFieldSchema.js";
+import { saveErrorMessage } from "../lib/adminGuards.js";
 import { createBlankRecord } from "../lib/adminRecordDefaults.js";
 import { getFirestoreDb } from "../lib/firebaseClient.js";
 import { restoreItemsFromFirestore, sanitizeItemsForFirestore } from "../lib/firestoreSanitize.js";
@@ -42,6 +43,9 @@ export default function DataEditorPanel({ onMessage }) {
   const [columnKeys, setColumnKeys] = useState(["id"]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  // If loading fails the editor is empty; saving then would delete every stored record.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadedCount, setLoadedCount] = useState(0);
 
   const columns = useMemo(() => orderColumns(columnKeys, datasetKey), [columnKeys, datasetKey]);
   const activeDataset = MODULE_DATASETS.find((item) => item.key === datasetKey);
@@ -57,11 +61,14 @@ export default function DataEditorPanel({ onMessage }) {
       const { items } = await loadTenantListFromFirestore(dataDepartmentId, datasetKey);
       const keyedRows = withStableRowKeys(items, { persisted: true });
       setRows(keyedRows);
+      setLoadFailed(false);
+      setLoadedCount(keyedRows.length);
       setColumnKeys(orderColumns(collectColumns(keyedRows), datasetKey));
     } catch (error) {
       console.error(`Failed to load dataset ${datasetKey}`, error);
-      onMessage?.(`Failed to load ${datasetTitle} dataset`);
+      onMessage?.(`Couldn't load ${datasetTitle}. Saving is turned off so nothing is overwritten. Refresh the page to try again.`, "error");
       setRows([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -109,6 +116,14 @@ export default function DataEditorPanel({ onMessage }) {
   async function saveDataset() {
     const db = getFirestoreDb();
     if (!db || !dataDepartmentId) return;
+    if (loadFailed) {
+      onMessage?.("This list didn't load, so it can't be saved. Refresh the page and try again.", "error");
+      return;
+    }
+    if (!rows.length && loadedCount > 0
+      && !window.confirm(`This removes all ${loadedCount} ${datasetLabel} records. Continue?`)) {
+      return;
+    }
 
     setSaving(true);
     try {
@@ -126,7 +141,7 @@ export default function DataEditorPanel({ onMessage }) {
       await loadDataset();
     } catch (error) {
       console.error("Failed to save dataset", error);
-      onMessage?.("Save failed — check permissions and try again");
+      onMessage?.(saveErrorMessage(error), "error");
     } finally {
       setSaving(false);
     }
@@ -148,7 +163,7 @@ export default function DataEditorPanel({ onMessage }) {
         {!usePanelEditor && (
           <div className="data-editor-actions">
             <button className="secondary-button" type="button" onClick={addRow}><CirclePlus size={14} /> Add row</button>
-            <button className="primary-button" type="button" onClick={saveDataset} disabled={saving || loading}>
+            <button className="primary-button" type="button" onClick={saveDataset} disabled={saving || loading || loadFailed}>
               <Check size={14} /> {saving ? "Saving..." : "Save dataset"}
             </button>
           </div>
@@ -173,7 +188,7 @@ export default function DataEditorPanel({ onMessage }) {
           rows={rows}
           columns={columns}
           loading={loading}
-          saving={saving}
+          saving={saving || loadFailed}
           onUpdateCell={updateCell}
           onAddRecord={addRow}
           onRemoveRecord={removeRow}

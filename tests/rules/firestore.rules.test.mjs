@@ -343,6 +343,29 @@ describe("department admins", () => {
     await assertFails(updateDoc(doc(db, `departments/${A}/users/member-a`), { role: "creator" }));
   });
 
+  it("are the only ones who change department settings", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `departments/${A}/settings/main`), { payRules: { overtimeMultiplier: 1.5 } });
+      await setDoc(doc(ctx.firestore(), `departments/${A}/settings/damageFormJotform`), { formUrl: "https://form.jotform.com/1" });
+    });
+    const member = memberA().firestore();
+    await assertSucceeds(getDoc(doc(member, `departments/${A}/settings/main`)));
+    await assertFails(setDoc(doc(member, `departments/${A}/settings/main`), { payRules: { overtimeMultiplier: 3 } }, { merge: true }));
+    await assertFails(setDoc(doc(member, `departments/${A}/settings/damageFormJotform`), { formUrl: "https://evil.example" }, { merge: true }));
+    await assertFails(setDoc(doc(member, `departments/${A}/settings/other`), { anything: true }));
+    // Distribution groups are the one thing members may save (the app checks the permission).
+    await assertSucceeds(setDoc(doc(member, `departments/${A}/settings/main`), { internalEmailGroups: [], updatedAt: "now" }, { merge: true }));
+    await assertSucceeds(setDoc(doc(adminA().firestore(), `departments/${A}/settings/main`), { payRules: { overtimeMultiplier: 2 } }, { merge: true }));
+  });
+
+  it("can delete notifications; members can't", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `departments/${A}/notifications/n1`), { title: "x" });
+    });
+    await assertFails(deleteDoc(doc(memberA().firestore(), `departments/${A}/notifications/n1`)));
+    await assertSucceeds(deleteDoc(doc(adminA().firestore(), `departments/${A}/notifications/n1`)));
+  });
+
   it("cannot manage another department's members", async () => {
     const db = adminA().firestore();
     await assertFails(setDoc(doc(db, `departments/${B}/users/x`), membership("x", B)));

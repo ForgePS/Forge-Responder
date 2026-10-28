@@ -163,8 +163,9 @@ export default function TrainingAcademiesPanel({
     setError("");
     setNotice("");
     try {
-      await fn();
-      if (successMessage) setNotice(successMessage);
+      const outcome = await fn();
+      const message = typeof outcome === "string" ? outcome : successMessage;
+      if (message) setNotice(message);
       await refresh();
     } catch (err) {
       setError(err.message || "Action failed.");
@@ -290,8 +291,12 @@ export default function TrainingAcademiesPanel({
                       onClick={() =>
                         runAction(
                           `test-${connection.connectionId}`,
-                          () => testAcademyConnection(departmentId, connection.connectionId),
-                          "Connection test completed."
+                          async () => {
+                            const response = await testAcademyConnection(departmentId, connection.connectionId);
+                            const result = response?.result || {};
+                            if (!result.ok) throw new Error(`Connection test failed: ${result.message || "the academy didn't respond."}`);
+                            return `Connection test passed. ${result.message || ""}`.trim();
+                          }
                         )
                       }
                     >
@@ -378,9 +383,11 @@ export default function TrainingAcademiesPanel({
               value={form.providerType}
               onChange={(e) => setForm({ ...form, providerType: e.target.value })}
             >
-              {PROVIDER_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
+              {PROVIDER_TYPE_OPTIONS
+                .filter((opt) => ["forge_academy", "manual"].includes(opt.value) || opt.value === form.providerType)
+                .map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
             </select>
           </label>
           <label>

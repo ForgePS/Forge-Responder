@@ -647,6 +647,10 @@ footer i, .app-footer i { width: 9px; height: 9px; border-radius: 50%; backgroun
   font-size: 13px;
   font-weight: 600;
 }
+.damage-form-webhook-row { display: flex; gap: 8px; align-items: flex-start; }
+.damage-form-webhook-row code { flex: 1; margin-top: 0 !important; }
+.damage-form-api-key-status .dd-action-button { margin-left: 10px; vertical-align: middle; }
+.dd-damage-form-admin .dd-panel-head h3 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 15px; }
 .damage-form-embed-frame {
   width: 100%;
   min-height: 640px;
@@ -846,6 +850,8 @@ tbody tr:hover { background: var(--rms-bg-hover); }
 .contact-actions svg { color: var(--rms-text-link); }
 .success-banner { min-height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; border: 1px solid rgba(34,197,94,.4); border-radius: 5px; background: rgba(34,197,94,.1); color: #86efac; font-size: 14px; }
 .success-banner button { display: grid; place-items: center; background: transparent; color: #86efac; }
+.error-banner { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; border: 1px solid rgba(239,68,68,.45); border-radius: 5px; background: rgba(239,68,68,.12); color: #fca5a5; font-size: 14px; }
+.error-banner button { display: grid; place-items: center; background: transparent; color: #fca5a5; }
 .warning-banner { min-height: 34px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid rgba(245,158,11,.45); border-radius: 5px; background: rgba(245,158,11,.1); color: #fbbf24; font-size: 14px; margin-bottom: 10px; }
 .cert-summary { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .cert-stat { position: relative; overflow: hidden; }
