@@ -647,6 +647,10 @@ footer i, .app-footer i { width: 9px; height: 9px; border-radius: 50%; backgroun
   font-size: 13px;
   font-weight: 600;
 }
+.damage-form-webhook-row { display: flex; gap: 8px; align-items: flex-start; }
+.damage-form-webhook-row code { flex: 1; margin-top: 0 !important; }
+.damage-form-api-key-status .dd-action-button { margin-left: 10px; vertical-align: middle; }
+.dd-damage-form-admin .dd-panel-head h3 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 15px; }
 .damage-form-embed-frame {
   width: 100%;
   min-height: 640px;
@@ -846,6 +850,8 @@ tbody tr:hover { background: var(--rms-bg-hover); }
 .contact-actions svg { color: var(--rms-text-link); }
 .success-banner { min-height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; border: 1px solid rgba(34,197,94,.4); border-radius: 5px; background: rgba(34,197,94,.1); color: #86efac; font-size: 14px; }
 .success-banner button { display: grid; place-items: center; background: transparent; color: #86efac; }
+.error-banner { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; border: 1px solid rgba(239,68,68,.45); border-radius: 5px; background: rgba(239,68,68,.12); color: #fca5a5; font-size: 14px; }
+.error-banner button { display: grid; place-items: center; background: transparent; color: #fca5a5; }
 .warning-banner { min-height: 34px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid rgba(245,158,11,.45); border-radius: 5px; background: rgba(245,158,11,.1); color: #fbbf24; font-size: 14px; margin-bottom: 10px; }
 .cert-summary { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .cert-stat { position: relative; overflow: hidden; }
@@ -3702,3 +3708,20 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
 .call-shift-offers .panel-header strong { display: inline-flex; align-items: center; gap: 6px; }
 .call-shift-offers .inline-actions button.active { background: var(--rms-primary, #25a194); color: #fff; border-color: transparent; }
 .employee-apparatus-check { display: grid; gap: 8px; }
+
+.field-hint { display: block; margin-top: 4px; color: var(--rms-text-muted); font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; line-height: 1.35; }
+.audit-log-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; overflow: visible; }
+.audit-log-search { display: flex; align-items: center; gap: 6px; flex: 1 1 220px; padding: 0 8px; border: 1px solid var(--rms-border, rgba(148,163,184,.3)); border-radius: 5px; background: var(--rms-bg-input); }
+.audit-log-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; padding: 7px 0; outline: none; }
+.audit-log-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--rms-text-muted); }
+/* Activity Log: scroll sideways on narrow screens instead of cutting off Details. */
+.admin-audit-table { overflow-x: auto; }
+.admin-audit-row { grid-template-columns: 130px minmax(110px, 1fr) minmax(110px, .9fr) minmax(90px, .8fr) minmax(220px, 2.4fr); min-width: 720px; }
+.department-config-actions { align-items: center; gap: 8px; }
+.unsaved-chip { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(245,158,11,.45); background: rgba(245,158,11,.12); color: #fbbf24; font-size: 12px; font-weight: 600; margin-right: auto; }
+.admin-section-description { margin: 4px 0 0 4px; color: var(--rms-text-muted); font-size: 13px; }
+.role-permissions-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; color: var(--rms-text-muted); font-size: 13px; }
+.role-permissions-summary .unsaved-chip { margin-right: 0; }
+.role-permissions-summary .text-button { margin-left: auto; }
+.role-permission-search { max-width: 360px; margin: 6px 0; }
+.user-picker-search { max-width: 260px; }

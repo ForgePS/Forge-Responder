@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ExternalLink, FileWarning, LoaderCircle, RefreshCw, Save } from "lucide-react";
+import { AlertTriangle, Copy, ExternalLink, FileWarning, LoaderCircle, RefreshCw, Save, Trash2 } from "lucide-react";
 import {
-  buildJotformWebhookUrl,
   ensureDamageFormSettings,
   loadDamageFormSettings,
   saveDamageFormSettings,
@@ -23,11 +22,38 @@ export default function DamageFormJotformIntegrationPanel({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "";
-  const webhookUrl = useMemo(
-    () => buildJotformWebhookUrl(projectId, departmentId, settings?.webhookToken),
-    [projectId, departmentId, settings?.webhookToken]
-  );
+  const webhookUrl = settings?.webhookUrl || "";
+  const status = useMemo(() => {
+    if (!settings?.formUrl) return { tone: "critical", label: "Not connected" };
+    if (settings?.lastSubmissionAt) return { tone: "success", label: "Receiving submissions" };
+    return { tone: "warning", label: "Waiting for first submission" };
+  }, [settings?.formUrl, settings?.lastSubmissionAt]);
+
+  async function copyWebhookUrl() {
+    try {
+      await navigator.clipboard.writeText(webhookUrl);
+      setNotice("Webhook link copied.");
+    } catch {
+      setError("Couldn't copy. Select the link and copy it by hand.");
+    }
+  }
+
+  async function handleRemoveApiKey() {
+    if (!window.confirm("Remove the saved JotForm API key? Command staff won't be able to open the official PDF until a new key is saved.")) return;
+    setBusy("remove-key");
+    setError("");
+    setNotice("");
+    try {
+      const saved = await saveDamageFormSettings(departmentId, { formUrl: formUrlDraft, formTitle: formTitleDraft, removeApiKey: true });
+      setSettings(saved);
+      setApiKeyConfigured(Boolean(saved?.apiKeyConfigured));
+      setNotice("API key removed.");
+    } catch (removeError) {
+      setError(removeError?.message || "Couldn't remove the API key.");
+    } finally {
+      setBusy("");
+    }
+  }
 
   useEffect(() => {
     if (!departmentId) {
@@ -113,16 +139,12 @@ export default function DamageFormJotformIntegrationPanel({
     <section className="dd-panel dd-damage-form-panel dd-damage-form-admin">
       <div className="dd-panel-head">
         <div>
-          <strong><FileWarning size={16} /> Damage Form (JotForm)</strong>
+          <h3><FileWarning size={16} /> Damage Form (JotForm)</h3>
           <p className="dd-panel-subtitle">
             Connect a JotForm damage report. New submissions appear on the Command Dashboard.
           </p>
         </div>
-        {settings?.formUrl ? (
-          <span className="dd-status-pill dd-status-success">Connected</span>
-        ) : (
-          <span className="dd-status-pill dd-status-critical">Not connected</span>
-        )}
+        <span className={`dd-status-pill dd-status-${status.tone}`}>{status.label}</span>
       </div>
 
       <div className="dd-panel-body">
@@ -171,7 +193,12 @@ export default function DamageFormJotformIntegrationPanel({
                 autoComplete="off"
               />
               {apiKeyConfigured ? (
-                <span className="damage-form-api-key-status">API key saved</span>
+                <span className="damage-form-api-key-status">
+                  API key saved. Leave blank to keep it.
+                  <button type="button" className="dd-action-button" onClick={handleRemoveApiKey} disabled={busy === "remove-key"}>
+                    <Trash2 size={14} /> Remove key
+                  </button>
+                </span>
               ) : null}
             </label>
 
@@ -181,7 +208,12 @@ export default function DamageFormJotformIntegrationPanel({
                   Paste this webhook URL into JotForm under <strong>Settings → Integrations → Webhooks</strong>.
                   That sends each submission to the Command Dashboard.
                 </p>
-                <code>{webhookUrl}</code>
+                <div className="damage-form-webhook-row">
+                  <code>{webhookUrl}</code>
+                  <button type="button" className="dd-action-button" onClick={copyWebhookUrl}>
+                    <Copy size={14} /> Copy
+                  </button>
+                </div>
                 <p className="damage-form-setup-copy">
                   You do not need the script, popup, or lightbox embed codes from JotForm. FORGE uses the
                   <strong> iFrame embed</strong> automatically in the Employee Portal once this form URL is saved.

@@ -100,6 +100,8 @@ export default function SystemRecordCollectionEditor({
 
   function handleRemoveRecord() {
     if (!selectedEntry || deleteProtected) return;
+    const label = selectedEntry.row?.label || selectedEntry.row?.name || selectedEntry.row?.title || "this record";
+    if (!window.confirm(`Remove ${label}? It's deleted when you save.`)) return;
     onRemoveRecord?.(selectedEntry.index);
   }
 

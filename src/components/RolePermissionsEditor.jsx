@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, CirclePlus, Trash2 } from "lucide-react";
+import { Check, CirclePlus, Search, Trash2 } from "lucide-react";
+import { ADMIN_PERMISSION_GROUPS } from "../data/adminRegistry.js";
 import CreateRoleModal from "./CreateRoleModal.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import PermissionGroupGrid from "./PermissionGroupGrid.jsx";
 import { CREATOR_PERMISSIONS } from "../data/creatorPermissions.js";
 import { writeAuditLog } from "../lib/auditService.js";
+import { isLockedAdminPermission, saveErrorMessage, withLockedAdminPermissions } from "../lib/adminGuards.js";
 import { listRecords, updateRecord } from "../lib/firestoreService.js";
 import {
   createDepartmentRole,
@@ -37,9 +39,16 @@ function buildRoleMeta(roles = []) {
   );
 }
 
-export default function RolePermissionsEditor({ onMessage }) {
+export function countPermissionsOn(draft = {}, showPlatform = false) {
+  const keys = ADMIN_PERMISSION_GROUPS
+    .filter((group) => showPlatform || group.label !== "Platform")
+    .flatMap((group) => group.keys);
+  return { on: keys.filter((key) => draft[key]).length, total: keys.length };
+}
+
+export default function RolePermissionsEditor({ onMessage, onDirtyChange }) {
   const { departmentId } = useTenant();
-  const { user, membership } = useAuth();
+  const { user, membership, isCreator } = useAuth();
   const [roles, setRoles] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [roleMeta, setRoleMeta] = useState({});
@@ -49,11 +58,38 @@ export default function RolePermissionsEditor({ onMessage }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creatingRole, setCreatingRole] = useState(false);
   const [deletingRoleId, setDeletingRoleId] = useState("");
+  // Each role starts collapsed to a one-line summary.
+  const [expandedRoleIds, setExpandedRoleIds] = useState(() => new Set());
+  const [permissionFilter, setPermissionFilter] = useState("");
 
   const roleMap = useMemo(
     () => Object.fromEntries(roles.map((role) => [role.id, role])),
     [roles]
   );
+
+  const dirtyRoleIds = useMemo(() => new Set(roles.filter((role) => {
+    if (role.id === "creator") return false;
+    const saved = buildPermissionDraft(role);
+    const draft = drafts[role.id] || {};
+    const permsChanged = Object.keys({ ...saved, ...draft }).some((key) => Boolean(saved[key]) !== Boolean(draft[key]));
+    const meta = roleMeta[role.id];
+    const metaChanged = Boolean(meta) && (
+      String(meta.name || "") !== String(role.name || role.id) || String(meta.description || "") !== String(role.description || "")
+    );
+    return permsChanged || metaChanged;
+  }).map((role) => role.id)), [roles, drafts, roleMeta]);
+  const anyRoleDirty = dirtyRoleIds.size > 0;
+  useEffect(() => { onDirtyChange?.(anyRoleDirty); }, [anyRoleDirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+
+  function toggleExpanded(roleId) {
+    setExpandedRoleIds((current) => {
+      const next = new Set(current);
+      if (next.has(roleId)) next.delete(roleId);
+      else next.add(roleId);
+      return next;
+    });
+  }
 
   async function loadRoles() {
     if (!departmentId) return;
@@ -77,6 +113,10 @@ export default function RolePermissionsEditor({ onMessage }) {
 
   function togglePermission(roleId, permissionKey) {
     if (roleId === "creator") return;
+    if (isLockedAdminPermission(roleId, permissionKey)) {
+      onMessage?.("Fire Chief and IT Admin always keep user and system-settings access, so nobody gets locked out of System Admin.", "error");
+      return;
+    }
     setDrafts((current) => ({
       ...current,
       [roleId]: {
@@ -91,6 +131,7 @@ export default function RolePermissionsEditor({ onMessage }) {
     setDrafts((current) => {
       const next = { ...current[roleId] };
       for (const key of keys) {
+        if (isLockedAdminPermission(roleId, key)) continue;
         next[key] = enabled;
       }
       return { ...current, [roleId]: next };
@@ -114,7 +155,7 @@ export default function RolePermissionsEditor({ onMessage }) {
       const role = roleMap[roleId];
       const permissions = roleId === "creator"
         ? { ...CREATOR_PERMISSIONS }
-        : clonePermissions(drafts[roleId]);
+        : withLockedAdminPermissions(roleId, clonePermissions(drafts[roleId]));
       const meta = roleMeta[roleId] || {};
 
       await updateRecord(departmentId, "roles", roleId, {
@@ -151,7 +192,7 @@ export default function RolePermissionsEditor({ onMessage }) {
       onMessage?.(`Saved permissions for ${updatedRole.name}`);
     } catch (error) {
       console.error("Failed to save role permissions", error);
-      onMessage?.("Failed to save role permissions");
+      onMessage?.(saveErrorMessage(error), "error");
     } finally {
       setSavingRoleId("");
     }
@@ -162,10 +203,10 @@ export default function RolePermissionsEditor({ onMessage }) {
     setSavingAll(true);
     try {
       const savedRoles = [];
-      for (const role of roles) {
+      for (const role of roles.filter((item) => isCreator || item.id !== "creator")) {
         const permissions = role.id === "creator"
           ? { ...CREATOR_PERMISSIONS }
-          : clonePermissions(drafts[role.id]);
+          : withLockedAdminPermissions(role.id, clonePermissions(drafts[role.id]));
         const meta = roleMeta[role.id] || {};
         const payload = {
           name: String(meta.name || role.name || role.id).trim() || role.id,
@@ -191,7 +232,7 @@ export default function RolePermissionsEditor({ onMessage }) {
       onMessage?.(`Saved permissions for ${savedRoles.length} roles`);
     } catch (error) {
       console.error("Failed to save all role permissions", error);
-      onMessage?.("Failed to save all role permissions");
+      onMessage?.(saveErrorMessage(error), "error");
     } finally {
       setSavingAll(false);
     }
@@ -269,8 +310,18 @@ export default function RolePermissionsEditor({ onMessage }) {
     <section className="role-permissions-editor">
       <div className="role-permissions-toolbar">
         <p className="auth-help">
-          Built-in roles are always available. Create custom roles for ranks like Captain or Training Officer, then assign them to users.
+          A role is a set of permissions. Give people roles under People. Create custom roles for ranks like Captain or Training Officer.
         </p>
+        <label className="audit-log-search role-permission-search">
+          <Search size={14} aria-hidden="true" />
+          <input
+            type="search"
+            value={permissionFilter}
+            onChange={(event) => setPermissionFilter(event.target.value)}
+            placeholder="Find a permission (e.g. schedule, fleet)"
+            aria-label="Find a permission"
+          />
+        </label>
         <div className="role-permissions-toolbar-actions">
           <button
             className="secondary-button"
@@ -286,13 +337,13 @@ export default function RolePermissionsEditor({ onMessage }) {
             onClick={saveAllRoles}
             disabled={savingAll || Boolean(savingRoleId) || creatingRole}
           >
-            <Check size={14} /> {savingAll ? "Saving all roles..." : "Save all roles"}
+            <Check size={14} /> {savingAll ? "Saving all roles..." : anyRoleDirty ? `Save all changes (${dirtyRoleIds.size})` : "Save all roles"}
           </button>
         </div>
       </div>
 
       <div className="role-permissions-list">
-        {roles.map((role) => {
+        {roles.filter((role) => isCreator || role.id !== "creator").map((role) => {
           const isCreatorRole = role.id === "creator";
           const isCustomRole = !isBuiltinRole(role.id);
           const draft = drafts[role.id] || {};
@@ -352,18 +403,33 @@ export default function RolePermissionsEditor({ onMessage }) {
                 </div>
               </header>
 
+              <div className="role-permissions-summary">
+                {(() => {
+                  const { on, total } = countPermissionsOn(draft, isCreator);
+                  return <span>{isCreatorRole ? "Full platform access" : `${on} of ${total} permissions on`}</span>;
+                })()}
+                {dirtyRoleIds.has(role.id) ? <span className="unsaved-chip">Unsaved changes</span> : null}
+                <button type="button" className="text-button" onClick={() => toggleExpanded(role.id)} aria-expanded={expandedRoleIds.has(role.id) || Boolean(permissionFilter.trim())}>
+                  {expandedRoleIds.has(role.id) || permissionFilter.trim() ? "Hide permissions" : "Show permissions"}
+                </button>
+              </div>
+
               {isCreatorRole && (
                 <p className="auth-help role-permissions-note">
                   Creator permissions are locked to full platform access.
                 </p>
               )}
 
-              <PermissionGroupGrid
-                draft={draft}
-                disabled={isCreatorRole}
-                onToggle={(permissionKey) => togglePermission(role.id, permissionKey)}
-                onSetGroup={(keys, enabled) => setGroupPermissions(role.id, keys, enabled)}
-              />
+              {expandedRoleIds.has(role.id) || permissionFilter.trim() ? (
+                <PermissionGroupGrid
+                  draft={draft}
+                  disabled={isCreatorRole}
+                  showPlatform={isCreator}
+                  filter={permissionFilter}
+                  onToggle={(permissionKey) => togglePermission(role.id, permissionKey)}
+                  onSetGroup={(keys, enabled) => setGroupPermissions(role.id, keys, enabled)}
+                />
+              ) : null}
             </article>
           );
         })}

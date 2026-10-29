@@ -73,12 +73,13 @@ async function saveIntegration(db, departmentId, payload = {}) {
     if (KEY_FIELDS.includes(field)) delete next[field];
   });
 
-  if (Object.prototype.hasOwnProperty.call(payload, "defaultMapCenter")) {
+  // null/blank means "not sent" (callables turn undefined into null).
+  if (payload.defaultMapCenter !== undefined && payload.defaultMapCenter !== null) {
     next.defaultMapCenter = String(payload.defaultMapCenter || "").trim();
   }
-  if (Object.prototype.hasOwnProperty.call(payload, "defaultMapZoom")) {
+  if (payload.defaultMapZoom !== undefined && payload.defaultMapZoom !== null && payload.defaultMapZoom !== "") {
     const zoom = Number(payload.defaultMapZoom);
-    next.defaultMapZoom = Number.isFinite(zoom) ? Math.min(Math.max(zoom, 3), 20) : 12;
+    if (Number.isFinite(zoom)) next.defaultMapZoom = Math.min(Math.max(zoom, 3), 20);
   }
 
   await integrationRef(db, departmentId).set(next, { merge: true });

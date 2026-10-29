@@ -16,6 +16,7 @@ import {
   withStableRowKeys
 } from "../lib/adminCellUtils.js";
 import { orderColumns } from "../lib/adminFieldSchema.js";
+import { isAdminMembershipRoles, saveErrorMessage } from "../lib/adminGuards.js";
 import { createBlankRecord } from "../lib/adminRecordDefaults.js";
 import { createRecord, deleteRecord, listRecords, updateRecord } from "../lib/firestoreService.js";
 import { ensureDefaultDropdowns } from "../lib/dropdownService.js";
@@ -36,16 +37,25 @@ export default function RecordCollectionEditor({
   onOpenPersonnelProfile,
   onOpenEmployeeProfile,
   onInviteSomeone,
+  onDirtyChange,
 }) {
   const { departmentId } = useTenant();
   const { user, membership, isCreator } = useAuth();
   const { refreshDropdowns } = useDropdowns();
-  const [collectionName, setCollectionName] = useState(initialCollection);
+  const [collectionName, setCollectionName] = useState(
+    !isCreator ? "dropdowns" : initialCollection
+  );
   const [rows, setRows] = useState([]);
   const [columnKeys, setColumnKeys] = useState(["id"]);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadedCount, setLoadedCount] = useState(0);
+  const [loadedSnapshot, setLoadedSnapshot] = useState("");
+  const isDirty = !loading && !loadFailed && loadedSnapshot !== "" && JSON.stringify(stripRowKeys(rows)) !== loadedSnapshot;
+  useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   const columns = useMemo(
     () => orderColumns(columnKeys, collectionName),
@@ -66,11 +76,15 @@ export default function RecordCollectionEditor({
       setRoles(nextRoles);
       const keyedRows = withStableRowKeys(records, { persisted: true });
       setRows(keyedRows);
+      setLoadFailed(false);
+      setLoadedCount(keyedRows.length);
+      setLoadedSnapshot(JSON.stringify(stripRowKeys(keyedRows)));
       setColumnKeys(orderColumns(collectColumns(keyedRows), collectionName));
     } catch (error) {
       console.error("Failed to load records", error);
-      onMessage?.(`Failed to load ${collectionLabel}`);
+      onMessage?.(`Couldn't load ${collectionLabel}. Saving is turned off so nothing is overwritten. Refresh the page to try again.`, "error");
       setRows([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -117,6 +131,26 @@ export default function RecordCollectionEditor({
 
   async function saveRecords() {
     if (!departmentId) return;
+    if (loadFailed) {
+      onMessage?.("This list didn't load, so it can't be saved. Refresh the page and try again.", "error");
+      return;
+    }
+    if (collectionName === "users" && !isCreator) {
+      const selfRow = rows.find((row) => row.id === user?.uid || row.uid === user?.uid);
+      if (!selfRow) {
+        onMessage?.("You can't delete your own account. Ask another administrator to remove it.", "error");
+        return;
+      }
+      const wasAdmin = isAdminMembershipRoles(membership);
+      if (wasAdmin && !isAdminMembershipRoles(selfRow)) {
+        onMessage?.("You can't remove your own administrator role. Ask another administrator to change it.", "error");
+        return;
+      }
+    }
+    if (!rows.length && loadedCount > 0
+      && !window.confirm(`This removes all ${loadedCount} ${collectionLabel} records. Continue?`)) {
+      return;
+    }
     setSaving(true);
     try {
       const existing = await listRecords(departmentId, collectionName);
@@ -178,7 +212,7 @@ export default function RecordCollectionEditor({
       await loadRecords();
     } catch (error) {
       console.error("Failed to save records", error);
-      onMessage?.("Save failed — check permissions and try again");
+      onMessage?.(saveErrorMessage(error), "error");
     } finally {
       setSaving(false);
     }
@@ -189,8 +223,14 @@ export default function RecordCollectionEditor({
       <div className="data-editor-toolbar">
         <label>
           <span>Record collection</span>
-          <select value={collectionName} onChange={(event) => setCollectionName(event.target.value)}>
-            {ADMIN_COLLECTIONS.map((collection) => (
+          <select
+            value={collectionName}
+            onChange={(event) => {
+              if (isDirty && !window.confirm("You have unsaved changes in this list. Switch without saving?")) return;
+              setCollectionName(event.target.value);
+            }}
+          >
+            {ADMIN_COLLECTIONS.filter((collection) => isCreator || collection.key === "dropdowns").map((collection) => (
               <option key={collection.key} value={collection.key}>
                 {collection.label}
               </option>
@@ -208,7 +248,7 @@ export default function RecordCollectionEditor({
         onOpenPersonnelProfile={onOpenPersonnelProfile}
         onOpenEmployeeProfile={onOpenEmployeeProfile}
         loading={loading}
-        saving={saving}
+        saving={saving || loadFailed}
         onUpdateCell={updateCell}
         onAddRecord={addRow}
         onInviteSomeone={onInviteSomeone}

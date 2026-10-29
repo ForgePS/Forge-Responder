@@ -99,7 +99,8 @@ async function getActiveConnections(db, departmentId) {
  */
 async function refreshAcademyNavFlag(db, departmentId) {
   if (!departmentId) return false;
-  const connected = (await getActiveConnections(db, departmentId)).length > 0;
+  const connected = (await getActiveConnections(db, departmentId))
+    .some((c) => c.status === "connected" && c.providerType === "forge_academy");
   await db.doc(`departments/${departmentId}/settings/main`).set(
     { academy: { connected, updatedAt: new Date().toISOString() } },
     { merge: true },

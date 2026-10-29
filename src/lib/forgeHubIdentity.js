@@ -124,11 +124,11 @@ export async function attachForgePersonIds(departmentId, records = []) {
     } catch (error) {
       if (error instanceof IdentityReviewRequiredError) throw error;
       const message = error instanceof Error ? error.message : String(error);
-      if (/not configured|Hub base URL|failed-precondition|hubConfigured|not-found/i.test(message)) {
-        next.push(person);
-        continue;
+      if (!/not configured|Hub base URL|failed-precondition|hubConfigured|not-found/i.test(message)) {
+        console.warn("Forge identity lookup failed; saving without it.", message);
       }
-      throw error;
+      next.push(person);
+      continue;
     }
   }
   return next;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildDepartmentGatewayUrl } from "../lib/gatewayRouting.js";
-import { Check, RotateCcw, UserMinus } from "lucide-react";
+import { Check, RotateCcw, Search, UserMinus } from "lucide-react";
 import PermissionGroupGrid from "./PermissionGroupGrid.jsx";
 import PersonnelLinkField from "./PersonnelLinkField.jsx";
 import DepartmentInvitesPanel from "./DepartmentInvitesPanel.jsx";
@@ -17,6 +17,7 @@ import {
   getRoleBasedPermissions
 } from "../lib/userPermissions.js";
 import { normalizeRoleIds } from "../lib/permissions.js";
+import { isAdminMembershipRoles, saveErrorMessage } from "../lib/adminGuards.js";
 
 function buildUserDraft(userRecord = {}, rolesById = {}) {
   const roleIds = normalizeRoleIds(userRecord);
@@ -33,9 +34,10 @@ export default function UserPermissionsEditor({
   personnel = [],
   onOpenPersonnelProfile,
   onOpenEmployeeProfile,
+  onDirtyChange,
 }) {
   const { departmentId } = useTenant();
-  const { user: authUser, membership: authMembership, patchMembership } = useAuth();
+  const { user: authUser, membership: authMembership, patchMembership, isCreator: viewerIsCreator } = useAuth();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [rolesById, setRolesById] = useState({});
@@ -49,6 +51,26 @@ export default function UserPermissionsEditor({
     () => users.find((item) => item.id === selectedUserId) || null,
     [users, selectedUserId]
   );
+
+  const [userSearch, setUserSearch] = useState("");
+  const filteredUsers = useMemo(() => {
+    const term = userSearch.trim().toLowerCase();
+    if (!term) return users;
+    return users.filter((item) => [item.displayName, item.email].some((value) => String(value || "").toLowerCase().includes(term))
+      || item.id === selectedUserId);
+  }, [users, userSearch, selectedUserId]);
+
+  // Unsaved edits to the selected person.
+  const isDirty = useMemo(() => {
+    if (!selectedUser) return false;
+    const saved = buildUserDraft(selectedUser, rolesById);
+    const sameRoles = [...saved.roleIds].sort().join(",") === [...(draft.roleIds || [])].sort().join(",");
+    const samePerms = Object.keys({ ...saved.permissions, ...draft.permissions })
+      .every((key) => Boolean(saved.permissions[key]) === Boolean(draft.permissions?.[key]));
+    return !(sameRoles && samePerms && saved.personnelId === String(draft.personnelId || ""));
+  }, [selectedUser, rolesById, draft]);
+  useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   const isCreatorUser = Boolean(
     selectedUser?.isPlatformCreator ||
@@ -67,7 +89,10 @@ export default function UserPermissionsEditor({
         listRecords(departmentId, "users"),
         loadRolesMap(departmentId)
       ]);
-      const sortedUsers = [...nextUsers].sort((a, b) =>
+      // FORGE staff (platform creators) aren't department users; only creators see them.
+      const sortedUsers = [...nextUsers].filter((item) => viewerIsCreator || !(
+        item.isPlatformCreator || item.role === "creator" || (item.roleIds || []).includes("creator")
+      )).sort((a, b) =>
         String(a.displayName || a.email || a.id).localeCompare(String(b.displayName || b.email || b.id))
       );
       setRoles(nextRoles.filter((role) => role.id !== "creator"));
@@ -95,6 +120,7 @@ export default function UserPermissionsEditor({
   function selectUser(userId) {
     const record = users.find((item) => item.id === userId);
     if (!record) return;
+    if (isDirty && !window.confirm("You have unsaved changes for this person. Switch without saving?")) return;
     setSelectedUserId(userId);
     setDraft(buildUserDraft(record, rolesById));
   }
@@ -114,6 +140,7 @@ export default function UserPermissionsEditor({
       );
       const nextMembership = { ...membership, permissions: overrides };
       return {
+        ...current,
         roleIds: nextRoleIds,
         permissions: getEffectiveUserPermissions(nextMembership, rolesById)
       };
@@ -145,10 +172,11 @@ export default function UserPermissionsEditor({
   function resetToRoleDefaults() {
     if (!selectedUser) return;
     const membership = { ...selectedUser, roleIds: draft.roleIds, permissions: {} };
-    setDraft({
+    setDraft((current) => ({
+      ...current,
       roleIds: draft.roleIds,
       permissions: getRoleBasedPermissions(membership, rolesById)
-    });
+    }));
   }
 
   async function saveUserPermissions() {
@@ -165,11 +193,22 @@ export default function UserPermissionsEditor({
       if (isSelf && !(authMembership?.isPlatformCreator || authMembership?.role === "creator")) {
         permissions = {};
         if (!roleIds.length) roleIds = ["fireChief"];
+        if (isAdminMembershipRoles(authMembership) && !isAdminMembershipRoles({ roleIds })) {
+          onMessage?.("You can't remove your own administrator role. Ask another administrator to change it.", "error");
+          return;
+        }
       }
 
       if (isSelf && (authMembership?.isPlatformCreator || authMembership?.role === "creator" || isPlatformBootstrapEmail(authUser?.email))) {
         roleIds = ["creator"];
         permissions = {};
+      }
+
+      if (!isSelf && isAdminMembershipRoles(selectedUser) && !isAdminMembershipRoles({ roleIds })) {
+        const name = selectedUser.displayName || selectedUser.email || "this person";
+        if (!window.confirm(`Remove administrator access from ${name}? They will no longer be able to open System Admin.`)) {
+          return;
+        }
       }
 
       const primaryRole = roleIds.includes("creator")
@@ -214,7 +253,7 @@ export default function UserPermissionsEditor({
       onMessage?.(`Saved permissions for ${selectedUser.displayName || selectedUser.email}`);
     } catch (error) {
       console.error("Failed to save user permissions", error);
-      onMessage?.("Failed to save user permissions");
+      onMessage?.(saveErrorMessage(error), "error");
     } finally {
       setSaving(false);
     }
@@ -285,17 +324,31 @@ export default function UserPermissionsEditor({
     <section className="user-permissions-editor">
       {invitesPanel}
       <div className="user-permissions-toolbar">
+        {users.length > 6 ? (
+          <label className="audit-log-search user-picker-search">
+            <Search size={14} aria-hidden="true" />
+            <input
+              type="search"
+              value={userSearch}
+              onChange={(event) => setUserSearch(event.target.value)}
+              placeholder="Search by name or email"
+              aria-label="Search people"
+            />
+          </label>
+        ) : null}
         <label>
-          <span>Select user</span>
+          <span>Person</span>
           <select value={selectedUserId} onChange={(event) => selectUser(event.target.value)}>
-            {users.map((item) => (
+            {filteredUsers.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.displayName || item.email || item.id}
-                {item.email ? ` (${item.email})` : ""}
+                {item.email && item.email !== item.displayName ? ` (${item.email})` : ""}
+                {item.status && item.status !== "active" ? ` · ${item.status}` : ""}
               </option>
             ))}
           </select>
         </label>
+        {isDirty ? <span className="unsaved-chip">Unsaved changes</span> : null}
         <div className="user-permissions-actions">
           <button className="secondary-button" type="button" onClick={resetToRoleDefaults} disabled={isCreatorUser || saving}>
             <RotateCcw size={14} /> Reset to role defaults
@@ -311,7 +364,7 @@ export default function UserPermissionsEditor({
             </button>
           )}
           <button className="primary-button" type="button" onClick={saveUserPermissions} disabled={saving || removing || !selectedUser}>
-            <Check size={14} /> {saving ? "Saving..." : "Save user"}
+            <Check size={14} /> {saving ? "Saving..." : "Save changes"}
           </button>
         </div>
       </div>
@@ -374,6 +427,7 @@ export default function UserPermissionsEditor({
           <PermissionGroupGrid
             draft={isCreatorUser ? CREATOR_PERMISSIONS : draft.permissions}
             disabled={isCreatorUser}
+            showPlatform={viewerIsCreator}
             onToggle={togglePermission}
             onSetGroup={setGroupPermissions}
           />

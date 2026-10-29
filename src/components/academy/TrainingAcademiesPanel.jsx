@@ -44,6 +44,7 @@ export default function TrainingAcademiesPanel({
   departmentId = "",
   canConfigure = false,
   canView = true,
+  canMigrateLegacy = false,
 }) {
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -163,8 +164,9 @@ export default function TrainingAcademiesPanel({
     setError("");
     setNotice("");
     try {
-      await fn();
-      if (successMessage) setNotice(successMessage);
+      const outcome = await fn();
+      const message = typeof outcome === "string" ? outcome : successMessage;
+      if (message) setNotice(message);
       await refresh();
     } catch (err) {
       setError(err.message || "Action failed.");
@@ -206,17 +208,18 @@ export default function TrainingAcademiesPanel({
         <div>
           <h3>Training Academies</h3>
           <p className="muted">
-            Department-scoped academy connections. Forge Academy is optional — each department
-            chooses whether and how to connect.
+            Connect FORGE Academy to show members their classes and training records. Optional.
           </p>
         </div>
         <div className="admin-integration-card__actions">
           {canConfigure ? (
             <>
-              <button type="button" className="btn-secondary" onClick={openCreate} disabled={Boolean(busy)}>
-                Add another academy
-              </button>
-              <button
+              {connections.length ? (
+                <button type="button" className="btn-secondary" onClick={openCreate} disabled={Boolean(busy)}>
+                  Add another academy
+                </button>
+              ) : null}
+              {canMigrateLegacy ? <button
                 type="button"
                 className="btn-secondary"
                 disabled={Boolean(busy)}
@@ -229,7 +232,7 @@ export default function TrainingAcademiesPanel({
                 }
               >
                 Migrate legacy Hub settings
-              </button>
+              </button> : null}
             </>
           ) : null}
         </div>
@@ -290,8 +293,12 @@ export default function TrainingAcademiesPanel({
                       onClick={() =>
                         runAction(
                           `test-${connection.connectionId}`,
-                          () => testAcademyConnection(departmentId, connection.connectionId),
-                          "Connection test completed."
+                          async () => {
+                            const response = await testAcademyConnection(departmentId, connection.connectionId);
+                            const result = response?.result || {};
+                            if (!result.ok) throw new Error(`Connection test failed: ${result.message || "the academy didn't respond."}`);
+                            return `Connection test passed. ${result.message || ""}`.trim();
+                          }
                         )
                       }
                     >
@@ -321,7 +328,7 @@ export default function TrainingAcademiesPanel({
                       className="btn-secondary"
                       disabled={Boolean(busy)}
                       onClick={() =>
-                        runAction(
+                        window.confirm("Pause this academy connection? Nothing is deleted; you can turn it back on.") && runAction(
                           `disable-${connection.connectionId}`,
                           () => disableAcademyConnection(departmentId, connection.connectionId),
                           "Connection disabled."
@@ -335,7 +342,7 @@ export default function TrainingAcademiesPanel({
                       className="btn-secondary"
                       disabled={Boolean(busy)}
                       onClick={() =>
-                        runAction(
+                        window.confirm("Disconnect this academy? Its saved login details are deleted and the Academy menu item is hidden until you connect again.") && runAction(
                           `disconnect-${connection.connectionId}`,
                           () => disconnectAcademyConnection(departmentId, connection.connectionId),
                           "Connection disconnected."
@@ -378,9 +385,11 @@ export default function TrainingAcademiesPanel({
               value={form.providerType}
               onChange={(e) => setForm({ ...form, providerType: e.target.value })}
             >
-              {PROVIDER_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
+              {PROVIDER_TYPE_OPTIONS
+                .filter((opt) => ["forge_academy", "manual"].includes(opt.value) || opt.value === form.providerType)
+                .map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
             </select>
           </label>
           <label>

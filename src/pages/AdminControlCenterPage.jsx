@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ChevronDown, Database, KeyRound, LayoutGrid, Settings, ShieldCheck, Wand2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, ChevronDown, Database, History, KeyRound, LayoutGrid, Settings, Users, Wand2, X } from "lucide-react";
 import DataEditorPanel from "../components/DataEditorPanel.jsx";
 import DepartmentConfigPanel from "../components/DepartmentConfigPanel.jsx";
 import GoogleApisIntegrationPanel from "../components/digitalDashboard/GoogleApisIntegrationPanel.jsx";
@@ -12,12 +12,13 @@ import SubscriptionExpiryBanner from "../components/SubscriptionExpiryBanner.jsx
 import UserPermissionsEditor from "../components/UserPermissionsEditor.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
-import { listAuditLogs } from "../lib/auditService.js";
+import AuditLogPanel from "../components/AuditLogPanel.jsx";
+import { isPlatformScope } from "../lib/tenantPaths.js";
 import { listRecords } from "../lib/firestoreService.js";
 import { canManagePlatformSecrets, hasPermission } from "../lib/permissions.js";
 import { ensureDefaultRoles } from "../lib/roleService.js";
 
-function AdminSectionPill({ id, label, icon: Icon, isOpen, onToggle, children }) {
+function AdminSectionPill({ id, label, description = "", icon: Icon, isOpen, onToggle, children }) {
   return (
     <section id={id} className={`admin-section${isOpen ? " is-open" : ""}`}>
       <button
@@ -31,6 +32,7 @@ function AdminSectionPill({ id, label, icon: Icon, isOpen, onToggle, children })
         <span>{label}</span>
         <ChevronDown size={14} className="admin-section-pill-chevron" aria-hidden="true" />
       </button>
+      {description && !isOpen ? <p className="admin-section-description">{description}</p> : null}
       {isOpen ? (
         <div className="admin-section-body" id={`admin-section-${id}`}>
           {children}
@@ -39,6 +41,20 @@ function AdminSectionPill({ id, label, icon: Icon, isOpen, onToggle, children })
     </section>
   );
 }
+
+// Department-config tabs, split between the "Department" and "Scheduling & Pay" sections.
+const DEPARTMENT_TABS = ["branding", "stations", "modules", "subscription", "academy"];
+const SCHEDULING_TABS = ["shift-rotation", "portal-rules", "pay-rules", "scheduling-apparatus", "crew-slots"];
+
+const SECTION_LABELS = {
+  department: "Department",
+  scheduling: "Scheduling & Pay",
+  people: "People & Access",
+  integrations: "Connected Services",
+  modules: "Module Data",
+  records: "Dropdown Lists",
+  audit: "Activity Log",
+};
 
 export default function AdminControlCenterPage({
   personnel = [],
@@ -56,52 +72,84 @@ export default function AdminControlCenterPage({
     || hasPermission(permissions, "academyIntegrationsView");
   const canManageAcademyIntegrations = isCreator
     || hasPermission(permissions, "academyIntegrationsManage");
-  const [openSections, setOpenSections] = useState(() => new Set());
-  const [permissionsView, setPermissionsView] = useState("roles");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [auditFilter, setAuditFilter] = useState("All");
-  const [stats, setStats] = useState({ users: 0, roles: 0, dropdowns: 0, notifications: 0 });
+  // One section open at a time; sections report unsaved edits so we can warn before closing them.
+  const [openSection, setOpenSection] = useState("");
+  const dirtySectionsRef = useRef({});
+  const [permissionsView, setPermissionsView] = useState("users");
+  const markDirty = useCallback((sectionId, dirty) => {
+    dirtySectionsRef.current = { ...dirtySectionsRef.current, [sectionId]: Boolean(dirty) };
+  }, []);
+  const dirtyHandlers = useMemo(() => Object.fromEntries(
+    Object.keys(SECTION_LABELS).map((id) => [id, (dirty) => markDirty(id, dirty)])
+  ), [markDirty]);
+
+  useEffect(() => {
+    function warnBeforeLeaving(event) {
+      if (!Object.values(dirtySectionsRef.current).some(Boolean)) return;
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, []);
+  const [banner, setBanner] = useState({ text: "", tone: "success" });
+  const message = banner.text;
+  // Panels call onMessage(text) or onMessage(text, "error"); older failure messages are recognised by wording.
+  function setMessage(text, tone) {
+    const value = String(text || "");
+    const isError = tone === "error" || (!tone && /^(failed|couldn't|could not|can't|cannot|save failed|unable)/i.test(value));
+    setBanner({ text: value, tone: isError ? "error" : "success" });
+  }
+  const [stats, setStats] = useState(null);
+  const inPlatformScope = isPlatformScope(departmentId);
+
+  function confirmLeave(sectionId) {
+    if (!sectionId || !dirtySectionsRef.current[sectionId]) return true;
+    const ok = window.confirm(`You have unsaved changes in ${SECTION_LABELS[sectionId] || "this section"}. Leave without saving?`);
+    if (ok) markDirty(sectionId, false);
+    return ok;
+  }
+
+  function openOnly(sectionId) {
+    if (sectionId === openSection) return;
+    if (!confirmLeave(openSection)) return;
+    setOpenSection(sectionId);
+    requestAnimationFrame(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
 
   function toggleSection(sectionId) {
-    setOpenSections((current) => {
-      const next = new Set(current);
-      if (next.has(sectionId)) next.delete(sectionId);
-      else next.add(sectionId);
-      return next;
-    });
+    if (sectionId === openSection) {
+      if (confirmLeave(sectionId)) setOpenSection("");
+      return;
+    }
+    openOnly(sectionId);
   }
 
   function isOpen(sectionId) {
-    return openSections.has(sectionId);
+    return openSection === sectionId;
   }
 
-  async function reload() {
-    setLoading(true);
+  async function loadStats() {
+    if (!departmentId || inPlatformScope) return;
     try {
-      const [nextRoles, nextAudit, users, dropdowns, notifications] = await Promise.all([
+      const [nextRoles, users] = await Promise.all([
         ensureDefaultRoles(departmentId),
-        listAuditLogs(departmentId, { module: auditFilter }),
         listRecords(departmentId, "users"),
-        listRecords(departmentId, "dropdowns"),
-        listRecords(departmentId, "notifications")
       ]);
-      setAuditLogs(nextAudit);
+      const isStaff = (item) => item.isPlatformCreator || item.role === "creator" || (item.roleIds || []).includes("creator");
       setStats({
-        users: users.length,
-        roles: nextRoles.length,
-        dropdowns: dropdowns.length,
-        notifications: notifications.length
+        users: users.filter((item) => isCreator || !isStaff(item)).length,
+        roles: nextRoles.filter((role) => isCreator || role.id !== "creator").length,
       });
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error("Failed to load admin stats", error);
+      setStats(null);
     }
   }
 
   useEffect(() => {
-    reload();
-  }, [departmentId, auditFilter]);
+    loadStats();
+  }, [departmentId]);
 
   return (
     <div className="module-page admin-page">
@@ -110,20 +158,22 @@ export default function AdminControlCenterPage({
           <span className="module-icon"><Settings size={22} /></span>
           <div>
             <h1>System Admin</h1>
-            <p>Department settings, module data, users, roles, and permissions. Open a section below to manage it.</p>
+            <p>Your department's settings, people and their access, connected services, and activity. Open a section to manage it.</p>
           </div>
         </div>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => window.dispatchEvent(new CustomEvent("forge:open-setup-wizard"))}
-        >
-          <Wand2 size={14} /> Run setup wizard
-        </button>
+        {inPlatformScope ? null : (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => window.dispatchEvent(new CustomEvent("forge:open-setup-wizard"))}
+          >
+            <Wand2 size={14} /> Run setup wizard
+          </button>
+        )}
       </section>
 
       {message && (
-        <div className="success-banner">
+        <div className={banner.tone === "error" ? "error-banner" : "success-banner"} role={banner.tone === "error" ? "alert" : "status"}>
           {message}
           <button type="button" onClick={() => setMessage("")}><X size={13} /></button>
         </div>
@@ -134,29 +184,91 @@ export default function AdminControlCenterPage({
         departmentName={profile?.shortName || profile?.name}
       />
 
-      <div className="admin-stats-strip">
-        <span>{stats.users} users</span>
-        <span>{stats.roles} roles</span>
-        <span>{stats.dropdowns} dropdowns</span>
-        <span>{stats.notifications} notifications</span>
-      </div>
+      {stats ? (
+        <div className="admin-stats-strip">
+          <span>{stats.users} {stats.users === 1 ? "person has" : "people have"} access</span>
+          <span>{stats.roles} roles</span>
+        </div>
+      ) : null}
 
       <section className="admin-sections">
         <AdminSectionPill
           id="department"
-          label="Department & Branding"
+          label="Department"
+          description="Name, logo, contact details, stations, and your plan."
           icon={Settings}
           isOpen={isOpen("department")}
           onToggle={toggleSection}
         >
-          <DepartmentConfigPanel onMessage={setMessage} apparatus={apparatus} />
+          <DepartmentConfigPanel
+            onMessage={setMessage}
+            apparatus={apparatus}
+            sectionIds={DEPARTMENT_TABS}
+            onDirtyChange={dirtyHandlers.department}
+          />
         </AdminSectionPill>
 
         <AdminSectionPill
-          id="google-apis"
-          label="Integrations & API Keys"
+          id="people"
+          label="People & Access"
+          description="Invite people, choose their roles, and decide what each role can do."
+          icon={Users}
+          isOpen={isOpen("people")}
+          onToggle={toggleSection}
+        >
+          <section className="permissions-view-toolbar">
+            <div className="segmented-control admin-filter-control">
+              <button
+                type="button"
+                className={permissionsView === "users" ? "active" : ""}
+                onClick={() => setPermissionsView("users")}
+              >
+                People
+              </button>
+              <button
+                type="button"
+                className={permissionsView === "roles" ? "active" : ""}
+                onClick={() => setPermissionsView("roles")}
+              >
+                Roles
+              </button>
+            </div>
+          </section>
+          {permissionsView === "roles" ? (
+            <RolePermissionsEditor onMessage={setMessage} onDirtyChange={dirtyHandlers.people} />
+          ) : (
+            <UserPermissionsEditor
+              onMessage={setMessage}
+              personnel={personnel}
+              onOpenPersonnelProfile={onOpenPersonnelProfile}
+              onOpenEmployeeProfile={onOpenEmployeeProfile}
+              onDirtyChange={dirtyHandlers.people}
+            />
+          )}
+        </AdminSectionPill>
+
+        <AdminSectionPill
+          id="scheduling"
+          label="Scheduling & Pay"
+          description="Shift rotation, roster units, crew positions, pay periods, overtime, and portal rules."
+          icon={CalendarDays}
+          isOpen={isOpen("scheduling")}
+          onToggle={toggleSection}
+        >
+          <DepartmentConfigPanel
+            onMessage={setMessage}
+            apparatus={apparatus}
+            sectionIds={SCHEDULING_TABS}
+            onDirtyChange={dirtyHandlers.scheduling}
+          />
+        </AdminSectionPill>
+
+        <AdminSectionPill
+          id="integrations"
+          label="Connected Services"
+          description="Google Maps, Active911, the JotForm damage form, and FORGE Academy."
           icon={KeyRound}
-          isOpen={isOpen("google-apis")}
+          isOpen={isOpen("integrations")}
           onToggle={toggleSection}
         >
           <div className="admin-integrations-stack">
@@ -178,23 +290,15 @@ export default function AdminControlCenterPage({
               departmentId={departmentId}
               canView={canViewAcademyIntegrations}
               canConfigure={canManageAcademyIntegrations}
+              canMigrateLegacy={isCreator}
             />
           </div>
         </AdminSectionPill>
 
         <AdminSectionPill
-          id="modules"
-          label="Module Data"
-          icon={Database}
-          isOpen={isOpen("modules")}
-          onToggle={toggleSection}
-        >
-          <DataEditorPanel onMessage={setMessage} />
-        </AdminSectionPill>
-
-        <AdminSectionPill
           id="records"
-          label="System Records"
+          label={isCreator ? "System Records" : "Dropdown Lists"}
+          description="The choices offered in dropdowns across the app, like incident types and ranks."
           icon={LayoutGrid}
           isOpen={isOpen("records")}
           onToggle={toggleSection}
@@ -204,87 +308,37 @@ export default function AdminControlCenterPage({
             personnel={personnel}
             onOpenPersonnelProfile={onOpenPersonnelProfile}
             onOpenEmployeeProfile={onOpenEmployeeProfile}
+            onDirtyChange={dirtyHandlers.records}
             onInviteSomeone={() => {
               setPermissionsView("users");
-              setOpenSections((current) => new Set([...current, "permissions"]));
-              requestAnimationFrame(() => document.getElementById("permissions")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+              openOnly("people");
             }}
           />
         </AdminSectionPill>
 
         <AdminSectionPill
-          id="permissions"
-          label="Permissions"
-          icon={ShieldCheck}
-          isOpen={isOpen("permissions")}
-          onToggle={toggleSection}
-        >
-          <section className="permissions-view-toolbar">
-            <div className="segmented-control admin-filter-control">
-              <button
-                type="button"
-                className={permissionsView === "roles" ? "active" : ""}
-                onClick={() => setPermissionsView("roles")}
-              >
-                Roles
-              </button>
-              <button
-                type="button"
-                className={permissionsView === "users" ? "active" : ""}
-                onClick={() => setPermissionsView("users")}
-              >
-                Users
-              </button>
-            </div>
-          </section>
-          {permissionsView === "roles" ? (
-            <RolePermissionsEditor onMessage={setMessage} />
-          ) : (
-            <UserPermissionsEditor
-              onMessage={setMessage}
-              personnel={personnel}
-              onOpenPersonnelProfile={onOpenPersonnelProfile}
-              onOpenEmployeeProfile={onOpenEmployeeProfile}
-            />
-          )}
-        </AdminSectionPill>
-
-        <AdminSectionPill
           id="audit"
-          label="Audit Logs"
-          icon={ShieldCheck}
+          label="Activity Log"
+          description="Who changed what, and when."
+          icon={History}
           isOpen={isOpen("audit")}
           onToggle={toggleSection}
         >
-          {loading ? (
-            <p className="auth-help">Loading audit logs…</p>
-          ) : (
-            <>
-              <div className="admin-filter-bar">
-                <div className="segmented-control admin-filter-control">
-                  {["All", "Personnel", "Users", "Roles", "Dropdowns", "Data Editor", "System Admin", "Employee Portal"].map((item) => (
-                    <button key={item} type="button" className={auditFilter === item ? "active" : ""} onClick={() => setAuditFilter(item)}>{item}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="admin-audit-table">
-                <div className="admin-audit-row admin-audit-head">
-                  <span>When</span><span>Actor</span><span>Action</span><span>Module</span><span>Summary</span>
-                </div>
-                {auditLogs.map((log) => (
-                  <div className="admin-audit-row" key={log.id}>
-                    <span>{String(log.created_at || log.createdAt || "").slice(0, 19)}</span>
-                    <span>{log.actorName}</span>
-                    <span>{log.action}</span>
-                    <span>{log.module}</span>
-                    <span>{log.summary}</span>
-                  </div>
-                ))}
-                {!auditLogs.length && <p className="empty-table">No audit logs yet.</p>}
-              </div>
-            </>
-          )}
+          <AuditLogPanel departmentId={departmentId} />
         </AdminSectionPill>
+
+        {isCreator ? (
+          <AdminSectionPill
+            id="modules"
+            label="Module Data (FORGE staff)"
+            description="Raw records for every module. Staff only."
+            icon={Database}
+            isOpen={isOpen("modules")}
+            onToggle={toggleSection}
+          >
+            <DataEditorPanel onMessage={setMessage} onDirtyChange={dirtyHandlers.modules} />
+          </AdminSectionPill>
+        ) : null}
       </section>
     </div>
   );
