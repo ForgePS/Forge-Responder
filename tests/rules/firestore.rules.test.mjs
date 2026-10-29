@@ -182,16 +182,24 @@ describe("per-item lists", () => {
   });
 });
 
-describe("two-factor login", () => {
+// Two-step sign-in codes are optional for everyone (2026-10-29).
+describe("two-factor login (optional)", () => {
   const setDeadline = (date) => env.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), "platformConfig/main"), { mfaAdminDeadline: date }, { merge: true });
   });
 
-  it("creator powers need a session signed in with a code", async () => {
+  it("creators have their powers with or without a code", async () => {
     await assertSucceeds(getDoc(doc(creator().firestore(), `departments/${B}/incidents/i9`)));
-    await assertFails(getDoc(doc(creatorNo2fa().firestore(), `departments/${A}/incidents/i1`)));
-    await assertFails(setDoc(doc(creatorNo2fa().firestore(), `departments/${A}/users/new-user`), membership("new-user", A)));
-    await assertSucceeds(setDoc(doc(creator().firestore(), `departments/${A}/users/new-user`), membership("new-user", A)));
+    await assertSucceeds(getDoc(doc(creatorNo2fa().firestore(), `departments/${A}/incidents/i1`)));
+    await assertSucceeds(setDoc(doc(creatorNo2fa().firestore(), `departments/${A}/users/new-user`), membership("new-user", A)));
+  });
+
+  it("a removed creator has no creator powers", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "platformCreators/ex-creator"), { status: "removed" });
+    });
+    const db = as("ex-creator", { email: "ex@forge.test", email_verified: true }).firestore();
+    await assertFails(getDoc(doc(db, `departments/${A}/incidents/i1`)));
   });
 
   it("department admins keep admin powers until the deadline", async () => {
@@ -199,11 +207,10 @@ describe("two-factor login", () => {
     await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
   });
 
-  it("after the deadline, admin powers need a code; ordinary member access does not", async () => {
+  it("an old deadline no longer locks admins out", async () => {
     await setDeadline(new Date(Date.now() - 24 * 3600 * 1000));
-    await assertFails(updateDoc(doc(adminA().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
-    await assertFails(setDoc(doc(adminA().firestore(), `departments/${A}/roles/firefighter`), { name: "FF", permissions: {} }));
-    await assertSucceeds(updateDoc(doc(adminA2fa().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
+    await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
+    await assertSucceeds(setDoc(doc(adminA().firestore(), `departments/${A}/roles/firefighter`), { name: "FF", permissions: {} }));
     await assertSucceeds(getDoc(doc(adminA().firestore(), `departments/${A}/incidents/i1`)));
   });
 

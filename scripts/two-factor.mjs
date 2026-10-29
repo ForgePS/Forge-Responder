@@ -12,9 +12,14 @@
  *                              many days (sets platformConfig/main.mfaAdminDeadline).
  *   --reset=<email>            clear someone's two-factor (lost phone), including
  *                              your own; they set it up again at next sign-in.
+ *   --turn-off                 do away with two-factor for everyone: clear the admin
+ *                              deadline, remove every authenticator app that was set
+ *                              up, and switch codes off for the project. Nobody is
+ *                              asked for a code at sign-in afterwards.
  *
  *   $env:GOOGLE_CLOUD_PROJECT = "rms-dashboard-7562e"; node scripts/two-factor.mjs *> two-factor.txt
  *   $env:GOOGLE_CLOUD_PROJECT = "rms-dashboard-7562e"; node scripts/two-factor.mjs --enable-totp *> two-factor.txt
+ *   $env:GOOGLE_CLOUD_PROJECT = "rms-dashboard-7562e"; node scripts/two-factor.mjs --turn-off *> two-factor.txt
  */
 import { initializeApp, applicationDefault } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -82,6 +87,40 @@ async function main() {
       created_at: new Date().toISOString(),
     });
     console.log(`Two-factor cleared for ${resetEmail}. They sign in with their password and set it up again.\n`);
+  }
+
+  if (arg("turn-off")) {
+    await db.doc("platformConfig/main").set({ mfaAdminDeadline: null }, { merge: true });
+    console.log("Admin deadline cleared.");
+    let cleared = 0;
+    let pageToken;
+    do {
+      const page = await auth.listUsers(1000, pageToken);
+      for (const user of page.users) {
+        if (!(user.multiFactor?.enrolledFactors || []).length) continue;
+        await auth.updateUser(user.uid, { multiFactor: { enrolledFactors: null } });
+        console.log(`  removed authenticator app for ${user.email || user.uid}`);
+        cleared += 1;
+      }
+      pageToken = page.pageToken;
+    } while (pageToken);
+    try {
+      await auth.projectConfigManager().updateProjectConfig({
+        multiFactorConfig: { providerConfigs: [{ state: "DISABLED", totpProviderConfig: { adjacentIntervals: 5 } }] },
+      });
+      console.log("Authenticator-app codes switched OFF for the project.");
+    } catch (error) {
+      console.log(`Couldn't switch codes off for the project (${error.message.split("\n")[0]}). Turn off TOTP in Firebase console: Authentication, Settings, Multi-factor.`);
+    }
+    await db.collection("platformAuditLogs").add({
+      action: "security.two-factor-off",
+      module: "Creator Console",
+      summary: `Two-factor login turned off for everyone (${cleared} authenticator app(s) removed)`,
+      actorUid: "script",
+      actorName: "scripts/two-factor.mjs",
+      created_at: new Date().toISOString(),
+    });
+    console.log(`Done: ${cleared} authenticator app(s) removed. Everyone signs in with just their password.\n`);
   }
 
   // Status

@@ -14,21 +14,20 @@ service cloud.firestore {
         && request.auth.token.get("firebase", {}).get("sign_in_second_factor", null) != null;
     }
 
-    // Department admins must use two-factor once platformConfig/main.mfaAdminDeadline
-    // has passed (set by scripts/two-factor.mjs); the shared demo is exempt.
+    // Two-step sign-in codes are optional (2026-10-29): nobody is required to use
+    // them. These helpers stay so the requirement can be switched back on in one place.
     function adminTwoFactorDeadlinePassed() {
       return exists(/databases/$(database)/documents/platformConfig/main)
         && get(/databases/$(database)/documents/platformConfig/main).data.get("mfaAdminDeadline", null) != null
         && request.time >= get(/databases/$(database)/documents/platformConfig/main).data.mfaAdminDeadline;
     }
     function adminTwoFactorOk(departmentId) {
-      return hasSecondFactor() || isDemoDepartment(departmentId) || !adminTwoFactorDeadlinePassed();
+      return true;
     }
 
-    // Creator powers need a session signed in with a two-factor code.
+    // Platform creators: an active platformCreators/{uid} record (two-step code optional).
     function isPlatformCreator() {
       return isAuthenticated()
-        && hasSecondFactor()
         && exists(/databases/$(database)/documents/platformCreators/$(request.auth.uid))
         && get(/databases/$(database)/documents/platformCreators/$(request.auth.uid)).data.status == "active";
     }

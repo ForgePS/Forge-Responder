@@ -1,10 +1,10 @@
 const { HttpsError } = require("firebase-functions/v2/https");
-const { hasSecondFactor, assertAdminSecondFactor } = require("./twoFactor");
+const { assertAdminSecondFactor } = require("./twoFactor");
 
-// Platform creators are listed in platformCreators/{uid} (no email allowlists),
-// and creator powers need a session signed in with a two-factor code.
+// Platform creators are listed in platformCreators/{uid} (no email allowlists).
+// Two-step sign-in codes are optional (2026-10-29).
 async function isPlatformCreator(db, auth) {
-  if (!auth?.uid || !hasSecondFactor(auth)) return false;
+  if (!auth?.uid) return false;
   const creatorSnap = await db.doc(`platformCreators/${auth.uid}`).get();
   return creatorSnap.exists && creatorSnap.data()?.status === "active";
 }

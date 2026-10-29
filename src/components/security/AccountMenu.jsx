@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, KeyRound, LogOut, ShieldCheck, X } from "lucide-react";
 import { accountErrorMessage, changePassword } from "../../lib/accountService.js";
 import TwoFactorSetup from "./TwoFactorSetup.jsx";
+import { SECOND_FACTOR_ENFORCED } from "../../lib/twoFactor.js";
 
 /** Header profile button: change password, two-factor login, sign out. */
 export default function AccountMenu({ initials, displayName, roleLabel, onSignOut }) {
@@ -31,7 +32,9 @@ export default function AccountMenu({ initials, displayName, roleLabel, onSignOu
       {open && (
         <div className="account-menu-list" role="menu">
           <button type="button" role="menuitem" onClick={() => openDialog("password")}><KeyRound size={15} /> Change password</button>
-          <button type="button" role="menuitem" onClick={() => openDialog("twofactor")}><ShieldCheck size={15} /> Two-factor login</button>
+          {SECOND_FACTOR_ENFORCED ? (
+            <button type="button" role="menuitem" onClick={() => openDialog("twofactor")}><ShieldCheck size={15} /> Two-factor login</button>
+          ) : null}
           <button type="button" role="menuitem" onClick={() => { setOpen(false); onSignOut(); }}><LogOut size={15} /> Sign out</button>
         </div>
       )}

@@ -47,9 +47,9 @@ const invite = (auth, departmentId = "camden") => invites.createInvite(db, {
 });
 
 describe("two-factor login", () => {
-  it("creator powers need a session signed in with a code", async () => {
+  it("creators have their powers with or without a code (codes are optional)", async () => {
     assert.equal(await access.isPlatformCreator(db, withCode("creator-1")), true);
-    assert.equal(await access.isPlatformCreator(db, withoutCode("creator-1")), false);
+    assert.equal(await access.isPlatformCreator(db, withoutCode("creator-1")), true);
     assert.equal(twoFactor.hasSecondFactor(withCode("x")), true);
     assert.equal(twoFactor.hasSecondFactor(withoutCode("x")), false);
   });
@@ -67,10 +67,9 @@ describe("two-factor login", () => {
     assert.ok((await invite(withoutCode("chief"))).inviteId);
   });
 
-  it("after the deadline, admin tools need a code; with one they work", async () => {
+  it("an old deadline no longer blocks admin tools", async () => {
     await setDeadline(new Date(Date.now() - DAY));
-    assert.equal(await twoFactor.adminSecondFactorRequired(db, "camden"), true);
-    await assert.rejects(invite(withoutCode("chief")), (e) => e.code === "permission-denied");
+    assert.ok((await invite(withoutCode("chief"))).inviteId);
     assert.ok((await invite(withCode("chief"))).inviteId);
   });
 
