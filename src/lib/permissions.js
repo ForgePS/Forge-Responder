@@ -33,6 +33,7 @@ const navPermissionMap = {
   "Fleet Hardening": "manageFleetConfig",
   "All Fleet Assets": "viewFleetAssets",
   "Fleet Configuration Studio": "manageFleetConfig",
+  "Apparatus Check Setup": "manageFleetConfig",
   Occupancies: "viewInspections",
   Inspections: "viewInspections",
   "Inspection Queue": "viewInspections",
