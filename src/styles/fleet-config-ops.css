@@ -1,0 +1,102 @@
+/* Configuration Studio: Testing Programs, Fuel, Roadside & Towing tabs. */
+
+.fco-intro {
+  margin: 0 0 12px;
+  color: var(--rms-text-muted, #64748b);
+  font-size: 14px;
+  line-height: 1.45;
+  max-width: 72ch;
+}
+
+.fco-empty {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 16px 4px;
+  color: var(--rms-text-muted, #64748b);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.fco-empty strong {
+  color: var(--rms-text-body, inherit);
+  font-size: 15px;
+}
+
+.fco-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--rms-border, rgba(148, 163, 184, 0.4));
+  color: var(--rms-text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.fco-tag.fco-tag-new {
+  border-color: rgba(37, 99, 235, 0.5);
+  color: var(--rms-text-link, #2563eb);
+}
+
+.fco-row-off strong {
+  opacity: 0.65;
+}
+
+.fco-hint {
+  display: block;
+  margin-top: 2px;
+  color: var(--rms-text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.fco-readonly {
+  min-height: 33px;
+  display: flex;
+  align-items: center;
+  color: var(--rms-text-body, inherit);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fco-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fco-toggle-stack {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+}
+
+.fco-toggle-stack .occupancy-primary-toggle {
+  align-items: flex-start;
+}
+
+.fco-wide {
+  grid-column: 1 / -1;
+}
+
+.fco-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--rms-border, rgba(148, 163, 184, 0.4));
+  border-radius: 6px;
+  color: var(--rms-text-muted, #64748b);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.fco-show-removed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--rms-text-muted, #64748b);
+  font-size: 13px;
+}

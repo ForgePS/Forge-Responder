@@ -1,5 +1,6 @@
 import {
   createRecord,
+  deleteRecord,
   listRecords,
   updateRecord,
 } from "../firestoreService.js";
@@ -100,4 +101,28 @@ export async function saveFleetClass(departmentId, record = {}, audit = {}) {
   }).catch(() => null);
 
   return normalized;
+}
+
+/** Delete a vehicle type. Callers should check no units use it first. */
+export async function deleteFleetClass(departmentId, classRecord = {}, audit = {}) {
+  if (!departmentId || !classRecord.id) return;
+  await deleteRecord(departmentId, FLEET_CLASSES_COLLECTION, classRecord.id);
+  await writeFleetAuditLog(departmentId, {
+    action: "delete",
+    recordId: classRecord.id,
+    summary: `Deleted vehicle type ${classRecord.name || classRecord.id}`,
+    actorUid: audit.actorUid || "system",
+    actorName: audit.actorName || "System",
+  }).catch(() => null);
+}
+
+export const FLEET_CLASS_CATEGORIES = [
+  { id: "emergency_response", label: "Emergency response" },
+  { id: "ems", label: "EMS" },
+  { id: "support", label: "Support" },
+  { id: "specialty", label: "Specialty" },
+];
+
+export function fleetClassCategoryLabel(id = "") {
+  return FLEET_CLASS_CATEGORIES.find((row) => row.id === id)?.label || "";
 }

@@ -53,21 +53,5 @@ export const SAFETY_REVIEW_OUTCOMES = [
   { id: "undetermined", label: "Undetermined" },
 ];
 
-export const STARTER_TOW_PROVIDERS = [
-  {
-    id: "tow-midsouth",
-    name: "Mid-South Heavy Recovery",
-    phone: "",
-    afterHoursPhone: "",
-    services: "heavy wrecker, roadside",
-    active: true,
-  },
-  {
-    id: "tow-local",
-    name: "Local Light Duty Tow",
-    phone: "",
-    afterHoursPhone: "",
-    services: "light duty, jump start, tire",
-    active: true,
-  },
-];
+/** No starter tow providers: the department enters its own (no made-up vendors). */
+export const STARTER_TOW_PROVIDERS = [];

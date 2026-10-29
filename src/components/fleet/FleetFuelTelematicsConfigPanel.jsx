@@ -1,80 +1,101 @@
 import { useEffect, useState } from "react";
-import { CirclePlus, Fuel, Radio, Save } from "lucide-react";
+import { CirclePlus, Fuel, Save, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 import {
-  ensureFleetAssets,
-  ensureFuelExceptionRulesSeeded,
-  ensureFuelSitesSeeded,
-  ensureTelematicsAdaptersSeeded,
+  addRecommendedFuelExceptionRules,
+  deleteFuelExceptionRule,
+  deleteFuelSite,
   getFuelProductTypes,
-  listTelematicsMappings,
+  listFuelExceptionRules,
+  listFuelSites,
   saveFuelExceptionRule,
   saveFuelSite,
-  saveTelematicsAdapter,
-  saveTelematicsMapping,
 } from "../../lib/fleet/index.js";
+import { STARTER_FUEL_EXCEPTION_RULES } from "../../lib/fleet/fuelDefaults.js";
+import {
+  FUEL_RULE_TYPES,
+  FUEL_SITE_TYPES,
+  SEVERITY_LABELS,
+  byActiveThenName,
+  describeFuelRuleSetting,
+  fuelRuleType,
+  fuelRuleTypeLabel,
+  fuelSiteTypeLabel,
+  fuelUnitFor,
+  missingRecommendedRules,
+  newFuelRuleDraft,
+  newFuelSiteDraft,
+  siteTracksInventory,
+} from "../../lib/fleet/configOpsLogic.js";
+import "../../styles/fleet-config-ops.css";
 
-function Field({ label, children }) {
+// Vehicle-tracking (telematics) setup is intentionally not shown here: the
+// adapters are not connected to any vendor yet. The telematics services
+// (fleetTelematicsService.js) are kept for when that work is done.
+
+const NEW_ID = "__new__";
+
+function Field({ label, hint, children, wide = false }) {
   return (
-    <label className="config-field">
+    <label className={`config-field${wide ? " fco-wide" : ""}`}>
       <span>{label}</span>
       {children}
+      {hint ? <small className="fco-hint">{hint}</small> : null}
     </label>
   );
 }
 
+function formatNumber(value) {
+  return (Number(value) || 0).toLocaleString();
+}
+
 /**
- * Fuel sites, exception rules, and telematics adapters for Configuration Studio.
+ * Fuel sites and fuel exception rules for Configuration Studio.
+ * (legacyApparatus is accepted for the panel contract but not needed here.)
  */
 export default function FleetFuelTelematicsConfigPanel({
   departmentId,
   actor,
   onMessage,
   onError,
-  legacyApparatus = [],
 }) {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState("sites");
   const [sites, setSites] = useState([]);
   const [rules, setRules] = useState([]);
-  const [adapters, setAdapters] = useState([]);
-  const [mappings, setMappings] = useState([]);
-  const [assets, setAssets] = useState([]);
   const [selectedSiteId, setSelectedSiteId] = useState("");
   const [selectedRuleId, setSelectedRuleId] = useState("");
-  const [selectedAdapterId, setSelectedAdapterId] = useState("");
   const [siteDraft, setSiteDraft] = useState(null);
   const [ruleDraft, setRuleDraft] = useState(null);
-  const [adapterDraft, setAdapterDraft] = useState(null);
-  const [mapDraft, setMapDraft] = useState({ fleetAssetId: "", adapterId: "", externalVehicleId: "" });
   const products = getFuelProductTypes();
+
+  const siteIsNew = selectedSiteId === NEW_ID;
+  const ruleIsNew = selectedRuleId === NEW_ID;
+  const siteOriginal = siteIsNew ? null : sites.find((row) => row.id === selectedSiteId) || null;
+  const ruleOriginal = ruleIsNew ? null : rules.find((row) => row.id === selectedRuleId) || null;
+  const siteDirty = Boolean(siteDraft) && (siteIsNew || JSON.stringify(siteDraft) !== JSON.stringify(siteOriginal));
+  const ruleDirty = Boolean(ruleDraft) && (ruleIsNew || JSON.stringify(ruleDraft) !== JSON.stringify(ruleOriginal));
+  const missingRecommended = missingRecommendedRules(rules, STARTER_FUEL_EXCEPTION_RULES);
 
   async function reload() {
     if (!departmentId) return;
     setLoading(true);
+    setLoadError("");
     try {
-      const [nextSites, nextRules, nextAdapters, nextMappings, nextAssets] = await Promise.all([
-        ensureFuelSitesSeeded(departmentId, actor),
-        ensureFuelExceptionRulesSeeded(departmentId, actor),
-        ensureTelematicsAdaptersSeeded(departmentId, actor),
-        listTelematicsMappings(departmentId),
-        ensureFleetAssets(departmentId, legacyApparatus, actor),
+      // Read only: opening this tab never writes anything.
+      const [nextSites, nextRules] = await Promise.all([
+        listFuelSites(departmentId),
+        listFuelExceptionRules(departmentId),
       ]);
-      setSites(nextSites);
-      setRules(nextRules);
-      setAdapters(nextAdapters);
-      setMappings(nextMappings);
-      setAssets(nextAssets);
+      setSites([...nextSites].sort(byActiveThenName));
+      setRules([...nextRules].sort(byActiveThenName));
       setSelectedSiteId((c) => c || nextSites[0]?.id || "");
       setSelectedRuleId((c) => c || nextRules[0]?.id || "");
-      setSelectedAdapterId((c) => c || nextAdapters[0]?.id || "");
-      setMapDraft((c) => ({
-        ...c,
-        fleetAssetId: c.fleetAssetId || nextAssets[0]?.id || "",
-        adapterId: c.adapterId || nextAdapters[0]?.id || "",
-      }));
-    } catch (loadError) {
-      onError?.(loadError?.message || "Unable to load fuel / telematics config.");
+    } catch (err) {
+      const message = err?.message || "Unable to load fuel settings.";
+      setLoadError(message);
+      onError?.(message);
     } finally {
       setLoading(false);
     }
@@ -86,34 +107,196 @@ export default function FleetFuelTelematicsConfigPanel({
   }, [departmentId]);
 
   useEffect(() => {
-    setSiteDraft(sites.find((row) => row.id === selectedSiteId) || null);
+    if (selectedSiteId === NEW_ID) return;
+    const row = sites.find((item) => item.id === selectedSiteId);
+    setSiteDraft(row ? { ...row } : null);
   }, [sites, selectedSiteId]);
 
   useEffect(() => {
-    setRuleDraft(rules.find((row) => row.id === selectedRuleId) || null);
+    if (selectedRuleId === NEW_ID) return;
+    const row = rules.find((item) => item.id === selectedRuleId);
+    setRuleDraft(row ? { ...row } : null);
   }, [rules, selectedRuleId]);
 
-  useEffect(() => {
-    setAdapterDraft(adapters.find((row) => row.id === selectedAdapterId) || null);
-  }, [adapters, selectedAdapterId]);
+  function confirmLeave(dirty) {
+    return !dirty || window.confirm("You have unsaved changes. Discard them?");
+  }
+
+  function switchMode(next) {
+    if (next === mode) return;
+    const dirty = mode === "sites" ? siteDirty : ruleDirty;
+    if (!confirmLeave(dirty)) return;
+    if (mode === "sites" && siteIsNew) setSelectedSiteId(sites[0]?.id || "");
+    if (mode === "rules" && ruleIsNew) setSelectedRuleId(rules[0]?.id || "");
+    setMode(next);
+  }
+
+  // ——— Sites ———
+
+  function startNewSite() {
+    if (!confirmLeave(siteDirty)) return;
+    setSelectedSiteId(NEW_ID);
+    setSiteDraft(newFuelSiteDraft());
+  }
+
+  function selectSite(id) {
+    if (id === selectedSiteId || !confirmLeave(siteDirty)) return;
+    setSelectedSiteId(id);
+  }
+
+  async function saveSite() {
+    if (!siteDraft) return;
+    if (!String(siteDraft.name || "").trim()) {
+      onError?.("Give the fuel site a name before saving.");
+      return;
+    }
+    if (siteTracksInventory(siteDraft.siteType) && Number(siteDraft.capacity) > 0
+      && Number(siteDraft.currentInventory) > Number(siteDraft.capacity)) {
+      onError?.("The amount on hand can't be more than the tank holds.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await saveFuelSite(departmentId, { ...siteDraft, name: siteDraft.name.trim() }, actor);
+      setSites((c) => [saved, ...c.filter((row) => row.id !== saved.id)].sort(byActiveThenName));
+      setSelectedSiteId(saved.id);
+      setSiteDraft({ ...saved });
+      onMessage?.(siteIsNew ? `Added "${saved.name}".` : `Saved "${saved.name}".`);
+    } catch (err) {
+      onError?.(err?.message || "Unable to save the fuel site.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeSite() {
+    if (siteIsNew) {
+      setSelectedSiteId(sites[0]?.id || "");
+      if (!sites.length) setSiteDraft(null);
+      return;
+    }
+    if (!siteOriginal) return;
+    if (!window.confirm(`Remove "${siteOriginal.name}"? Fuel already logged from it keeps its history. This can't be undone.`)) return;
+    setSaving(true);
+    try {
+      await deleteFuelSite(departmentId, siteOriginal.id, actor);
+      const remaining = sites.filter((row) => row.id !== siteOriginal.id);
+      setSites(remaining);
+      setSelectedSiteId(remaining[0]?.id || "");
+      if (!remaining.length) setSiteDraft(null);
+      onMessage?.(`Removed "${siteOriginal.name}".`);
+    } catch (err) {
+      onError?.(err?.message || "Unable to remove the fuel site.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ——— Rules ———
+
+  function startNewRule() {
+    if (!confirmLeave(ruleDirty)) return;
+    setSelectedRuleId(NEW_ID);
+    setRuleDraft(newFuelRuleDraft());
+  }
+
+  function selectRule(id) {
+    if (id === selectedRuleId || !confirmLeave(ruleDirty)) return;
+    setSelectedRuleId(id);
+  }
+
+  async function saveRule() {
+    if (!ruleDraft) return;
+    if (!String(ruleDraft.name || "").trim()) {
+      onError?.("Give the rule a name before saving.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await saveFuelExceptionRule(departmentId, { ...ruleDraft, name: ruleDraft.name.trim() }, actor);
+      setRules((c) => [saved, ...c.filter((row) => row.id !== saved.id)].sort(byActiveThenName));
+      setSelectedRuleId(saved.id);
+      setRuleDraft({ ...saved });
+      onMessage?.(ruleIsNew ? `Added "${saved.name}".` : `Saved "${saved.name}".`);
+    } catch (err) {
+      onError?.(err?.message || "Unable to save the rule.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeRule() {
+    if (ruleIsNew) {
+      setSelectedRuleId(rules[0]?.id || "");
+      if (!rules.length) setRuleDraft(null);
+      return;
+    }
+    if (!ruleOriginal) return;
+    if (!window.confirm(`Remove the rule "${ruleOriginal.name}"? Fuel entries will no longer be checked for this. This can't be undone.`)) return;
+    setSaving(true);
+    try {
+      await deleteFuelExceptionRule(departmentId, ruleOriginal.id, actor);
+      const remaining = rules.filter((row) => row.id !== ruleOriginal.id);
+      setRules(remaining);
+      setSelectedRuleId(remaining[0]?.id || "");
+      if (!remaining.length) setRuleDraft(null);
+      onMessage?.(`Removed "${ruleOriginal.name}".`);
+    } catch (err) {
+      onError?.(err?.message || "Unable to remove the rule.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addRecommended() {
+    if (ruleIsNew && !confirmLeave(ruleDirty)) return;
+    setSaving(true);
+    try {
+      const next = await addRecommendedFuelExceptionRules(departmentId, actor);
+      const added = next.length - rules.length;
+      setRules([...next].sort(byActiveThenName));
+      setSelectedRuleId((c) => (c && c !== NEW_ID ? c : next[0]?.id || ""));
+      onMessage?.(added > 0 ? `Added ${added} recommended rule${added === 1 ? "" : "s"}.` : "You already have all the recommended rules.");
+    } catch (err) {
+      onError?.(err?.message || "Unable to add the recommended rules.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (loading) {
-    return <div className="inspections-loading-state" role="status"><p>Loading fuel & telematics config...</p></div>;
+    return <div className="inspections-loading-state" role="status"><p>Loading fuel settings...</p></div>;
   }
+
+  if (loadError) {
+    return (
+      <section className="panel">
+        <div className="panel-body fco-empty" role="alert">
+          <strong>Fuel settings couldn't be loaded.</strong>
+          <span>{loadError}</span>
+          <button className="secondary-button" type="button" onClick={reload}>Try again</button>
+        </div>
+      </section>
+    );
+  }
+
+  const setSite = (patch) => setSiteDraft((c) => ({ ...c, ...patch }));
+  const setRule = (patch) => setRuleDraft((c) => ({ ...c, ...patch }));
+  const siteUnit = siteDraft ? fuelUnitFor(siteDraft.product, products) : "gallons";
+  const ruleMeta = ruleDraft ? fuelRuleType(ruleDraft.ruleType) : null;
 
   return (
     <section className="fleet-fuel-telematics-config">
-      <nav className="inspections-subnav" aria-label="Fuel telematics config">
+      <nav className="inspections-subnav" aria-label="Fuel settings">
         {[
           ["sites", "Fuel sites", Fuel],
-          ["rules", "Exception rules", Fuel],
-          ["adapters", "Telematics adapters", Radio],
+          ["rules", "Fuel exception rules", ShieldAlert],
         ].map(([id, label, Icon]) => (
           <button
             key={id}
             type="button"
             className={`inspections-subnav-item${mode === id ? " active" : ""}`}
-            onClick={() => setMode(id)}
+            onClick={() => switchMode(id)}
           >
             <Icon size={14} /> {label}
           </button>
@@ -121,334 +304,280 @@ export default function FleetFuelTelematicsConfigPanel({
       </nav>
 
       {mode === "sites" ? (
-        <section className="personnel-workspace occupancy-workspace">
-          <section className="panel">
-            <header>
-              <div><Fuel size={15} /><strong>Sites</strong></div>
-              <button
-                className="text-button"
-                type="button"
-                disabled={saving}
-                onClick={async () => {
-                  setSaving(true);
-                  try {
-                    const saved = await saveFuelSite(departmentId, {
-                      name: "New fuel site",
-                      siteType: "station_tank",
-                      product: "diesel",
-                      capacity: 1000,
-                      currentInventory: 500,
-                      active: true,
-                    }, actor);
-                    setSites((c) => [saved, ...c]);
-                    setSelectedSiteId(saved.id);
-                    onMessage?.("Fuel site created.");
-                  } catch (err) {
-                    onError?.(err?.message || "Unable to create site.");
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                <CirclePlus size={14} /> Add site
-              </button>
-            </header>
-            <div className="panel-body">
-              <div className="personnel-list">
-                {sites.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={item.id === selectedSiteId ? "person-row selected" : "person-row"}
-                    onClick={() => setSelectedSiteId(item.id)}
-                  >
-                    <span>
-                      <strong>{item.name}</strong>
-                      <small>{item.product} · {item.currentInventory}/{item.capacity || "—"}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-          {siteDraft ? (
+        <>
+          <p className="fco-intro">
+            Where your units get fuel or charge: station tanks, EV chargers, mobile fueling, and outside vendors
+            or fuel cards. Tank levels go down automatically as fuel is logged from a site.
+          </p>
+          <section className="personnel-workspace occupancy-workspace">
             <section className="panel">
               <header>
-                <div><strong>Edit site</strong></div>
-                <button
-                  className="primary-button"
-                  type="button"
-                  disabled={saving}
-                  onClick={async () => {
-                    setSaving(true);
-                    try {
-                      const saved = await saveFuelSite(departmentId, siteDraft, actor);
-                      setSites((c) => [saved, ...c.filter((row) => row.id !== saved.id)].sort((a, b) => a.name.localeCompare(b.name)));
-                      onMessage?.("Fuel site saved.");
-                    } catch (err) {
-                      onError?.(err?.message || "Unable to save site.");
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                >
-                  <Save size={14} /> Save
+                <div><Fuel size={15} /><strong>Fuel sites</strong></div>
+                <button className="text-button" type="button" disabled={saving} onClick={startNewSite}>
+                  <CirclePlus size={14} /> Add fuel site
                 </button>
               </header>
-              <div className="panel-body occupancy-form-grid">
-                <Field label="Name"><input value={siteDraft.name || ""} onChange={(e) => setSiteDraft((c) => ({ ...c, name: e.target.value }))} /></Field>
-                <Field label="Type">
-                  <select value={siteDraft.siteType || "station_tank"} onChange={(e) => setSiteDraft((c) => ({ ...c, siteType: e.target.value }))}>
-                    <option value="station_tank">Station tank</option>
-                    <option value="ev_charger">EV charger</option>
-                    <option value="mobile">Mobile fueling</option>
-                    <option value="vendor">Vendor</option>
-                  </select>
-                </Field>
-                <Field label="Product">
-                  <select value={siteDraft.product || "diesel"} onChange={(e) => setSiteDraft((c) => ({ ...c, product: e.target.value }))}>
-                    {products.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
-                  </select>
-                </Field>
-                <Field label="Capacity"><input type="number" value={siteDraft.capacity ?? 0} onChange={(e) => setSiteDraft((c) => ({ ...c, capacity: Number(e.target.value) || 0 }))} /></Field>
-                <Field label="Inventory"><input type="number" value={siteDraft.currentInventory ?? 0} onChange={(e) => setSiteDraft((c) => ({ ...c, currentInventory: Number(e.target.value) || 0 }))} /></Field>
-                <Field label="Location"><input value={siteDraft.location || ""} onChange={(e) => setSiteDraft((c) => ({ ...c, location: e.target.value }))} /></Field>
-                <Field label="Connector (EV)"><input value={siteDraft.connectorType || ""} onChange={(e) => setSiteDraft((c) => ({ ...c, connectorType: e.target.value }))} /></Field>
-                <label className="occupancy-primary-toggle">
-                  <input type="checkbox" checked={siteDraft.active !== false} onChange={(e) => setSiteDraft((c) => ({ ...c, active: e.target.checked }))} />
-                  Active
-                </label>
+              <div className="panel-body">
+                <div className="personnel-list">
+                  {siteIsNew ? (
+                    <button type="button" className="person-row selected">
+                      <span>
+                        <strong>{siteDraft?.name?.trim() || "New fuel site"}<span className="fco-tag fco-tag-new">Not saved</span></strong>
+                        <small>{fuelSiteTypeLabel(siteDraft?.siteType)}</small>
+                      </span>
+                    </button>
+                  ) : null}
+                  {sites.map((item) => {
+                    const unit = fuelUnitFor(item.product, products);
+                    const product = products.find((p) => p.id === item.product)?.label || "Fuel";
+                    const level = siteTracksInventory(item.siteType) && item.capacity
+                      ? ` · ${formatNumber(item.currentInventory)} of ${formatNumber(item.capacity)} ${unit} on hand`
+                      : "";
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`${item.id === selectedSiteId ? "person-row selected" : "person-row"}${item.active === false ? " fco-row-off" : ""}`}
+                        onClick={() => selectSite(item.id)}
+                      >
+                        <span>
+                          <strong>
+                            {item.name}
+                            {item.active === false ? <span className="fco-tag">Not in use</span> : null}
+                          </strong>
+                          <small>{fuelSiteTypeLabel(item.siteType)} · {product}{level}</small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {!sites.length && !siteIsNew ? (
+                    <div className="fco-empty">
+                      <strong>No fuel sites yet.</strong>
+                      <span>Add your station tanks, EV chargers, and the vendors or fuel cards you buy from.</span>
+                      <button className="secondary-button" type="button" onClick={startNewSite}>
+                        <CirclePlus size={14} /> Add fuel site
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </section>
-          ) : null}
-        </section>
+
+            {siteDraft ? (
+              <section className="panel">
+                <header>
+                  <div><strong>{siteIsNew ? "New fuel site" : "Edit fuel site"}</strong></div>
+                  <div className="fco-header-actions">
+                    <button className="secondary-button danger-button" type="button" disabled={saving} onClick={removeSite}>
+                      <Trash2 size={14} /> {siteIsNew ? "Discard" : "Remove"}
+                    </button>
+                    <button className="primary-button" type="button" disabled={saving || !siteDirty} onClick={saveSite}>
+                      <Save size={14} /> {saving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                </header>
+                <div className="panel-body occupancy-form-grid">
+                  <Field label="Name">
+                    <input value={siteDraft.name || ""} placeholder="e.g. Station 1 diesel tank" onChange={(e) => setSite({ name: e.target.value })} />
+                  </Field>
+                  <Field label="Kind of site">
+                    <select
+                      value={siteDraft.siteType || "station_tank"}
+                      onChange={(e) => {
+                        const siteType = e.target.value;
+                        setSite(siteType === "ev_charger"
+                          ? { siteType, product: "electric" }
+                          : { siteType, product: siteDraft.product === "electric" ? "diesel" : siteDraft.product });
+                      }}
+                    >
+                      {FUEL_SITE_TYPES.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+                    </select>
+                  </Field>
+                  {siteDraft.siteType !== "ev_charger" ? (
+                    <Field label="Fuel">
+                      <select value={siteDraft.product || "diesel"} onChange={(e) => setSite({ product: e.target.value })}>
+                        {products.filter((row) => row.id !== "electric").map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+                      </select>
+                    </Field>
+                  ) : (
+                    <Field label="Plug type" hint="For example J1772 or CCS.">
+                      <input value={siteDraft.connectorType || ""} onChange={(e) => setSite({ connectorType: e.target.value })} />
+                    </Field>
+                  )}
+                  <Field label="Location" hint="Station or address.">
+                    <input value={siteDraft.location || ""} onChange={(e) => setSite({ location: e.target.value })} />
+                  </Field>
+                  {siteDraft.siteType === "vendor" ? (
+                    <Field label="Vendor or fuel card company">
+                      <input value={siteDraft.vendorName || ""} onChange={(e) => setSite({ vendorName: e.target.value })} />
+                    </Field>
+                  ) : null}
+                  {siteTracksInventory(siteDraft.siteType) ? (
+                    <>
+                      <Field label={`Tank holds (${siteUnit})`}>
+                        <input type="number" min="0" value={siteDraft.capacity ?? 0} onChange={(e) => setSite({ capacity: Number(e.target.value) || 0 })} />
+                      </Field>
+                      <Field label={`On hand now (${siteUnit})`} hint="Goes down automatically as fuel is logged from this site.">
+                        <input type="number" min="0" value={siteDraft.currentInventory ?? 0} onChange={(e) => setSite({ currentInventory: Number(e.target.value) || 0 })} />
+                      </Field>
+                    </>
+                  ) : null}
+                  <Field label="Notes" wide>
+                    <textarea rows={2} value={siteDraft.notes || ""} onChange={(e) => setSite({ notes: e.target.value })} />
+                  </Field>
+                  <label className="occupancy-primary-toggle">
+                    <input type="checkbox" checked={siteDraft.active !== false} onChange={(e) => setSite({ active: e.target.checked })} />
+                    <span>
+                      In use
+                      <small className="fco-hint">Turn off to stop offering this site when fuel is logged.</small>
+                    </span>
+                  </label>
+                </div>
+              </section>
+            ) : null}
+          </section>
+        </>
       ) : null}
 
       {mode === "rules" ? (
-        <section className="personnel-workspace occupancy-workspace">
-          <section className="panel">
-            <header><div><strong>Exception rules</strong></div></header>
-            <div className="panel-body">
-              <div className="personnel-list">
-                {rules.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={item.id === selectedRuleId ? "person-row selected" : "person-row"}
-                    onClick={() => setSelectedRuleId(item.id)}
-                  >
-                    <span>
-                      <strong>{item.name}</strong>
-                      <small>{item.ruleType} · {item.enabled === false ? "off" : "on"}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-          {ruleDraft ? (
+        <>
+          <p className="fco-intro">
+            When fuel is logged, FORGE checks it against these rules and flags anything unusual for review,
+            such as a fill bigger than normal or a missing receipt.
+          </p>
+          <section className="personnel-workspace occupancy-workspace">
             <section className="panel">
               <header>
-                <div><strong>Edit rule</strong></div>
-                <button
-                  className="primary-button"
-                  type="button"
-                  disabled={saving}
-                  onClick={async () => {
-                    setSaving(true);
-                    try {
-                      const saved = await saveFuelExceptionRule(departmentId, ruleDraft, actor);
-                      setRules((c) => [saved, ...c.filter((row) => row.id !== saved.id)].sort((a, b) => a.name.localeCompare(b.name)));
-                      onMessage?.("Exception rule saved.");
-                    } catch (err) {
-                      onError?.(err?.message || "Unable to save rule.");
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                >
-                  <Save size={14} /> Save
-                </button>
+                <div><ShieldAlert size={15} /><strong>Fuel exception rules</strong></div>
+                <div className="fco-header-actions">
+                  {rules.length && missingRecommended.length ? (
+                    <button className="text-button" type="button" disabled={saving} onClick={addRecommended}>
+                      <Sparkles size={14} /> Add recommended ({missingRecommended.length})
+                    </button>
+                  ) : null}
+                  <button className="text-button" type="button" disabled={saving} onClick={startNewRule}>
+                    <CirclePlus size={14} /> Add rule
+                  </button>
+                </div>
               </header>
-              <div className="panel-body occupancy-form-grid">
-                <Field label="Name"><input value={ruleDraft.name || ""} onChange={(e) => setRuleDraft((c) => ({ ...c, name: e.target.value }))} /></Field>
-                <Field label="Threshold"><input type="number" value={ruleDraft.threshold ?? 0} onChange={(e) => setRuleDraft((c) => ({ ...c, threshold: Number(e.target.value) || 0 }))} /></Field>
-                <Field label="Severity">
-                  <select value={ruleDraft.severity || "medium"} onChange={(e) => setRuleDraft((c) => ({ ...c, severity: e.target.value }))}>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
-                </Field>
-                <Field label="Description">
-                  <textarea rows={3} value={ruleDraft.description || ""} onChange={(e) => setRuleDraft((c) => ({ ...c, description: e.target.value }))} />
-                </Field>
-                <label className="occupancy-primary-toggle">
-                  <input type="checkbox" checked={ruleDraft.enabled !== false} onChange={(e) => setRuleDraft((c) => ({ ...c, enabled: e.target.checked }))} />
-                  Enabled
-                </label>
+              <div className="panel-body">
+                <div className="personnel-list">
+                  {ruleIsNew ? (
+                    <button type="button" className="person-row selected">
+                      <span>
+                        <strong>{ruleDraft?.name?.trim() || "New rule"}<span className="fco-tag fco-tag-new">Not saved</span></strong>
+                        <small>{fuelRuleTypeLabel(ruleDraft?.ruleType)}</small>
+                      </span>
+                    </button>
+                  ) : null}
+                  {rules.map((item) => {
+                    const setting = describeFuelRuleSetting(item);
+                    const kind = fuelRuleTypeLabel(item.ruleType);
+                    const parts = [];
+                    if (kind !== item.name) parts.push(kind);
+                    if (setting) parts.push(setting);
+                    parts.push(`${SEVERITY_LABELS[item.severity] || "Medium"} priority`);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`${item.id === selectedRuleId ? "person-row selected" : "person-row"}${item.enabled === false ? " fco-row-off" : ""}`}
+                        onClick={() => selectRule(item.id)}
+                      >
+                        <span>
+                          <strong>
+                            {item.name}
+                            {item.enabled === false ? <span className="fco-tag">Off</span> : null}
+                          </strong>
+                          <small>{parts.join(" · ")}</small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {!rules.length && !ruleIsNew ? (
+                    <div className="fco-empty">
+                      <strong>No fuel exception rules yet.</strong>
+                      <span>
+                        Start with the recommended set (odometer went backwards, fill larger than normal, wrong fuel,
+                        possible duplicate, missing receipt, more fuel than the tank had). You can adjust or remove any of them.
+                      </span>
+                      <button className="secondary-button" type="button" disabled={saving} onClick={addRecommended}>
+                        <Sparkles size={14} /> Add recommended rules
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </section>
-          ) : null}
-        </section>
-      ) : null}
 
-      {mode === "adapters" ? (
-        <section className="personnel-workspace occupancy-workspace">
-          <section className="panel">
-            <header>
-              <div><Radio size={15} /><strong>Adapters</strong></div>
-              <button
-                className="text-button"
-                type="button"
-                disabled={saving}
-                onClick={async () => {
-                  setSaving(true);
-                  try {
-                    const saved = await saveTelematicsAdapter(departmentId, {
-                      name: "New adapter",
-                      provider: "generic_api",
-                      status: "configured",
-                      syncMeters: true,
-                      syncFuelLevel: true,
-                      pollMinutes: 15,
-                    }, actor);
-                    setAdapters((c) => [saved, ...c]);
-                    setSelectedAdapterId(saved.id);
-                    onMessage?.("Adapter created.");
-                  } catch (err) {
-                    onError?.(err?.message || "Unable to create adapter.");
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                <CirclePlus size={14} /> Add adapter
-              </button>
-            </header>
-            <div className="panel-body">
-              <div className="personnel-list">
-                {adapters.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={item.id === selectedAdapterId ? "person-row selected" : "person-row"}
-                    onClick={() => setSelectedAdapterId(item.id)}
-                  >
-                    <span>
-                      <strong>{item.name}</strong>
-                      <small>{item.provider} · {item.status}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-          {adapterDraft ? (
-            <section className="panel">
-              <header>
-                <div><strong>Edit adapter</strong></div>
-                <button
-                  className="primary-button"
-                  type="button"
-                  disabled={saving}
-                  onClick={async () => {
-                    setSaving(true);
-                    try {
-                      const saved = await saveTelematicsAdapter(departmentId, adapterDraft, actor);
-                      setAdapters((c) => [saved, ...c.filter((row) => row.id !== saved.id)].sort((a, b) => a.name.localeCompare(b.name)));
-                      onMessage?.("Adapter saved.");
-                    } catch (err) {
-                      onError?.(err?.message || "Unable to save adapter.");
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                >
-                  <Save size={14} /> Save
-                </button>
-              </header>
-              <div className="panel-body occupancy-form-grid">
-                <Field label="Name"><input value={adapterDraft.name || ""} onChange={(e) => setAdapterDraft((c) => ({ ...c, name: e.target.value }))} /></Field>
-                <Field label="Provider">
-                  <select value={adapterDraft.provider || "manual"} onChange={(e) => setAdapterDraft((c) => ({ ...c, provider: e.target.value }))}>
-                    <option value="manual">Manual / CSV</option>
-                    <option value="generic_api">Generic API</option>
-                    <option value="geotab">Geotab</option>
-                    <option value="samsara">Samsara</option>
-                    <option value="other">Other</option>
-                  </select>
-                </Field>
-                <Field label="Status">
-                  <select value={adapterDraft.status || "configured"} onChange={(e) => setAdapterDraft((c) => ({ ...c, status: e.target.value }))}>
-                    <option value="configured">Configured</option>
-                    <option value="active">Active</option>
-                    <option value="error">Error</option>
-                    <option value="disabled">Disabled</option>
-                  </select>
-                </Field>
-                <Field label="Poll minutes"><input type="number" min="0" value={adapterDraft.pollMinutes ?? 0} onChange={(e) => setAdapterDraft((c) => ({ ...c, pollMinutes: Number(e.target.value) || 0 }))} /></Field>
-                <Field label="API base URL"><input value={adapterDraft.apiBaseUrl || ""} onChange={(e) => setAdapterDraft((c) => ({ ...c, apiBaseUrl: e.target.value }))} /></Field>
-                <Field label="Notes"><textarea rows={2} value={adapterDraft.notes || ""} onChange={(e) => setAdapterDraft((c) => ({ ...c, notes: e.target.value }))} /></Field>
-                <label className="occupancy-primary-toggle">
-                  <input type="checkbox" checked={adapterDraft.syncMeters !== false} onChange={(e) => setAdapterDraft((c) => ({ ...c, syncMeters: e.target.checked }))} />
-                  Sync odometer / hours
-                </label>
-                <label className="occupancy-primary-toggle">
-                  <input type="checkbox" checked={adapterDraft.syncFuelLevel !== false} onChange={(e) => setAdapterDraft((c) => ({ ...c, syncFuelLevel: e.target.checked }))} />
-                  Sync fuel level
-                </label>
-              </div>
-
-              <section className="occupancy-section">
-                <header><div><strong>Asset mappings</strong></div></header>
-                <div className="occupancy-form-grid">
-                  <Field label="Fleet asset">
-                    <select value={mapDraft.fleetAssetId} onChange={(e) => setMapDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
-                      {assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.fleetNumber || asset.id}</option>)}
+            {ruleDraft ? (
+              <section className="panel">
+                <header>
+                  <div><strong>{ruleIsNew ? "New rule" : "Edit rule"}</strong></div>
+                  <div className="fco-header-actions">
+                    <button className="secondary-button danger-button" type="button" disabled={saving} onClick={removeRule}>
+                      <Trash2 size={14} /> {ruleIsNew ? "Discard" : "Remove"}
+                    </button>
+                    <button className="primary-button" type="button" disabled={saving || !ruleDirty} onClick={saveRule}>
+                      <Save size={14} /> {saving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                </header>
+                <div className="panel-body occupancy-form-grid">
+                  <Field label="What to check" hint={ruleMeta ? ruleMeta.explain : "This rule's check isn't recognized, so it never flags anything. You can remove it."}>
+                    {ruleIsNew ? (
+                      <select
+                        value={ruleDraft.ruleType}
+                        onChange={(e) => {
+                          const fresh = newFuelRuleDraft(e.target.value);
+                          setRuleDraft((c) => ({ ...fresh, severity: c.severity, enabled: c.enabled }));
+                        }}
+                      >
+                        {FUEL_RULE_TYPES.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+                      </select>
+                    ) : (
+                      <span className="fco-readonly">{fuelRuleTypeLabel(ruleDraft.ruleType)}</span>
+                    )}
+                  </Field>
+                  <Field label="Name">
+                    <input value={ruleDraft.name || ""} onChange={(e) => setRule({ name: e.target.value })} />
+                  </Field>
+                  {ruleMeta?.threshold ? (
+                    <Field label={`${ruleMeta.threshold.label} (${ruleMeta.threshold.unit})`}>
+                      <input
+                        type="number"
+                        min="1"
+                        value={ruleDraft.threshold || ruleMeta.threshold.defaultValue}
+                        onChange={(e) => setRule({ threshold: Number(e.target.value) || 0 })}
+                      />
+                    </Field>
+                  ) : null}
+                  <Field label="Priority when flagged">
+                    <select value={ruleDraft.severity || "medium"} onChange={(e) => setRule({ severity: e.target.value })}>
+                      {Object.entries(SEVERITY_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
                     </select>
                   </Field>
-                  <Field label="External vehicle ID">
-                    <input value={mapDraft.externalVehicleId} onChange={(e) => setMapDraft((c) => ({ ...c, externalVehicleId: e.target.value }))} />
+                  <Field label="Description" wide>
+                    <textarea rows={2} value={ruleDraft.description || ""} onChange={(e) => setRule({ description: e.target.value })} />
                   </Field>
+                  <label className="occupancy-primary-toggle">
+                    <input type="checkbox" checked={ruleDraft.enabled !== false} onChange={(e) => setRule({ enabled: e.target.checked })} />
+                    <span>
+                      Turned on
+                      <small className="fco-hint">When off, fuel entries are not checked for this.</small>
+                    </span>
+                  </label>
                 </div>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  disabled={saving || !mapDraft.externalVehicleId.trim()}
-                  onClick={async () => {
-                    setSaving(true);
-                    try {
-                      const saved = await saveTelematicsMapping(departmentId, {
-                        ...mapDraft,
-                        adapterId: selectedAdapterId,
-                      }, actor);
-                      setMappings((c) => [saved, ...c.filter((row) => row.id !== saved.id)]);
-                      setMapDraft((c) => ({ ...c, externalVehicleId: "" }));
-                      onMessage?.("Mapping saved.");
-                    } catch (err) {
-                      onError?.(err?.message || "Unable to save mapping.");
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                >
-                  Save mapping
-                </button>
-                <ul className="occupancy-timeline">
-                  {mappings.filter((row) => row.adapterId === selectedAdapterId).map((row) => (
-                    <li key={row.id}>
-                      <strong>{row.fleetNumber}</strong>
-                      <small>→ {row.externalVehicleId}</small>
-                    </li>
-                  ))}
-                </ul>
               </section>
-            </section>
-          ) : null}
-        </section>
+            ) : null}
+          </section>
+        </>
       ) : null}
+
+      <p className="fco-note">
+        Vehicle tracking integrations (Geotab, Samsara) are set up by FORGE Public Safety.
+        Contact us if your department uses one.
+      </p>
     </section>
   );
 }

@@ -26,6 +26,7 @@ import {
   transitionFleetWorkOrder,
   updateFleetWorkOrder,
 } from "../lib/fleet/index.js";
+import { activeOptionsWithSelected, firstActiveId } from "../lib/fleet/repairsConfig.js";
 
 function Field({ label, children }) {
   return (
@@ -107,7 +108,7 @@ export default function FleetWorkOrdersPage({
           || initialDefect?.fleetAssetId
           || nextAssets[0]?.id
           || "",
-        shopId: c.shopId || nextShops[0]?.id || "",
+        shopId: c.shopId || firstActiveId(nextShops),
         vendorId: c.vendorId || "",
         complaint: c.complaint || initialDefect?.description || "",
         priority: initialDefect?.severity === "critical" || initialDefect?.severity === "high"
@@ -174,7 +175,7 @@ export default function FleetWorkOrdersPage({
       }, actor);
       upsert(created);
       setShowCreate(false);
-      setCreateDraft({ ...emptyCreate, fleetAssetId: assets[0]?.id || "", shopId: shops[0]?.id || "" });
+      setCreateDraft({ ...emptyCreate, fleetAssetId: assets[0]?.id || "", shopId: firstActiveId(shops) });
       setMessage(`Work order ${created.workOrderNumber} created.`);
     } catch (createError) {
       setError(createError?.message || "Unable to create work order.");
@@ -572,7 +573,7 @@ export default function FleetWorkOrdersPage({
                     onChange={(e) => setCreateDraft((c) => ({ ...c, shopId: e.target.value }))}
                   >
                     <option value="">None</option>
-                    {shops.map((shop) => (
+                    {activeOptionsWithSelected(shops, createDraft.shopId).map((shop) => (
                       <option key={shop.id} value={shop.id}>{shop.name}</option>
                     ))}
                   </select>
@@ -583,7 +584,7 @@ export default function FleetWorkOrdersPage({
                     onChange={(e) => setCreateDraft((c) => ({ ...c, vendorId: e.target.value }))}
                   >
                     <option value="">None</option>
-                    {vendors.map((vendor) => (
+                    {activeOptionsWithSelected(vendors, createDraft.vendorId).map((vendor) => (
                       <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
                     ))}
                   </select>

@@ -1,0 +1,87 @@
+/* Maintenance Schedules tab (Fleet Configuration Studio). Scoped to .fleet-pm-builder. */
+.fleet-pm-builder { display: grid; gap: 12px; }
+.fleet-pm-builder .pm-intro {
+  margin: 0;
+  color: var(--rms-text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 80ch;
+}
+.fleet-pm-builder .pm-empty { margin: 10px; color: var(--rms-text-muted); font-size: 14px; }
+.fleet-pm-builder .pm-header-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.fleet-pm-builder .pm-editor { display: grid; gap: 14px; padding: 14px; overflow-x: visible; }
+.fleet-pm-builder .pm-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.fleet-pm-builder .pm-field { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.fleet-pm-builder .pm-field.wide { grid-column: 1 / -1; }
+.fleet-pm-builder .pm-field-label { color: var(--rms-text-muted); font-size: 13px; font-weight: 700; }
+.fleet-pm-builder .pm-field input,
+.fleet-pm-builder .pm-field select,
+.fleet-pm-builder .pm-field textarea {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--rms-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--rms-bg-input);
+  color: var(--rms-text-body);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.fleet-pm-builder .pm-input-unit { display: flex; align-items: center; gap: 8px; }
+.fleet-pm-builder .pm-input-unit input { flex: 1 1 auto; min-width: 0; }
+.fleet-pm-builder .pm-input-unit em {
+  flex: 0 0 auto;
+  font-style: normal;
+  font-size: 13px;
+  color: var(--rms-text-muted);
+  white-space: nowrap;
+}
+.fleet-pm-builder .pm-help { color: var(--rms-text-muted); font-size: 12.5px; line-height: 1.4; font-weight: 400; }
+.fleet-pm-builder .pm-warn { color: var(--rms-status-warning, #f59e0b); }
+.fleet-pm-builder .pm-section {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--rms-border);
+  min-width: 0;
+}
+.fleet-pm-builder .pm-section legend {
+  padding: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--rms-text-strong);
+}
+.fleet-pm-builder .pm-summary { margin: 0; font-size: 14px; color: var(--rms-text-body); }
+.fleet-pm-builder .pm-radio-row { display: flex; gap: 18px; flex-wrap: wrap; }
+.fleet-pm-builder .pm-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--rms-text-body);
+  cursor: pointer;
+}
+.fleet-pm-builder .pm-check input { width: 16px; height: 16px; margin: 0; }
+.fleet-pm-builder .pm-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px 12px;
+}
+.fleet-pm-builder .pm-remove-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--rms-border);
+}
+@media (max-width: 720px) {
+  .fleet-pm-builder .pm-grid { grid-template-columns: 1fr; }
+}

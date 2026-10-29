@@ -537,7 +537,8 @@ export default function FleetAccidentRiskPage({ onNavigate, legacyApparatus = []
                 </Field>
                 <Field label="Provider">
                   <select value={roadsideDraft.providerId} onChange={(e) => setRoadsideDraft((c) => ({ ...c, providerId: e.target.value }))}>
-                    {(board?.providers || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    <option value="">{(board?.providers || []).some((p) => p.active !== false) ? "Not chosen yet" : "No providers set up"}</option>
+                    {(board?.providers || []).filter((p) => p.active !== false).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </Field>
                 <Field label="Location"><input value={roadsideDraft.location} onChange={(e) => setRoadsideDraft((c) => ({ ...c, location: e.target.value }))} /></Field>

@@ -143,7 +143,9 @@ export default function FleetMigrationPanel({
             <button className="secondary-button" type="button" disabled={busy} onClick={() => runMigration(true)}>
               Dry run
             </button>
-            <button className="primary-button" type="button" disabled={busy} onClick={() => runMigration(false)}>
+            <button className="primary-button" type="button" disabled={busy} onClick={() => {
+              if (window.confirm("Copy the classic Apparatus list into fleet units now? Run a dry run first if you haven't.")) runMigration(false);
+            }}>
               Apply migration
             </button>
             <button className="secondary-button" type="button" disabled={busy} onClick={handleRollback}>
