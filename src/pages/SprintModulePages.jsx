@@ -65,6 +65,8 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
   const [lifecycleView, setLifecycleView] = useState("active");
   const [selectedId, setSelectedId] = useState("");
   const [showUpload, setShowUpload] = useState(false);
+  // When set, the upload attaches a file to this existing document instead of adding a new one.
+  const [attachToId, setAttachToId] = useState("");
   const [busyId, setBusyId] = useState("");
   const [notice, setNotice] = useState("");
   const [uploadMeta, setUploadMeta] = useState({ title: "", category: category || "Upload", description: "" });
@@ -133,6 +135,22 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
   function handleUploaded(uploaded) {
     const today = new Date().toISOString().slice(0, 10);
     const ext = String(uploaded.name || "").split(".").pop()?.toUpperCase() || "FILE";
+    const uploaderName = membership?.displayName || user?.displayName || user?.email || "Current User";
+    if (attachToId) {
+      const target = records.find((item) => item.id === attachToId);
+      setRecords((current) => current.map((item) => (item.id === attachToId ? {
+        ...item,
+        fileUrl: uploaded.downloadUrl,
+        storagePath: uploaded.storagePath,
+        fileType: ext,
+        uploadedBy: uploaderName,
+        uploadedDate: today,
+      } : item)));
+      setAttachToId("");
+      setShowUpload(false);
+      setNotice(`File attached to ${target?.title || "the document"}.`);
+      return;
+    }
     const next = withActiveLifecycle({
       id: `DOC-${Date.now()}`,
       title: uploadMeta.title.trim() || uploaded.name,
@@ -140,7 +158,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
       subcategory: "Uploads",
       version: "1.0",
       effectiveDate: today,
-      uploadedBy: "Current User",
+      uploadedBy: uploaderName,
       uploadedDate: today,
       fileType: ext,
       fileUrl: uploaded.downloadUrl,
@@ -171,7 +189,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
           </div>
         </div>
         {canEdit ? (
-          <button className="primary-button" type="button" onClick={() => setShowUpload(true)} disabled={!departmentId}>
+          <button className="primary-button" type="button" onClick={() => { setAttachToId(""); setShowUpload(true); }} disabled={!departmentId}>
             <Upload size={14} /> Upload Document
           </button>
         ) : null}
@@ -203,7 +221,12 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
               <button
                 key={item.id}
                 className={item.id === selected?.id ? "doc-row selected" : "doc-row"}
-                onClick={() => setSelectedId(item.id)}
+                onClick={() => {
+                  setSelectedId(item.id);
+                  if (window.innerWidth < 900) {
+                    requestAnimationFrame(() => document.getElementById("document-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+                  }
+                }}
               >
                 <strong>{item.title}</strong>
                 <small>{item.category} · v{item.version}</small>
@@ -214,6 +237,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
           </div>
         </Panel>
         {selected && (
+          <div id="document-detail">
           <Panel
             title="Document Detail"
             icon={BookOpen}
@@ -240,10 +264,26 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
               ))}
             </div>
             {selected.fileUrl && selected.fileUrl !== "#" ? (
-              <a className="primary-button" href={selected.fileUrl} target="_blank" rel="noreferrer" style={{ marginTop: 12, display: "inline-flex" }}>
-                Open Document
-              </a>
-            ) : null}
+              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <a className="primary-button" href={selected.fileUrl} target="_blank" rel="noreferrer" style={{ display: "inline-flex" }}>
+                  Open Document
+                </a>
+                {canEdit ? (
+                  <button className="secondary-button" type="button" onClick={() => { setAttachToId(selected.id); setShowUpload(true); }}>
+                    Replace file
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="document-missing-file" role="status">
+                <span>No file is attached to this document yet.</span>
+                {canEdit ? (
+                  <button className="primary-button" type="button" onClick={() => { setAttachToId(selected.id); setShowUpload(true); }} disabled={!departmentId}>
+                    Attach file
+                  </button>
+                ) : <span> Ask an administrator to add it.</span>}
+              </div>
+            )}
             {canEdit && isObjectVisibleInActiveList(selected) ? (
               <label className="inline-check" style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
                 <input
@@ -267,11 +307,15 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
               </div>
             ) : null}
           </Panel>
+          </div>
         )}
       </section>
       {showUpload && canEdit ? (
-        <Modal title="Upload Document" onClose={() => setShowUpload(false)}>
-          <div className="upload-form" style={{ marginBottom: 12 }}>
+        <Modal
+          title={attachToId ? `Attach file: ${records.find((item) => item.id === attachToId)?.title || "Document"}` : "Upload Document"}
+          onClose={() => { setShowUpload(false); setAttachToId(""); }}
+        >
+          {attachToId ? null : <div className="upload-form" style={{ marginBottom: 12 }}>
             <label>
               <span>Title</span>
               <input
@@ -299,7 +343,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
                 placeholder="Optional description"
               />
             </label>
-          </div>
+          </div>}
           <ObjectUploadField
             label="Upload to document library"
             hint="PDF, Office, or image files up to 12 MB"
@@ -308,7 +352,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
             onUploaded={handleUploaded}
           />
           <div className="modal-actions">
-            <button className="secondary-button" type="button" onClick={() => setShowUpload(false)}>Cancel</button>
+            <button className="secondary-button" type="button" onClick={() => { setShowUpload(false); setAttachToId(""); }}>Cancel</button>
           </div>
         </Modal>
       ) : null}
