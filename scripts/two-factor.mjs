@@ -126,16 +126,16 @@ async function main() {
   // Status
   const deadline = (await db.doc("platformConfig/main").get()).data()?.mfaAdminDeadline;
   console.log(`Authenticator-app codes:  ${await totpStatus()}`);
-  console.log(`Admin deadline:           ${deadline ? deadline.toDate().toISOString() : "not set (admins not required yet)"}\n`);
+  console.log(`Admin deadline:           ${deadline ? deadline.toDate().toISOString() : "not set (codes are optional)"}\n`);
 
-  console.log("Platform creators (always required):");
+  console.log("Platform creators (codes optional):");
   for (const doc of (await db.collection("platformCreators").get()).docs) {
     if (doc.data().status !== "active") continue;
     const f = await factorsFor(doc.id);
-    console.log(`  ${f.totp ? "[set up]   " : "[NOT SET UP]"} ${f.email}`);
+    console.log(`  ${f.totp ? "[set up]   " : "[not set up]"} ${f.email}`);
   }
 
-  console.log("\nDepartment admins (required after the deadline; demo exempt):");
+  console.log("\nDepartment admins (codes optional):");
   for (const dept of (await db.collection("platformDepartments").get()).docs) {
     if (dept.id === "forge-demo") continue;
     const members = await db.collection(`departments/${dept.id}/users`).where("status", "==", "active").get();
