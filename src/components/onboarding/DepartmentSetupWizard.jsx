@@ -51,8 +51,9 @@ export default function DepartmentSetupWizard({
 }) {
   const { entitlements } = useTenant();
   const { isCreator } = useAuth();
-  const savedStep = STEPS.findIndex((s) => s.id === settings?.onboarding?.step);
-  const [stepIndex, setStepIndex] = useState(savedStep > 0 ? savedStep : 0);
+  const setupFinished = Boolean(settings?.onboarding?.completedAt || settings?.onboardingCompletedAt);
+  const savedStep = setupFinished ? -1 : STEPS.findIndex((s) => s.id === settings?.onboarding?.step);
+  const [stepIndex, setStepIndex] = useState(savedStep > 0 && STEPS[savedStep]?.id !== "done" ? savedStep : 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -121,7 +122,7 @@ export default function DepartmentSetupWizard({
       await saveProfile({
         name: details.name.trim(),
         shortName: details.shortName.trim() || details.name.trim(),
-        displayTitle: details.name.trim(),
+        ...(profile.displayTitle ? {} : { displayTitle: details.name.trim() }),
         address: details.address.trim(),
         city: details.city.trim(),
         stateId: details.stateId,

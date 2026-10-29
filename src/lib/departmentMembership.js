@@ -135,11 +135,4 @@ export function membershipInitials(membership, user) {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function formatRoleLabel(role = "", membership = {}) {
-  if (membership?.isPlatformCreator || role === "creator") return "Creator";
-  const normalizedRole = String(role || "member");
-  return normalizedRole
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
+export { formatRoleLabel } from "./roleLabels.js";

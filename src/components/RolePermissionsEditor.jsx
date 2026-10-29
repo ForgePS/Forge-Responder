@@ -40,7 +40,7 @@ function buildRoleMeta(roles = []) {
 
 export default function RolePermissionsEditor({ onMessage }) {
   const { departmentId } = useTenant();
-  const { user, membership } = useAuth();
+  const { user, membership, isCreator } = useAuth();
   const [roles, setRoles] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [roleMeta, setRoleMeta] = useState({});
@@ -168,7 +168,7 @@ export default function RolePermissionsEditor({ onMessage }) {
     setSavingAll(true);
     try {
       const savedRoles = [];
-      for (const role of roles) {
+      for (const role of roles.filter((item) => isCreator || item.id !== "creator")) {
         const permissions = role.id === "creator"
           ? { ...CREATOR_PERMISSIONS }
           : withLockedAdminPermissions(role.id, clonePermissions(drafts[role.id]));
@@ -298,7 +298,7 @@ export default function RolePermissionsEditor({ onMessage }) {
       </div>
 
       <div className="role-permissions-list">
-        {roles.map((role) => {
+        {roles.filter((role) => isCreator || role.id !== "creator").map((role) => {
           const isCreatorRole = role.id === "creator";
           const isCustomRole = !isBuiltinRole(role.id);
           const draft = drafts[role.id] || {};
@@ -367,6 +367,7 @@ export default function RolePermissionsEditor({ onMessage }) {
               <PermissionGroupGrid
                 draft={draft}
                 disabled={isCreatorRole}
+                showPlatform={isCreator}
                 onToggle={(permissionKey) => togglePermission(role.id, permissionKey)}
                 onSetGroup={(keys, enabled) => setGroupPermissions(role.id, keys, enabled)}
               />

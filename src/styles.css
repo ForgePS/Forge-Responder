@@ -3708,3 +3708,12 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
 .call-shift-offers .panel-header strong { display: inline-flex; align-items: center; gap: 6px; }
 .call-shift-offers .inline-actions button.active { background: var(--rms-primary, #25a194); color: #fff; border-color: transparent; }
 .employee-apparatus-check { display: grid; gap: 8px; }
+
+.field-hint { display: block; margin-top: 4px; color: var(--rms-text-muted); font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; line-height: 1.35; }
+.audit-log-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; overflow: visible; }
+.audit-log-search { display: flex; align-items: center; gap: 6px; flex: 1 1 220px; padding: 0 8px; border: 1px solid var(--rms-border, rgba(148,163,184,.3)); border-radius: 5px; background: var(--rms-bg-input); }
+.audit-log-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; padding: 7px 0; outline: none; }
+.audit-log-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--rms-text-muted); }
+/* Activity Log: scroll sideways on narrow screens instead of cutting off Details. */
+.admin-audit-table { overflow-x: auto; }
+.admin-audit-row { grid-template-columns: 130px minmax(110px, 1fr) minmax(110px, .9fr) minmax(90px, .8fr) minmax(220px, 2.4fr); min-width: 720px; }

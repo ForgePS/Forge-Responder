@@ -36,7 +36,7 @@ export default function UserPermissionsEditor({
   onOpenEmployeeProfile,
 }) {
   const { departmentId } = useTenant();
-  const { user: authUser, membership: authMembership, patchMembership } = useAuth();
+  const { user: authUser, membership: authMembership, patchMembership, isCreator: viewerIsCreator } = useAuth();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [rolesById, setRolesById] = useState({});
@@ -68,7 +68,10 @@ export default function UserPermissionsEditor({
         listRecords(departmentId, "users"),
         loadRolesMap(departmentId)
       ]);
-      const sortedUsers = [...nextUsers].sort((a, b) =>
+      // FORGE staff (platform creators) aren't department users; only creators see them.
+      const sortedUsers = [...nextUsers].filter((item) => viewerIsCreator || !(
+        item.isPlatformCreator || item.role === "creator" || (item.roleIds || []).includes("creator")
+      )).sort((a, b) =>
         String(a.displayName || a.email || a.id).localeCompare(String(b.displayName || b.email || b.id))
       );
       setRoles(nextRoles.filter((role) => role.id !== "creator"));
@@ -381,6 +384,7 @@ export default function UserPermissionsEditor({
           <PermissionGroupGrid
             draft={isCreatorUser ? CREATOR_PERMISSIONS : draft.permissions}
             disabled={isCreatorUser}
+            showPlatform={viewerIsCreator}
             onToggle={togglePermission}
             onSetGroup={setGroupPermissions}
           />

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { ADMIN_MODULE_OPTIONS } from "../data/adminRegistry.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import DepartmentStateSelect from "./DepartmentStateSelect.jsx";
 import { isValidTimezone } from "../lib/timezone.js";
 import { useTenant } from "../context/TenantContext.jsx";
 import { writeAuditLog } from "../lib/auditService.js";
@@ -41,6 +42,9 @@ const emptyProfileForm = {
   contactEmail: "",
   contactPhone: "",
   address: "",
+  city: "",
+  stateId: "",
+  zip: "",
   timezone: "America/Chicago",
   shifts: "",
 };
@@ -81,7 +85,6 @@ const DEPARTMENT_CONFIG_SECTIONS = [
   { id: "scheduling-apparatus", label: "Roster Apparatus" },
   { id: "crew-slots", label: "Crew Positions" },
   { id: "modules", label: "Enabled Modules" },
-  { id: "summary", label: "Summary" },
   { id: "subscription", label: "Subscription" },
 ];
 
@@ -127,6 +130,9 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
       contactEmail: profile.contactEmail || "",
       contactPhone: profile.contactPhone || "",
       address: profile.address || "",
+      city: profile.city || "",
+      stateId: profile.stateId || "",
+      zip: profile.zip || "",
       timezone: profile.timezone || "America/Chicago",
       shifts: toCommaField(profile.shifts),
     });
@@ -199,6 +205,9 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
         contactEmail: profileForm.contactEmail.trim(),
         contactPhone: profileForm.contactPhone.trim(),
         address: profileForm.address.trim(),
+        city: profileForm.city.trim(),
+        stateId: profileForm.stateId,
+        zip: profileForm.zip.trim(),
         timezone: isValidTimezone(profileForm.timezone.trim()) ? profileForm.timezone.trim() : "America/Chicago",
         stations: stationNamesFromDetails(normalizedStations),
         stationDetails: normalizedStations,
@@ -296,11 +305,12 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
       >
         {activeSection === "branding" ? (
           <div className="workflow-form">
-            <label><span>Top Bar Title</span><input value={profileForm.displayTitle} onChange={(e) => setProfileForm({ ...profileForm, displayTitle: e.target.value })} placeholder="Your Fire/EMS Department" /></label>
-            <label><span>Department Name</span><input value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} /></label>
-            <label><span>Short Name</span><input value={profileForm.shortName} onChange={(e) => setProfileForm({ ...profileForm, shortName: e.target.value })} /></label>
-            <label><span>Theme Name</span><input value={profileForm.themeName} onChange={(e) => setProfileForm({ ...profileForm, themeName: e.target.value })} /></label>
-            <label><span>Branch Label</span><input value={profileForm.branchLabel} onChange={(e) => setProfileForm({ ...profileForm, branchLabel: e.target.value })} /></label>
+            <label><span>Department Name</span><input value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} placeholder="Riverside Fire & EMS" /><small className="field-hint">Your full official name, used on reports and the sign-in page.</small></label>
+            <label><span>Short Name</span><input value={profileForm.shortName} onChange={(e) => setProfileForm({ ...profileForm, shortName: e.target.value })} placeholder="Riverside FD" /><small className="field-hint">Used where space is tight, like the menu and emails.</small></label>
+            <label><span>Top Bar Title</span><input value={profileForm.displayTitle} onChange={(e) => setProfileForm({ ...profileForm, displayTitle: e.target.value })} placeholder="Same as Department Name" /><small className="field-hint">The large title at the top of every page. Leave blank to use the department name.</small></label>
+            {isCreator ? (
+              <label><span>Branch Label (FORGE staff)</span><input value={profileForm.branchLabel} onChange={(e) => setProfileForm({ ...profileForm, branchLabel: e.target.value })} /><small className="field-hint">Shown only in the platform workspace.</small></label>
+            ) : null}
             <div className="wide-field" style={{ display: "grid", gap: "10px" }}>
               <span>Department logo</span>
               <ObjectUploadField
@@ -316,18 +326,23 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
                 }}
                 disabled={!departmentId || saving}
               />
-              <label className="wide-field" style={{ margin: 0 }}>
-                <span>Logo URL (optional override)</span>
-                <input
-                  value={profileForm.logoUrl}
-                  onChange={(e) => setProfileForm({ ...profileForm, logoUrl: e.target.value })}
-                  placeholder="Upload above or paste a logo URL"
-                />
-              </label>
+              {profileForm.logoUrl ? (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  style={{ justifySelf: "start" }}
+                  onClick={() => setProfileForm((current) => ({ ...current, logoUrl: "" }))}
+                >
+                  Remove logo
+                </button>
+              ) : null}
             </div>
-            <label><span>Contact Email</span><input value={profileForm.contactEmail} onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })} /></label>
-            <label><span>Contact Phone</span><input value={profileForm.contactPhone} onChange={(e) => setProfileForm({ ...profileForm, contactPhone: e.target.value })} /></label>
-            <label className="wide-field"><span>Address</span><input value={profileForm.address} onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })} /></label>
+            <label><span>Contact Email</span><input type="email" value={profileForm.contactEmail} onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })} /></label>
+            <label><span>Contact Phone</span><input type="tel" inputMode="tel" value={profileForm.contactPhone} onChange={(e) => setProfileForm({ ...profileForm, contactPhone: e.target.value })} /></label>
+            <label className="wide-field"><span>Street Address</span><input value={profileForm.address} onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })} /></label>
+            <label><span>City</span><input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} /></label>
+            <label><span>State</span><DepartmentStateSelect value={profileForm.stateId} onChange={(value) => setProfileForm({ ...profileForm, stateId: value })} /></label>
+            <label><span>ZIP</span><input inputMode="numeric" value={profileForm.zip} onChange={(e) => setProfileForm({ ...profileForm, zip: e.target.value })} /></label>
             <label><span>Timezone</span>
               <select value={profileForm.timezone || "America/Chicago"} onChange={(e) => setProfileForm({ ...profileForm, timezone: e.target.value })}>
                 {timezoneOptions(profileForm.timezone).map(([value, label]) => (
@@ -335,7 +350,7 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
                 ))}
               </select>
             </label>
-            <label className="wide-field"><span>Shifts (comma-separated)</span><input value={profileForm.shifts} onChange={(e) => setProfileForm({ ...profileForm, shifts: e.target.value })} /></label>
+            <label className="wide-field"><span>Shift names (separate with commas, e.g. A, B, C)</span><input value={profileForm.shifts} onChange={(e) => setProfileForm({ ...profileForm, shifts: e.target.value })} /></label>
           </div>
         ) : null}
 
@@ -453,7 +468,7 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
             <p className="auth-help">
               {canManageModules
                 ? "Only modules enabled on the FORGE platform can be assigned here."
-                : "Module access for this branch is managed by the FORGE platform creator. Contact your platform administrator to change enabled modules."}
+                : "Your plan sets which modules are turned on. Contact FORGE Public Safety to add or remove one."}
             </p>
             {moduleOptions.map((module) => (
               <label key={module.key} className="permission-toggle permission-check">
@@ -466,13 +481,6 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
                 <span>{module.label}</span>
               </label>
             ))}
-          </div>
-        ) : null}
-
-        {activeSection === "summary" ? (
-          <div className="cert-detail-grid">
-            <div><span>Department ID</span><strong>{departmentId}</strong></div>
-            <div><span>Enabled Modules</span><strong>{enabledModules.length}</strong></div>
           </div>
         ) : null}
 
@@ -489,11 +497,13 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
         ) : null}
       </div>
 
-      <div className="modal-actions">
-        <button className="primary-button" type="button" onClick={saveConfig} disabled={saving}>
-          <Check size={14} /> {saving ? "Saving..." : "Save Department Config"}
-        </button>
-      </div>
+      {activeSection === "subscription" || (activeSection === "modules" && !canManageModules) ? null : (
+        <div className="modal-actions">
+          <button className="primary-button" type="button" onClick={saveConfig} disabled={saving}>
+            <Check size={14} /> {saving ? "Saving..." : "Save changes"}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

@@ -3,10 +3,11 @@ import { ADMIN_PERMISSION_GROUPS, formatPermissionLabel } from "../data/adminReg
 export default function PermissionGroupGrid({
   draft = {},
   disabled = false,
+  showPlatform = false,
   onToggle,
   onSetGroup
 }) {
-  return ADMIN_PERMISSION_GROUPS.map((group) => (
+  return ADMIN_PERMISSION_GROUPS.filter((group) => showPlatform || group.label !== "Platform").map((group) => (
     <section className="role-permissions-group" key={group.label}>
       <div className="role-permissions-group-head">
         <strong>{group.label}</strong>

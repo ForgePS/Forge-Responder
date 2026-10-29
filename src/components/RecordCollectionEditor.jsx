@@ -41,7 +41,9 @@ export default function RecordCollectionEditor({
   const { departmentId } = useTenant();
   const { user, membership, isCreator } = useAuth();
   const { refreshDropdowns } = useDropdowns();
-  const [collectionName, setCollectionName] = useState(initialCollection);
+  const [collectionName, setCollectionName] = useState(
+    !isCreator && ["users", "roles"].includes(initialCollection) ? "dropdowns" : initialCollection
+  );
   const [rows, setRows] = useState([]);
   const [columnKeys, setColumnKeys] = useState(["id"]);
   const [roles, setRoles] = useState([]);
@@ -216,7 +218,7 @@ export default function RecordCollectionEditor({
         <label>
           <span>Record collection</span>
           <select value={collectionName} onChange={(event) => setCollectionName(event.target.value)}>
-            {ADMIN_COLLECTIONS.map((collection) => (
+            {ADMIN_COLLECTIONS.filter((collection) => isCreator || !["users", "roles"].includes(collection.key)).map((collection) => (
               <option key={collection.key} value={collection.key}>
                 {collection.label}
               </option>

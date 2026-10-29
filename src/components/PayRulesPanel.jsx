@@ -74,7 +74,7 @@ export default function PayRulesPanel({
       <header className="employee-portal-rules-heading">
         <strong>Pay, Overtime &amp; Holiday Rules</strong>
         <p className="auth-help">
-          Configure how the employee time card calculates regular hours, holiday pay, and overtime for this branch.
+          Configure how the employee time card calculates regular hours, holiday pay, and overtime for your department.
         </p>
       </header>
 

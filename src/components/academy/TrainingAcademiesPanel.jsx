@@ -44,6 +44,7 @@ export default function TrainingAcademiesPanel({
   departmentId = "",
   canConfigure = false,
   canView = true,
+  canMigrateLegacy = false,
 }) {
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -207,17 +208,18 @@ export default function TrainingAcademiesPanel({
         <div>
           <h3>Training Academies</h3>
           <p className="muted">
-            Department-scoped academy connections. Forge Academy is optional — each department
-            chooses whether and how to connect.
+            Connect FORGE Academy to show members their classes and training records. Optional.
           </p>
         </div>
         <div className="admin-integration-card__actions">
           {canConfigure ? (
             <>
-              <button type="button" className="btn-secondary" onClick={openCreate} disabled={Boolean(busy)}>
-                Add another academy
-              </button>
-              <button
+              {connections.length ? (
+                <button type="button" className="btn-secondary" onClick={openCreate} disabled={Boolean(busy)}>
+                  Add another academy
+                </button>
+              ) : null}
+              {canMigrateLegacy ? <button
                 type="button"
                 className="btn-secondary"
                 disabled={Boolean(busy)}
@@ -230,7 +232,7 @@ export default function TrainingAcademiesPanel({
                 }
               >
                 Migrate legacy Hub settings
-              </button>
+              </button> : null}
             </>
           ) : null}
         </div>

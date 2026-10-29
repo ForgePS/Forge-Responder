@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Database, KeyRound, LayoutGrid, Settings, ShieldCheck, Wand2, X } from "lucide-react";
+import { ChevronDown, Database, History, KeyRound, LayoutGrid, Settings, ShieldCheck, Wand2, X } from "lucide-react";
 import DataEditorPanel from "../components/DataEditorPanel.jsx";
 import DepartmentConfigPanel from "../components/DepartmentConfigPanel.jsx";
 import GoogleApisIntegrationPanel from "../components/digitalDashboard/GoogleApisIntegrationPanel.jsx";
@@ -12,7 +12,8 @@ import SubscriptionExpiryBanner from "../components/SubscriptionExpiryBanner.jsx
 import UserPermissionsEditor from "../components/UserPermissionsEditor.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
-import { listAuditLogs } from "../lib/auditService.js";
+import AuditLogPanel from "../components/AuditLogPanel.jsx";
+import { isPlatformScope } from "../lib/tenantPaths.js";
 import { listRecords } from "../lib/firestoreService.js";
 import { canManagePlatformSecrets, hasPermission } from "../lib/permissions.js";
 import { ensureDefaultRoles } from "../lib/roleService.js";
@@ -66,10 +67,8 @@ export default function AdminControlCenterPage({
     const isError = tone === "error" || (!tone && /^(failed|couldn't|could not|can't|cannot|save failed|unable)/i.test(value));
     setBanner({ text: value, tone: isError ? "error" : "success" });
   }
-  const [loading, setLoading] = useState(true);
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [auditFilter, setAuditFilter] = useState("All");
-  const [stats, setStats] = useState({ users: 0, roles: 0, dropdowns: 0, notifications: 0 });
+  const [stats, setStats] = useState(null);
+  const inPlatformScope = isPlatformScope(departmentId);
 
   function toggleSection(sectionId) {
     setOpenSections((current) => {
@@ -84,31 +83,27 @@ export default function AdminControlCenterPage({
     return openSections.has(sectionId);
   }
 
-  async function reload() {
-    setLoading(true);
+  async function loadStats() {
+    if (!departmentId || inPlatformScope) return;
     try {
-      const [nextRoles, nextAudit, users, dropdowns, notifications] = await Promise.all([
+      const [nextRoles, users] = await Promise.all([
         ensureDefaultRoles(departmentId),
-        listAuditLogs(departmentId, { module: auditFilter }),
         listRecords(departmentId, "users"),
-        listRecords(departmentId, "dropdowns"),
-        listRecords(departmentId, "notifications")
       ]);
-      setAuditLogs(nextAudit);
+      const isStaff = (item) => item.isPlatformCreator || item.role === "creator" || (item.roleIds || []).includes("creator");
       setStats({
-        users: users.length,
-        roles: nextRoles.length,
-        dropdowns: dropdowns.length,
-        notifications: notifications.length
+        users: users.filter((item) => isCreator || !isStaff(item)).length,
+        roles: nextRoles.filter((role) => isCreator || role.id !== "creator").length,
       });
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error("Failed to load admin stats", error);
+      setStats(null);
     }
   }
 
   useEffect(() => {
-    reload();
-  }, [departmentId, auditFilter]);
+    loadStats();
+  }, [departmentId]);
 
   return (
     <div className="module-page admin-page">
@@ -117,16 +112,18 @@ export default function AdminControlCenterPage({
           <span className="module-icon"><Settings size={22} /></span>
           <div>
             <h1>System Admin</h1>
-            <p>Department settings, module data, users, roles, and permissions. Open a section below to manage it.</p>
+            <p>Your department's settings, people and their access, connected services, and activity. Open a section to manage it.</p>
           </div>
         </div>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => window.dispatchEvent(new CustomEvent("forge:open-setup-wizard"))}
-        >
-          <Wand2 size={14} /> Run setup wizard
-        </button>
+        {inPlatformScope ? null : (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => window.dispatchEvent(new CustomEvent("forge:open-setup-wizard"))}
+          >
+            <Wand2 size={14} /> Run setup wizard
+          </button>
+        )}
       </section>
 
       {message && (
@@ -141,12 +138,12 @@ export default function AdminControlCenterPage({
         departmentName={profile?.shortName || profile?.name}
       />
 
-      <div className="admin-stats-strip">
-        <span>{stats.users} users</span>
-        <span>{stats.roles} roles</span>
-        <span>{stats.dropdowns} dropdowns</span>
-        <span>{stats.notifications} notifications</span>
-      </div>
+      {stats ? (
+        <div className="admin-stats-strip">
+          <span>{stats.users} {stats.users === 1 ? "person has" : "people have"} access</span>
+          <span>{stats.roles} roles</span>
+        </div>
+      ) : null}
 
       <section className="admin-sections">
         <AdminSectionPill
@@ -185,23 +182,26 @@ export default function AdminControlCenterPage({
               departmentId={departmentId}
               canView={canViewAcademyIntegrations}
               canConfigure={canManageAcademyIntegrations}
+              canMigrateLegacy={isCreator}
             />
           </div>
         </AdminSectionPill>
 
-        <AdminSectionPill
-          id="modules"
-          label="Module Data"
-          icon={Database}
-          isOpen={isOpen("modules")}
-          onToggle={toggleSection}
-        >
-          <DataEditorPanel onMessage={setMessage} />
-        </AdminSectionPill>
+        {isCreator ? (
+          <AdminSectionPill
+            id="modules"
+            label="Module Data (FORGE staff)"
+            icon={Database}
+            isOpen={isOpen("modules")}
+            onToggle={toggleSection}
+          >
+            <DataEditorPanel onMessage={setMessage} />
+          </AdminSectionPill>
+        ) : null}
 
         <AdminSectionPill
           id="records"
-          label="System Records"
+          label={isCreator ? "System Records" : "Dropdown Lists & Notifications"}
           icon={LayoutGrid}
           isOpen={isOpen("records")}
           onToggle={toggleSection}
@@ -258,39 +258,12 @@ export default function AdminControlCenterPage({
 
         <AdminSectionPill
           id="audit"
-          label="Audit Logs"
-          icon={ShieldCheck}
+          label="Activity Log"
+          icon={History}
           isOpen={isOpen("audit")}
           onToggle={toggleSection}
         >
-          {loading ? (
-            <p className="auth-help">Loading audit logs…</p>
-          ) : (
-            <>
-              <div className="admin-filter-bar">
-                <div className="segmented-control admin-filter-control">
-                  {["All", "Personnel", "Users", "Roles", "Dropdowns", "Data Editor", "System Admin", "Employee Portal"].map((item) => (
-                    <button key={item} type="button" className={auditFilter === item ? "active" : ""} onClick={() => setAuditFilter(item)}>{item}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="admin-audit-table">
-                <div className="admin-audit-row admin-audit-head">
-                  <span>When</span><span>Actor</span><span>Action</span><span>Module</span><span>Summary</span>
-                </div>
-                {auditLogs.map((log) => (
-                  <div className="admin-audit-row" key={log.id}>
-                    <span>{String(log.created_at || log.createdAt || "").slice(0, 19)}</span>
-                    <span>{log.actorName}</span>
-                    <span>{log.action}</span>
-                    <span>{log.module}</span>
-                    <span>{log.summary}</span>
-                  </div>
-                ))}
-                {!auditLogs.length && <p className="empty-table">No audit logs yet.</p>}
-              </div>
-            </>
-          )}
+          <AuditLogPanel departmentId={departmentId} />
         </AdminSectionPill>
       </section>
     </div>

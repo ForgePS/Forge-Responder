@@ -242,12 +242,17 @@ async function createInvite(db, request) {
     });
   await db.doc(`invites/${inviteId}`).update({ emailStatus });
 
+  const createdIso = new Date().toISOString();
   await db.collection(`departments/${departmentId}/auditLogs`).add({
     action: "invite.created",
+    module: "Users",
     actorUid: request.auth.uid,
+    actorName: request.auth.token?.name || request.auth.token?.email || "Administrator",
+    summary: `Invited ${email}`,
     target: email,
     roleIds,
-    createdAt: new Date().toISOString(),
+    created_at: createdIso,
+    createdAt: createdIso,
   });
 
   return { inviteId, inviteUrl, emailStatus, expiresAt: expiresAt.toDate().toISOString() };
@@ -263,6 +268,17 @@ async function revokeInvite(db, request) {
   await assertDepartmentAdmin(db, invite.departmentId, request.auth);
   if (invite.status !== "pending") return { status: invite.status };
   await ref.update({ status: "revoked", revokedAt: Timestamp.now(), revokedBy: request.auth.uid });
+  const revokedIso = new Date().toISOString();
+  await db.collection(`departments/${invite.departmentId}/auditLogs`).add({
+    action: "invite.revoked",
+    module: "Users",
+    actorUid: request.auth.uid,
+    actorName: request.auth.token?.name || request.auth.token?.email || "Administrator",
+    summary: `Cancelled the invite for ${invite.email}`,
+    target: invite.email,
+    created_at: revokedIso,
+    createdAt: revokedIso,
+  });
   return { status: "revoked" };
 }
 
@@ -346,9 +362,13 @@ async function acceptInvite(db, request) {
     tx.update(ref, { status: "accepted", acceptedAt: Timestamp.now(), acceptedBy: uid });
     tx.set(db.collection(`departments/${invite.departmentId}/auditLogs`).doc(), {
       action: "invite.accepted",
+      module: "Users",
       actorUid: uid,
+      actorName: membership.displayName || userEmail,
+      summary: `${userEmail} accepted their invite`,
       target: userEmail,
       roleIds: membership.roleIds,
+      created_at: nowIso,
       createdAt: nowIso,
     });
     return { departmentId: invite.departmentId, departmentName: invite.departmentName };

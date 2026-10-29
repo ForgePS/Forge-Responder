@@ -127,7 +127,7 @@ export default function Active911IntegrationPanel({
           <h3>Active911 Integration</h3>
           <p className="dd-panel-subtitle">
             {variant === "admin"
-              ? "Connect with Active911 user credentials — individual API, no OAuth secret questions. Restricted to platform creator and super admin."
+              ? "Brings Active911 dispatch alerts into your dashboards. Set up by FORGE Public Safety."
               : "Sync dispatch alerts into Digital Dashboard media and playlists."}
           </p>
         </div>
@@ -148,7 +148,7 @@ export default function Active911IntegrationPanel({
 
         {!canConfigure && variant === "admin" ? (
           <p className="dd-empty-detail">
-            Active911 credentials are managed here by the platform creator or super admin only.
+            FORGE Public Safety connects Active911 for you. Contact us to set it up or change the account.
           </p>
         ) : null}
 
