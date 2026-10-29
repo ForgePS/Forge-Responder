@@ -3717,3 +3717,11 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
 /* Activity Log: scroll sideways on narrow screens instead of cutting off Details. */
 .admin-audit-table { overflow-x: auto; }
 .admin-audit-row { grid-template-columns: 130px minmax(110px, 1fr) minmax(110px, .9fr) minmax(90px, .8fr) minmax(220px, 2.4fr); min-width: 720px; }
+.department-config-actions { align-items: center; gap: 8px; }
+.unsaved-chip { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(245,158,11,.45); background: rgba(245,158,11,.12); color: #fbbf24; font-size: 12px; font-weight: 600; margin-right: auto; }
+.admin-section-description { margin: 4px 0 0 4px; color: var(--rms-text-muted); font-size: 13px; }
+.role-permissions-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; color: var(--rms-text-muted); font-size: 13px; }
+.role-permissions-summary .unsaved-chip { margin-right: 0; }
+.role-permissions-summary .text-button { margin-left: auto; }
+.role-permission-search { max-width: 360px; margin: 6px 0; }
+.user-picker-search { max-width: 260px; }

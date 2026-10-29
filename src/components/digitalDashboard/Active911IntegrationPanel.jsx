@@ -80,6 +80,7 @@ export default function Active911IntegrationPanel({
 
   async function handleDisconnect() {
     if (!canConfigure) return;
+    if (!window.confirm("Disconnect Active911? Dispatch alerts stop coming into your dashboards until it's connected again.")) return;
     setBusy("disconnect");
     setError("");
     try {

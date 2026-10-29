@@ -328,7 +328,7 @@ export default function TrainingAcademiesPanel({
                       className="btn-secondary"
                       disabled={Boolean(busy)}
                       onClick={() =>
-                        runAction(
+                        window.confirm("Pause this academy connection? Nothing is deleted; you can turn it back on.") && runAction(
                           `disable-${connection.connectionId}`,
                           () => disableAcademyConnection(departmentId, connection.connectionId),
                           "Connection disabled."
@@ -342,7 +342,7 @@ export default function TrainingAcademiesPanel({
                       className="btn-secondary"
                       disabled={Boolean(busy)}
                       onClick={() =>
-                        runAction(
+                        window.confirm("Disconnect this academy? Its saved login details are deleted and the Academy menu item is hidden until you connect again.") && runAction(
                           `disconnect-${connection.connectionId}`,
                           () => disconnectAcademyConnection(departmentId, connection.connectionId),
                           "Connection disconnected."

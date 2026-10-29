@@ -96,7 +96,7 @@ const emptyForgeAcademy = {
   forgeDepartmentId: "forge-platform",
 };
 
-export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
+export default function DepartmentConfigPanel({ onMessage, apparatus = [], sectionIds = null, onDirtyChange }) {
   const { departmentId, profile, settings, platformConfig, refreshDepartment } = useTenant();
   const { user, membership, isCreator, permissions } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -110,6 +110,8 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
   const [schedulingSettings, setSchedulingSettings] = useState(normalizeSchedulingSettings());
   const [stationDetails, setStationDetails] = useState([]);
   const [forgeAcademy, setForgeAcademy] = useState(emptyForgeAcademy);
+  const [baseline, setBaseline] = useState(null);
+  const [loadVersion, setLoadVersion] = useState(0);
   const fleetUnits = useMemo(
     () => (Array.isArray(apparatus) ? apparatus : []).map((unit) => unit?.unit).filter(Boolean),
     [apparatus]
@@ -147,7 +149,23 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
       ...emptyForgeAcademy,
       ...(settings.forgeAcademy || {}),
     });
+    // The baseline is taken on the render that shows these values.
+    setLoadVersion((version) => version + 1);
   }, [profile, settings, departmentId, fleetUnits]);
+
+  // Unsaved-changes tracking: compare the form with what was last loaded.
+  const formSnapshot = JSON.stringify({
+    profileForm, enabledModules, shiftRotation, payPeriod, portalRules,
+    payRules, schedulingSettings, stationDetails, forgeAcademy,
+  });
+  useEffect(() => {
+    if (loadVersion) setBaseline(formSnapshot);
+  }, [loadVersion]);
+  const isDirty = baseline !== null && formSnapshot !== baseline;
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   const moduleOptions = ADMIN_MODULE_OPTIONS.filter((module) => {
     const available = resolveAvailableModules(platformConfig?.availableModules);
@@ -168,8 +186,9 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
     () => DEPARTMENT_CONFIG_SECTIONS.filter((section) => (
       (section.id !== "subscription" || canViewSubscription)
       && (section.id !== "academy" || isCreator)
+      && (!sectionIds || sectionIds.includes(section.id))
     )),
-    [canViewSubscription, isCreator]
+    [canViewSubscription, isCreator, sectionIds]
   );
 
   useEffect(() => {
@@ -268,8 +287,9 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
         actorName: membership?.displayName || user?.email
       });
 
+      setBaseline(formSnapshot);
       await refreshDepartment?.();
-      onMessage?.("Department configuration saved");
+      onMessage?.("Changes saved");
     } catch (error) {
       console.error("Failed to save department config", error);
       onMessage?.("Save failed — check permissions and try again");
@@ -498,7 +518,23 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [] }) {
       </div>
 
       {activeSection === "subscription" || (activeSection === "modules" && !canManageModules) ? null : (
-        <div className="modal-actions">
+        <div className="modal-actions department-config-actions">
+          {isDirty ? <span className="unsaved-chip" role="status">Unsaved changes</span> : null}
+          {isDirty ? (
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={saving}
+              onClick={() => {
+                if (window.confirm("Discard your unsaved changes?")) {
+                  refreshDepartment?.();
+                  setBaseline(null);
+                }
+              }}
+            >
+              Discard
+            </button>
+          ) : null}
           <button className="primary-button" type="button" onClick={saveConfig} disabled={saving}>
             <Check size={14} /> {saving ? "Saving..." : "Save changes"}
           </button>

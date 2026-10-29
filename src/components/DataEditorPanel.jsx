@@ -33,7 +33,7 @@ const DEFAULT_COLUMNS = {
   "hlfd-rms-assets": ["id", "name", "category", "serial", "location", "assigned", "inspection", "value", "status"],
 };
 
-export default function DataEditorPanel({ onMessage }) {
+export default function DataEditorPanel({ onMessage, onDirtyChange }) {
   const { departmentId, isPlatformScope: inPlatformScope } = useTenant();
   // Module data always belongs to a department; none is editable in platform scope.
   const dataDepartmentId = inPlatformScope ? "" : departmentId;
@@ -46,6 +46,10 @@ export default function DataEditorPanel({ onMessage }) {
   // If loading fails the editor is empty; saving then would delete every stored record.
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadedCount, setLoadedCount] = useState(0);
+  const [loadedSnapshot, setLoadedSnapshot] = useState("");
+  const isDirty = !loading && !loadFailed && loadedSnapshot !== "" && JSON.stringify(stripRowKeys(rows)) !== loadedSnapshot;
+  useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   const columns = useMemo(() => orderColumns(columnKeys, datasetKey), [columnKeys, datasetKey]);
   const activeDataset = MODULE_DATASETS.find((item) => item.key === datasetKey);
@@ -63,6 +67,7 @@ export default function DataEditorPanel({ onMessage }) {
       setRows(keyedRows);
       setLoadFailed(false);
       setLoadedCount(keyedRows.length);
+      setLoadedSnapshot(JSON.stringify(stripRowKeys(keyedRows)));
       setColumnKeys(orderColumns(collectColumns(keyedRows), datasetKey));
     } catch (error) {
       console.error(`Failed to load dataset ${datasetKey}`, error);
@@ -152,7 +157,13 @@ export default function DataEditorPanel({ onMessage }) {
       <div className="data-editor-toolbar">
         <label>
           <span>Module dataset</span>
-          <select value={datasetKey} onChange={(event) => setDatasetKey(event.target.value)}>
+          <select
+            value={datasetKey}
+            onChange={(event) => {
+              if (isDirty && !window.confirm("You have unsaved changes in this dataset. Switch without saving?")) return;
+              setDatasetKey(event.target.value);
+            }}
+          >
             {MODULE_DATASETS.map((dataset) => (
               <option key={dataset.key} value={dataset.key}>
                 {dataset.group} · {dataset.label}

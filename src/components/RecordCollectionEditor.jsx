@@ -37,12 +37,13 @@ export default function RecordCollectionEditor({
   onOpenPersonnelProfile,
   onOpenEmployeeProfile,
   onInviteSomeone,
+  onDirtyChange,
 }) {
   const { departmentId } = useTenant();
   const { user, membership, isCreator } = useAuth();
   const { refreshDropdowns } = useDropdowns();
   const [collectionName, setCollectionName] = useState(
-    !isCreator && ["users", "roles"].includes(initialCollection) ? "dropdowns" : initialCollection
+    !isCreator ? "dropdowns" : initialCollection
   );
   const [rows, setRows] = useState([]);
   const [columnKeys, setColumnKeys] = useState(["id"]);
@@ -51,6 +52,10 @@ export default function RecordCollectionEditor({
   const [saving, setSaving] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadedCount, setLoadedCount] = useState(0);
+  const [loadedSnapshot, setLoadedSnapshot] = useState("");
+  const isDirty = !loading && !loadFailed && loadedSnapshot !== "" && JSON.stringify(stripRowKeys(rows)) !== loadedSnapshot;
+  useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   const columns = useMemo(
     () => orderColumns(columnKeys, collectionName),
@@ -73,6 +78,7 @@ export default function RecordCollectionEditor({
       setRows(keyedRows);
       setLoadFailed(false);
       setLoadedCount(keyedRows.length);
+      setLoadedSnapshot(JSON.stringify(stripRowKeys(keyedRows)));
       setColumnKeys(orderColumns(collectColumns(keyedRows), collectionName));
     } catch (error) {
       console.error("Failed to load records", error);
@@ -217,8 +223,14 @@ export default function RecordCollectionEditor({
       <div className="data-editor-toolbar">
         <label>
           <span>Record collection</span>
-          <select value={collectionName} onChange={(event) => setCollectionName(event.target.value)}>
-            {ADMIN_COLLECTIONS.filter((collection) => isCreator || !["users", "roles"].includes(collection.key)).map((collection) => (
+          <select
+            value={collectionName}
+            onChange={(event) => {
+              if (isDirty && !window.confirm("You have unsaved changes in this list. Switch without saving?")) return;
+              setCollectionName(event.target.value);
+            }}
+          >
+            {ADMIN_COLLECTIONS.filter((collection) => isCreator || collection.key === "dropdowns").map((collection) => (
               <option key={collection.key} value={collection.key}>
                 {collection.label}
               </option>
