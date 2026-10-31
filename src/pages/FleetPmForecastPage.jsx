@@ -131,7 +131,7 @@ export default function FleetPmForecastPage({ onNavigate, legacyApparatus = [] }
                   const results = await generateDuePmWorkOrders(departmentId, actor);
                   const fresh = results.filter((row) => !row.deduped).length;
                   const dupes = results.filter((row) => row.deduped).length;
-                  setMessage(`Generated ${fresh} work order(s)${dupes ? ` · ${dupes} already open` : ""}.`);
+                  setMessage(`Created ${fresh} work order(s)${dupes ? ` · ${dupes} already open` : ""}.`);
                   await reload();
                 } catch (genError) {
                   setError(genError?.message || "Unable to generate work orders.");
@@ -140,7 +140,7 @@ export default function FleetPmForecastPage({ onNavigate, legacyApparatus = [] }
                 }
               }}
             >
-              <Wrench size={14} /> Generate due WOs
+              <Wrench size={14} /> Create due work orders
             </button>
           </div>
         ) : null}
@@ -170,7 +170,7 @@ export default function FleetPmForecastPage({ onNavigate, legacyApparatus = [] }
         {!loading && !rows.length ? (
           <FleetEmptyState
             title="No PM schedules"
-            description="Seed programs in Configuration Studio, then apply them to the fleet."
+            description="Set up maintenance schedules in Configuration Studio. Saving a schedule places it on every matching vehicle."
             icon={CalendarClock}
           />
         ) : null}

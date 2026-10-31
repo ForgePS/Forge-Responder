@@ -266,8 +266,6 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [], secti
           forgeAcademy: {
             hubEnabled: forgeAcademy.hubEnabled !== false,
             hubBaseUrl: String(forgeAcademy.hubBaseUrl || "").trim().replace(/\/$/, ""),
-            hubBearerToken: String(forgeAcademy.hubBearerToken || "").trim(),
-            hubSecret: String(forgeAcademy.hubSecret || "").trim(),
             forgeDepartmentId: String(forgeAcademy.forgeDepartmentId || "").trim(),
           },
         } : {}),
@@ -417,24 +415,10 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [], secti
                 placeholder="forge-platform"
               />
             </label>
-            <label>
-              <span>Hub Bearer token</span>
-              <input
-                type="password"
-                value={forgeAcademy.hubBearerToken}
-                onChange={(e) => setForgeAcademy({ ...forgeAcademy, hubBearerToken: e.target.value })}
-                autoComplete="off"
-              />
-            </label>
-            <label>
-              <span>Hub shared secret</span>
-              <input
-                type="password"
-                value={forgeAcademy.hubSecret}
-                onChange={(e) => setForgeAcademy({ ...forgeAcademy, hubSecret: e.target.value })}
-                autoComplete="off"
-              />
-            </label>
+            <p className="hint-text" style={{ gridColumn: "1 / -1" }}>
+              The hub token and shared secret are kept on the server (members could read them here). Set them with
+              Integrations → Training Academies, or scripts/move-hub-secrets.mjs.
+            </p>
           </div>
         ) : null}
 

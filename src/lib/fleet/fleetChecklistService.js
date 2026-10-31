@@ -268,3 +268,36 @@ export async function getPublishedChecklistSnapshot(departmentId, templateId) {
     sections: version.sections,
   };
 }
+
+/** Checklists people can run: published at least once and not archived. */
+export function isUsableChecklist(template = {}) {
+  return template.lifecycleStatus !== "archived"
+    && (template.lifecycleStatus === "published" || Number(template.currentVersion) > 0);
+}
+
+/**
+ * Save and publish in one step: new checks use this version right away; checks
+ * already started keep the version they began with.
+ */
+export async function saveAndPublishChecklist(departmentId, template = {}, audit = {}) {
+  const saved = await saveChecklistTemplate(departmentId, { ...template, lifecycleStatus: template.lifecycleStatus === "archived" ? "draft" : template.lifecycleStatus }, audit);
+  const { template: published } = await publishChecklistTemplate(departmentId, saved, {
+    ...audit,
+    changeSummary: audit.changeSummary || "Updated in Apparatus Check Setup",
+  });
+  return published;
+}
+
+/** Hide a checklist from new checks; past checks and versions stay. */
+export async function archiveChecklistTemplate(departmentId, template = {}, audit = {}) {
+  const archived = normalizeChecklistTemplate({ ...template, lifecycleStatus: "archived", updatedAt: nowIso() }, departmentId);
+  await updateRecord(departmentId, FLEET_CHECKLIST_TEMPLATES_COLLECTION, archived.id, archived);
+  await writeFleetAuditLog(departmentId, {
+    action: "archive",
+    recordId: archived.id,
+    summary: `Removed checklist ${archived.name}`,
+    actorUid: audit.actorUid || "system",
+    actorName: audit.actorName || "System",
+  }).catch(() => null);
+  return archived;
+}

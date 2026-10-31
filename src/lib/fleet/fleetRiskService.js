@@ -1,9 +1,11 @@
 import {
   createRecord,
+  deleteRecord,
   getRecord,
   listRecords,
   updateRecord,
 } from "../firestoreService.js";
+import { activeProviders, pickRoadsideProvider } from "./configOpsLogic.js";
 import { writeFleetAuditLog } from "./fleetAudit.js";
 import { getFleetAsset, listFleetAssets } from "./fleetAssetService.js";
 import { createFleetWorkOrder } from "./fleetWorkOrderService.js";
@@ -13,7 +15,6 @@ import {
   ACCIDENT_STATUSES,
   INSURANCE_CLAIM_STATUSES,
   SAFETY_REVIEW_OUTCOMES,
-  STARTER_TOW_PROVIDERS,
   ROADSIDE_STATUSES,
 } from "./riskDefaults.js";
 import {
@@ -364,25 +365,27 @@ export async function listTowProviders(departmentId) {
     .sort((a, b) => String(a.name).localeCompare(String(b.name)));
 }
 
+// eslint-disable-next-line no-unused-vars
 export async function ensureTowProvidersSeeded(departmentId, audit = {}) {
-  if (!departmentId) return [];
-  const existing = await listTowProviders(departmentId);
-  if (existing.length) return existing;
-  const stamp = nowIso();
-  const created = [];
-  for (const starter of STARTER_TOW_PROVIDERS) {
-    const record = normalizeTowProvider({ ...starter, departmentId, createdAt: stamp, updatedAt: stamp }, departmentId);
-    await createRecord(departmentId, FLEET_TOW_PROVIDERS_COLLECTION, record.id, record);
-    created.push(record);
-  }
+  // Read-only: tow and roadside providers are entered by the department.
+  // (A made-up "Mid-South Heavy Recovery" used to be written on first view.)
+  return listTowProviders(departmentId);
+}
+
+/**
+ * Permanently remove a tow / roadside provider. Past roadside calls keep the
+ * provider name they were saved with.
+ */
+export async function deleteTowProvider(departmentId, providerId, audit = {}) {
+  if (!departmentId || !providerId) throw new Error("A provider is required.");
+  await deleteRecord(departmentId, FLEET_TOW_PROVIDERS_COLLECTION, providerId);
   await writeFleetAuditLog(departmentId, {
-    action: "seed",
-    recordId: FLEET_TOW_PROVIDERS_COLLECTION,
-    summary: `Seeded ${created.length} tow providers`,
+    action: "delete",
+    recordId: providerId,
+    summary: `Removed tow provider ${providerId}`,
     actorUid: audit.actorUid || "system",
     actorName: audit.actorName || "System",
   }).catch(() => null);
-  return created;
 }
 
 export async function saveTowProvider(departmentId, record = {}, audit = {}) {
@@ -413,7 +416,8 @@ export async function createRoadsideEvent(departmentId, input = {}, audit = {}) 
     ensureTowProvidersSeeded(departmentId, audit),
   ]);
   if (!asset) throw new Error("Fleet asset not found");
-  const provider = providers.find((row) => row.id === input.providerId) || providers[0];
+  // Only the provider that was chosen, and only if it is active. No fallback.
+  const provider = pickRoadsideProvider(providers, input.providerId);
   const stamp = nowIso();
   const id = input.id || `RDS-${Date.now().toString(36).toUpperCase()}`;
   const record = normalizeRoadsideEvent({
@@ -546,7 +550,8 @@ export async function buildRiskBoard(departmentId, canViewSensitive = false) {
     listInsuranceClaims(departmentId),
     listRoadsideEvents(departmentId),
     listSafetyReviews(departmentId),
-    ensureTowProvidersSeeded(departmentId),
+    // Only active providers are offered on the risk board and dispatch picker.
+    listTowProviders(departmentId).then(activeProviders),
   ]);
 
   const openAccidents = accidents.filter((row) => row.status !== "closed");

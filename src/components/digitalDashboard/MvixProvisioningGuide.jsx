@@ -13,8 +13,9 @@ const STEPS = [
 export default function MvixProvisioningGuide({
   gatewaySlug = "",
   displays = [],
+  displayKey = "",
 }) {
-  const departmentUrl = gatewaySlug ? buildAlertDashboardUrl(gatewaySlug) : "";
+  const departmentUrl = gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, "", displayKey) : "";
 
   return (
     <section className="dd-mvix-guide">
@@ -43,7 +44,7 @@ export default function MvixProvisioningGuide({
                 <strong>{display.name || display.id}</strong>
                 {display.station ? ` · ${display.station}` : ""}
                 <DisplayAlertUrlField
-                  url={gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, display.id) : ""}
+                  url={gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, display.id, displayKey) : ""}
                   label=""
                   compact
                 />

@@ -43,6 +43,7 @@ function formatWeatherLine(weather = {}) {
 export default function AlertDashboardView({
   departmentId = "",
   gatewaySlug = "",
+  displayKey = "",
   profile = {},
   alerts = [],
   config = {},
@@ -169,7 +170,7 @@ export default function AlertDashboardView({
         let latitude = Number(activeAlert.latitude);
         let longitude = Number(activeAlert.longitude);
         if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-          const geocoded = await geocodeAlertAddress(departmentId, buildAlertAddress(activeAlert), gatewaySlug);
+          const geocoded = await geocodeAlertAddress(departmentId, buildAlertAddress(activeAlert), gatewaySlug, displayKey);
           latitude = Number(geocoded.latitude);
           longitude = Number(geocoded.longitude);
         }
@@ -184,7 +185,7 @@ export default function AlertDashboardView({
           fetchWeatherAtTime(latitude, longitude, activeAlert.sentAt),
           businessMatch?.businessName
             ? Promise.resolve({ name: businessMatch.businessName })
-            : lookupAlertPlace(departmentId, { latitude, longitude, address: buildAlertAddress(activeAlert), gatewaySlug }),
+            : lookupAlertPlace(departmentId, { latitude, longitude, address: buildAlertAddress(activeAlert), gatewaySlug, displayKey }),
         ]);
         if (cancelled) return;
         setWeather(weatherResult);
@@ -193,7 +194,7 @@ export default function AlertDashboardView({
         const station = resolveDisplayStation(profile, display);
         const stationAddress = buildStationAddress(station || {});
         if (stationAddress) {
-          const origin = await geocodeAlertAddress(departmentId, stationAddress, gatewaySlug);
+          const origin = await geocodeAlertAddress(departmentId, stationAddress, gatewaySlug, displayKey);
           if (!cancelled && Number.isFinite(Number(origin.latitude))) {
             setOriginCoords({ latitude: Number(origin.latitude), longitude: Number(origin.longitude) });
           }
@@ -205,7 +206,7 @@ export default function AlertDashboardView({
 
     resolveLocation();
     return () => { cancelled = true; };
-  }, [activeAlert, businessMatch, departmentId, display, profile, gatewaySlug]);
+  }, [activeAlert, businessMatch, departmentId, display, profile, gatewaySlug, displayKey]);
 
   useEffect(() => {
     if (!activeAlert) return undefined;
@@ -341,6 +342,7 @@ export default function AlertDashboardView({
           lat: coords.latitude,
           lng: coords.longitude,
           gatewaySlug,
+          displayKey,
         });
         if (cancelled) return;
         setRouteMeta({

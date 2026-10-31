@@ -1,15 +1,16 @@
 import {
   createRecord,
+  deleteRecord,
   getRecord,
   listRecords,
   updateRecord,
 } from "../firestoreService.js";
+import { missingRecommendedRules } from "./configOpsLogic.js";
 import { writeFleetAuditLog } from "./fleetAudit.js";
 import { getFleetAsset, listFleetAssets } from "./fleetAssetService.js";
 import { recordMeterReading } from "./fleetMeterService.js";
 import {
   STARTER_FUEL_EXCEPTION_RULES,
-  STARTER_FUEL_SITES,
   FUEL_PRODUCT_TYPES,
   FUEL_TRANSACTION_SOURCES,
 } from "./fuelDefaults.js";
@@ -164,25 +165,30 @@ export async function listFuelSites(departmentId) {
  * @param {string} departmentId
  * @param {{ actorUid?: string, actorName?: string }} [audit]
  */
+// eslint-disable-next-line no-unused-vars
 export async function ensureFuelSitesSeeded(departmentId, audit = {}) {
-  if (!departmentId) return [];
-  const existing = await listFuelSites(departmentId);
-  if (existing.length) return existing;
-  const stamp = nowIso();
-  const created = [];
-  for (const starter of STARTER_FUEL_SITES) {
-    const record = normalizeFuelSite({ ...starter, departmentId, createdAt: stamp, updatedAt: stamp }, departmentId);
-    await createRecord(departmentId, FLEET_FUEL_SITES_COLLECTION, record.id, record);
-    created.push(record);
-  }
+  // Read-only: fuel sites are entered by the department. Nothing is written
+  // just because a screen was opened.
+  return listFuelSites(departmentId);
+}
+
+/**
+ * Permanently remove a fuel site. Past fuel records keep the site name they
+ * were saved with.
+ * @param {string} departmentId
+ * @param {string} siteId
+ * @param {{ actorUid?: string, actorName?: string }} [audit]
+ */
+export async function deleteFuelSite(departmentId, siteId, audit = {}) {
+  if (!departmentId || !siteId) throw new Error("A fuel site is required.");
+  await deleteRecord(departmentId, FLEET_FUEL_SITES_COLLECTION, siteId);
   await writeFleetAuditLog(departmentId, {
-    action: "seed",
-    recordId: FLEET_FUEL_SITES_COLLECTION,
-    summary: `Seeded ${created.length} fuel sites`,
+    action: "delete",
+    recordId: siteId,
+    summary: `Removed fuel site ${siteId}`,
     actorUid: audit.actorUid || "system",
     actorName: audit.actorName || "System",
   }).catch(() => null);
-  return created;
 }
 
 /**
@@ -224,13 +230,28 @@ export async function listFuelExceptionRules(departmentId) {
  * @param {string} departmentId
  * @param {{ actorUid?: string, actorName?: string }} [audit]
  */
+// eslint-disable-next-line no-unused-vars
 export async function ensureFuelExceptionRulesSeeded(departmentId, audit = {}) {
+  // Read-only: recommended rules are added only when an admin asks for them
+  // (addRecommendedFuelExceptionRules), never by opening a screen.
+  return listFuelExceptionRules(departmentId);
+}
+
+/**
+ * Add the recommended exception rules the department does not have yet.
+ * Rules the admin already has (same kind) are left alone.
+ * @param {string} departmentId
+ * @param {{ actorUid?: string, actorName?: string }} [audit]
+ * @returns {Promise<object[]>} the full rule list afterwards
+ */
+export async function addRecommendedFuelExceptionRules(departmentId, audit = {}) {
   if (!departmentId) return [];
   const existing = await listFuelExceptionRules(departmentId);
-  if (existing.length) return existing;
+  const missing = missingRecommendedRules(existing, STARTER_FUEL_EXCEPTION_RULES);
+  if (!missing.length) return existing;
   const stamp = nowIso();
   const created = [];
-  for (const starter of STARTER_FUEL_EXCEPTION_RULES) {
+  for (const starter of missing) {
     const record = normalizeFuelExceptionRule({ ...starter, departmentId, createdAt: stamp, updatedAt: stamp }, departmentId);
     await createRecord(departmentId, FLEET_FUEL_EXCEPTION_RULES_COLLECTION, record.id, record);
     created.push(record);
@@ -238,11 +259,29 @@ export async function ensureFuelExceptionRulesSeeded(departmentId, audit = {}) {
   await writeFleetAuditLog(departmentId, {
     action: "seed",
     recordId: FLEET_FUEL_EXCEPTION_RULES_COLLECTION,
-    summary: `Seeded ${created.length} fuel exception rules`,
+    summary: `Added ${created.length} recommended fuel exception rules`,
     actorUid: audit.actorUid || "system",
     actorName: audit.actorName || "System",
   }).catch(() => null);
-  return created;
+  return [...existing, ...created].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+/**
+ * Permanently remove a fuel exception rule.
+ * @param {string} departmentId
+ * @param {string} ruleId
+ * @param {{ actorUid?: string, actorName?: string }} [audit]
+ */
+export async function deleteFuelExceptionRule(departmentId, ruleId, audit = {}) {
+  if (!departmentId || !ruleId) throw new Error("A rule is required.");
+  await deleteRecord(departmentId, FLEET_FUEL_EXCEPTION_RULES_COLLECTION, ruleId);
+  await writeFleetAuditLog(departmentId, {
+    action: "delete",
+    recordId: ruleId,
+    summary: `Removed fuel exception rule ${ruleId}`,
+    actorUid: audit.actorUid || "system",
+    actorName: audit.actorName || "System",
+  }).catch(() => null);
 }
 
 /**
@@ -259,6 +298,13 @@ export async function saveFuelExceptionRule(departmentId, record = {}, audit = {
   const exists = (await listFuelExceptionRules(departmentId)).some((row) => row.id === normalized.id);
   if (exists) await updateRecord(departmentId, FLEET_FUEL_EXCEPTION_RULES_COLLECTION, normalized.id, normalized);
   else await createRecord(departmentId, FLEET_FUEL_EXCEPTION_RULES_COLLECTION, normalized.id, normalized);
+  await writeFleetAuditLog(departmentId, {
+    action: exists ? "update" : "create",
+    recordId: normalized.id,
+    summary: `${exists ? "Updated" : "Created"} fuel exception rule ${normalized.name}`,
+    actorUid: audit.actorUid || "system",
+    actorName: audit.actorName || "System",
+  }).catch(() => null);
   return normalized;
 }
 
@@ -488,8 +534,9 @@ export async function buildFuelEnergySummary(departmentId) {
   const [transactions, sessions, sites, rules] = await Promise.all([
     listFuelTransactions(departmentId),
     listChargingSessions(departmentId),
-    ensureFuelSitesSeeded(departmentId),
-    ensureFuelExceptionRulesSeeded(departmentId),
+    // Sites turned off in Configuration Studio are not offered for new entries.
+    listFuelSites(departmentId).then((rows) => rows.filter((row) => row.active !== false)),
+    listFuelExceptionRules(departmentId),
   ]);
   const withExceptions = transactions.filter((row) => (row.exceptions || []).length > 0);
   const fuelCost = transactions

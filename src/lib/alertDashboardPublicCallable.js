@@ -9,6 +9,6 @@ async function callPublicAlertDashboard(name, payload = {}) {
   return result.data || {};
 }
 
-export function fetchPublicAlertDashboard(gatewaySlug = "") {
-  return callPublicAlertDashboard("alertDashboardPublicView", { gatewaySlug });
+export function fetchPublicAlertDashboard(gatewaySlug = "", displayKey = "") {
+  return callPublicAlertDashboard("alertDashboardPublicView", { gatewaySlug, displayKey });
 }

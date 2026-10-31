@@ -372,13 +372,14 @@ exports.alertDashboardPublicView = onCall(
   { region: "us-central1", invoker: "public" },
   async (request) => {
     const db = admin.firestore();
-    const { gatewaySlug = "" } = request.data || {};
+    const { gatewaySlug = "", displayKey = "" } = request.data || {};
     if (!String(gatewaySlug || "").trim()) {
       throw new HttpsError("invalid-argument", "gatewaySlug is required.");
     }
     try {
-      return await loadPublicAlertDashboard(db, gatewaySlug, { sync: true });
+      return await loadPublicAlertDashboard(db, gatewaySlug, { sync: true, displayKey });
     } catch (error) {
+      if (error.code === "permission-denied") throw new HttpsError("permission-denied", error.message);
       console.error("alertDashboardPublicView failed", error);
       throw new HttpsError("not-found", error.message || "Alert dashboard is unavailable.");
     }
@@ -390,7 +391,7 @@ exports.googleGeocode = onCall(
   async (request) => {
     const db = admin.firestore();
     const { departmentId = "", address = "", gatewaySlug = "" } = request.data || {};
-    await assertDepartmentAccessOrPublicGateway(db, departmentId, request.auth, gatewaySlug);
+    await assertDepartmentAccessOrPublicGateway(db, departmentId, request.auth, gatewaySlug, request.data?.displayKey);
     try {
       return await geocodeAddress(db, departmentId, address);
     } catch (error) {
@@ -404,7 +405,7 @@ exports.googleDirections = onCall(
   async (request) => {
     const db = admin.firestore();
     const { departmentId = "", origin = "", destination = "", lat, lng, originLat, originLng, gatewaySlug = "" } = request.data || {};
-    await assertDepartmentAccessOrPublicGateway(db, departmentId, request.auth, gatewaySlug);
+    await assertDepartmentAccessOrPublicGateway(db, departmentId, request.auth, gatewaySlug, request.data?.displayKey);
     try {
       return await fetchDirections(db, departmentId, {
         origin, destination, lat, lng, originLat, originLng,
@@ -420,7 +421,7 @@ exports.googlePlacesLookup = onCall(
   async (request) => {
     const db = admin.firestore();
     const { departmentId = "", latitude, longitude, address = "", gatewaySlug = "" } = request.data || {};
-    await assertDepartmentAccessOrPublicGateway(db, departmentId, request.auth, gatewaySlug);
+    await assertDepartmentAccessOrPublicGateway(db, departmentId, request.auth, gatewaySlug, request.data?.displayKey);
     try {
       return await lookupPlace(db, departmentId, { latitude, longitude, address });
     } catch (error) {
@@ -742,9 +743,13 @@ async function assertAcademyWebhookSecret(db, secretHeader, body = {}) {
 
   const departmentId = String(body.departmentId || body.forgeDepartmentId || "").trim();
   if (departmentId && departmentId !== "forge-platform") {
-    const deptSnap = await db.doc(`departments/${departmentId}/settings/main`).get().catch(() => ({ exists: false }));
-    if (deptSnap.exists) {
-      const fa = deptSnap.data()?.forgeAcademy || {};
+    const [deptSnap, secretSnap] = await Promise.all([
+      db.doc(`departments/${departmentId}/settings/main`).get().catch(() => ({ exists: false })),
+      db.doc(`departments/${departmentId}/integrations/forgeAcademyHub`).get().catch(() => ({ exists: false })),
+    ]);
+    for (const snap of [deptSnap, secretSnap]) {
+      if (!snap.exists) continue;
+      const fa = snap === deptSnap ? snap.data()?.forgeAcademy || {} : snap.data() || {};
       if (fa.webhookSecret) expectedCandidates.push(String(fa.webhookSecret).trim());
       if (fa.hubSecret) expectedCandidates.push(String(fa.hubSecret).trim());
       if (fa.outboundSecret) expectedCandidates.push(String(fa.outboundSecret).trim());
@@ -752,7 +757,8 @@ async function assertAcademyWebhookSecret(db, secretHeader, body = {}) {
   }
 
   const expected = expectedCandidates.filter(Boolean);
-  if (!expected.length) return true;
+  // No secret configured means nobody can post training records (it used to let anyone in).
+  if (!expected.length) return false;
   return expected.includes(String(secretHeader || "").trim());
 }
 

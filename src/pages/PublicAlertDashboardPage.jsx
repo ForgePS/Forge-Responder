@@ -10,12 +10,18 @@ function readDisplayId() {
   return new URLSearchParams(window.location.search).get("display") || "";
 }
 
+function readDisplayKey() {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("key") || "";
+}
+
 export default function PublicAlertDashboardPage() {
   const gatewaySlug = useMemo(
     () => parseAlertDashboardGatewaySlug(window.location.pathname),
     []
   );
   const displayId = useMemo(() => readDisplayId(), []);
+  const displayKey = useMemo(() => readDisplayKey(), []);
   const [payload, setPayload] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -27,7 +33,12 @@ export default function PublicAlertDashboardPage() {
       return;
     }
     try {
-      const data = await loadPublicAlertDashboard(gatewaySlug);
+      if (!displayKey) {
+        setError("This display link is missing its key. Copy the current link from Digital Dashboard in FORGE.");
+        setLoading(false);
+        return;
+      }
+      const data = await loadPublicAlertDashboard(gatewaySlug, displayKey);
       setPayload(data);
       setError("");
     } catch (err) {
@@ -36,7 +47,7 @@ export default function PublicAlertDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [gatewaySlug]);
+  }, [gatewaySlug, displayKey]);
 
   useEffect(() => {
     refresh();
@@ -82,6 +93,7 @@ export default function PublicAlertDashboardPage() {
       <AlertDashboardView
         departmentId={payload.departmentId}
         gatewaySlug={gatewaySlug}
+        displayKey={displayKey}
         profile={{
           ...payload.profile,
           name: payload.departmentName,

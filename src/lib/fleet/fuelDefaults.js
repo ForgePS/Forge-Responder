@@ -20,85 +20,62 @@ export const FUEL_TRANSACTION_SOURCES = [
   { id: "ev_charger", label: "EV charger" },
 ];
 
-export const STARTER_FUEL_SITES = [
-  {
-    id: "site-hq-diesel",
-    name: "HQ diesel tank",
-    siteType: "station_tank",
-    product: "diesel",
-    capacity: 5000,
-    currentInventory: 3200,
-    location: "Headquarters",
-    active: true,
-  },
-  {
-    id: "site-hq-gas",
-    name: "HQ gasoline tank",
-    siteType: "station_tank",
-    product: "gasoline",
-    capacity: 2000,
-    currentInventory: 1100,
-    location: "Headquarters",
-    active: true,
-  },
-  {
-    id: "site-ev-bay1",
-    name: "EV charger bay 1",
-    siteType: "ev_charger",
-    product: "electric",
-    capacity: 0,
-    currentInventory: 0,
-    location: "Headquarters",
-    connectorType: "J1772",
-    active: true,
-  },
-];
+/**
+ * No starter fuel sites: a department's tanks, chargers, and vendors are
+ * entered by the department. (Made-up tanks with made-up inventory used to be
+ * written here on first view.)
+ */
+export const STARTER_FUEL_SITES = [];
 
+/**
+ * Recommended exception rules. Written only when an admin clicks
+ * "Add recommended rules" in Configuration Studio, never just by viewing.
+ */
 export const STARTER_FUEL_EXCEPTION_RULES = [
   {
     id: "rule-meter-rollback",
-    name: "Meter rollback",
+    name: "Odometer went backwards",
     ruleType: "meter_rollback",
     enabled: true,
     threshold: 0,
     severity: "high",
-    description: "Flag when reported meter is lower than the previous reading.",
+    description: "Flags a fill where the mileage entered is lower than the last reading.",
   },
   {
     id: "rule-excess-qty",
-    name: "Excess quantity",
+    name: "Fill larger than normal",
     ruleType: "excess_quantity",
     enabled: true,
     threshold: 100,
     severity: "medium",
-    description: "Flag transactions above the quantity threshold (gallons / kWh).",
+    description: "Flags a fill-up bigger than the amount you set.",
   },
   {
     id: "rule-over-capacity",
-    name: "Above tank capacity",
+    name: "More fuel than the tank had on hand",
     ruleType: "above_capacity",
     enabled: true,
     threshold: 0,
     severity: "high",
-    description: "Flag when quantity exceeds the fuel site remaining capacity.",
+    description: "Flags a fill from a station tank that is larger than what the tank had left.",
   },
   {
     id: "rule-type-mismatch",
-    name: "Fuel type mismatch",
+    name: "Wrong fuel for the site",
     ruleType: "fuel_type_mismatch",
     enabled: true,
     threshold: 0,
     severity: "medium",
-    description: "Flag when transaction product does not match the selected site product.",
+    description: "Flags a fill whose fuel type does not match the site's fuel.",
   },
   {
     id: "rule-duplicate",
-    name: "Duplicate transaction",
+    name: "Possible duplicate fill",
     ruleType: "duplicate",
     enabled: true,
     threshold: 15,
     severity: "medium",
-    description: "Flag near-duplicate transactions for the same asset within N minutes.",
+    description: "Flags the same unit and amount entered twice within the time you set.",
   },
   {
     id: "rule-missing-receipt",
@@ -107,7 +84,7 @@ export const STARTER_FUEL_EXCEPTION_RULES = [
     enabled: true,
     threshold: 0,
     severity: "low",
-    description: "Flag card / vendor transactions without a receipt reference.",
+    description: "Flags fuel card or vendor fills entered without a receipt number.",
   },
 ];
 
