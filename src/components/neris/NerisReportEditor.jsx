@@ -17,6 +17,7 @@ import { getOccupancyIncidentHistory } from "../../lib/neris/autoPopulation.js";
 import { uploadFirebaseFile, deleteFirebaseFile } from "../../lib/firebaseClient.js";
 import { buildNerisAttachmentPath } from "../../lib/storagePaths.js";
 import { isObjectDeleted, softDeleteObject, withActiveLifecycle } from "../../lib/objectLifecycle.js";
+import "../../styles/neris-analytics.css";
 
 const STEP_ICONS = { basics: Info, response: Radio, scene: Building2, details: Flame, narrative: Sparkles, review: ClipboardCheck };
 const CATEGORY_LABELS = { FIRE: "Fire", MEDICAL: "Medical", RESCUE: "Rescue", HAZSIT: "Hazardous condition", PUBSERV: "Public service", NOEMERG: "No emergency", LAWENFORCE: "Law enforcement" };
@@ -163,7 +164,7 @@ export default function NerisReportEditor({
               <Section
                 title="Times"
                 icon={Clock}
-                description="From CAD or your run sheet."
+                description="From CAD or your run sheet. Call received and en route are needed for the NFPA 1710 call-processing, turnout and travel times."
                 action={editable ? (
                   <div className="nr-actions">
                     <button type="button" className="nr-btn nr-btn-soft" onClick={() => setCadOpen(true)}><Download size={15} /> Import from CAD</button>
@@ -171,8 +172,14 @@ export default function NerisReportEditor({
                   </div>
                 ) : null}
               >
+                <Field label="Call received" help="When the 911 call was answered (PSAP answer).">
+                  <TextInput type="datetime-local" value={ws.cad?.receivedTime} disabled={!editable} onChange={(v) => updateWorkspace("cad", { receivedTime: v })} />
+                </Field>
                 <Field label="Dispatched" required missing={missingFor("dispatch")}>
                   <TextInput type="datetime-local" value={ws.cad?.dispatchTime} disabled={!editable} onChange={(v) => updateWorkspace("cad", { dispatchTime: v })} />
+                </Field>
+                <Field label="En route" help="When the first unit started responding.">
+                  <TextInput type="datetime-local" value={ws.cad?.enrouteTime} disabled={!editable} onChange={(v) => updateWorkspace("cad", { enrouteTime: v })} />
                 </Field>
                 <Field label="Arrived on scene" required={!asList(c.incident_noaction).length} missing={missingFor("arrival")}>
                   <TextInput type="datetime-local" value={ws.cad?.arrivalTime} disabled={!editable} onChange={(v) => updateWorkspace("cad", { arrivalTime: v })} />
@@ -442,7 +449,7 @@ function UnitsSection({ report, editable, apparatus, missing, onChange }) {
   function addUnit(unitId) {
     if (!unitId) return;
     const rig = apparatus.find((u) => String(u.unit || u.name || u.id) === unitId);
-    onChange([...units, { unitId, apparatusType: rig?.type || rig?.apparatusType || "", station: rig?.station || "", dispatchTime: "", arrivalTime: "", clearTime: "", source: rig ? "apparatus" : "manual" }]);
+    onChange([...units, { unitId, apparatusType: rig?.type || rig?.apparatusType || "", station: rig?.station || "", dispatchTime: "", enrouteTime: "", arrivalTime: "", clearTime: "", source: rig ? "apparatus" : "manual" }]);
     setAdding("");
     setOther("");
   }
@@ -454,9 +461,10 @@ function UnitsSection({ report, editable, apparatus, missing, onChange }) {
     <Section title="Responding units" icon={Truck} tone={missing ? "missing" : undefined} description="Every apparatus that responded, with its own times if they differ.">
       <div className="nr-wide nr-units">
         {units.map((unit, index) => (
-          <div className="nr-unit" key={`${unit.unitId}-${index}`}>
+          <div className="nr-unit nr-unit-times4" key={`${unit.unitId}-${index}`}>
             <div className="nr-unit-name"><Truck size={16} /><strong>{unit.unitId}</strong>{unit.apparatusType ? <small>{unit.apparatusType}</small> : null}</div>
             <label><span>Dispatched</span><TextInput type="datetime-local" value={unit.dispatchTime} disabled={!editable} onChange={(v) => patch(index, { dispatchTime: v })} /></label>
+            <label><span>En route</span><TextInput type="datetime-local" value={unit.enrouteTime} disabled={!editable} onChange={(v) => patch(index, { enrouteTime: v })} /></label>
             <label><span>On scene</span><TextInput type="datetime-local" value={unit.arrivalTime} disabled={!editable} onChange={(v) => patch(index, { arrivalTime: v })} /></label>
             <label><span>Cleared</span><TextInput type="datetime-local" value={unit.clearTime} disabled={!editable} onChange={(v) => patch(index, { clearTime: v })} /></label>
             {editable ? <button type="button" className="nr-icon-btn" aria-label={`Remove ${unit.unitId}`} onClick={() => onChange(units.filter((_, i) => i !== index))}><Trash2 size={15} /></button> : null}

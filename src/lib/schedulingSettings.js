@@ -33,6 +33,8 @@ export function normalizeSchedulingSettings(input = {}, availableUnits = []) {
   return {
     displayApparatus: cleaned.length ? cleaned : fallback,
     crewSlotsByUnit: normalizeCrewSlotsByUnit(input?.crewSlotsByUnit),
+    // People the department needs on duty each shift (0 = use the crew seats on roster units).
+    minimumStaffing: Math.max(0, Math.round(Number(input?.minimumStaffing) || 0)),
   };
 }
 

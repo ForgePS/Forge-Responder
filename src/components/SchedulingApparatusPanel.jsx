@@ -64,6 +64,21 @@ export default function SchedulingApparatusPanel({
             ? "Daily roster apparatus are managed by the platform creator. Selected units appear on Scheduling with assigned crew for each shift day."
             : "Choose which apparatus appear on the Scheduling daily roster. Each selected unit shows everyone assigned to that apparatus for the selected shift day."}
         </p>
+        <label className="config-field" style={{ maxWidth: 360, marginBottom: 12 }}>
+          <span>Minimum on duty each shift</span>
+          <input
+            type="number"
+            min="0"
+            inputMode="numeric"
+            value={normalized.minimumStaffing || ""}
+            placeholder="Use crew seats"
+            disabled={readOnly}
+            onChange={(event) => onChange?.(normalizeSchedulingSettings({ ...value, minimumStaffing: event.target.value }, availableUnits))}
+          />
+          <small className="field-hint">
+            Used for Staffing Deficit on the dashboard and Daily Staffing on Scheduling. Leave blank to use the total crew seats on these units (Crew Positions).
+          </small>
+        </label>
         {!unitChoices.length ? (
           <p className="auth-help">Add apparatus in the Apparatus module to configure roster display units.</p>
         ) : (

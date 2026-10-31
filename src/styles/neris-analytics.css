@@ -1,0 +1,38 @@
+/* NERIS report editor: unit rows now carry four times (dispatched, en route, on scene, cleared). */
+.nr-units .nr-unit.nr-unit-times4 {
+  grid-template-columns: minmax(100px, 0.7fr) repeat(4, minmax(0, 1fr)) auto;
+}
+@media (max-width: 1180px) {
+  .nr-units .nr-unit.nr-unit-times4 { grid-template-columns: repeat(4, minmax(0, 1fr)) auto; }
+  .nr-units .nr-unit.nr-unit-times4 .nr-unit-name { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .nr-units .nr-unit.nr-unit-times4 { grid-template-columns: minmax(0, 1fr) auto; }
+  .nr-units .nr-unit.nr-unit-times4 label { grid-column: 1 / -1; }
+  .nr-units .nr-unit.nr-unit-times4 .nr-unit-name { grid-column: 1; }
+}
+
+/* NERIS Analytics + general Analytics: honest "not enough data" states. */
+.neris-analytics-metric.is-empty strong,
+.analytics-empty-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+}
+.neris-analytics-note,
+.analytics-range-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted, #64748b);
+}
+.analytics-panel-note {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+}
+.analytics-empty {
+  margin: 0;
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--text-muted, #64748b);
+}

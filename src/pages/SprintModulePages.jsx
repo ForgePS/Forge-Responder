@@ -11,6 +11,8 @@ import ObjectLifecycleActions from "../components/ObjectLifecycleActions.jsx";
 import { buildDocumentLibraryPath } from "../lib/storagePaths.js";
 import { deleteFirebaseFile } from "../lib/firebaseClient.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { ANALYTICS_RANGES, daysFromToday, filterByRange, rangeWindow } from "../lib/analyticsRange.js";
+import "../styles/neris-analytics.css";
 import {
   acknowledgementKeys,
   acknowledgementLabel,
@@ -399,29 +401,130 @@ export function PreplansPage({ query, records = [], setRecords }) {
 
 export { default as HoseTestingPage } from "./HoseTestingPage.jsx";
 
+const ANALYTICS_PREVIEW_ROWS = 8;
+const CLOSED_WORK_ORDER = /^(complete|completed|closed|cancel+ed|void)$/i;
+
+function analyticsPercent(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return "—";
+  const n = Number(value);
+  return Number.isFinite(n) ? `${n}%` : "—";
+}
+
+function analyticsText(value) {
+  return value === null || value === undefined || String(value).trim() === "" ? "—" : value;
+}
+
+/**
+ * Card definitions for the Analytics page. `dateOf` is the record date the range
+ * filter uses; cards without one show current status and say the range doesn't apply.
+ */
+function buildAnalyticsSections({ scheduleDays, training, apparatus, certifications, inspections }, today) {
+  return [
+    {
+      key: "staffing",
+      title: "Staffing",
+      records: scheduleDays,
+      dateOf: (day) => day.id || day.date,
+      dateLabel: "shift date",
+      note: "Staffed and minimum counts as saved on each schedule day.",
+      toRow: (day) => ({ Date: analyticsText(day.date || day.id), Shift: analyticsText(day.shift), Staffed: analyticsText(day.staffed), Minimum: analyticsText(day.minimum), Status: analyticsText(day.status) }),
+    },
+    {
+      key: "training",
+      title: "Training",
+      records: training,
+      dateOf: (item) => item.date,
+      dateLabel: "class date",
+      toRow: (item) => ({ Course: analyticsText(item.course), Category: analyticsText(item.category), Date: analyticsText(item.date), Completion: analyticsPercent(item.completion), Status: analyticsText(item.status) }),
+    },
+    {
+      key: "inspections",
+      title: "Inspections",
+      records: inspections,
+      dateOf: (item) => item.due,
+      dateLabel: "due date",
+      toRow: (item) => ({ Occupancy: analyticsText(item.occupancy), "Due date": analyticsText(item.due), Status: analyticsText(item.status) }),
+    },
+    {
+      key: "fleet",
+      title: "Fleet",
+      records: apparatus,
+      dateOf: null,
+      note: "Current status. The date range doesn't apply to this card.",
+      toRow: (item) => ({ Unit: analyticsText(item.unit), Status: analyticsText(item.status), "PM due": analyticsText(item.pmDue) }),
+    },
+    {
+      key: "certifications",
+      title: "Certifications",
+      records: certifications,
+      dateOf: null,
+      note: "Current certifications. The date range doesn't apply to this card. Days left is counted from today.",
+      toRow: (item) => {
+        const days = daysFromToday(item.expires, today);
+        return {
+          Person: analyticsText(item.person),
+          Certification: analyticsText(item.type),
+          Expires: analyticsText(item.expires),
+          "Days left": days === null ? "—" : days < 0 ? `Expired ${Math.abs(days)}d ago` : String(days),
+          Status: analyticsText(item.status),
+        };
+      },
+    },
+  ];
+}
+
 export function AnalyticsPage({
-  personnel, certifications, training, apparatus, workOrders, assets, inspections, scheduleDays
+  personnel = [], certifications = [], training = [], apparatus = [], workOrders = [], assets = [], inspections = [], scheduleDays = []
 }) {
   const [range, setRange] = useState("30");
-  const sections = useMemo(() => ({
-    staffing: scheduleDays.map((day) => ({ shift: day.shift, staffed: day.staffed, minimum: day.minimum, status: day.status })),
-    training: training.map((item) => ({ course: item.course, category: item.category, completion: item.completion, status: item.status })),
-    fleet: apparatus.map((item) => ({ unit: item.unit, status: item.status, pmDue: item.pmDue })),
-    certifications: certifications.map((item) => ({ person: item.person, type: item.type, days: item.days, status: item.status })),
-    inspections: inspections.map((item) => ({ occupancy: item.occupancy, due: item.due, status: item.status }))
-  }), [scheduleDays, training, apparatus, certifications, inspections]);
+  const span = useMemo(() => rangeWindow(range), [range]);
+  const sections = useMemo(() => {
+    const today = new Date();
+    return buildAnalyticsSections({ scheduleDays, training, apparatus, certifications, inspections }, today).map((section) => {
+      if (!section.dateOf) {
+        return { ...section, filtered: false, rows: section.records.map(section.toRow), undated: 0 };
+      }
+      const result = filterByRange(section.records, section.dateOf, range, today);
+      return { ...section, filtered: true, rows: result.rows.map(section.toRow), undated: result.undated };
+    });
+  }, [range, scheduleDays, training, apparatus, certifications, inspections]);
+
+  const trainingInRange = sections.find((s) => s.key === "training")?.rows.length ?? 0;
+  const openWorkOrders = workOrders.filter((w) => !CLOSED_WORK_ORDER.test(String(w.status || "").trim())).length;
+  const rangeName = ANALYTICS_RANGES.find((r) => r.id === range)?.label || range;
 
   return (
     <div className="module-page analytics-page">
-      <section className="module-heading"><div><span className="module-icon"><BarChart3 size={22} /></span><div><h1>Analytics</h1><p>Cross-module command analytics with exportable operational metrics.</p></div></div>
-        <div className="heading-actions"><div className="segmented-control">{["30", "60", "90", "YTD"].map((item) => <button key={item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item === "YTD" ? "YTD" : `${item} days`}</button>)}</div></div>
+      <section className="module-heading"><div><span className="module-icon"><BarChart3 size={22} /></span><div><h1>Analytics</h1><p>Cross-module numbers with CSV export. Dated cards follow the range you pick; the others show current status.</p></div></div>
+        <div className="heading-actions"><div className="segmented-control">{ANALYTICS_RANGES.map((item) => <button key={item.id} type="button" className={range === item.id ? "active" : ""} onClick={() => setRange(item.id)}>{item.label}</button>)}</div></div>
       </section>
-      <FleetSummary items={[["Personnel", personnel.length, "info"], ["Training Events", training.length, "success"], ["Fleet Units", apparatus.length, "info"], ["Open Work Orders", workOrders.filter((w) => w.status !== "Complete").length, "warning"], ["Assets", assets.length, "info"]]} />
-      {Object.entries(sections).map(([key, rows]) => (
-        <Panel key={key} title={key.charAt(0).toUpperCase() + key.slice(1)} icon={BarChart3} action={<button className="text-button" onClick={() => exportCsv(`${key}-${range}-days.csv`, rows)}>Export CSV</button>}>
-          <div className="mini-table"><div className="mini-row mini-head" style={{ gridTemplateColumns: `repeat(${Object.keys(rows[0] || {}).length}, minmax(0,1fr))` }}>{Object.keys(rows[0] || {}).map((col) => <span key={col}>{col}</span>)}</div>{rows.slice(0, 8).map((row) => <div className="mini-row" key={JSON.stringify(row)} style={{ gridTemplateColumns: `repeat(${Object.keys(row).length}, minmax(0,1fr))` }}>{Object.values(row).map((val, i) => <span key={i}>{val}</span>)}</div>)}</div>
-        </Panel>
-      ))}
+      <p className="analytics-range-note">Showing {span.label} ({span.start.toLocaleDateString()} – {new Date().toLocaleDateString()}) for Staffing, Training and Inspections.</p>
+      <FleetSummary items={[["Personnel (current)", personnel.length, "info"], [`Training events (${rangeName.toLowerCase()})`, trainingInRange, "success"], ["Fleet units (current)", apparatus.length, "info"], ["Open work orders (now)", openWorkOrders, "warning"], ["Assets (current)", assets.length, "info"]]} />
+      {sections.map((section) => {
+        const columns = Object.keys(section.rows[0] || {});
+        const fileName = `${section.key}-${section.filtered ? (range === "YTD" ? "ytd" : `${range}-days`) : "current"}.csv`;
+        return (
+          <Panel
+            key={section.key}
+            title={section.title}
+            icon={BarChart3}
+            action={<button type="button" className="text-button" disabled={!section.rows.length} onClick={() => exportCsv(fileName, section.rows)}>Export CSV</button>}
+          >
+            {section.filtered
+              ? <p className="analytics-panel-note">{section.rows.length} {section.rows.length === 1 ? "record" : "records"} by {section.dateLabel}, {span.label}.{section.undated ? ` ${section.undated} ${section.undated === 1 ? "record has" : "records have"} no usable ${section.dateLabel} and ${section.undated === 1 ? "isn't" : "aren't"} included.` : ""}{section.note ? ` ${section.note}` : ""}</p>
+              : <p className="analytics-panel-note">{section.note}</p>}
+            {section.rows.length ? (
+              <div className="mini-table">
+                <div className="mini-row mini-head" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0,1fr))` }}>{columns.map((col) => <span key={col}>{col}</span>)}</div>
+                {section.rows.slice(0, ANALYTICS_PREVIEW_ROWS).map((row, index) => <div className="mini-row" key={index} style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0,1fr))` }}>{columns.map((col) => <span key={col}>{row[col]}</span>)}</div>)}
+                {section.rows.length > ANALYTICS_PREVIEW_ROWS ? <p className="analytics-panel-note">Showing {ANALYTICS_PREVIEW_ROWS} of {section.rows.length}. Export CSV for all.</p> : null}
+              </div>
+            ) : (
+              <p className="analytics-empty">{section.filtered ? `No ${section.title.toLowerCase()} records in the ${span.label}.` : `No ${section.title.toLowerCase()} records yet.`}</p>
+            )}
+          </Panel>
+        );
+      })}
     </div>
   );
 }

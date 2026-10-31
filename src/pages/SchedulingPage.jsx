@@ -16,6 +16,7 @@ import WeekRosterView from "../components/WeekRosterView.jsx";
 import AdminDailyRoster from "../components/admin/AdminDailyRoster.jsx";
 
 import { Badge, Panel } from "../components/shell/ui.jsx";
+import { dutyDayId } from "../lib/liveDates.js";
 
 const ADMIN_SCHEDULE_TABS = [
   { id: "daily", label: "Daily Roster" },
@@ -68,10 +69,10 @@ export default function SchedulingPage({
   const today = new Date();
   const [calendarYear, setCalendarYear] = useState(today.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(today.getMonth());
-  const [selectedId, setSelectedId] = useState(formatDayId(today));
+  const [selectedId, setSelectedId] = useState(() => dutyDayId(today, shiftChangeTime));
   const [message, setMessage] = useState("");
   const [rosterTab, setRosterTab] = useState("daily");
-  const [weekRosterStartId, setWeekRosterStartId] = useState(() => formatDayId(today));
+  const [weekRosterStartId, setWeekRosterStartId] = useState(() => dutyDayId(today, shiftChangeTime));
 
   useEffect(() => {
     if (!initialTab) return;
@@ -164,6 +165,9 @@ export default function SchedulingPage({
     },
     [rosterSnapshotOptions, selectedId, selectedDay?.shift]
   );
+  // Real minimum (department setting or crew seats), same as the dashboard.
+  const staffingCoverage = selectedDaySnapshot?.coverage || dayCoverage;
+
   const weekSnapshots = useMemo(
     () => {
       try {
@@ -193,13 +197,13 @@ export default function SchedulingPage({
       }
     }));
   }, [calendarYear, calendarMonth, days, rotation, rosterSnapshotOptions]);
-  const vacancies = selectedDaySnapshot?.openVacancies?.length ?? dayCoverage.vacancies ?? 0;
+  const vacancies = selectedDaySnapshot?.openVacancies?.length ?? staffingCoverage.vacancies ?? 0;
   const scheduleStats = [
     { label: "Selected Shift", value: shiftShortLabel(selectedDaySnapshot?.shift || selectedDay?.shift || ""), tone: "info", icon: CalendarDays },
-    { label: "Staffed Today", value: selectedDaySnapshot?.coverage?.staffed ?? dayCoverage.staffed, tone: "success", icon: Users },
-    { label: "Daily Staffing", value: selectedDaySnapshot?.coverage?.minimum ?? dayCoverage.minimum, tone: "neutral", icon: ShieldCheck },
+    { label: "Staffed Today", value: selectedDaySnapshot?.coverage?.staffed ?? staffingCoverage.staffed, tone: "success", icon: Users },
+    { label: "Daily Staffing", value: selectedDaySnapshot?.coverage?.minimum ?? staffingCoverage.minimum, tone: "neutral", icon: ShieldCheck },
     { label: "Open Vacancies", value: vacancies, tone: vacancies > 0 ? "critical" : "success", icon: AlertTriangle },
-    { label: "Leave Today", value: selectedDaySnapshot?.coverage?.leave ?? dayCoverage.leave, tone: (selectedDaySnapshot?.coverage?.leave ?? dayCoverage.leave) > 0 ? "warning" : "neutral", icon: Clock3 },
+    { label: "Leave Today", value: selectedDaySnapshot?.coverage?.leave ?? staffingCoverage.leave, tone: (selectedDaySnapshot?.coverage?.leave ?? staffingCoverage.leave) > 0 ? "warning" : "neutral", icon: Clock3 },
   ];
 
   function selectDay(day) {
@@ -563,7 +567,7 @@ export default function SchedulingPage({
       setMessage("Allow pop-ups for this site to print the roster.");
       return;
     }
-    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:system-ui,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 4px}p{margin:0 0 16px;color:#555}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f3f4f6}</style></head><body><h1>${esc(title)}</h1><p>Staffed ${esc(dayCoverage.staffed)} of ${esc(dayCoverage.minimum)} · printed ${esc(new Date().toLocaleString())}</p><table><thead><tr><th>Unit</th><th>Name</th><th>Rank</th><th>Position</th><th>Hours</th></tr></thead><tbody>${rows || '<tr><td colspan="5">No one rostered.</td></tr>'}</tbody></table></body></html>`);
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:system-ui,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 4px}p{margin:0 0 16px;color:#555}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f3f4f6}</style></head><body><h1>${esc(title)}</h1><p>Staffed ${esc(staffingCoverage.staffed)} of ${esc(staffingCoverage.minimum)} · printed ${esc(new Date().toLocaleString())}</p><table><thead><tr><th>Unit</th><th>Name</th><th>Rank</th><th>Position</th><th>Hours</th></tr></thead><tbody>${rows || '<tr><td colspan="5">No one rostered.</td></tr>'}</tbody></table></body></html>`);
     win.document.close();
     win.focus();
     win.print();
@@ -644,18 +648,18 @@ export default function SchedulingPage({
     <Panel title="Daily Staffing" icon={ShieldCheck}>
       <div className="staffing-card">
         <div>
-          <strong>{dayCoverage.staffed} / {dayCoverage.minimum}</strong>
+          <strong>{staffingCoverage.staffed} / {staffingCoverage.minimum}</strong>
           <span>{vacancies ? `${vacancies} position needs coverage` : "Daily staffing met"}</span>
         </div>
         <div className="staffing-meter">
-          <i style={{ width: `${Math.min(100, dayCoverage.minimum ? (dayCoverage.staffed / dayCoverage.minimum) * 100 : 100)}%` }} />
+          <i style={{ width: `${Math.min(100, staffingCoverage.minimum ? (staffingCoverage.staffed / staffingCoverage.minimum) * 100 : 100)}%` }} />
         </div>
         <div className="staffing-requirements">
-          <span>Command</span><b>{dayCoverage.command}</b>
-          <span>Company Officers</span><b>{dayCoverage.officers}</b>
-          <span>Drivers</span><b>{dayCoverage.drivers}</b>
-          <span>Paramedics</span><b>{dayCoverage.paramedics}</b>
-          <span>EMT</span><b>{dayCoverage.emt}</b>
+          <span>Command</span><b>{staffingCoverage.command}</b>
+          <span>Company Officers</span><b>{staffingCoverage.officers}</b>
+          <span>Drivers</span><b>{staffingCoverage.drivers}</b>
+          <span>Paramedics</span><b>{staffingCoverage.paramedics}</b>
+          <span>EMT</span><b>{staffingCoverage.emt}</b>
         </div>
       </div>
     </Panel>

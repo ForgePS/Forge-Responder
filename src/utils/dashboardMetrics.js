@@ -1,4 +1,5 @@
 import { pendingForPerson } from "../lib/documentAcknowledgement.js";
+import { daysUntil } from "../lib/liveDates.js";
 import {
   formatDayId,
   parseDayId,
@@ -58,12 +59,15 @@ function parseMonthDay(value = "") {
   return { month: months[match[1]], day: Number(match[2]) };
 }
 
-function isDueWithinDays(dateLabel, days = 30, reference = new Date(2026, 5, 10)) {
+function isDueWithinDays(dateLabel, days = 30, reference = new Date()) {
+  const full = daysUntil(dateLabel, reference);
+  if (full !== null && /\d{4}/.test(String(dateLabel))) return full >= 0 && full <= days;
   const parsed = parseMonthDay(dateLabel);
   if (!parsed) return false;
-  const due = new Date(reference.getFullYear(), parsed.month, parsed.day);
-  if (due < reference) due.setFullYear(due.getFullYear() + 1);
-  const diff = (due - reference) / (1000 * 60 * 60 * 24);
+  const today = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
+  const due = new Date(today.getFullYear(), parsed.month, parsed.day);
+  if (due < today) due.setFullYear(due.getFullYear() + 1);
+  const diff = Math.round((due - today) / (1000 * 60 * 60 * 24));
   return diff >= 0 && diff <= days;
 }
 
@@ -79,15 +83,19 @@ export function buildDashboardMetrics({
   scheduleDays = [],
   leaveRequests = [],
   shiftTrades = [],
+  liveDayMetrics = {},
+  dutyDayId = "",
   acknowledgementKeys: ackKeys = []
 }) {
   const activePersonnel = personnel.filter((p) => p.status === "Active").length;
-  const onDuty = personnel.filter((p) => p.status === "Active").length;
-  const selectedDay = scheduleDays.find((day) => day.id === "2026-06-10") || scheduleDays[0] || {};
-  const staffed = Number(selectedDay.staffed || onDuty);
-  const minimum = Number(selectedDay.minimum || staffed);
-  const staffingDeficit = Math.max(minimum - staffed, 0);
-  const certsExpiring90 = certifications.filter((c) => Number(c.days) <= 90).length;
+  // Today's numbers come from the roster for the shift on duty (Scheduling uses the same calculation).
+  const today = liveDayMetrics?.[dutyDayId] || null;
+  const onDuty = today ? Number(today.staffed) || 0 : null;
+  const staffed = onDuty;
+  const minimum = today ? Number(today.minimum) || 0 : null;
+  const staffingDeficit = today ? Math.max(minimum - staffed, 0) : null;
+  void scheduleDays;
+  const certsExpiring90 = certifications.filter((c) => Number.isFinite(Number(c.days)) && Number(c.days) >= 0 && Number(c.days) <= 90).length;
   const trainingCompliance = trainingCompliancePercent(training);
   const unitsAvailable = apparatus.filter((u) => u.status === "In Service").length;
   const unitsOos = apparatus.filter((u) => u.status === "Out of Service" || u.status === "PM Due").length;

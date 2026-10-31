@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { BarChart3, Download, FileSpreadsheet, Flame, MapPin, Timer } from "lucide-react";
 import {
+  NFPA1710_METRICS,
   buildAnnualSurveyTotals,
   buildHeatMapPoints,
   buildNfpa1710Metrics,
@@ -10,6 +11,26 @@ import {
 } from "../lib/neris/analytics.js";
 import { isNerisFeatureEnabled } from "../lib/neris/featureFlags.js";
 import { useTenant } from "../context/TenantContext.jsx";
+import "../styles/neris-analytics.css";
+
+const NOT_ENOUGH = "Not enough data";
+
+function formatSeconds(value) {
+  if (value == null) return "—";
+  if (value < 120) return `${value}s`;
+  const m = Math.floor(value / 60);
+  const sec = value % 60;
+  if (m < 60) return sec ? `${m}m ${sec}s` : `${m}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+const AD_HOC_LABELS = {
+  reportNumber: "Report #",
+  incidentDate: "Date",
+  incidentTypeSummary: "Incident type",
+  incidentAddress: "Address",
+  status: "Status",
+};
 
 function downloadText(filename, content, mime = "text/csv") {
   const blob = new Blob([content], { type: mime });
@@ -21,9 +42,9 @@ function downloadText(filename, content, mime = "text/csv") {
   URL.revokeObjectURL(url);
 }
 
-function MetricCard({ label, value, sub }) {
+function MetricCard({ label, value, sub, empty = false }) {
   return (
-    <div className="neris-analytics-metric">
+    <div className={`neris-analytics-metric${empty ? " is-empty" : ""}`}>
       <span>{label}</span>
       <strong>{value}</strong>
       {sub ? <small>{sub}</small> : null}
@@ -42,6 +63,7 @@ export default function NerisAnalyticsPage({ reports = [] }) {
 
   const nfpa1710 = useMemo(() => buildNfpa1710Metrics(reports), [reports]);
   const survey = useMemo(() => buildAnnualSurveyTotals(reports, surveyYear), [reports, surveyYear]);
+  const noYearData = survey.totalIncidents === 0;
   const heatPoints = useMemo(() => buildHeatMapPoints(reports), [reports]);
   const adHoc = useMemo(
     () => runAdHocReport(reports, {
@@ -54,7 +76,7 @@ export default function NerisAnalyticsPage({ reports = [] }) {
   const tabs = [
     { id: "nfpa1710", label: "NFPA 1710", icon: Timer, enabled: isNerisFeatureEnabled(settings, "nfpa1710Analytics") },
     { id: "annual", label: "Annual Survey", icon: FileSpreadsheet, enabled: isNerisFeatureEnabled(settings, "nfpaAnnualSurvey") },
-    { id: "heatmap", label: "Heat Map", icon: MapPin, enabled: isNerisFeatureEnabled(settings, "incidentHeatMapping") },
+    { id: "heatmap", label: "Incident Locations", icon: MapPin, enabled: isNerisFeatureEnabled(settings, "incidentHeatMapping") },
     { id: "adhoc", label: "Ad-Hoc Reports", icon: BarChart3, enabled: isNerisFeatureEnabled(settings, "adHocIncidentReporting") },
   ].filter((t) => t.enabled);
 
@@ -93,16 +115,32 @@ export default function NerisAnalyticsPage({ reports = [] }) {
 
       {activeTab === "nfpa1710" ? (
         <section className="neris-analytics-grid">
+          <p className="neris-analytics-note">
+            Percent of incidents at or under the NFPA 1710 benchmark. An incident only counts toward a measure when both of its times were recorded on the report.
+          </p>
           <div className="neris-analytics-metrics">
-            <MetricCard label="Incidents measured" value={nfpa1710.measuredCount} sub={`of ${nfpa1710.incidentCount} total`} />
-            {Object.entries(nfpa1710.compliance).map(([metric, data]) => (
-              <MetricCard
-                key={metric}
-                label={metric.replace(/Seconds$/, " (sec)")}
-                value={`${data.percentage}%`}
-                sub={`${data.compliant}/${data.measured} ≤ ${data.benchmark}s`}
-              />
-            ))}
+            <MetricCard label="Incidents with any times" value={nfpa1710.measuredCount} sub={`of ${nfpa1710.incidentCount} reports`} />
+            {NFPA1710_METRICS.map((metric) => {
+              const data = nfpa1710.compliance[metric.key];
+              const empty = data.percentage == null;
+              return (
+                <MetricCard
+                  key={metric.key}
+                  label={`${metric.label} (≤ ${formatSeconds(data.benchmark)})`}
+                  value={empty ? NOT_ENOUGH : `${data.percentage}%`}
+                  empty={empty}
+                  sub={empty
+                    ? `Needs ${metric.from.toLowerCase()} and ${metric.to.toLowerCase()} times`
+                    : `${data.compliant} of ${data.measured} on time · based on ${data.measured} of ${data.total} incidents · 90th percentile ${formatSeconds(data.percentile90)}`}
+                />
+              );
+            })}
+            <MetricCard
+              label="Time on scene (median)"
+              value={nfpa1710.scene.median == null ? NOT_ENOUGH : formatSeconds(nfpa1710.scene.median)}
+              empty={nfpa1710.scene.median == null}
+              sub={nfpa1710.scene.median == null ? "Needs on-scene and cleared times" : `based on ${nfpa1710.scene.measured} of ${nfpa1710.scene.total} incidents`}
+            />
           </div>
           <section className="panel">
             <header><strong>Incident drill-down</strong></header>
@@ -112,21 +150,28 @@ export default function NerisAnalyticsPage({ reports = [] }) {
                   <tr>
                     <th>Report</th>
                     <th>Date</th>
+                    <th>Call processing</th>
                     <th>Turnout</th>
                     <th>Travel</th>
                     <th>Total response</th>
+                    <th>On scene</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {nfpa1710.incidents.slice(0, 25).map((row) => (
-                    <tr key={row.incidentId}>
-                      <td>{row.reportNumber}</td>
-                      <td>{row.incidentDate}</td>
-                      <td>{row.turnoutSeconds ?? "—"}s</td>
-                      <td>{row.travelSeconds ?? "—"}s</td>
-                      <td>{row.totalResponseSeconds ?? "—"}s</td>
+                  {nfpa1710.incidents.slice(0, 25).map((row, index) => (
+                    <tr key={row.incidentId || index}>
+                      <td>{row.reportNumber || "—"}</td>
+                      <td>{row.incidentDate || "—"}</td>
+                      <td>{formatSeconds(row.callProcessingSeconds)}</td>
+                      <td>{formatSeconds(row.turnoutSeconds)}</td>
+                      <td>{formatSeconds(row.travelSeconds)}</td>
+                      <td>{formatSeconds(row.totalResponseSeconds)}</td>
+                      <td>{formatSeconds(row.sceneSeconds)}</td>
                     </tr>
                   ))}
+                  {!nfpa1710.incidents.length ? (
+                    <tr><td colSpan={7}>No reports have response times yet. Add them on the Response step of each report.</td></tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -156,20 +201,35 @@ export default function NerisAnalyticsPage({ reports = [] }) {
             </button>
           </div>
           <div className="neris-analytics-metrics">
-            <MetricCard label="Total incidents" value={survey.totalIncidents} />
-            <MetricCard label="Fire incidents" value={survey.fireIncidents} />
-            <MetricCard label="EMS incidents" value={survey.emsIncidents} />
-            <MetricCard label="Mutual aid" value={survey.mutualAidIncidents} />
-            <MetricCard label="Civilian casualties" value={survey.civilianCasualties} />
-            <MetricCard label="Firefighter casualties" value={survey.firefighterCasualties} />
-            <MetricCard label="Property loss" value={`$${survey.propertyLoss.toLocaleString()}`} />
+            <MetricCard label="Total incidents" value={survey.totalIncidents} sub={survey.totalIncidents ? undefined : `No reports dated ${surveyYear}`} />
+            <MetricCard label="Fire incidents" value={noYearData ? "—" : survey.fireIncidents} empty={noYearData} />
+            <MetricCard label="Medical incidents" value={noYearData ? "—" : survey.emsIncidents} empty={noYearData} />
+            <MetricCard label="Mutual aid given or received" value={noYearData ? "—" : survey.mutualAidIncidents} empty={noYearData} />
+            <MetricCard
+              label="Civilian injuries and deaths"
+              value={noYearData ? "—" : survey.civilianCasualties}
+              empty={noYearData}
+              sub={noYearData ? undefined : `${survey.civilianInjuries} injured · ${survey.civilianDeaths} died · blank counts as none`}
+            />
+            <MetricCard
+              label="Firefighter injuries"
+              value={noYearData ? "—" : survey.firefighterCasualties}
+              empty={noYearData}
+              sub={noYearData ? undefined : "Blank counts as none"}
+            />
+            <MetricCard
+              label="Property and contents loss"
+              value={survey.lossReports ? `${survey.propertyLoss.toLocaleString()}` : NOT_ENOUGH}
+              empty={!survey.lossReports}
+              sub={survey.lossReports ? `from ${survey.lossReports} of ${survey.totalIncidents} reports with a loss amount` : "No report this year has a loss amount entered"}
+            />
           </div>
         </section>
       ) : null}
 
       {activeTab === "heatmap" ? (
         <section className="panel">
-          <header><strong>Incident density ({heatPoints.length} geocoded)</strong></header>
+          <header><strong>{heatPoints.length ? `Incident locations (${heatPoints.length} of ${reports.length} reports have coordinates)` : "Incident locations"}</strong></header>
           <div className="panel-body">
             {heatPoints.length ? (
               <ul className="neris-heatmap-list">
@@ -182,7 +242,7 @@ export default function NerisAnalyticsPage({ reports = [] }) {
                 ))}
               </ul>
             ) : (
-              <p>Add latitude/longitude to incident reports to populate the heat map layer.</p>
+              <p className="neris-analytics-note">Add incident locations to see the map. Reports don't record map coordinates yet, so there's nothing to plot.</p>
             )}
           </div>
         </section>
@@ -208,12 +268,12 @@ export default function NerisAnalyticsPage({ reports = [] }) {
             </button>
           </div>
           <section className="panel">
-            <header><strong>{adHoc.total} matching rows</strong></header>
+            <header><strong>{adHoc.total} matching {adHoc.total === 1 ? "report" : "reports"}</strong></header>
             <div className="panel-body">
               <table className="data-table">
                 <thead>
                   <tr>
-                    {(adHoc.columns || []).map((col) => <th key={col}>{col}</th>)}
+                    {(adHoc.columns || []).map((col) => <th key={col}>{AD_HOC_LABELS[col] || col}</th>)}
                   </tr>
                 </thead>
                 <tbody>
