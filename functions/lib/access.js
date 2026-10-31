@@ -71,7 +71,7 @@ async function assertDepartmentManage(db, departmentId, auth) {
 
 const { resolveGatewayDepartmentId } = require("./gatewayResolver");
 
-async function assertDepartmentAccessOrPublicGateway(db, departmentId, auth, gatewaySlug = "") {
+async function assertDepartmentAccessOrPublicGateway(db, departmentId, auth, gatewaySlug = "", displayKey = "") {
   if (auth?.uid) {
     const allowed = await isPlatformCreator(db, auth)
       || await isDepartmentMember(db, departmentId, auth.uid);
@@ -82,7 +82,8 @@ async function assertDepartmentAccessOrPublicGateway(db, departmentId, auth, gat
   if (slug) {
     const gateway = await resolveGatewayDepartmentId(db, slug);
     if (gateway?.departmentId && gateway.departmentId === String(departmentId || "").trim().toLowerCase()) {
-      return;
+      const { verifyPublicDisplayKey } = require("./alertDashboardPublic");
+      if (await verifyPublicDisplayKey(db, gateway.departmentId, displayKey)) return;
     }
   }
 

@@ -62,9 +62,14 @@ import { parseRecipientList, sendHydrantDailyActivityEmail } from "../lib/hydran
 import HydrantImportTemplatesPanel from "../components/hydrants/HydrantImportTemplatesPanel.jsx";
 import { HYDRANT_DAMAGE_PRESELECT_KEY } from "../lib/hydrantDamage/paths.js";
 import {
+
   hydrantPathForTab,
   resolveInitialHydrantTab,
 } from "../lib/hydrantAppRouting.js";
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[ch]));
+}
 
 // Crew options come from the department's own personnel list (no bundled names).
 let hydrantDepartmentId = "";
@@ -859,7 +864,8 @@ function HydrantMap({ hydrants, selected, onSelect, mapBounds = cityBoundsDefaul
         onSelect(h);
         marker.openPopup();
       });
-      marker.bindPopup(`<b>${h.hydrant_id || h.location_id}</b><br>${h.address || h.location || ""}<br>Flow: ${flowText(h)}<br>${checkedLabel(h)}`);
+      // Escape everything: hydrant IDs and addresses come from CSV imports.
+      marker.bindPopup(`<b>${escapeHtml(h.hydrant_id || h.location_id)}</b><br>${escapeHtml(h.address || h.location || "")}<br>Flow: ${escapeHtml(flowText(h))}<br>${escapeHtml(checkedLabel(h))}`);
       marker.addTo(group);
         markers.set(key, marker);
       }

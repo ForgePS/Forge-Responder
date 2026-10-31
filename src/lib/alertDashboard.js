@@ -206,15 +206,30 @@ export function formatWindDirection(degrees) {
   const index = Math.round(((Number(degrees) % 360) / 45)) % 8;
   return dirs[index];
 }
+export function publicDisplayKeyFrom(configItems = []) {
+  const config = (configItems || []).find((item) => item.id === "config") || (configItems || [])[0] || {};
+  return config.publicDashboardEnabled === false ? "" : String(config.publicDisplayKey || "");
+}
+
+/** A long random key for station TV links. */
+export function createPublicDisplayKey() {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export function defaultAlertDashboardConfig(overrides = {}) {
   return { ...DEFAULT_ALERT_DASHBOARD_CONFIG, ...overrides };
 }
 
-export function buildAlertDashboardUrl(gatewaySlug = "", displayId = "") {
+/** Station TV links need the department's display key (no key, no link). */
+export function buildAlertDashboardUrl(gatewaySlug = "", displayId = "", displayKey = "") {
+  if (!displayKey) return "";
   const base = (typeof window !== "undefined" ? window.location.origin : resolveRmsAppUrl()).replace(/\/$/, "");
   const path = buildAlertDashboardPath(String(gatewaySlug || "").trim());
   const params = new URLSearchParams();
   if (displayId) params.set("display", displayId);
+  params.set("key", displayKey);
   const query = params.toString();
   return `${base}${path}${query ? `?${query}` : ""}`;
 }

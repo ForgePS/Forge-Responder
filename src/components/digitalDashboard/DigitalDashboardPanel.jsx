@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext.jsx";
-import { buildAlertDashboardUrl } from "../../lib/alertDashboard.js";
+import { buildAlertDashboardUrl, publicDisplayKeyFrom } from "../../lib/alertDashboard.js";
 import IntegrationsPanel from "./IntegrationsPanel.jsx";
 import AlertDashboardSettingsPanel from "./AlertDashboardSettingsPanel.jsx";
 import AddMediaModal from "./AddMediaModal.jsx";
@@ -478,7 +478,7 @@ export default function DigitalDashboardPanel({
             canEdit={canEdit}
           />
           <div className="dd-panel-body dd-mvix-guide-wrap">
-            <MvixProvisioningGuide gatewaySlug={gatewaySlug} displays={displays} />
+            <MvixProvisioningGuide gatewaySlug={gatewaySlug} displays={displays} displayKey={publicDisplayKeyFrom(alertDashboardConfig)} />
           </div>
           <div className="dd-panel-body">
           {filteredDisplays.length ? (
@@ -516,7 +516,7 @@ export default function DigitalDashboardPanel({
                         <td>
                           {gatewaySlug && display.id ? (
                             <a
-                              href={buildAlertDashboardUrl(gatewaySlug, display.id)}
+                              href={buildAlertDashboardUrl(gatewaySlug, display.id, publicDisplayKeyFrom(alertDashboardConfig)) || undefined}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="dd-table-link"
@@ -907,7 +907,7 @@ export default function DigitalDashboardPanel({
               </label>
             ) : (
               <DisplayAlertUrlField
-                url={modal.form.id && gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, modal.form.id) : ""}
+                url={modal.form.id && gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, modal.form.id, publicDisplayKeyFrom(alertDashboardConfig)) : ""}
                 label="MVIX / signage stick home URL"
               />
             )}

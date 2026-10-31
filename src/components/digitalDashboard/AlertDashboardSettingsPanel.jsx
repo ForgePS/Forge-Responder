@@ -3,8 +3,10 @@ import { FlaskConical, Save, Upload } from "lucide-react";
 import { useTenant } from "../../context/TenantContext.jsx";
 import {
   buildAlertDashboardUrl,
+  createPublicDisplayKey,
   defaultAlertDashboardConfig,
   prependTestAlert,
+  publicDisplayKeyFrom,
 } from "../../lib/alertDashboard.js";
 import { savePublicAlertDashboardDoc } from "../../lib/alertDashboardPublicLoader.js";
 import {
@@ -58,6 +60,30 @@ export default function AlertDashboardSettingsPanel({
       }).catch(() => {});
     }
     setNotice("Alert dashboard settings saved.");
+  }
+
+  const displayKey = publicDisplayKeyFrom(configItems);
+
+  function saveDisplayAccess(patch, message) {
+    if (!canManage) return;
+    const record = defaultAlertDashboardConfig({ ...saved, ...form, ...patch, id: "config" });
+    setForm(record);
+    setConfigItems([record]);
+    setNotice(message);
+  }
+
+  function turnOnTvLinks() {
+    saveDisplayAccess({ publicDashboardEnabled: true, publicDisplayKey: saved.publicDisplayKey || createPublicDisplayKey() }, "Station TV links are on. Copy each link below onto its screen.");
+  }
+
+  function turnOffTvLinks() {
+    if (!window.confirm("Turn off station TV links? Every screen showing alerts goes blank until you turn them back on.")) return;
+    saveDisplayAccess({ publicDashboardEnabled: false }, "Station TV links are off.");
+  }
+
+  function makeNewLinks() {
+    if (!window.confirm("Make new links? Every screen using the current links stops working until you give it the new link. Use this if a link was shared by mistake.")) return;
+    saveDisplayAccess({ publicDashboardEnabled: true, publicDisplayKey: createPublicDisplayKey() }, "New links made. Update each screen with its new link.");
   }
 
   function pushTestAlert() {
@@ -137,20 +163,34 @@ export default function AlertDashboardSettingsPanel({
           </div>
         ) : null}
 
-        <MvixProvisioningGuide gatewaySlug={gatewaySlug} displays={displays} />
+        <MvixProvisioningGuide gatewaySlug={gatewaySlug} displays={displays} displayKey={displayKey} />
 
         <div className="dd-alert-display-links">
-          <h4>Display URLs</h4>
+          <h4>Station TV links</h4>
           <p className="dd-empty-detail">
-            Public URLs — no login required. Set each URL as the MVIX / signage stick home page for that screen.
+            Screens open these links without signing in. Each link contains a private key: only put it on your own screens,
+            and use "Make new links" if one is shared by mistake.
           </p>
+          {canManage ? (
+            <div className="dd-alert-test-actions">
+              {displayKey ? (
+                <>
+                  <button type="button" className="dd-action-button" onClick={makeNewLinks}>Make new links</button>
+                  <button type="button" className="dd-action-button" onClick={turnOffTvLinks}>Turn off TV links</button>
+                </>
+              ) : (
+                <button type="button" className="dd-action-button primary" onClick={turnOnTvLinks}>Turn on station TV links</button>
+              )}
+            </div>
+          ) : null}
+          {!displayKey ? <p className="dd-empty-detail">Station TV links are off.</p> : null}
           {!gatewaySlug ? (
             <p className="dd-upload-error">Department gateway not resolved — open FORGE from your department portal first.</p>
           ) : null}
           <ul>
             <li>
               <DisplayAlertUrlField
-                url={gatewaySlug ? buildAlertDashboardUrl(gatewaySlug) : ""}
+                url={gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, "", displayKey) : ""}
                 label="Department default"
                 compact
               />
@@ -158,7 +198,7 @@ export default function AlertDashboardSettingsPanel({
             {displays.map((display) => (
               <li key={display.id}>
                 <DisplayAlertUrlField
-                  url={gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, display.id) : ""}
+                  url={gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, display.id, displayKey) : ""}
                   label={`${display.name || display.id}${display.station ? ` · ${display.station}` : ""}`}
                   compact
                 />

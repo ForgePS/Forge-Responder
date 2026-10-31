@@ -2,6 +2,7 @@ const { syncAlerts } = require("./active911Store");
 const { clientConfig: googleApisClientConfig, loadIntegration: loadGoogleApisIntegration } = require("./googleApisStore");
 const { resolveGatewayDepartmentId } = require("./gatewayResolver");
 const { readListItems } = require("./listStore");
+const crypto = require("crypto");
 
 const LIST_KEYS = {
   active911Alerts: "hlfd-rms-active911-alerts",
@@ -43,6 +44,55 @@ function publicBusinessDirectory(entries = []) {
   }));
 }
 
+/**
+ * Station TV screens open /{department}/alerts?key=... with no sign-in. The key is
+ * the department's publicDisplayKey (Digital Dashboard settings); without the right
+ * key, or with the public display turned off, nothing is returned.
+ */
+function sameKey(a = "", b = "") {
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  return left.length === right.length && left.length > 0 && crypto.timingSafeEqual(left, right);
+}
+
+function publicDisplayAllowed(config = {}, displayKey = "") {
+  if (config.publicDashboardEnabled === false) return false;
+  return sameKey(config.publicDisplayKey, String(displayKey || "").trim());
+}
+
+/** True when this key opens the department's station displays. */
+async function verifyPublicDisplayKey(db, departmentId, displayKey = "") {
+  if (!departmentId || !displayKey) return false;
+  const configItems = await readListItems(db, departmentId, LIST_KEYS.alertDashboardConfig).catch(() => []);
+  const config = configItems.find((item) => item.id === "config") || configItems[0] || {};
+  return publicDisplayAllowed(config, displayKey);
+}
+
+// Only what a station screen shows: no responder names or free-text notes.
+function publicAlert(alert = {}) {
+  return {
+    id: alert.id || "",
+    cadCode: alert.cadCode || "",
+    description: alert.description || "",
+    address: alert.address || "",
+    city: alert.city || "",
+    state: alert.state || "",
+    crossStreet: alert.crossStreet || "",
+    units: alert.units || "",
+    priority: alert.priority || "",
+    sentAt: alert.sentAt || "",
+    syncedAt: alert.syncedAt || "",
+    latitude: alert.latitude ?? null,
+    longitude: alert.longitude ?? null,
+    source: alert.source || "",
+  };
+}
+
+function publicConfig(config = {}) {
+  const { publicDisplayKey: _key, ...rest } = config;
+  return rest;
+}
+
 async function maybeSyncAlerts(db, departmentId, config = {}) {
   const intervalSec = Number(config.autoSyncIntervalSec) || 90;
   const integrationSnap = await db.doc(`departments/${departmentId}/integrations/active911`).get();
@@ -76,6 +126,11 @@ async function loadPublicAlertDashboard(db, gatewaySlug, options = {}) {
   const { departmentId } = gateway;
   const configItems = await loadListItems(db, departmentId, LIST_KEYS.alertDashboardConfig);
   const config = configItems.find((item) => item.id === "config") || configItems[0] || {};
+  if (!publicDisplayAllowed(config, options.displayKey)) {
+    const error = new Error("This display link isn't valid. Copy the current link from Digital Dashboard in FORGE.");
+    error.code = "permission-denied";
+    throw error;
+  }
 
   if (options.sync !== false) {
     await maybeSyncAlerts(db, departmentId, config);
@@ -103,8 +158,8 @@ async function loadPublicAlertDashboard(db, gatewaySlug, options = {}) {
     gatewayId: gateway.gatewayId,
     departmentId,
     departmentName: gateway.label || profile.name || departmentId,
-    alerts,
-    configItems: configItems.length ? configItems : [{ id: "config" }],
+    alerts: alerts.map(publicAlert),
+    configItems: [publicConfig(config)],
     businessDirectory: publicBusinessDirectory(businessDirectory),
     displays: publicDisplays(displays),
     profile: { stationDetails: publicStationDetails(profile) },
@@ -114,4 +169,6 @@ async function loadPublicAlertDashboard(db, gatewaySlug, options = {}) {
 
 module.exports = {
   loadPublicAlertDashboard,
+  verifyPublicDisplayKey,
+  publicAlert,
 };

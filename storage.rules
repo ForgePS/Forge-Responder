@@ -26,7 +26,12 @@ service firebase.storage {
     function canAccessDepartment(departmentId) {
       return isPlatformCreator()
         || isDepartmentMember(departmentId)
-        || (isAuthenticated() && departmentId == "forge-demo");
+        || (isAuthenticated() && departmentId == "forge-demo" && request.auth.token.get("email", "") == "demo@forge.demo");
+    }
+
+    // The shared demo account can't host large files.
+    function isAllowedDemoUpload(departmentId) {
+      return departmentId != "forge-demo" || request.resource == null || request.resource.size < 10 * 1024 * 1024;
     }
 
     // Uploads: max 100 MB (pre-fire plan PDFs, dashboard media).
@@ -36,7 +41,7 @@ service firebase.storage {
 
     match /departments/{departmentId}/{allPaths=**} {
       allow read: if canAccessDepartment(departmentId);
-      allow create, update: if canAccessDepartment(departmentId) && isAllowedUpload();
+      allow create, update: if canAccessDepartment(departmentId) && isAllowedUpload() && isAllowedDemoUpload(departmentId);
       allow delete: if canAccessDepartment(departmentId);
     }
 

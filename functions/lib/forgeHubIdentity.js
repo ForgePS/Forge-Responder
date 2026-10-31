@@ -17,6 +17,15 @@ function normalizeEmail(value) {
     .toLowerCase();
 }
 
+const HUB_SECRET_FIELDS = ["hubBearerToken", "hubSecret", "webhookSecret", "outboundSecret"];
+
+/** Hub token/secrets for a department (server-only doc; members can't read it). */
+async function loadHubSecrets(db, departmentId) {
+  const snap = await db.doc(`departments/${departmentId}/integrations/forgeAcademyHub`).get().catch(() => null);
+  const data = snap?.exists ? snap.data() || {} : {};
+  return Object.fromEntries(HUB_SECRET_FIELDS.filter((field) => data[field]).map((field) => [field, data[field]]));
+}
+
 /**
  * @param {FirebaseFirestore.Firestore} db
  * @param {string} departmentId
@@ -31,7 +40,8 @@ async function loadHubSettings(db, departmentId) {
 
   const dept = deptSnap.exists ? deptSnap.data()?.forgeAcademy || {} : {};
   const platform = platformSnap.exists ? platformSnap.data()?.forgeAcademy || {} : {};
-  let merged = { ...platform, ...dept };
+  const deptSecrets = departmentId ? await loadHubSecrets(db, departmentId) : {};
+  let merged = { ...platform, ...dept, ...deptSecrets };
 
   // Prefer multi-academy forge_academy connection secrets when available.
   try {
