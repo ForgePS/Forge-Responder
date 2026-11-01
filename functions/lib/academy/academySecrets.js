@@ -82,6 +82,15 @@ async function tryLoadSecretManager(secretId) {
  * @returns {{ secretReference: string }}
  */
 async function saveConnectionSecrets(db, departmentId, connectionId, secrets = {}) {
+  const stored = await loadConnectionSecrets(db, departmentId, connectionId).catch(() => ({}));
+  const keep = (field) => {
+    const value = String(secrets[field] || "").trim();
+    return value ? secrets[field] : stored?.[field] || "";
+  };
+  secrets = Object.fromEntries([
+    "hubBaseUrl", "hubBearerToken", "hubSecret", "forgeDepartmentId",
+    "apiBaseUrl", "apiKey", "sftpHost", "sftpUsername", "sftpPassword",
+  ].map((field) => [field, keep(field)]));
   const cleaned = {
     hubBaseUrl: String(secrets.hubBaseUrl || "").trim().replace(/\/$/, ""),
     hubBearerToken: String(secrets.hubBearerToken || "").trim(),

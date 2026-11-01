@@ -21,14 +21,18 @@ import {
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import { useTenant } from "./context/TenantContext.jsx";
 import { isPlatformScope } from "./lib/tenantPaths.js";
+import { isValidTimezone } from "./lib/timezone.js";
+import { dutyDayId, withLiveCertDays } from "./lib/liveDates.js";
 import { useTenantPersistentState } from "./hooks/useTenantPersistentState.js";
 import { formatRoleLabel, membershipInitials } from "./lib/departmentMembership.js";
 import AccessDeniedPage from "./pages/AccessDeniedPage.jsx";
+import { useDepartmentStatus } from "./hooks/useDepartmentStatus.js";
 import DemoEntryPage from "./pages/DemoEntryPage.jsx";
 import DemoModeBanner from "./components/DemoModeBanner.jsx";
 import GatewayNotFoundPage from "./pages/GatewayNotFoundPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import TwoFactorScreen from "./components/security/TwoFactorScreen.jsx";
+import AccountMenu from "./components/security/AccountMenu.jsx";
 import TwoFactorReminder from "./components/security/TwoFactorReminder.jsx";
 import { useTwoFactorStatus } from "./hooks/useTwoFactorStatus.js";
 import { isDemoEntryPath, isDemoModeActive } from "./lib/demoMode.js";
@@ -113,7 +117,9 @@ import { normalizeEmployeePortalRules } from "./lib/employeePortalRules.js";
 import { normalizePayRules } from "./lib/payRules.js";
 import { normalizeDailyLogSettings } from "./lib/dailyLogSettings.js";
 const CreatorConsolePage = lazyPage(() => import("./pages/CreatorConsolePage.jsx"));
-import { ModulePage, AccessDeniedModule } from "./pages/ModulePage.jsx";
+import { ModulePage, AccessDeniedModule, ModuleNotIncluded } from "./pages/ModulePage.jsx";
+import { NAV_MODULE_MAP } from "./data/adminRegistry.js";
+import SaveFailedNotice from "./components/SaveFailedNotice.jsx";
 const CertificationsPage = lazyPage(() => import("./pages/CertificationsPage.jsx"));
 const SchedulingPage = lazyPage(() => import("./pages/SchedulingPage.jsx"));
 const TrainingPage = lazyPage(() => import("./pages/TrainingPage.jsx"));
@@ -175,6 +181,7 @@ import {
 const FleetDashboardPage = lazyPage(() => import("./pages/FleetDashboardPage.jsx"));
 const FleetAssetsMasterPage = lazyPage(() => import("./pages/FleetAssetsMasterPage.jsx"));
 const FleetConfigStudioPage = lazyPage(() => import("./pages/FleetConfigStudioPage.jsx"));
+const ApparatusCheckSetupPage = lazyPage(() => import("./pages/ApparatusCheckSetupPage.jsx"));
 const FleetReadinessBoardPage = lazyPage(() => import("./pages/FleetReadinessBoardPage.jsx"));
 const FleetDefectsPage = lazyPage(() => import("./pages/FleetDefectsPage.jsx"));
 const FleetWorkOrdersPage = lazyPage(() => import("./pages/FleetWorkOrdersPage.jsx"));
@@ -197,6 +204,7 @@ const navGroups = [
   { label: "Fleet", items: [
     ["Fleet Dashboard", Truck],
     ["Readiness Board", ClipboardCheck],
+    ["Apparatus Check Setup", ClipboardCheck],
     ["Fleet Defects", AlertTriangle],
     ["Fleet Work Orders", Wrench],
     ["PM Forecast", CalendarDays],
@@ -226,7 +234,6 @@ const navGroups = [
   { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Uploads", Upload]] },
   { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay]] },
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
-  { label: "Future / Later", items: [["Incidents", AlertTriangle], ["EMS Reports", Ambulance], ["Compliance Export", Upload]] }
 ];
 
 // Every in-app page reachable from the menu, keyed by its URL slug (?page=...).
@@ -292,17 +299,37 @@ function persistJson(key, value) {
   }
 }
 
+function navGroupHasHeader(group) {
+  return Boolean(group.label) || groupHasNavTree(group) || (group.items?.length || 0) > 1;
+}
+
+/** Accordion: every headed section closed except `openKey`. */
+function onlySectionOpen(groups, openKey) {
+  const next = {};
+  groups.forEach((group, index) => {
+    if (!navGroupHasHeader(group)) return;
+    const key = navSectionKey(group, index);
+    next[key] = key !== openKey;
+  });
+  return next;
+}
+
 function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGroups }) {
   const [collapsedSections, setCollapsedSections] = useState(readCollapsedNavSections);
   const [collapsedNested, setCollapsedNested] = useState(readCollapsedNestedNav);
+  const lastRouteRef = useRef("");
 
   useEffect(() => {
     const activeIndex = groups.findIndex((group) => groupContainsRoute(group, current));
     if (activeIndex < 0) return;
+    // Only when the page changes, so a section opened by hand isn't closed when the menu re-renders.
+    if (lastRouteRef.current === current) return;
+    lastRouteRef.current = current;
     const key = navSectionKey(groups[activeIndex], activeIndex);
     setCollapsedSections((prev) => {
-      if (!prev[key]) return prev;
-      const next = { ...prev, [key]: false };
+      const next = onlySectionOpen(groups, key);
+      const same = Object.keys(next).every((k) => Boolean(prev[k]) === next[k]);
+      if (same) return prev;
       persistJson(NAV_SECTIONS_STORAGE_KEY, next);
       return next;
     });
@@ -329,15 +356,23 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
 
   function toggleSection(key) {
     setCollapsedSections((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
+      const opening = Boolean(prev[key]);
+      const next = opening ? onlySectionOpen(groups, key) : { ...prev, [key]: true };
       persistJson(NAV_SECTIONS_STORAGE_KEY, next);
       return next;
     });
   }
 
-  function toggleNested(id) {
+  // Sub-groups (e.g. under Prevention): opening one closes its siblings.
+  function toggleNested(id, siblingIds = []) {
     setCollapsedNested((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
+      const isClosed = prev[id] === undefined ? true : Boolean(prev[id]);
+      const next = { ...prev, [id]: !isClosed };
+      if (isClosed) {
+        for (const sibling of siblingIds) {
+          if (sibling !== id) next[sibling] = true;
+        }
+      }
       persistJson(NAV_NESTED_STORAGE_KEY, next);
       return next;
     });
@@ -357,6 +392,7 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
   }
 
   function renderNavTree(nodes, depth = 0) {
+    const siblingBranchIds = (nodes || []).filter((node) => isNavBranch(node)).map((node) => node.id || node.label);
     return (nodes || []).map((node) => {
       if (isNavBranch(node)) {
         const branchId = node.id || node.label;
@@ -378,7 +414,7 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
                 aria-expanded={!isBranchCollapsed}
                 aria-controls={`nav-branch-${branchId}`}
                 id={`nav-branch-btn-${branchId}`}
-                onClick={() => toggleNested(branchId)}
+                onClick={() => toggleNested(branchId, siblingBranchIds)}
               >
                 <BranchIcon size={15} aria-hidden />
                 <span>{navNodeLabel(node)}</span>
@@ -436,7 +472,7 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
           const key = navSectionKey(group, index);
           const title = navSectionTitle(group, index);
           const isSectionCollapsed = Boolean(collapsedSections[key]);
-          const showHeader = Boolean(group.label) || groupHasNavTree(group) || (group.items?.length || 0) > 1;
+          const showHeader = navGroupHasHeader(group);
           const sectionHasActive = groupContainsRoute(group, current);
 
           return (
@@ -586,7 +622,7 @@ function TopBar({
   const initials = membershipInitials(membership, user);
   const displayName = membership?.displayName || user?.displayName || user?.email || "User";
   const roleLabel = formatRoleLabel(membership?.role || "member", membership);
-  const { dateLabel, timeLabel } = useLiveClock(profile.timezone || "America/Chicago");
+  const { dateLabel, timeLabel } = useLiveClock(isValidTimezone(profile.timezone) ? profile.timezone : "America/Chicago");
   const brandTitle = profile.displayTitle || profile.name || defaultPlatformConfig.platformTitle;
   const brandSubtitle = profile.shortName || profile.name;
 
@@ -637,11 +673,7 @@ function TopBar({
       <div className="command-time"><span><CalendarDays size={15} /> {dateLabel}</span><span><Clock3 size={15} /> {timeLabel}</span></div>
       {!hideSearch && <label className="global-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search personnel, apparatus, occupancies, training, inspections..." /></label>}
       <NotificationBell departmentId={departmentId} userId={user?.uid} />
-      <button className="profile-button" type="button" onClick={onSignOut} title="Sign out">
-        <span>{initials}</span>
-        <div><strong>{displayName}</strong><small>{roleLabel}</small></div>
-        <ChevronRight size={13} />
-      </button>
+      <AccountMenu initials={initials} displayName={displayName} roleLabel={roleLabel} onSignOut={onSignOut} />
     </div>
   </header>;
 }
@@ -789,8 +821,10 @@ function AppShell() {
     };
   }, [departmentId, platformConfig?.availablePreplanFeatures]);
 
+  const academyConnected = Boolean(settings?.academy?.connected);
   const visibleNavGroups = useMemo(() => {
-    const permissionFiltered = filterNavGroups(navGroups, permissions, { isCreator });
+    const permissionFiltered = filterNavGroups(navGroups, permissions, { isCreator })
+      .map((group) => (isCreator ? group : { ...group, items: (group.items || []).filter(([name]) => name !== "Fleet Hardening") }));
     const moduleFiltered = filterNavByEnabledModules(permissionFiltered, isModuleEnabled, {
       isCreator,
       isPlatformScope: inPlatformScope,
@@ -800,8 +834,13 @@ function AppShell() {
       isCreator,
       isPlatformCreator: Boolean(membership?.isPlatformCreator),
     });
-    return filterNavGroupsByPreplanFeatures(codeFiltered, preplanFeatures || {}, { isCreator });
-  }, [permissions, isCreator, isModuleEnabled, inPlatformScope, membership?.isPlatformCreator, codeLibraryAccess, preplanFeatures]);
+    const preplanFiltered = filterNavGroupsByPreplanFeatures(codeFiltered, preplanFeatures || {}, { isCreator });
+    // Academy Class Schedule only when the department has an Academy connected.
+    return academyConnected ? preplanFiltered : preplanFiltered.map((group) => ({
+      ...group,
+      items: (group.items || []).filter(([name]) => name !== "Academy Class Schedule"),
+    }));
+  }, [permissions, isCreator, isModuleEnabled, inPlatformScope, membership?.isPlatformCreator, codeLibraryAccess, preplanFeatures, academyConnected]);
   const canViewInternalEmail = hasPermission(permissions, "viewInternalEmail");
   const canViewDailyLog = hasPermission(permissions, "viewDailyLog");
   const visibleEmployeeNavGroups = useMemo(
@@ -809,8 +848,9 @@ function AppShell() {
       canViewInternalEmail,
       canViewDailyLog,
       isModuleEnabled,
+      academyConnected,
     }),
-    [canViewInternalEmail, canViewDailyLog, isModuleEnabled]
+    [canViewInternalEmail, canViewDailyLog, isModuleEnabled, academyConnected]
   );
   const showAdminToggle = canAccessAdminRms(permissions, isCreator);
   const showEmployeeToggle = canAccessEmployeePortal(permissions);
@@ -1081,9 +1121,12 @@ function AppShell() {
     () => personnel.find((person) => person.id === employeePreviewPersonId) || null,
     [personnel, employeePreviewPersonId]
   );
+  // The shift on duty now (a 07:00 shift change means 02:00 still belongs to yesterday).
+  const currentDutyDayId = dutyDayId(new Date(), dailyLogSettings.shiftChangeTime);
   const dashboardLiveDayMetrics = useMemo(
     () => buildLiveScheduleDayMetrics({
-      referenceDayId: formatDayId(new Date()),
+      referenceDayId: currentDutyDayId,
+      shiftChangeTime: dailyLogSettings.shiftChangeTime,
       dayCount: 7,
       scheduleDays,
       rotation: shiftRotation,
@@ -1095,6 +1138,8 @@ function AppShell() {
       apparatus,
     }),
     [
+      currentDutyDayId,
+      dailyLogSettings.shiftChangeTime,
       scheduleDays,
       shiftRotation,
       roster,
@@ -1104,6 +1149,11 @@ function AppShell() {
       schedulingSettings,
       apparatus,
     ]
+  );
+  // Days left and Expired/Due Soon worked out from each expiration date, every time.
+  const liveCertifications = useMemo(
+    () => (Array.isArray(certifications) ? certifications : []).map((cert) => withLiveCertDays(cert)),
+    [certifications]
   );
 
   function openPersonnelProfile(personnelId = "") {
@@ -1167,6 +1217,9 @@ function AppShell() {
     setEmployeeSection(name);
     setMobileNav(false);
   }
+  // A page whose module is switched off (reachable by a saved ?page= link) is not shown.
+  const blockedModuleKey = effectiveAppView === "employee" ? "" : NAV_MODULE_MAP[current] || "";
+  const moduleBlocked = Boolean(!inPlatformScope && blockedModuleKey && !isModuleEnabled(blockedModuleKey));
   const pageContent = effectiveAppView === "employee" ? (
     <EmployeePortalPage
       current={employeeSection}
@@ -1176,7 +1229,7 @@ function AppShell() {
       permissions={permissions}
       showInternalEmail={isModuleEnabled("internalEmail")}
       personnel={personnel}
-      certifications={certifications}
+      certifications={liveCertifications}
       training={training}
       documents={documents}
       setDocuments={setDocuments}
@@ -1186,6 +1239,8 @@ function AppShell() {
       setShiftTrades={setShiftTrades}
       vacancyPickups={vacancyPickups}
       setVacancyPickups={setVacancyPickups}
+      callShifts={callShifts}
+      setCallShifts={setCallShifts}
       setPersonnel={setPersonnel}
       scheduleDays={scheduleDays}
       roster={roster}
@@ -1217,7 +1272,7 @@ function AppShell() {
       }}
     />
   ) : current === "Dashboard" ? (
-    <CommandDashboard onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={certifications} apparatus={apparatus} workOrders={workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} />
+    <CommandDashboard onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={liveCertifications} apparatus={apparatus} workOrders={workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} dutyDayId={currentDutyDayId} />
   ) : current === "Personnel" ? (
     hasPermission(permissions, "viewPersonnel") ? (
       <PersonnelPage
@@ -1238,7 +1293,7 @@ function AppShell() {
     hasPermission(permissions, "viewCertifications") ? (
       <CertificationsPage
         query={query}
-        records={certifications}
+        records={liveCertifications}
         setRecords={setCertifications}
         departmentId={departmentId}
         canEdit={
@@ -1357,6 +1412,7 @@ function AppShell() {
         }
         legacyWritesLocked={fleetCutover.legacyApparatusWritesLocked}
         onOpenFleetAssets={() => setCurrent("All Fleet Assets")}
+        onOpenFleetReport={hasPermission(permissions, "viewFleetReporting") || isCreator ? () => setCurrent("Reporting & Automation") : undefined}
       />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Fleet Dashboard" ? (
@@ -1463,15 +1519,19 @@ function AppShell() {
       ? <FleetVendorPortalPage onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
   ) : current === "Fleet Hardening" ? (
-    hasPermission(permissions, "manageFleetConfig")
-      || hasPermission(permissions, "manageSystemSettings")
-      || hasPermission(permissions, "viewFleetDashboard")
-      || isCreator
+    isCreator
       ? <FleetHardeningPage onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
   ) : current === "All Fleet Assets" ? (
     hasPermission(permissions, "viewFleetAssets") || hasPermission(permissions, "viewApparatus") || isCreator
       ? <FleetAssetsMasterPage query={query} onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Apparatus Check Setup" ? (
+    hasPermission(permissions, "manageFleetConfig")
+      || hasPermission(permissions, "manageSystemSettings")
+      || hasPermission(permissions, "editApparatus")
+      || isCreator
+      ? <ApparatusCheckSetupPage legacyApparatus={apparatus} />
       : <AccessDeniedModule name={current} />
   ) : current === "Fleet Configuration Studio" ? (
     hasPermission(permissions, "manageFleetConfig")
@@ -1487,11 +1547,11 @@ function AppShell() {
       )
       : <AccessDeniedModule name={current} />
   ) : current === "Maintenance" ? (
-    hasPermission(permissions, "viewApparatus") ? <MaintenancePage orders={workOrders} setOrders={setWorkOrders} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "viewApparatus") ? <MaintenancePage orders={workOrders} setOrders={setWorkOrders} units={apparatus} canEdit={canEditApparatus(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Assets" ? (
     hasPermission(permissions, "viewAssets") ? <AssetsPageConnected query={query} records={assets} setRecords={setAssets} canEdit={canEditAssets(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Hose Testing" ? (
-    hasPermission(permissions, "viewApparatus") ? <HoseTestingPage query={query} records={hoseTests} setRecords={setHoseTests} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "viewApparatus") ? <HoseTestingPage query={query} records={hoseTests} setRecords={setHoseTests} apparatus={apparatus} canEdit={canEditApparatus(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Occupancies" ? (
     hasPermission(permissions, "viewInspections") ? (
       <OccupanciesMasterPage
@@ -1647,7 +1707,7 @@ function AppShell() {
           onNavigate={setCurrent}
           variant="nearby"
           title="Nearby Preplans"
-          description="Operational preplans for response (map overlay comes with Phase 5)."
+          description="Operational preplans for response."
         />
       )
       : <AccessDeniedModule name={current} />
@@ -1708,7 +1768,7 @@ function AppShell() {
       <NerisAnalyticsPage reports={nerisFireReports} />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Analytics" ? (
-    hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={certifications} training={training} apparatus={apparatus} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={liveCertifications} training={training} apparatus={apparatus} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />
   ) : current === "Messages" ? (
     hasPermission(permissions, "viewInternalEmail") ? <InternalEmailBoardPage personnel={personnel} /> : <AccessDeniedModule name={current} />
   ) : current === "Digital Dashboard" ? (
@@ -1794,7 +1854,7 @@ function AppShell() {
       || isCreator
       ? <HydrantDamageAnalyticsPage onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
-  ) : <ModulePage name={current} query={query} />;
+  ) : <ModulePage name={current} />;
 
   return <main className={`app-shell ${collapsed ? "nav-collapsed" : ""} ${mobileNav ? "mobile-nav-open" : ""} ${isHydrantsView ? "hydrants-view" : ""} ${isDemoModeActive() ? "demo-mode-shell" : ""}`}>
     {isDemoModeActive() && <DemoModeBanner />}
@@ -1862,7 +1922,7 @@ function AppShell() {
         </div>
       )}
       {/* Module pages load on demand (see lazyPage). */}
-      <Suspense fallback={<PageLoading />}>{pageContent}</Suspense>
+      <Suspense fallback={<PageLoading />}>{moduleBlocked ? <ModuleNotIncluded name={current} /> : pageContent}</Suspense>
     </section>
     {!isHydrantsView ? (
       <PlatformFooter
@@ -1875,8 +1935,17 @@ function AppShell() {
 
 export default function App() {
   const { authRequired, authLoading, membershipLoading, user, membership, isCreator } = useAuth();
-  const { ready, gatewayDepartmentId, gatewayError } = useTenant();
+  const { ready, gatewayDepartmentId, gatewayError, departmentId: activeDepartmentId, isPlatformScope: platformScopeActive, setDepartmentId: setActiveDepartmentId } = useTenant();
   const twoFactor = useTwoFactorStatus();
+  const departmentStatus = useDepartmentStatus(user && !platformScopeActive ? activeDepartmentId : "");
+
+  // A creator whose remembered workspace has since been archived goes back to the
+  // FORGE platform workspace instead of editing a department that no longer exists.
+  useEffect(() => {
+    if (isCreator && departmentStatus.reason === "archived" && !platformScopeActive) {
+      setActiveDepartmentId?.(PLATFORM_SCOPE_ID);
+    }
+  }, [isCreator, departmentStatus.reason, platformScopeActive, setActiveDepartmentId]);
 
   if (isDemoEntryPath() && !authLoading) {
     return <DemoEntryPage />;
@@ -1916,9 +1985,12 @@ export default function App() {
     }
   }
   if (!membership && !isCreator) return <AccessDeniedPage userId={user?.uid} />;
+  // The rules refuse members of a suspended or archived department; say why.
+  if (!isCreator && departmentStatus.reason) return <AccessDeniedPage userId={user?.uid} />;
   return (
     <>
       <Suspense fallback={<LoadingScreen />}><AppShell /></Suspense>
+      <SaveFailedNotice />
       {twoFactor.level === "grace" && twoFactor.sessionOk === false && (
         <TwoFactorReminder daysLeft={twoFactor.daysLeft} enrolled={twoFactor.enrolled} />
       )}

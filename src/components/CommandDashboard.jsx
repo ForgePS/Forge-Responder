@@ -5,6 +5,9 @@ import {
 import { useEffect, useState } from "react";
 import { normalizeTableRows } from "../lib/tableRows.js";
 import { buildDashboardMetrics, buildDashboardStaffingRows } from "../utils/dashboardMetrics.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { resolveEmployeePerson } from "../lib/employeePortalUtils.js";
+import { acknowledgementKeys } from "../lib/documentAcknowledgement.js";
 import { loadDepartmentHydrants, applyLocalHydrantOverrides } from "../lib/hydrantTenantService.js";
 import { currentHydrantYear } from "../lib/hydrantCompletionStats.js";
 import HydrantCompletionChart from "./HydrantCompletionChart.jsx";
@@ -53,6 +56,7 @@ export default function CommandDashboard({
   shiftTrades,
   shiftRotation,
   liveDayMetrics = {},
+  dutyDayId = "",
 }) {
   const [hydrants, setHydrants] = useState([]);
   const [hydrantsLoading, setHydrantsLoading] = useState(Boolean(departmentId));
@@ -84,6 +88,8 @@ export default function CommandDashboard({
     };
   }, [departmentId]);
 
+  const { user, membership } = useAuth();
+  const viewerPerson = resolveEmployeePerson(Array.isArray(personnel) ? personnel : [], membership, user);
   const metrics = buildDashboardMetrics({
     personnel,
     certifications,
@@ -95,7 +101,11 @@ export default function CommandDashboard({
     documents,
     scheduleDays,
     leaveRequests,
-    shiftTrades
+    shiftTrades,
+    liveDayMetrics,
+    dutyDayId,
+    // Documents waiting on the person looking at the dashboard.
+    acknowledgementKeys: acknowledgementKeys({ personnelId: viewerPerson?.id || membership?.personnelId, uid: user?.uid }),
   });
 
   const staffingRows = buildDashboardStaffingRows({
@@ -105,8 +115,8 @@ export default function CommandDashboard({
   });
 
   const kpis = [
-    ["Personnel On Duty", metrics.onDuty, `of ${personnel.length} Assigned`, "info", Users, "Personnel"],
-    ["Staffing Deficit", metrics.staffingDeficit, metrics.staffingDeficit ? "Below Target" : "Covered", metrics.staffingDeficit ? "critical" : "success", Users, "Scheduling"],
+    ["Personnel On Duty", metrics.onDuty ?? "—", metrics.onDuty === null ? "Roster not set up" : `of ${metrics.minimum} needed this shift`, "info", Users, "Scheduling"],
+    ["Staffing Deficit", metrics.staffingDeficit ?? "—", metrics.staffingDeficit === null ? "Roster not set up" : metrics.staffingDeficit ? `${metrics.staffingDeficit} short this shift` : "Fully staffed", metrics.staffingDeficit ? "critical" : "success", Users, "Scheduling"],
     ["Certifications Expiring", metrics.certsExpiring90, "Next 90 Days", "warning", FileCheck2, "Certifications"],
     ["Training Compliance", `${metrics.trainingCompliance}%`, "Department-wide", metrics.trainingCompliance >= 85 ? "success" : "warning", GraduationCap, "Training"],
     ["Units Available", metrics.unitsAvailable, `of ${apparatus.length} Total`, "success", Truck, "Apparatus"],
@@ -140,7 +150,7 @@ export default function CommandDashboard({
   ];
   if (metrics.pendingAcknowledgements) {
     actionRows.unshift({
-      title: "Policy acknowledgements pending",
+      title: "Documents for you to acknowledge",
       detail: `${metrics.pendingAcknowledgements} documents`,
       target: "SOGs / Policies",
     });

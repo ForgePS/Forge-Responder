@@ -14,21 +14,20 @@ service cloud.firestore {
         && request.auth.token.get("firebase", {}).get("sign_in_second_factor", null) != null;
     }
 
-    // Department admins must use two-factor once platformConfig/main.mfaAdminDeadline
-    // has passed (set by scripts/two-factor.mjs); the shared demo is exempt.
+    // Two-step sign-in codes are optional (2026-10-29): nobody is required to use
+    // them. These helpers stay so the requirement can be switched back on in one place.
     function adminTwoFactorDeadlinePassed() {
       return exists(/databases/$(database)/documents/platformConfig/main)
         && get(/databases/$(database)/documents/platformConfig/main).data.get("mfaAdminDeadline", null) != null
         && request.time >= get(/databases/$(database)/documents/platformConfig/main).data.mfaAdminDeadline;
     }
     function adminTwoFactorOk(departmentId) {
-      return hasSecondFactor() || isDemoDepartment(departmentId) || !adminTwoFactorDeadlinePassed();
+      return true;
     }
 
-    // Creator powers need a session signed in with a two-factor code.
+    // Platform creators: an active platformCreators/{uid} record (two-step code optional).
     function isPlatformCreator() {
       return isAuthenticated()
-        && hasSecondFactor()
         && exists(/databases/$(database)/documents/platformCreators/$(request.auth.uid))
         && get(/databases/$(database)/documents/platformCreators/$(request.auth.uid)).data.status == "active";
     }
@@ -41,6 +40,13 @@ service cloud.firestore {
 
     function isDemoDepartment(departmentId) {
       return departmentId == "forge-demo";
+    }
+
+    // The shared demo login (its password is shown on the public demo page). Only this
+    // account, demo members and platform creators use forge-demo; other signed-in
+    // users no longer get in just by being signed in.
+    function isDemoAccount() {
+      return isAuthenticated() && request.auth.token.get("email", "") == "demo@forge.demo";
     }
 
     // A department is usable unless its subscription is suspended/cancelled or the
@@ -82,9 +88,11 @@ service cloud.firestore {
         || data.get("roleIds", []).hasAny(["creator"]);
     }
 
+    // Department admins may change someone's role(s), but never to or from the
+    // platform "creator" role or flag.
     function platformFlagsUnchanged() {
       return request.resource.data.get("isPlatformCreator", false) == resource.data.get("isPlatformCreator", false)
-        && request.resource.data.get("role", "") == resource.data.get("role", "")
+        && (request.resource.data.get("role", "") == "creator") == (resource.data.get("role", "") == "creator")
         && request.resource.data.get("roleIds", []).hasAny(["creator"]) == resource.data.get("roleIds", []).hasAny(["creator"]);
     }
 
@@ -104,7 +112,7 @@ service cloud.firestore {
     function canAccessDepartment(departmentId) {
       return isPlatformCreator()
         || (isDepartmentMember(departmentId) && isDepartmentActive(departmentId))
-        || (isAuthenticated() && isDemoDepartment(departmentId));
+        || (isDemoAccount() && isDemoDepartment(departmentId));
     }
 
     // ---- Plan entitlements (written only by Cloud Functions; functions/lib/entitlements.js) ----
@@ -255,7 +263,7 @@ service cloud.firestore {
       // Public read so signed-out login can show the correct department name/logo.
       allow read: if true;
       allow create, update: if isPlatformCreator()
-        || (isAuthenticated() && isDemoDepartment(departmentId));
+        || (isDemoAccount() && isDemoDepartment(departmentId));
       allow delete: if false;
     }
 
@@ -360,6 +368,8 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Station TV screens no longer read these lists directly: they go through
+    // alertDashboardPublicView with the department display key (2026-10-29).
     function isPublicAlertList(listKey) {
       return listKey in [
         "hlfd-rms-active911-alerts",
@@ -437,14 +447,20 @@ service cloud.firestore {
                request.resource.data.get("stations", []).size(), resource.data.get("stations", []).size());
         allow delete: if canAccessDepartment(departmentId);
       }
+      // Department settings: admins change them. A member may only seed a missing
+      // settings/main on first load and save distribution groups (the app checks
+      // manageInternalEmail). Secrets live in integrations/, never here.
       match /settings/{document} {
         allow read: if canAccessDepartment(departmentId);
-        // FORGE Field settings (workflows, fields, logo) are admin-only.
-        allow create: if canAccessDepartment(departmentId)
-          && (document != "fieldApp" || isDepartmentAdmin(departmentId));
-        allow update: if canAccessDepartment(departmentId)
-          && (isPlatformCreator() || (subscriptionFieldUnchanged() && enabledModulesUnchanged()))
-          && (document != "fieldApp" || isDepartmentAdmin(departmentId));
+        allow create: if isDepartmentAdmin(departmentId)
+          || (document == "main" && canAccessDepartment(departmentId));
+        allow update: if (
+            isDepartmentAdmin(departmentId)
+            || (canAccessDepartment(departmentId) && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(["internalEmailGroups", "departmentId", "updatedAt"]))
+          )
+          && (isPlatformCreator() || (subscriptionFieldUnchanged() && enabledModulesUnchanged()));
+        // FORGE Field settings (settings/fieldApp) are admin-only through the rule above.
       }
       // FORGE Field: EMS unit / supply closet check-off lists (built by admins)
       // and the counts crews submit from the field.
@@ -489,7 +505,7 @@ service cloud.firestore {
       // Writes also need the list's module switched on, and the personnel list
       // cannot grow past the plan's maxPersonnel.
       match /lists/{listKey} {
-        allow read: if isPublicAlertList(listKey) || canAccessDepartment(departmentId);
+        allow read: if canAccessDepartment(departmentId);
         allow create: if canWriteModule(departmentId, listModule(listKey))
           && (listKey != "hlfd-rms-personnel"
               || withinLimit(departmentId, "maxPersonnel", request.resource.data.get("items", []).size(), 0));
@@ -502,7 +518,7 @@ service cloud.firestore {
         allow delete: if canWriteModule(departmentId, listModule(listKey));
 
         match /items/{itemId} {
-          allow read: if isPublicAlertList(listKey) || canAccessDepartment(departmentId);
+          allow read: if canAccessDepartment(departmentId);
           allow create: if canWriteModule(departmentId, listModule(listKey))
             && (listKey != "hlfd-rms-personnel" || personnelRoom(departmentId));
           allow update, delete: if canWriteModule(departmentId, listModule(listKey));
@@ -516,10 +532,10 @@ service cloud.firestore {
         // plan's portal-user limit); only creators create memberships directly.
         allow create: if isPlatformCreator()
           || (
-            // Demo sandbox: anyone may self-join (demo users get Fire Chief by design),
-            // but never with platform-creator flags.
+            // Demo sandbox: the shared demo account may join itself (as Fire Chief by
+            // design), but never with platform-creator flags.
             isDemoDepartment(departmentId)
-            && isAuthenticated()
+            && isDemoAccount()
             && request.auth.uid == userId
             && !touchesPlatformFlags(request.resource.data)
           );
@@ -1089,7 +1105,7 @@ service cloud.firestore {
         allow read: if canAccessDepartment(departmentId);
         allow create: if canAccessDepartment(departmentId);
         allow update: if canAccessDepartment(departmentId);
-        allow delete: if false;
+        allow delete: if isDepartmentAdmin(departmentId);
       }
       match /waterCompanies/{companyId} {
         allow read: if canAccessDepartment(departmentId);

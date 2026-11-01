@@ -347,6 +347,7 @@ export function purgeInspectionLocalData(departmentId, policyInput = null) {
   writeJson(QUEUE_KEY(departmentId), queue.slice(0, policy.maxQueueItems));
 
   const attachments = listInspectionAttachmentQueue(departmentId).filter((row) => {
+    if (row.status !== "uploaded") return true;
     const ts = Date.parse(row.clientUpdatedAt || "");
     if (Number.isFinite(ts) && ts < cutoff) {
       purgedAttachments += 1;

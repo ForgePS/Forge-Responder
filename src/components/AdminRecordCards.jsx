@@ -36,7 +36,9 @@ export default function AdminRecordCards({
                 <span>{row.id}</span>
               )}
             </div>
-            <button className="row-action danger" type="button" onClick={() => onRemoveRow(rowIndex)}>
+            <button className="row-action danger" type="button" onClick={() => {
+              if (window.confirm(`Remove ${recordTitle(row, collectionName) || "this record"}? It's deleted when you save.`)) onRemoveRow(rowIndex);
+            }} aria-label="Remove record">
               <Trash2 size={14} />
             </button>
           </header>

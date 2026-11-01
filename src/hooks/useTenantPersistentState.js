@@ -12,6 +12,7 @@ import { ensureItemIds, entriesFromRecords, isItemsStorage, itemsFromRecords, pl
 import { commitListPlan, itemsHeaderPayload, listHeaderRef, listItemsQuery, recordsFromSnapshot } from "../lib/tenantListStore.js";
 
 import { LIST_MODULE_NAMES } from "../lib/tenantListKeys.js";
+import { notifySaveFailed } from "../lib/saveNotice.js";
 
 function normalizeDataset(value, fallback) {
   if (Array.isArray(value)) return value;
@@ -269,9 +270,13 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
               }).catch((error) => console.warn("Audit log write failed", error));
             }
           })
-          .catch((error) => console.error(`Firebase save failed for ${listKey}`, error));
+          .catch((error) => {
+            console.error(`Firebase save failed for ${listKey}`, error);
+            notifySaveFailed(LIST_MODULE_NAMES[listKey] || "your change", error);
+          });
       } else {
         console.warn(`Skipped Firebase save for ${listKey} until remote data finishes loading`);
+        notifySaveFailed(LIST_MODULE_NAMES[listKey] || "your change", { code: "not-loaded" });
       }
 
       return normalizedItems;

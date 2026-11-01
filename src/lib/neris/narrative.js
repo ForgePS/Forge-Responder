@@ -12,7 +12,7 @@ export function generateDraftNarrative(report = {}) {
   const address = report.incidentAddress || workspace.location?.address || "the reported location";
   const units = (workspace.units || []).map((u) => u.unitId).filter(Boolean).join(", ");
   const actions = (workspace.actions || []).join(", ").replace(/_/g, " ").toLowerCase();
-  const weather = workspace.weather?.dispatchWeather;
+  const weather = workspace.weather?.source === "weather-api-simulated" ? null : workspace.weather?.dispatchWeather;
   const cad = workspace.cad || {};
 
   const templateId = matchTemplate(type);
@@ -43,7 +43,7 @@ export function generateDraftNarrative(report = {}) {
   if (core.incident_narrative_outcome) {
     parts.push(String(core.incident_narrative_outcome));
   } else {
-    parts.push(template ? `This report follows the ${template.label} template.` : "All units cleared the scene without further incident.");
+    parts.push("All units returned to service.");
   }
 
   return {

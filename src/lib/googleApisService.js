@@ -23,26 +23,12 @@ export function getGoogleApisClientConfig(departmentId = "") {
   return callGoogleApis("googleApisGetClientConfig", { departmentId });
 }
 
-export function saveGoogleApisConfig({
-  departmentId = "",
-  mapsJsApiKey,
-  geocodingApiKey,
-  placesApiKey,
-  youtubeDataApiKey,
-  defaultMapCenter = "",
-  defaultMapZoom,
-  removeKeys = [],
-} = {}) {
-  return callGoogleApis("googleApisSave", {
-    departmentId,
-    mapsJsApiKey,
-    geocodingApiKey,
-    placesApiKey,
-    youtubeDataApiKey,
-    defaultMapCenter,
-    defaultMapZoom,
-    removeKeys,
-  });
+export function saveGoogleApisConfig({ departmentId = "", removeKeys = [], ...fields } = {}) {
+  const payload = { departmentId, removeKeys };
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined && value !== null) payload[key] = value;
+  }
+  return callGoogleApis("googleApisSave", payload);
 }
 
 export function clearGoogleApisConfig(departmentId = "") {

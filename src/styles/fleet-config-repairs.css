@@ -1,0 +1,20 @@
+/* Fleet Configuration Studio — Repairs tab (defect categories, shops, vendors). */
+.fleet-repairs-config { display: grid; gap: 24px; }
+.fleet-repairs-section { display: grid; gap: 10px; }
+.fleet-repairs-section > header h3 { margin: 0; font-size: 16px; color: var(--rms-text-strong); }
+.fleet-repairs-section > header p { margin: 4px 0 0; }
+.fleet-repairs-block { display: grid; gap: 10px; }
+.fleet-repairs-intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 0; }
+.fleet-repairs-intro p { margin: 0; flex: 1 1 320px; }
+.fleet-repairs-severity-help {
+  margin: 0;
+  padding: 10px 14px 10px 28px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--rms-border-subtle);
+  border-radius: 8px;
+  color: var(--rms-text-body);
+  font-size: 14px;
+}
+.fleet-repairs-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.fleet-repairs-empty { padding: 12px 10px; margin: 0; }

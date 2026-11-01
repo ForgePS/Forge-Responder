@@ -14,7 +14,7 @@ export default function CategoryHubPanel({ categoryId, hubConfig, onConfigChange
       <div className="dd-source-panel">
         <div className="dd-source-placeholder">
           <strong>{categoryId}</strong>
-          <p>This category is coming soon.</p>
+          <p>Nothing to set up in this category.</p>
         </div>
       </div>
     );
@@ -41,7 +41,7 @@ export default function CategoryHubPanel({ categoryId, hubConfig, onConfigChange
           <p>
             {activeTab?.enabled
               ? "Configure this app from the fields on the right, then save to your media library."
-              : "This integration is coming soon."}
+              : "This app isn't available."}
           </p>
         </div>
       </div>

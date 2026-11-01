@@ -31,7 +31,7 @@ export default function InspectionAutomationConfigPanel() {
         <div className="panel-body">
           <p className="occupancy-muted">
             Configure rules, workflows, webhooks, calendar stubs, NERIS mappings, and adapters under
-            Prevention → Automation & Integrations. Email/SMS/webhook network delivery remains stubbed.
+            Prevention → Automation & Integrations. Email, SMS and webhook delivery isn't connected yet; matching actions are logged only.
           </p>
         </div>
       </section>

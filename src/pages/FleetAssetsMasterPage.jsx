@@ -178,7 +178,7 @@ export default function FleetAssetsMasterPage({
     <FleetPermissionGate allowed={canView}>
       <FleetModuleLayout
         title="All Fleet Assets"
-        description="Authoritative fleet master records. Classic Apparatus list remains until Phase 3 cutover."
+        description="Authoritative fleet master records. The classic Apparatus list stays available until your department switches over to Fleet."
         activeNavName="All Fleet Assets"
         onNavigate={onNavigate}
         actions={canEdit ? (
@@ -282,14 +282,14 @@ export default function FleetAssetsMasterPage({
                         onChange={(e) => setDraft((c) => ({ ...c, type: e.target.value }))}
                       />
                     </Field>
-                    <Field label="Fleet class">
+                    <Field label="Vehicle type">
                       <select
                         value={draft.fleetClassId || ""}
                         disabled={!canEdit}
                         onChange={(e) => setDraft((c) => ({ ...c, fleetClassId: e.target.value }))}
                       >
-                        <option value="">Select class</option>
-                        {classes.map((item) => (
+                        <option value="">Select type</option>
+                        {classes.filter((item) => item.active !== false || item.id === draft.fleetClassId).map((item) => (
                           <option key={item.id} value={item.id}>{item.name}</option>
                         ))}
                       </select>

@@ -1,5 +1,6 @@
 import {
   createRecord,
+  deleteRecord,
   listRecords,
   updateRecord,
 } from "../firestoreService.js";
@@ -105,7 +106,7 @@ export async function ensureFleetShopsSeeded(departmentId, audit = {}) {
 export async function ensureFleetVendorsSeeded(departmentId, audit = {}) {
   if (!departmentId) return [];
   const existing = await listFleetVendors(departmentId);
-  if (existing.length) return existing;
+  if (existing.length || !STARTER_VENDORS.length) return existing;
   const stamp = nowIso();
   const created = [];
   for (const starter of STARTER_VENDORS) {
@@ -169,4 +170,37 @@ export async function saveFleetVendor(departmentId, record = {}, audit = {}) {
     actorName: audit.actorName || "System",
   }).catch(() => null);
   return normalized;
+}
+
+async function deleteFleetRow(departmentId, collection, label, record = {}, audit = {}) {
+  if (!departmentId || !record?.id) throw new Error("Nothing to remove.");
+  await deleteRecord(departmentId, collection, record.id);
+  await writeFleetAuditLog(departmentId, {
+    action: "delete",
+    recordId: record.id,
+    summary: `Removed ${label} ${record.name || ""}`.trim(),
+    actorUid: audit.actorUid || "system",
+    actorName: audit.actorName || "System",
+  }).catch(() => null);
+  return true;
+}
+
+/**
+ * Permanently remove a shop. Callers should check open work orders first.
+ * @param {string} departmentId
+ * @param {{ id: string, name?: string }} record
+ * @param {{ actorUid?: string, actorName?: string }} [audit]
+ */
+export async function deleteFleetShop(departmentId, record = {}, audit = {}) {
+  return deleteFleetRow(departmentId, FLEET_SHOPS_COLLECTION, "shop", record, audit);
+}
+
+/**
+ * Permanently remove a vendor. Callers should check open work orders first.
+ * @param {string} departmentId
+ * @param {{ id: string, name?: string }} record
+ * @param {{ actorUid?: string, actorName?: string }} [audit]
+ */
+export async function deleteFleetVendor(departmentId, record = {}, audit = {}) {
+  return deleteFleetRow(departmentId, FLEET_VENDORS_COLLECTION, "vendor", record, audit);
 }

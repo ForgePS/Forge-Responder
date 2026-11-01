@@ -27,6 +27,23 @@ async function countOf(query) {
   }
 }
 
+/** Pending invites that have not expired yet (expired ones don't hold a seat). */
+async function countUnexpiredPendingInvites(db, departmentId) {
+  try {
+    const snap = await db.collection("invites")
+      .where("departmentId", "==", departmentId)
+      .where("status", "==", "pending")
+      .get();
+    const now = Date.now();
+    return snap.docs.filter((doc) => {
+      const millis = doc.data().expiresAt?.toMillis?.();
+      return !(Number.isFinite(millis) && millis < now);
+    }).length;
+  } catch {
+    return null;
+  }
+}
+
 /** Latest audit timestamp; logs use created_at (older) or createdAt (newer). */
 async function lastActivity(deptRef) {
   const logs = deptRef.collection("auditLogs");
@@ -62,7 +79,7 @@ async function usageForDepartment(db, bucket, id, registry = {}) {
     countListItems(db, id, PERSONNEL_LIST),
     countOf(ref.collection("users").where("status", "==", "active")),
     countOf(ref.collection("users")),
-    countOf(db.collection("invites").where("departmentId", "==", id).where("status", "==", "pending")),
+    countUnexpiredPendingInvites(db, id),
     lastActivity(ref),
     storageUsage(bucket, id),
   ]);

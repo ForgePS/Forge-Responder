@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { getFirestoreDb, getFirebaseFunctions } from "./firebaseClient.js";
 import { createRecord, subscribeCollection } from "./firestoreService.js";
@@ -82,66 +82,39 @@ export function subscribeDamageForms(departmentId, onData, onError) {
   );
 }
 
-export async function loadDamageFormSettings(departmentId, options = {}) {
+export async function loadDamageFormSettings(departmentId) {
   const db = getFirestoreDb();
   if (!db || !departmentId) return null;
   const ref = doc(db, "departments", departmentId, "settings", DAMAGE_FORM_SETTINGS_DOC);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
-  const data = snap.data();
-  if (options.includeSecrets) return data;
-  const { apiKey, ...rest } = data;
+  // Older departments may still have the key and webhook token here until an admin
+  // opens the setup screen (the server then moves them); never pass them on.
+  const { apiKey, webhookToken: _webhookToken, ...rest } = snap.data();
   return { ...rest, apiKeyConfigured: Boolean(apiKey) };
 }
 
-export async function ensureDamageFormSettings(departmentId) {
-  const existing = await loadDamageFormSettings(departmentId, { includeSecrets: true });
-  if (existing?.webhookToken) {
-    const { apiKey, ...rest } = existing;
-    return { ...rest, apiKeyConfigured: Boolean(apiKey) };
-  }
-
-  const db = getFirestoreDb();
-  if (!db || !departmentId) return null;
-
-  const payload = {
-    formUrl: existing?.formUrl || "",
-    formId: existing?.formId || extractJotformId(existing?.formUrl || ""),
-    formTitle: existing?.formTitle || "Damage Form",
-    webhookToken: existing?.webhookToken || crypto.randomUUID(),
-    updatedAt: new Date().toISOString(),
-  };
-  await setDoc(doc(db, "departments", departmentId, "settings", DAMAGE_FORM_SETTINGS_DOC), payload, { merge: true });
-  return { ...payload, apiKeyConfigured: Boolean(payload.apiKey) };
+async function callJotformSetup(departmentId, data) {
+  const functions = getFirebaseFunctions();
+  if (!functions || !departmentId) throw new Error("Damage form setup is unavailable.");
+  const callable = httpsCallable(functions, "saveJotformDamageSetup");
+  const result = await callable({ departmentId, ...data });
+  return result.data || null;
 }
 
+/** Admins: load the setup (including the webhook link). The key stays on the server. */
+export async function ensureDamageFormSettings(departmentId) {
+  return callJotformSetup(departmentId, { readOnly: true });
+}
+
+/** Admins: save the form link/title; a non-blank apiKey replaces the stored one. */
 export async function saveDamageFormSettings(departmentId, settings = {}) {
-  const db = getFirestoreDb();
-  if (!db || !departmentId) return null;
-
-  const existing = await loadDamageFormSettings(departmentId, { includeSecrets: true });
-  const formUrl = String(settings.formUrl || "").trim();
-  const payload = {
-    formUrl,
-    formId: extractJotformId(formUrl),
-    formTitle: String(settings.formTitle || "Damage Form").trim() || "Damage Form",
-    webhookToken: existing?.webhookToken || crypto.randomUUID(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  const apiKey = String(settings.apiKey || "").trim();
-  if (apiKey) {
-    payload.apiKey = apiKey;
-  } else if (existing?.apiKey) {
-    payload.apiKey = existing.apiKey;
-  }
-
-  await setDoc(doc(db, "departments", departmentId, "settings", DAMAGE_FORM_SETTINGS_DOC), payload, { merge: true });
-  const saved = await loadDamageFormSettings(departmentId);
-  return {
-    ...saved,
-    apiKeyConfigured: Boolean(saved?.apiKeyConfigured),
-  };
+  return callJotformSetup(departmentId, {
+    formUrl: String(settings.formUrl || "").trim(),
+    formTitle: String(settings.formTitle || "").trim(),
+    apiKey: String(settings.apiKey || "").trim(),
+    removeApiKey: Boolean(settings.removeApiKey),
+  });
 }
 
 export async function fetchJotformDamagePdf(departmentId, { recordId = "", submissionId = "", formId = "" } = {}) {

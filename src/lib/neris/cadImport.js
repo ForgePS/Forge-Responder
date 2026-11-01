@@ -34,9 +34,16 @@ const CAD_FIELD_ALIASES = {
     "cadcallnumber", "cad_call_number", "callid", "call_id", "callno", "call_no", "cadid", "cad_id",
     "incidentnumber", "incident_number",
   ],
+  receivedTime: [
+    "receivedtime", "received_time", "callreceived", "call_received", "callreceivedtime", "call_received_time",
+    "psapanswertime", "psap_answer_time", "answertime", "answer_time",
+  ],
   dispatchTime: [
     "dispatchtime", "dispatch_time", "dispatchedat", "dispatched_at", "alarmtime", "alarm_time",
     "calltime", "call_time", "createdat", "created_at", "timeofcall", "time_of_call",
+  ],
+  enrouteTime: [
+    "enroutetime", "enroute_time", "firstenroute", "first_enroute", "respondingtime", "responding_time",
   ],
   arrivalTime: [
     "arrivaltime", "arrival_time", "onscenetime", "on_scene_time", "atscenetime", "at_scene_time",
@@ -130,7 +137,9 @@ export function buildCadImportPreview(payload) {
   const cadLabels = {
     incidentNumber: "Incident number",
     cadCallNumber: "CAD call number",
+    receivedTime: "Call received",
     dispatchTime: "Dispatch time",
+    enrouteTime: "En route time",
     arrivalTime: "Arrival time",
     clearTime: "Clear time",
     priority: "Priority",
@@ -268,7 +277,7 @@ export function refreshCadInfo(report) {
     ...existing,
     incidentNumber: existing.incidentNumber || report.reportNumber || "",
     cadCallNumber: existing.cadCallNumber || report.cadIncidentId || report.reportNumber || "",
-    dispatchTime: existing.dispatchTime || (report.incidentDate ? `${report.incidentDate}T08:00` : ""),
+    dispatchTime: existing.dispatchTime || "",
     priority: existing.priority || "Routine",
     alarmLevel: existing.alarmLevel || "1",
   };
@@ -418,7 +427,9 @@ function mapRawToCadPayload(raw) {
   const cad = {
     incidentNumber: pickAlias(source, CAD_FIELD_ALIASES.incidentNumber),
     cadCallNumber: pickAlias(source, CAD_FIELD_ALIASES.cadCallNumber),
+    receivedTime: normalizeDateTime(pickAlias(source, CAD_FIELD_ALIASES.receivedTime)),
     dispatchTime: normalizeDateTime(pickAlias(source, CAD_FIELD_ALIASES.dispatchTime)),
+    enrouteTime: normalizeDateTime(pickAlias(source, CAD_FIELD_ALIASES.enrouteTime)),
     arrivalTime: normalizeDateTime(pickAlias(source, CAD_FIELD_ALIASES.arrivalTime)),
     clearTime: normalizeDateTime(pickAlias(source, CAD_FIELD_ALIASES.clearTime)),
     priority: pickAlias(source, CAD_FIELD_ALIASES.priority),

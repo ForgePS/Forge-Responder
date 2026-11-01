@@ -7,6 +7,15 @@ import { archiveObject, isObjectArchived, isObjectDeleted, isObjectVisibleInActi
 import ObjectLifecycleActions from "../components/ObjectLifecycleActions.jsx";
 
 import { Badge, Panel, Modal } from "../components/shell/ui.jsx";
+import { exportCsv } from "../utils/dashboardMetrics.js";
+
+// The 30/60/90-day tiles filter to certifications expiring in that window.
+const DUE_WINDOWS = { "Due in 30 Days": [0, 30], "Due in 60 Days": [31, 60], "Due in 90 Days": [61, 90] };
+function inDueWindow(record, filter) {
+  const window = DUE_WINDOWS[filter];
+  const days = Number(record.days);
+  return Boolean(window) && Number.isFinite(days) && days >= window[0] && days <= window[1];
+}
 
 export default function CertificationsPage({ query, records = [], setRecords, canEdit = false, departmentId = "" }) {
   const [filter, setFilter] = useState("All");
@@ -22,7 +31,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
     lifecycleView === "archived" ? isObjectVisibleInArchivedList(record) : isObjectVisibleInActiveList(record)
   ));
   const filtered = scoped.filter((record) => (
-    (filter === "All" || record.status === filter || record.category === filter)
+    (filter === "All" || record.status === filter || record.category === filter || inDueWindow(record, filter))
     && Object.values(record).join(" ").toLowerCase().includes(query.toLowerCase())
   ));
   const activeRecords = records.filter((record) => isObjectVisibleInActiveList(record));
@@ -121,7 +130,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
           </div>
         </div>
         <div className="heading-actions">
-          <button className="secondary-button">Export Compliance</button>
+          <button className="secondary-button" disabled={!filtered.length} onClick={() => exportCsv(`certifications-${new Date().toISOString().slice(0, 10)}.csv`, filtered.map((r) => ({ Personnel: r.person, Certification: r.type, Category: r.category, "Issue date": r.issue, Expires: r.expires, "Days left": r.days, Renewal: r.renewal, Status: r.status })))}>Export Compliance</button>
           {canEdit ? (
             <button className="primary-button" onClick={() => openUpload(activeRecords[0])} disabled={!activeRecords[0]}>
               <UploadCloud size={14} /> Upload Certification
@@ -142,7 +151,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
             className={`cert-stat stat-${tone}`}
             onClick={() => {
               setLifecycleView("active");
-              setFilter(label === "Expired" ? "Expired" : label === "Active" ? "Active" : "All");
+              setFilter(label);
             }}
           >
             <strong>{value}</strong>
@@ -170,7 +179,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
         </div>
         <span>{filtered.length} certifications shown</span>
       </section>
-      <Panel title="Certification Compliance Records" icon={FileCheck2} action={<button className="text-button">Configure columns</button>}>
+      <Panel title="Certification Compliance Records" icon={FileCheck2}>
         <div className="cert-table">
           <div className="cert-row cert-head">
             <span>Personnel</span><span>Certification</span><span>Category</span><span>Issue Date</span>

@@ -1050,6 +1050,16 @@ export function groupRosterByApparatus(dayRoster = [], displayUnits = [], option
   return { grouped, unassigned };
 }
 
+/** Total crew seats on the roster units (Crew Positions); the natural minimum on duty. */
+export function countCrewSeats(dayRoster = [], displayUnits = [], schedulingSettings = {}, personnel = [], apparatus = []) {
+  void dayRoster;
+  void personnel;
+  return (Array.isArray(displayUnits) ? displayUnits : []).reduce((total, unit) => {
+    const apparatusRecord = findApparatusRecord(apparatus, unit);
+    return total + resolveApparatusCrewSlotRoles(unit, { apparatusRecord, schedulingSettings }).length;
+  }, 0);
+}
+
 export function buildApparatusVacancies(dayRoster = [], displayUnits = [], schedulingSettings = {}, personnel = [], apparatus = []) {
   const { grouped } = groupRosterByApparatus(dayRoster, displayUnits);
   const vacancies = [];
@@ -1242,11 +1252,14 @@ export function buildDayScheduleSnapshot({
   const combinedDayRoster = [...dayRoster, ...overtimeMembers];
   const configuredMinimum = minimumStaffing > 0
     ? minimumStaffing
-    : Math.max(Number(dayRecord.minimum) || 0, 0);
+    : Number(schedulingSettings?.minimumStaffing) > 0
+      ? Number(schedulingSettings.minimumStaffing)
+      : Math.max(Number(dayRecord.minimum) || 0, 0)
+        || countCrewSeats(combinedDayRoster, displayUnits, schedulingSettings, personnel, apparatus);
   const coverage = resolveDayCoverageMetrics({
     dayRoster: combinedDayRoster,
     personnel,
-    minimum: configuredMinimum || dayRecord.minimum,
+    minimum: configuredMinimum,
   });
   const apparatusVacancies = buildApparatusVacancies(combinedDayRoster, displayUnits, schedulingSettings, personnel, apparatus);
   const date = parseDayId(dayId);

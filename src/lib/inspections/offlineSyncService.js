@@ -8,7 +8,9 @@ import { listInspectionRecords } from "./inspectionRecords.js";
 import { listOccupancyRecords } from "./occupancyService.js";
 import { listViolations } from "./violationService.js";
 import { listInspectionTypes, listTemplateVersions } from "./inspectionConfigService.js";
-import { getInspectionRecord, saveInspectionDraft } from "./inspectionWorkflow.js";
+import { addInspectionAttachment, getInspectionRecord, saveInspectionDraft } from "./inspectionWorkflow.js";
+import { deleteAttachmentBlob, readAttachmentBlob, saveAttachmentBlob } from "./attachmentBlobStore.js";
+import { uploadFirebaseFile } from "../firebaseClient.js";
 import {
   DEFAULT_DEVICE_POLICY,
   normalizeDevicePolicy,
@@ -26,6 +28,7 @@ import {
   listInspectionOfflineQueue,
   purgeInspectionLocalData,
   recordInspectionOfflineConflict,
+  removeInspectionAttachment,
   removeInspectionLocalDraft,
   removeInspectionOfflineQueueEntry,
   resolveInspectionOfflineConflict,
@@ -248,7 +251,8 @@ export async function saveInspectionDraftWithOffline(departmentId, inspectionId,
   };
 }
 
-export async function queueInspectionAttachmentStub(departmentId, input = {}, actor = {}) {
+/** Queue a file captured offline. `input.file` is the File/Blob; it is kept on the device until sync. */
+export async function queueInspectionAttachment(departmentId, input = {}, actor = {}) {
   const policy = getCachedDevicePolicy(departmentId);
   if (!policy.allowPhotoOffline && input.kind === "photo") {
     throw new Error("Photo offline capture is disabled by device policy.");
@@ -259,7 +263,20 @@ export async function queueInspectionAttachmentStub(departmentId, input = {}, ac
   if (policy.requireWifiForAttachments && !isBrowserOnline()) {
     throw new Error("Attachments require Wi-Fi per device policy.");
   }
-  const entry = enqueueInspectionAttachment(departmentId, input);
+  if (!input.file) throw new Error("Choose a file to attach.");
+  const entry = enqueueInspectionAttachment(departmentId, {
+    ...input,
+    fileName: input.fileName || input.file.name || "attachment",
+    mimeType: input.file.type || "application/octet-stream",
+    sizeBytes: input.file.size || 0,
+  });
+  if (!entry) throw new Error("Enter the inspection and choose a file.");
+  try {
+    await saveAttachmentBlob(entry.id, input.file);
+  } catch (error) {
+    removeInspectionAttachment(departmentId, entry.id);
+    throw error;
+  }
   await writeInspectionAuditLog(departmentId, {
     action: "offline.attachment.queue",
     entityType: "attachment_queue",
@@ -272,9 +289,21 @@ export async function queueInspectionAttachmentStub(departmentId, input = {}, ac
 }
 
 /**
- * Flush mutation + attachment queues. Attachment uploads are stubbed (marked uploaded).
+ * Flush mutation + attachment queues. Attachments are uploaded to Storage and added to their inspection.
  */
+let syncInProgress = false;
+
 export async function syncInspectionOfflineQueue(departmentId, actor = {}) {
+  if (syncInProgress) return { synced: 0, conflicts: 0, failed: 0, attachments: 0, message: "A sync is already running." };
+  syncInProgress = true;
+  try {
+    return await runInspectionOfflineSync(departmentId, actor);
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+async function runInspectionOfflineSync(departmentId, actor = {}) {
   setInspectionSyncMeta(departmentId, { lastAttemptAt: nowIso(), lastError: "" });
   if (!isBrowserOnline()) {
     const message = "Device is offline — sync deferred.";
@@ -332,16 +361,36 @@ export async function syncInspectionOfflineQueue(departmentId, actor = {}) {
   }
 
   let attachments = 0;
-  for (const item of listInspectionAttachmentQueue(departmentId).filter((row) => row.status === "queued" || row.status === "failed")) {
+  // "uploading" here means an earlier sync was interrupted (page closed mid-upload): retry it.
+  for (const item of listInspectionAttachmentQueue(departmentId).filter((row) => ["queued", "failed", "uploading"].includes(row.status))) {
     updateInspectionAttachment(departmentId, item.id, { status: "uploading", attempts: (item.attempts || 0) + 1 });
-    // Blob upload to Storage deferred — mark stub success for staff-mediated MVP.
-    updateInspectionAttachment(departmentId, item.id, {
-      status: "uploaded",
-      lastError: "",
-      uploadedAt: nowIso(),
-      uploadMode: "stub",
-    });
-    attachments += 1;
+    try {
+      const blob = await readAttachmentBlob(item.id);
+      if (!blob) throw new Error("The file is no longer on this device. Capture it again.");
+      const safeName = String(item.fileName || "attachment").replace(/[^A-Za-z0-9._-]+/g, "_");
+      const storagePath = `departments/${departmentId}/inspections/${item.inspectionId}/attachments/${item.id}-${safeName}`;
+      const file = blob instanceof File ? blob : new File([blob], safeName, { type: item.mimeType || blob.type || "application/octet-stream" });
+      const uploaded = await uploadFirebaseFile(storagePath, file);
+      await addInspectionAttachment(departmentId, item.inspectionId, {
+        id: item.id,
+        kind: item.kind || "photo",
+        fileName: item.fileName,
+        note: item.note || "",
+        storagePath: uploaded.storagePath,
+        downloadUrl: uploaded.downloadUrl,
+        contentType: uploaded.contentType,
+        sizeBytes: item.sizeBytes || 0,
+        capturedAt: item.clientUpdatedAt || "",
+        uploadedAt: nowIso(),
+        uploadedBy: actor.actorName || "",
+      }, actor);
+      updateInspectionAttachment(departmentId, item.id, { status: "uploaded", lastError: "", uploadedAt: nowIso(), storagePath });
+      await deleteAttachmentBlob(item.id);
+      attachments += 1;
+    } catch (error) {
+      updateInspectionAttachment(departmentId, item.id, { status: "failed", lastError: error?.message || "Upload failed" });
+      failed += 1;
+    }
   }
 
   purgeInspectionLocalData(departmentId, policy);

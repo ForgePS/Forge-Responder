@@ -1,0 +1,72 @@
+## Navigation, dashboard, Employee Portal and design system
+
+### Inventory
+| Page / feature | Where (file) | Status (1-7) | One-line note |
+|---|---|---|---|
+| Sidebar menu (admin) | src/App.jsx:200-236, 316-531 | 2 | Works, filtered by permission, module and plan. 89 menu entries in total; Fleet alone has 22, Prevention 48 |
+| Collapsed (icon-only) sidebar | src/App.jsx:428, 496 | 4 | In collapsed mode every section and Prevention branch is forced open: about 89 icons in a 64px rail, many of them identical |
+| Phone/tablet drawer | src/styles.css:1196-1237 | 1 | Drawer below 980px with scrim and scroll lock. Works |
+| Page routing and `?page=` deep links | src/App.jsx:858-901, 1263-1846 | 2 | Every menu leaf has a route. Unknown names fall through to the "isn't available yet" placeholder (src/pages/ModulePage.jsx:4) |
+| Active-page highlight | src/App.jsx:445, 507 | 2 | Nothing is highlighted when a page is opened under a non-menu name, e.g. dashboard "Open hydrants" → `"Hydrants"` (menu says "Hydrant Overview") |
+| Global search box | src/App.jsx:673 | 3 | Only filters the current page, and only if that page takes `query`. Does nothing on Dashboard, Scheduling, Time Sheets, Fleet Dashboard or Analytics, although the placeholder promises a search across modules |
+| Notification bell | src/App.jsx:533-575, src/lib/notificationService.js:36 | 3 | Loads once, never refreshes. Clicking does not open the record. Shows raw ISO timestamps |
+| Account menu (password, sign out) | src/components/security/AccountMenu.jsx | 1 | Change password re-authenticates. Sign out works |
+| Admin RMS / Employee Portal toggle | src/App.jsx:644-667 | 2 | Works. "Admin RMS" is jargon |
+| Theme toggle | src/components/CommandDashboard.jsx:164 | 3 | Inside the app, the toggle only appears on the Command Dashboard. Portal-only users can never switch theme |
+| Command Dashboard KPIs | src/components/CommandDashboard.jsx:114-123, src/utils/dashboardMetrics.js | 3 | Values are computed from real lists, but some calculations are wrong or use hard-coded dates (see Findings) |
+| Unused `kpis` constant | src/App.jsx:246-255 | 7 | Hard-coded numbers ("42", "87%", …). Not rendered |
+| Dashboard panels (staffing, fleet, hydrants, work queue, certs, inspections) | CommandDashboard.jsx:177-244 | 2 | Real data, but fleet comes from the legacy `apparatus` list and inspections from the legacy `inspections` list |
+| "30-Day Trends" panel | CommandDashboard.jsx:236-242 | 5 | "Training Hours" is an all-time total, every card is labelled "30 days", and the sparklines are decorative CSS |
+| Analytics page | src/pages/SprintModulePages.jsx:402-427 | 5 | Raw tables. The 30/60/90/YTD buttons only change the CSV file name. Column headers are raw keys (`pmDue`). No charts |
+| Employee Portal: My Dashboard / Profile / Schedule / Time Card / Daily Log | src/pages/EmployeePortalPage.jsx:791-1079 | 2 | Real data. Leave and trade IDs come from `300 + list.length` (EmployeePortalPage.jsx:569, 618), so they can collide |
+| Portal: My Certifications / My Training | EmployeePortalPage.jsx:1081-1110 | 2 | Read-only. Reuses the 9-column, `min-width:1050px` `.cert-table`, so on a phone the columns misalign and the table scrolls sideways. Tells members to use the "admin Certifications module", which they cannot open |
+| Portal: My Documents | EmployeePortalPage.jsx:1112-1124 | 3 | Shows only unacknowledged documents, with no way to open or read them before pressing "Acknowledge". No library of SOGs or protocols |
+| Portal: Open Vacancies / Apparatus Checks / Messages | EmployeePortalPage.jsx:1126-1168 | 2 | Apparatus Checks was already reviewed. The others are wired |
+| Portal: Maintenance Issues | EmployeePortalPage.jsx:687-748 | 4 | Writes to the legacy `workOrders` list and emails the BCs. Fleet Work Orders never sees these after its first migration |
+| Login | src/pages/LoginPage.jsx | 2 | Sign-in, reset and 2FA work. Shows "Tenant ID", "Change tenant", and a "Create one" link even though there is no self-serve sign-up |
+| Department setup wizard | src/components/onboarding/DepartmentSetupWizard.jsx | 2 | Saves `profile/main` and `settings/main` after each step and can be finished later. Traced as working |
+| Design system CSS | src/styles.css + 23 other files | 2 | About 17k lines. Dark-first base with a light override layer. Button and card styles are defined in several places (see Duplicates) |
+
+### Findings
+- **[Demo-blocker] Dashboard "Personnel On Duty" counts everyone who is Active.** `onDuty = personnel.filter(status==="Active")` (src/utils/dashboardMetrics.js:84). A chief sees "56 of 58 Assigned" on duty. Fix: compute from today's roster in `liveDayMetrics`. Effort: S.
+- **[Demo-blocker] Staffing and asset KPIs use hard-coded dates from June 2026.** `scheduleDays.find(day.id === "2026-06-10") || scheduleDays[0]` (dashboardMetrics.js:86) and `isDueWithinDays(..., reference = new Date(2026, 5, 10))` (:61). "Staffing Deficit" reflects an arbitrary saved day, and is always 0 when no schedule days are saved. Fix: use today and `liveDayMetrics[today]`. Effort: S.
+- **[Demo-blocker] Portal maintenance reports never reach Fleet Work Orders.** `submitMaintenanceIssue` adds to the legacy `workOrders` list (EmployeePortalPage.jsx:706). `ensureFleetWorkOrders` only imports legacy orders while the Fleet V2 collection is empty (src/lib/fleet/fleetWorkOrderService.js:261-265). A firefighter's report shows up only in classic "Maintenance". Fix: call `createFleetWorkOrder` (or create a Fleet defect). Effort: M.
+- **[High] Dashboard fleet and inspection numbers come from legacy lists.** Units Available, Out of Service, Fleet Readiness and Open Work Orders use `apparatus`/`workOrders`. Inspections Due uses the legacy `inspections` list, yet the card opens the V2 Inspections Dashboard. The cards link to classic "Apparatus" and "Maintenance" (CommandDashboard.jsx:119-121), so the numbers can disagree with Fleet Dashboard and Prevention. Fix: read Fleet V2 assets/work orders and the inspections service. Effort: M.
+- **[High] "Certifications Expiring" goes stale.** It counts the stored `c.days` (dashboardMetrics.js:91), which is written only when a record is saved (src/pages/CertificationsPage.jsx:61). It is never recomputed from `expires`. Fix: derive days from `expires` at render. Effort: S.
+- **[High] Notifications: every member downloads every notification, and anyone can mark them read.** `listUserNotifications` reads the whole collection and filters on the client (notificationService.js:36-41). Rules allow any member to read and update any notification (firestore.rules:1057-1061). Read status of an `"all"` notification is a single shared field, so one person reading it clears it for everyone. The portal's `logAction` broadcasts every leave request, trade and acknowledgement to `userId:"all"` (EmployeePortalPage.jsx:527). Fix: query `where userId in [uid,"all"]`, track reads per user, tighten rules, stop broadcasting personal requests. Effort: M.
+- **[High] Global search doesn't search globally.** The placeholder says "Search personnel, apparatus, occupancies…" (App.jsx:673), but `query` is only passed to some pages and `navigate()` clears it (App.jsx:1176). On the Dashboard, typing does nothing. Fix: build a real cross-module search with a results dropdown, or rename it to "Filter this page" and hide it where unused. Effort: M (real search) / S (relabel).
+- **[High] Menu overload and duplicates.** Fleet lists 22 items, mixing V2 pages with classic "Apparatus", "Assets", "Maintenance" and "Hose Testing" (App.jsx:203-226). Prevention has 48 leaves. These pairs open the same component: "Prevention Dashboard"/"Inspections Dashboard", "Prevention Work Queue"/"Work Queue", "Frequently Used"/"Saved Sections", and "Preplan Dashboard"/"Preplan Work Queue"/"Preplan Reports" (App.jsx:1560-1675). Labels a firefighter won't recognise include "Import & Data Quality", "Offline & Sync", "Preplan Offline", "Configuration Studio" vs "Fleet Configuration Studio", "Reporting & Automation" vs "Automation & Integrations", and "Vendor Portal". Fix: group Fleet into Daily (Readiness, Checks, Defects, Work Orders), Maintenance, Admin; hide classic pages once cut over; drop the alias leaves. Effort: M.
+- **[Medium] Collapsed sidebar shows every menu item.** Collapsed mode ignores section and branch collapse (`hidden={isSectionCollapsed && !collapsed}`, App.jsx:428, 496). You get a column of about 89 icons, many identical (5× BookOpen, several LayoutList). Fix: in collapsed mode show one icon per section with a flyout. Effort: M.
+- **[Medium] Analytics page is a demo shell.** Range buttons don't filter (SprintModulePages.jsx:417, 421). Headers are raw object keys. With no data, panels render an empty header row and Export silently does nothing. Fix: either remove it from the menu before the demo, or add real date filtering and charts. Effort: S (hide) / L (build).
+- **[Medium] Theme toggle is hidden away.** Inside the app it is only on the Command Dashboard (CommandDashboard.jsx:164). Fix: move it into the account menu. Effort: S.
+- **[Medium] "Open Tasks" KPI goes nowhere.** Its target is "Dashboard", the current page (CommandDashboard.jsx:122). Every Work Queue row says "Today" (:217), and "View all" always opens Scheduling → trades (:213). Fix: point it to a real task list, or make it non-clickable. Effort: S.
+- **[Medium] Hydrants route has no permission check.** `current === "Hydrants" || "Hydrant Overview"` renders `HydrantTestingPage` without any `hasPermission` check (App.jsx:1809-1810). The dashboard's "Open hydrants" button reaches it for any admin-view user. Fix: wrap it in `viewHydrants`. Effort: S.
+- **[Medium] Login suggests self sign-up.** "Need an account? Create one" (LoginPage.jsx:362-373) creates a Firebase user who then lands on Access Denied, because departments are created manually. The sign-up placeholder is the owner's own name, "Jeremy Powell" (:332). "Tenant ID" and "Change tenant" are developer terms. Fix: show sign-up only with a valid invite, and use "Department ID". Effort: S.
+- **[Medium] The app shell loads about 30 department lists on every page, for every user** (App.jsx:971-1057). That includes portal-only members, who receive full personnel, time cards and leave. Lists are also cached in `localStorage` (src/hooks/useTenantPersistentState.js:128), which leaves personnel PII on shared station PCs. Every sync is also logged to the console (:136). Fix: load lists per page, scope portal data to the member, drop the localStorage mirror of PII lists. Effort: L.
+- **[Low] Employee Portal sections are not in the URL.** Refresh and Back return to My Dashboard (App.jsx:769, 1906). Effort: S.
+- **[Low] Dashboard header is too tall for tablets.** The top bar's `min-height:108px` and fixed `.top-brand` widths of 420/360px (styles.css:13, 52, 1189) take a large share of a 1024×768 tablet screen. Effort: S.
+
+### Duplicates and obsolete code
+- `kpis` constant with hard-coded demo numbers (App.jsx:246-255): dead.
+- `PREVENTION_ROUTE_ALIASES` (src/data/preventionNav.js:144) is never imported.
+- Unreachable routes: "Inspection Queue"/"Inspections" (legacy `InspectionsPage`), "Preplans", "Enforcement" and "Import & Hardening" (App.jsx:1611, 1651, 1658, 1736). None are in the menu, and `PAGE_INDEX` is built from the menu, so `?page=` can't reach them either. `OccupanciesPage` in SprintModulePages.jsx:363 is never imported.
+- Classic Apparatus, Assets, Maintenance and Hose Testing pages run alongside Fleet V2 (All Fleet Assets, Fleet Work Orders, Fleet Tests). Only Apparatus has a cutover redirect (App.jsx:1030-1034).
+- `src/theme/fixes.css` (104 lines) is not imported anywhere.
+- `.kpi-card` is defined in styles.css:376, modern-theme.css:175 and corona.css:103, then overridden again in light-polish.css:92. `.primary-button` and `.secondary-button` are each defined in 5 files.
+- Button vocabularies: `primary-/secondary-/text-/link-/icon-/danger-button`, `dd-action-button`, `nr-btn*`, `btn-primary`/`btn-secondary`, `button button-secondary`. **`.btn-primary`, `.btn-secondary` and `.button-secondary` have no CSS anywhere.** Buttons using them render with browser defaults: src/components/academy/TrainingAcademiesPanel.jsx, src/components/personnel/PersonnelAcademyPanel.jsx, and HydrantTestingPage.jsx:2033-2036.
+- Size of the style system: 66 `*-card` classes, 95 `*-table`/`*-row` classes, 39 badge/pill/chip/tag classes, 85 `*stat*` classes, 132 `!important` (102 of them in time-card.css), and about 1,860 hard-coded hex colours.
+- Theming: styles.css is written dark-first, with literals like `rgba(7,20,33,.65)` and `#42637c`. light-polish.css patches it with 298 `[data-theme="light"]` selectors. academy-integrations.css hard-codes `background:#fff`, which breaks the dark theme. The Hydrants module carries its own 80 KB single-line stylesheet (src/hydrant-testing.css) plus a 1,110-line bridge.
+- Breakpoints: 25 different max-widths are in use (560, 600, 620, 640, 700, 720, 760, 768, 900, 920, 960, 980, 1024, 1100, 1180, 1200, 1450 …), with no shared scale. Wide fixed tables: `.cert-table` 1050px, `.work-order-table` 1100px, `.asset-table` 1220px, `.roster-table` 880px (styles.css:866, 1102, 1167, 1174). They scroll sideways at 390 and 768, which is acceptable for admin pages but not in the portal.
+
+### Quick wins (under an hour each)
+- Delete the `kpis` constant, `fixes.css` and the unreachable route branches.
+- Fix `onDuty`, remove the `2026-06-10` and `new Date(2026,5,10)` hard-codes, and compute cert days from `expires`.
+- Make "Open Tasks" non-clickable, and label the trend cards honestly or remove them.
+- Hide Analytics (or the range buttons) before the demo.
+- Add a `viewHydrants` check to the Hydrants route.
+- Move ThemeToggle into AccountMenu.
+- Map `btn-primary`→`primary-button`, `btn-secondary`/`button-secondary`→`secondary-button`.
+- Hide "Create one" unless an invite is present, rename "Tenant ID" to "Department ID", and replace the "Jeremy Powell" placeholder.
+- Remove the alias menu leaves (Prevention Dashboard/Work Queue, Saved Sections, Preplan Dashboard/Reports). Hide classic Apparatus, Assets and Maintenance when the Fleet cutover flag is on.
+- Give the portal its own simple certification and training list styles, without the 1050px min-width.
+- Format notification timestamps and close the panel on outside click.

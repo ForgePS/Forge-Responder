@@ -42,7 +42,6 @@ export const employeePortalNavGroups = [
     label: "Requests",
     items: [
       ["Open Vacancies", UserPlus],
-      ["Assigned Tasks", ClipboardCheck],
       ["Apparatus Checks", Truck],
       ["Maintenance Issues", Wrench],
     ],
@@ -55,17 +54,34 @@ export const employeePortalNavGroups = [
   },
 ];
 
+/** Employee Portal menu item -> the module it belongs to (hidden when that module is off). */
+const PORTAL_ITEM_MODULES = {
+  "My Schedule": "scheduling",
+  "Open Vacancies": "scheduling",
+  "Time Card": "timeSheets",
+  "Daily Log": "dailyLog",
+  "My Certifications": "certifications",
+  "My Training": "training",
+  "My Documents": "documents",
+  "Apparatus Checks": "apparatus",
+  "Maintenance Issues": "maintenance",
+  Messages: "internalEmail",
+};
+
 export function filterEmployeePortalNav(
   groups = employeePortalNavGroups,
-  { canViewInternalEmail = true, canViewDailyLog = true, isModuleEnabled = () => true } = {}
+  { canViewInternalEmail = true, canViewDailyLog = true, isModuleEnabled = () => true, academyConnected = false } = {}
 ) {
   return groups
     .map((group) => ({
       ...group,
       items: group.items.filter(([name]) => {
         if (name === "Messages" && !canViewInternalEmail) return false;
-        if (name === "Daily Log" && (!canViewDailyLog || !isModuleEnabled("dailyLog"))) return false;
-        return true;
+        if (name === "Daily Log" && !canViewDailyLog) return false;
+        // Nothing to open until the department connects an Academy.
+        if (name === "Academy Class Schedule" && !academyConnected) return false;
+        const moduleKey = PORTAL_ITEM_MODULES[name];
+        return !moduleKey || isModuleEnabled(moduleKey);
       }),
     }))
     .filter((group) => group.items.length > 0);

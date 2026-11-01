@@ -55,7 +55,10 @@ function mapPlatformProfile(config = defaultPlatformConfig) {
 const TenantContext = createContext(null);
 
 export function TenantProvider({ children }) {
-  const { membership } = useAuth();
+  const { membership, user } = useAuth();
+  // Who is signed in: department data, platform config and entitlements reload when this changes
+  // (they were read signed-out on the login page, which the rules refuse).
+  const authUid = user?.uid || "";
   const initialGatewayDepartmentId = typeof window !== "undefined" ? parseGatewayDepartmentId() : null;
   const [gatewayDepartmentId, setGatewayDepartmentId] = useState(initialGatewayDepartmentId);
   const [gatewayRecord, setGatewayRecord] = useState(null);
@@ -192,7 +195,7 @@ export function TenantProvider({ children }) {
 
     loadPlatform();
     return () => { cancelled = true; };
-  }, [platformRefreshKey]);
+  }, [platformRefreshKey, authUid]);
 
   useEffect(() => {
     if (!inPlatformScope) return;
@@ -365,7 +368,7 @@ export function TenantProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [departmentId, inPlatformScope, gatewayRecord, departmentRefreshKey, platformConfig]);
+  }, [departmentId, inPlatformScope, gatewayRecord, departmentRefreshKey, platformConfig, authUid]);
 
   const refreshDepartment = useCallback(() => setDepartmentRefreshKey((value) => value + 1), []);
   const refreshPlatform = useCallback(() => setPlatformRefreshKey((value) => value + 1), []);
@@ -375,13 +378,13 @@ export function TenantProvider({ children }) {
   useEffect(() => {
     setEntitlements(null);
     const firestoreDb = getFirestoreDb();
-    if (inPlatformScope || !departmentId || !firebaseEnabled || !firestoreDb) return undefined;
+    if (inPlatformScope || !departmentId || !authUid || !firebaseEnabled || !firestoreDb) return undefined;
     return onSnapshot(
       doc(firestoreDb, "platformEntitlements", departmentId),
       (snap) => setEntitlements(snap.exists() ? snap.data() : null),
       () => setEntitlements(null),
     );
-  }, [departmentId, inPlatformScope]);
+  }, [departmentId, inPlatformScope, authUid]);
 
   // The modules this department can use: the server's list once it exists,
   // otherwise everything except what's switched off. settings.enabledModules

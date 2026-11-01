@@ -145,6 +145,9 @@ export default function GoogleApisIntegrationPanel({
         removeKeys: [fieldId],
       });
       setStatus(next);
+      if (fieldId === "mapsJsApiKey") {
+        await savePublicAlertDashboardDoc(departmentId, { mapsJsApiKey: "" }).catch(() => {});
+      }
       setNotice(`Removed ${API_FIELDS.find((item) => item.id === fieldId)?.label || "API key"}.`);
     } catch (err) {
       setError(err.message || "Could not remove key.");
@@ -160,6 +163,7 @@ export default function GoogleApisIntegrationPanel({
     setError("");
     try {
       await clearGoogleApisConfig(departmentId);
+      await savePublicAlertDashboardDoc(departmentId, { mapsJsApiKey: "" }).catch(() => {});
       setStatus({ configured: false, keys: {} });
       setForm({
         mapsJsApiKey: "",
@@ -183,11 +187,11 @@ export default function GoogleApisIntegrationPanel({
         <div>
           <h3>Google APIs</h3>
           <p className="dd-panel-subtitle">
-            Maps, geocoding, places, and YouTube keys for Digital Dashboard and location widgets.
-            {variant === "admin" ? " Restricted to platform creator and super admin." : ""}
+            Powers the maps, address lookup, and YouTube videos on your dashboards.
+            {variant === "admin" ? " Set up by FORGE Public Safety." : ""}
           </p>
         </div>
-        {status.configured ? (
+        {!canConfigure ? null : status.configured ? (
           <span className="dd-status-pill dd-status-success">
             <KeyRound size={14} />
             Configured
@@ -204,8 +208,7 @@ export default function GoogleApisIntegrationPanel({
 
         {!canConfigure ? (
           <p className="dd-empty-detail">
-            Google API keys are managed in <strong>System Admin → Google &amp; API Keys</strong> by the platform creator or super admin only.
-            {status.configured ? " Keys are configured for this department." : ""}
+            FORGE Public Safety manages these keys for you. Contact us if maps or videos aren't working.
           </p>
         ) : (
           <form className="dd-google-apis-form" onSubmit={handleSave}>

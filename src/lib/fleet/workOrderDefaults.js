@@ -29,32 +29,25 @@ export const DEFAULT_WORK_ORDER_TYPES = [
   { id: "manual", label: "Manual / other" },
 ];
 
+/**
+ * One generic in-house shop so work orders have somewhere to point on day one.
+ * Departments rename or remove it in Fleet setup.
+ */
 export const STARTER_SHOPS = [
   {
     id: "shop-internal",
-    name: "Internal fleet shop",
+    name: "In-house shop",
     shopType: "internal",
-    location: "Headquarters",
+    location: "",
     active: true,
   },
 ];
 
-export const STARTER_VENDORS = [
-  {
-    id: "vendor-midsouth",
-    name: "Mid-South Apparatus",
-    category: "Apparatus repair",
-    phone: "",
-    active: true,
-  },
-  {
-    id: "vendor-internal",
-    name: "Internal Fleet",
-    category: "Internal",
-    phone: "",
-    active: true,
-  },
-];
+/**
+ * Outside vendors are specific to each department, so none are seeded.
+ * Departments add their own in Fleet setup.
+ */
+export const STARTER_VENDORS = [];
 
 /** Allowed status transitions (from → to[]). */
 export const WORK_ORDER_TRANSITIONS = {

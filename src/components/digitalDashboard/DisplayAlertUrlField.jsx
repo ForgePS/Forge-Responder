@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { Check, Copy, ExternalLink, QrCode } from "lucide-react";
 
 export default function DisplayAlertUrlField({
@@ -7,6 +8,19 @@ export default function DisplayAlertUrlField({
   compact = false,
 }) {
   const [copied, setCopied] = useState(false);
+  const [qrSrc, setQrSrc] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!url || compact) {
+      setQrSrc("");
+      return undefined;
+    }
+    QRCode.toDataURL(url, { width: 160, margin: 1 })
+      .then((data) => { if (!cancelled) setQrSrc(data); })
+      .catch(() => { if (!cancelled) setQrSrc(""); });
+    return () => { cancelled = true; };
+  }, [url, compact]);
 
   async function copyUrl() {
     if (!url) return;
@@ -29,12 +43,10 @@ export default function DisplayAlertUrlField({
   if (!url) {
     return (
       <p className="dd-display-url-empty">
-        Save this device to generate its alert display URL for MVIX / signage sticks.
+        Turn on station TV links in Alert Dashboard settings to get this display's link.
       </p>
     );
   }
-
-  const qrSrc = `https://quickchart.io/qr?size=160&margin=1&text=${encodeURIComponent(url)}`;
 
   return (
     <div className={`dd-display-url-field ${compact ? "is-compact" : ""}`}>
@@ -55,7 +67,7 @@ export default function DisplayAlertUrlField({
           Open display
         </a>
       </div>
-      {!compact ? (
+      {!compact && qrSrc ? (
         <div className="dd-display-url-qr">
           <img src={qrSrc} alt="QR code for alert display URL" width={120} height={120} />
           <span><QrCode size={12} /> Scan to open on a stick</span>

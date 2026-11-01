@@ -3,10 +3,23 @@ import { ADMIN_PERMISSION_GROUPS, formatPermissionLabel } from "../data/adminReg
 export default function PermissionGroupGrid({
   draft = {},
   disabled = false,
+  showPlatform = false,
+  filter = "",
   onToggle,
   onSetGroup
 }) {
-  return ADMIN_PERMISSION_GROUPS.map((group) => (
+  const term = String(filter || "").trim().toLowerCase();
+  const groups = ADMIN_PERMISSION_GROUPS
+    .filter((group) => showPlatform || group.label !== "Platform")
+    .map((group) => ({
+      ...group,
+      keys: term && !group.label.toLowerCase().includes(term)
+        ? group.keys.filter((key) => formatPermissionLabel(key).toLowerCase().includes(term))
+        : group.keys,
+    }))
+    .filter((group) => group.keys.length);
+  if (!groups.length) return <p className="auth-help">No permissions match "{filter}".</p>;
+  return groups.map((group) => (
     <section className="role-permissions-group" key={group.label}>
       <div className="role-permissions-group-head">
         <strong>{group.label}</strong>

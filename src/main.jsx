@@ -23,6 +23,7 @@ import "./theme/leave-requests.css";
 import "./theme/time-card.css";
 import "./theme/corona.css";
 import "./styles/neris-incident.css";
+import "./styles/neris-reports.css";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 
 // The offline field app (/field) loads on demand and is cached by its service worker.

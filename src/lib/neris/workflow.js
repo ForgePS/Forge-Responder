@@ -60,9 +60,12 @@ export function applyReviewAction(report, payload) {
     ...report,
     status,
     locked,
+    // Sending for review hands it to the company officer; returning hands it back to the author.
     reviewStage: payload.action === "approve"
       ? (REVIEW_STAGES[REVIEW_STAGES.findIndex((s) => s.id === report.reviewStage) + 1]?.id || "submission")
-      : report.reviewStage || "author",
+      : payload.action === "submit" ? "company_officer"
+        : payload.action === "return" ? "author"
+          : report.reviewStage || "author",
     workspace: {
       ...(report.workspace || {}),
       approvals,

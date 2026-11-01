@@ -56,6 +56,8 @@ function PersonalDetailsSection({
   isNewRecord = false,
 }) {
   const canEditPrivate = canEdit && canViewPrivateInfo;
+  // Private details (SSN, birth date, demographics) are hidden, not just locked, for people without access.
+  const privateValue = (value) => (canViewPrivateInfo ? (value || "") : (value ? "Hidden" : ""));
 
   return (
     <div className="personnel-form-card">
@@ -89,11 +91,11 @@ function PersonalDetailsSection({
         <FormRow columns={3}>
           <ProfilePhoneField flow label="Phone" value={draft.phone || ""} editing={canEdit} onChange={(value) => updateDraftField("phone", value)} />
           <ProfileField flow label="IAFF Local number" value={draft.iaffLocalNumber || ""} editing={canEdit} onChange={(value) => updateDraftField("iaffLocalNumber", value)} />
-          <ProfileField flow label="Birth Date" value={draft.birthDate || ""} editing={canEditPrivate} type="date" onChange={(value) => updateDraftField("birthDate", value)} />
+          <ProfileField flow label="Birth Date" value={privateValue(draft.birthDate)} editing={canEditPrivate} type={canViewPrivateInfo ? "date" : "text"} onChange={(value) => updateDraftField("birthDate", value)} />
         </FormRow>
 
         <FormRow columns="citizenship-only">
-          <ProfileField flow label="Citizenship" value={draft.citizenship || ""} editing={canEditPrivate} dropdownId="citizenshipOptions" onChange={(value) => updateDraftField("citizenship", value)} />
+          <ProfileField flow label="Citizenship" value={privateValue(draft.citizenship)} editing={canEditPrivate} dropdownId="citizenshipOptions" onChange={(value) => updateDraftField("citizenship", value)} />
         </FormRow>
 
         <EmergencyContactSection
@@ -121,11 +123,11 @@ function PersonalDetailsSection({
         </FormRow>
 
         <FormRow columns={5}>
-          <ProfileField flow label="Race" value={draft.race || ""} editing={canEditPrivate} dropdownId="raceOptions" onChange={(value) => updateDraftField("race", value)} />
-          <ProfileField flow label="Ethnicity" value={draft.ethnicity || ""} editing={canEditPrivate} dropdownId="ethnicityOptions" onChange={(value) => updateDraftField("ethnicity", value)} />
-          <ProfileField flow label="Gender" value={draft.gender || ""} editing={canEditPrivate} dropdownId="genderOptions" onChange={(value) => updateDraftField("gender", value)} />
-          <ProfileField flow label="Marital Status" value={draft.maritalStatus || ""} editing={canEditPrivate} dropdownId="maritalStatusOptions" onChange={(value) => updateDraftField("maritalStatus", value)} />
-          <ProfileField flow label="Social Security Number" value={draft.socialSecurityNumber || ""} editing={canEditPrivate} onChange={(value) => updateDraftField("socialSecurityNumber", value)} />
+          <ProfileField flow label="Race" value={privateValue(draft.race)} editing={canEditPrivate} dropdownId="raceOptions" onChange={(value) => updateDraftField("race", value)} />
+          <ProfileField flow label="Ethnicity" value={privateValue(draft.ethnicity)} editing={canEditPrivate} dropdownId="ethnicityOptions" onChange={(value) => updateDraftField("ethnicity", value)} />
+          <ProfileField flow label="Gender" value={privateValue(draft.gender)} editing={canEditPrivate} dropdownId="genderOptions" onChange={(value) => updateDraftField("gender", value)} />
+          <ProfileField flow label="Marital Status" value={privateValue(draft.maritalStatus)} editing={canEditPrivate} dropdownId="maritalStatusOptions" onChange={(value) => updateDraftField("maritalStatus", value)} />
+          <ProfileField flow label="Social Security Number" value={privateValue(draft.socialSecurityNumber)} editing={canEditPrivate} onChange={(value) => updateDraftField("socialSecurityNumber", value)} />
         </FormRow>
 
         <FormRow columns={5}>

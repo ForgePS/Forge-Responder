@@ -370,15 +370,27 @@ async function handleListMyAcademyTraining(db, request) {
   };
 }
 
+const { refreshAcademyNavFlag } = require("./academyIntegrationsStore");
+
+/** Run a handler, then refresh the department's "Academy connected" flag (never fails the call). */
+function withNavFlag(handler) {
+  return async (db, request) => {
+    const result = await handler(db, request);
+    const departmentId = String(request.data?.departmentId || "").trim();
+    await refreshAcademyNavFlag(db, departmentId).catch((error) => console.warn("academy nav flag", error?.message));
+    return result;
+  };
+}
+
 module.exports = {
-  handleListAcademyConnections,
-  handleUpsertAcademyConnection,
-  handleTestAcademyConnection,
-  handleSetPrimaryAcademyConnection,
-  handleDisableAcademyConnection,
-  handleDisconnectAcademyConnection,
+  handleListAcademyConnections: withNavFlag(handleListAcademyConnections),
+  handleUpsertAcademyConnection: withNavFlag(handleUpsertAcademyConnection),
+  handleTestAcademyConnection: withNavFlag(handleTestAcademyConnection),
+  handleSetPrimaryAcademyConnection: withNavFlag(handleSetPrimaryAcademyConnection),
+  handleDisableAcademyConnection: withNavFlag(handleDisableAcademyConnection),
+  handleDisconnectAcademyConnection: withNavFlag(handleDisconnectAcademyConnection),
   handleListAcademyAuditLogs,
-  handleMigrateLegacyForgeAcademySettings,
+  handleMigrateLegacyForgeAcademySettings: withNavFlag(handleMigrateLegacyForgeAcademySettings),
   handleAcademyPersonAction,
   handleListAcademyLinks,
   handleLinkAcademyPerson,

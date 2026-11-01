@@ -98,7 +98,14 @@ class ForgeAcademyConnector extends AcademyConnector {
           headers: this.academyCommandHeaders(settings),
           body: JSON.stringify({ type: "list_enrollments", forgePersonId: "__connection_probe__" }),
         });
-        // Auth failures are still "reachable" if we get a structured response.
+        if (response.status === 401 || response.status === 403) {
+          return {
+            ok: false,
+            status: "authentication_error",
+            message: "FORGE Academy rejected these credentials. Check the token and secret.",
+            httpStatus: response.status,
+          };
+        }
         if (response.status >= 500) {
           return {
             ok: false,
@@ -125,6 +132,14 @@ class ForgeAcademyConnector extends AcademyConnector {
         headers,
       });
 
+      if (response.status === 401 || response.status === 403) {
+        return {
+          ok: false,
+          status: "authentication_error",
+          message: "FORGE Academy rejected these credentials. Check the token and secret.",
+          httpStatus: response.status,
+        };
+      }
       if (response.status >= 500) {
         return {
           ok: false,

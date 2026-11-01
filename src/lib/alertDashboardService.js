@@ -9,8 +9,8 @@ async function callAlertDashboard(name, payload = {}) {
   return result.data || {};
 }
 
-export function geocodeAlertAddress(departmentId = "", address = "", gatewaySlug = "") {
-  return callAlertDashboard("googleGeocode", { departmentId, address, gatewaySlug });
+export function geocodeAlertAddress(departmentId = "", address = "", gatewaySlug = "", displayKey = "") {
+  return callAlertDashboard("googleGeocode", { departmentId, address, gatewaySlug, displayKey });
 }
 
 export function fetchAlertDirections(departmentId = "", options = {}) {

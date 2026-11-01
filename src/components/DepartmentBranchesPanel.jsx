@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Globe, Search } from "lucide-react";
+import { describeDomainStatus, registerDepartmentDomain } from "../lib/departmentDomainService.js";
 import {
   filterDepartmentsBySearch,
   normalizeDepartmentStateId,
@@ -30,6 +31,29 @@ export default function DepartmentBranchesPanel({
   onSetSubscriptionDates,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
+  // Per-department web address setup state: { [id]: { busy, message, ok } }
+  const [domainSetup, setDomainSetup] = useState({});
+
+  async function setUpWebAddress(departmentId) {
+    setDomainSetup((current) => ({ ...current, [departmentId]: { busy: true, message: "" } }));
+    try {
+      const status = await registerDepartmentDomain(departmentId);
+      setDomainSetup((current) => ({
+        ...current,
+        [departmentId]: { busy: false, ok: true, message: describeDomainStatus(status) },
+      }));
+      onReload?.();
+    } catch (error) {
+      setDomainSetup((current) => ({
+        ...current,
+        [departmentId]: {
+          busy: false,
+          ok: false,
+          message: `Couldn't set up the web address: ${error?.message || "unknown error"}`,
+        },
+      }));
+    }
+  }
 
   const visibleDepartments = useMemo(() => {
     const filtered = filterDepartmentsBySearch(departments, searchQuery);
@@ -102,7 +126,29 @@ export default function DepartmentBranchesPanel({
                 <span className={`subscription-status subscription-status-${rowStatus?.level || "unknown"}`}>
                   {subscriptionStatusLabel(subscription)}
                 </span>
-                <span>/{department.id}</span>
+                <span style={isCreator ? { whiteSpace: "normal" } : undefined}>
+                  /{department.id}
+                  {isCreator && !department.domain && !domainSetup[department.id]?.ok && (
+                    <span className="department-branch-domain">
+                      <br />
+                      <em className="auth-help">Web address not set up</em>{" "}
+                      <button
+                        className="row-action"
+                        type="button"
+                        onClick={() => setUpWebAddress(department.id)}
+                        disabled={domainSetup[department.id]?.busy}
+                      >
+                        <Globe size={12} /> {domainSetup[department.id]?.busy ? "Setting up..." : "Set up web address"}
+                      </button>
+                    </span>
+                  )}
+                  {domainSetup[department.id]?.message && (
+                    <>
+                      <br />
+                      <span className="auth-help" role="status">{domainSetup[department.id].message}</span>
+                    </>
+                  )}
+                </span>
                 <button
                   className="row-action"
                   type="button"

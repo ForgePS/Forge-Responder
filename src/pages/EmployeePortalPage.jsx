@@ -79,7 +79,10 @@ import { resolveEmployeeVacancyDays, formatVacancyPickupSummary, buildVacancyPic
 import { hasPermission } from "../lib/permissions.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
+import { acknowledgementKeys, pendingForPerson, withAcknowledgement } from "../lib/documentAcknowledgement.js";
 import { loadDepartmentMembership } from "../lib/departmentMembership.js";
+import CallShiftOffers from "../components/employee/CallShiftOffers.jsx";
+import EmployeeApparatusCheck from "../components/employee/EmployeeApparatusCheck.jsx";
 
 const defaultLeaveForm = {
   type: "Vacation",
@@ -145,6 +148,8 @@ export default function EmployeePortalPage({
   setShiftTrades,
   vacancyPickups = [],
   setVacancyPickups,
+  callShifts = [],
+  setCallShifts,
   scheduleDays = [],
   roster = [],
   apparatus = [],
@@ -327,9 +332,14 @@ export default function EmployeePortalPage({
     return merged.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
   }, [training, academyTraining, membership, myPerson]);
 
+  const myAckIdentity = useMemo(() => ({
+    personnelId: myPerson?.id || membership?.personnelId || "",
+    uid: user?.uid || "",
+    name: myPerson?.name || membership?.displayName || user?.displayName || user?.email || "",
+  }), [myPerson, membership, user]);
   const myDocs = useMemo(
-    () => documents.filter((item) => item.acknowledgementStatus === "Pending"),
-    [documents]
+    () => pendingForPerson(documents, acknowledgementKeys(myAckIdentity)),
+    [documents, myAckIdentity]
   );
 
   const myLeave = useMemo(
@@ -617,7 +627,7 @@ export default function EmployeePortalPage({
       giveShift: tradeForm.giveShift,
       receiveShift: tradeForm.receiveShift,
       coverage: tradeForm.coverage,
-      submitted: "Today",
+      submitted: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       submittedAt: new Date().toISOString(),
       ...approvalMeta,
     };
@@ -741,7 +751,7 @@ export default function EmployeePortalPage({
     const doc = documents.find((item) => item.id === docId);
     if (!doc || !setDocuments) return;
     setDocuments((current) =>
-      current.map((item) => item.id === docId ? { ...item, acknowledgementStatus: "Acknowledged" } : item)
+      current.map((item) => item.id === docId ? withAcknowledgement(item, myAckIdentity) : item)
     );
     await logAction("approve", "Documents", `Document acknowledged: ${doc.title}`, docId);
     setMessage(`Acknowledged ${doc.title}`);
@@ -1114,6 +1124,17 @@ export default function EmployeePortalPage({
       )}
 
       {current === "Open Vacancies" && (
+        <CallShiftOffers
+          callShifts={callShifts}
+          setCallShifts={setCallShifts}
+          person={myPerson}
+          onResponded={(record, response) => {
+            logAction("update", "Scheduling", `${myPerson?.name || "A member"} ${response} the shift broadcast for ${record.dateLabel || record.dayId}`, record.id);
+            setMessage(response === "accepted" ? "Thanks — your supervisor will confirm." : "Got it — you declined this shift.");
+          }}
+        />
+      )}
+      {current === "Open Vacancies" && (
         <Panel title="Opposite-Shift Vacancies & Pickup Requests" icon={UserPlus}>
           <VacancyPickupPanel
             person={myPerson}
@@ -1127,26 +1148,16 @@ export default function EmployeePortalPage({
         </Panel>
       )}
 
-      {current === "Assigned Tasks" && (
-        <Panel title="Assigned Tasks" icon={ClipboardCheck}>
-          <p className="auth-help">Assigned operational tasks will appear here when command staff publish tasks for your shift.</p>
-        </Panel>
-      )}
-
       {current === "Apparatus Checks" && (
         <Panel title="Apparatus Checks" icon={Truck}>
-          {myUnit ? (
-            <div className="cert-detail-grid">
-              <div><span>Unit</span><strong>{myUnit.unit}</strong></div>
-              <div><span>Status</span><strong>{myUnit.status}</strong></div>
-              <div><span>Station</span><strong>{myUnit.station}</strong></div>
-              <div><span>Operator</span><strong>{myUnit.operator || "Unassigned"}</strong></div>
-            </div>
-          ) : <p className="auth-help">No apparatus currently assigned to your profile. Ask command staff to update your assignment.</p>}
-          <button className="primary-button" style={{ marginTop: 12 }} disabled={!myUnit} onClick={async () => {
-            await logAction("create", "Apparatus", `Daily check submitted for ${myUnit?.unit || "unit"}`, myUnit?.id || "");
-            setMessage("Apparatus check submitted");
-          }}><Check size={14} /> Submit Daily Check</button>
+          <EmployeeApparatusCheck
+            departmentId={departmentId}
+            myUnit={myUnit}
+            actor={{ actorUid: user?.uid || "", actorName: myPerson?.name || membership?.displayName || user?.email || "" }}
+            permissions={permissions}
+            isCreator={isCreator}
+            onMessage={setMessage}
+          />
         </Panel>
       )}
 

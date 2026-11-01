@@ -1,9 +1,11 @@
 import {
   createRecord,
+  deleteRecord,
   getRecord,
   listRecords,
   updateRecord,
 } from "../firestoreService.js";
+import { testProgramRemovalMode } from "./configOpsLogic.js";
 import { loadTenantListFromFirestore } from "../tenantListLoader.js";
 import { LIST_KEYS } from "../tenantListKeys.js";
 import { writeFleetAuditLog } from "./fleetAudit.js";
@@ -130,7 +132,11 @@ export async function saveTestProgram(departmentId, record = {}, audit = {}) {
   const stamp = nowIso();
   normalized.updatedAt = stamp;
   if (!normalized.createdAt) normalized.createdAt = stamp;
-  const exists = (await listTestPrograms(departmentId)).some((row) => row.id === normalized.id);
+  const prior = (await listTestPrograms(departmentId)).find((row) => row.id === normalized.id);
+  const exists = Boolean(prior);
+  // The type is fixed once saved: recorded tests and the hose-test import look
+  // programs up by type.
+  if (prior) normalized.programType = prior.programType;
   if (exists) await updateRecord(departmentId, FLEET_TEST_PROGRAMS_COLLECTION, normalized.id, normalized);
   else await createRecord(departmentId, FLEET_TEST_PROGRAMS_COLLECTION, normalized.id, normalized);
   await writeFleetAuditLog(departmentId, {
@@ -141,6 +147,42 @@ export async function saveTestProgram(departmentId, record = {}, audit = {}) {
     actorName: audit.actorName || "System",
   }).catch(() => null);
   return normalized;
+}
+
+/**
+ * Remove a test program. If any recorded tests point at it (or it is the last
+ * program), it is turned off instead, so test history keeps its program.
+ * @param {string} departmentId
+ * @param {string} programId
+ * @param {{ actorUid?: string, actorName?: string }} [audit]
+ * @returns {Promise<{ mode: "delete"|"deactivate", testCount: number, program?: object }>}
+ */
+export async function removeTestProgram(departmentId, programId, audit = {}) {
+  if (!departmentId || !programId) throw new Error("A test program is required.");
+  const [programs, tests] = await Promise.all([
+    listTestPrograms(departmentId),
+    listFleetTests(departmentId, { programId }),
+  ]);
+  const existing = programs.find((row) => row.id === programId);
+  if (!existing) throw new Error("That test program no longer exists.");
+  const mode = testProgramRemovalMode(tests.length, programs.length);
+  let program;
+  if (mode === "delete") {
+    await deleteRecord(departmentId, FLEET_TEST_PROGRAMS_COLLECTION, programId);
+  } else {
+    program = { ...existing, active: false, updatedAt: nowIso() };
+    await updateRecord(departmentId, FLEET_TEST_PROGRAMS_COLLECTION, programId, program);
+  }
+  await writeFleetAuditLog(departmentId, {
+    action: mode === "delete" ? "delete" : "update",
+    recordId: programId,
+    summary: mode === "delete"
+      ? `Removed test program ${existing.name}`
+      : `Turned off test program ${existing.name} (${tests.length} recorded tests)`,
+    actorUid: audit.actorUid || "system",
+    actorName: audit.actorName || "System",
+  }).catch(() => null);
+  return { mode, testCount: tests.length, program };
 }
 
 /**
@@ -434,9 +476,10 @@ export async function buildTestComplianceBoard(departmentId, legacyHoseFallback 
     failed: rows.filter((row) => row.status === "failed").length,
     certificates: rows.filter((row) => row.hasCertificate).length,
     assetsCovered: new Set(rows.map((row) => row.fleetAssetId || row.fleetNumber).filter(Boolean)).size,
-    programs: programs.length,
+    programs: programs.filter((row) => row.active !== false).length,
     assetCount: assets.length,
   };
 
-  return { rows, summary, programs };
+  // Only programs still in use are offered for new tests.
+  return { rows, summary, programs: programs.filter((row) => row.active !== false) };
 }

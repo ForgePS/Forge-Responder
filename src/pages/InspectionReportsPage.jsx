@@ -321,7 +321,7 @@ export default function InspectionReportsPage({ onNavigate, query = "" }) {
                   {scheduleStatuses.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
                 </select>
               </Field>
-              <Field label="Recipients (email stub)" wide>
+              <Field label="Recipients (emails aren't sent yet)" wide>
                 <input
                   value={scheduleDraft.recipients}
                   onChange={(e) => setScheduleDraft((c) => ({ ...c, recipients: e.target.value }))}
@@ -470,7 +470,7 @@ export default function InspectionReportsPage({ onNavigate, query = "" }) {
             <header><div><strong>Scheduled reports</strong></div></header>
             <div className="panel-body">
               <p className="occupancy-muted">
-                Schedules store frequency and recipients. Email delivery is stubbed — Run now executes the report and logs last run.
+                Schedules store frequency and recipients. Scheduled emails aren't sent yet. "Run now" runs the report and records when it ran.
               </p>
               {!(board?.schedules || []).length ? (
                 <InspectionEmptyState title="No schedules" description="Create a schedule to track recurring prevention reports." />

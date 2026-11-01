@@ -10,6 +10,17 @@ import ObjectUploadField from "../components/ObjectUploadField.jsx";
 import ObjectLifecycleActions from "../components/ObjectLifecycleActions.jsx";
 import { buildDocumentLibraryPath } from "../lib/storagePaths.js";
 import { deleteFirebaseFile } from "../lib/firebaseClient.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { ANALYTICS_RANGES, daysFromToday, filterByRange, rangeWindow } from "../lib/analyticsRange.js";
+import "../styles/neris-analytics.css";
+import {
+  acknowledgementKeys,
+  acknowledgementLabel,
+  acknowledgementList,
+  hasAcknowledged,
+  requiresAcknowledgement,
+  withAcknowledgement,
+} from "../lib/documentAcknowledgement.js";
 import {
   archiveObject,
   isObjectArchived,
@@ -44,11 +55,20 @@ function FleetSummary({ items }) {
 }
 
 export function DocumentsPage({ query, records = [], setRecords, navLabel = "Documents", departmentId = "", canEdit = true }) {
+  const { user, membership } = useAuth();
+  const myAckIdentity = {
+    personnelId: membership?.personnelId || "",
+    uid: user?.uid || "",
+    name: membership?.displayName || user?.displayName || user?.email || "",
+  };
+  const myAckKeys = acknowledgementKeys(myAckIdentity);
   const category = documentCategoryMap[navLabel];
   const [filter, setFilter] = useState(category || "All");
   const [lifecycleView, setLifecycleView] = useState("active");
   const [selectedId, setSelectedId] = useState("");
   const [showUpload, setShowUpload] = useState(false);
+  // When set, the upload attaches a file to this existing document instead of adding a new one.
+  const [attachToId, setAttachToId] = useState("");
   const [busyId, setBusyId] = useState("");
   const [notice, setNotice] = useState("");
   const [uploadMeta, setUploadMeta] = useState({ title: "", category: category || "Upload", description: "" });
@@ -78,7 +98,15 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
   }, [visible, selectedId]);
 
   function acknowledge(id) {
-    setRecords((current) => current.map((item) => item.id === id ? { ...item, acknowledgementStatus: "Acknowledged" } : item));
+    setRecords((current) => current.map((item) => item.id === id ? withAcknowledgement(item, myAckIdentity) : item));
+  }
+
+  function setRequiresAcknowledgement(id, required) {
+    setRecords((current) => current.map((item) => item.id === id ? {
+      ...item,
+      requiresAcknowledgement: required ? "Yes" : "No",
+      acknowledgementStatus: required ? "Pending" : "Not Required",
+    } : item));
   }
 
   function patchRecord(id, mapper, successNotice) {
@@ -109,6 +137,22 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
   function handleUploaded(uploaded) {
     const today = new Date().toISOString().slice(0, 10);
     const ext = String(uploaded.name || "").split(".").pop()?.toUpperCase() || "FILE";
+    const uploaderName = membership?.displayName || user?.displayName || user?.email || "Current User";
+    if (attachToId) {
+      const target = records.find((item) => item.id === attachToId);
+      setRecords((current) => current.map((item) => (item.id === attachToId ? {
+        ...item,
+        fileUrl: uploaded.downloadUrl,
+        storagePath: uploaded.storagePath,
+        fileType: ext,
+        uploadedBy: uploaderName,
+        uploadedDate: today,
+      } : item)));
+      setAttachToId("");
+      setShowUpload(false);
+      setNotice(`File attached to ${target?.title || "the document"}.`);
+      return;
+    }
     const next = withActiveLifecycle({
       id: `DOC-${Date.now()}`,
       title: uploadMeta.title.trim() || uploaded.name,
@@ -116,7 +160,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
       subcategory: "Uploads",
       version: "1.0",
       effectiveDate: today,
-      uploadedBy: "Current User",
+      uploadedBy: uploaderName,
       uploadedDate: today,
       fileType: ext,
       fileUrl: uploaded.downloadUrl,
@@ -147,7 +191,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
           </div>
         </div>
         {canEdit ? (
-          <button className="primary-button" type="button" onClick={() => setShowUpload(true)} disabled={!departmentId}>
+          <button className="primary-button" type="button" onClick={() => { setAttachToId(""); setShowUpload(true); }} disabled={!departmentId}>
             <Upload size={14} /> Upload Document
           </button>
         ) : null}
@@ -179,22 +223,30 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
               <button
                 key={item.id}
                 className={item.id === selected?.id ? "doc-row selected" : "doc-row"}
-                onClick={() => setSelectedId(item.id)}
+                onClick={() => {
+                  setSelectedId(item.id);
+                  if (window.innerWidth < 900) {
+                    requestAnimationFrame(() => document.getElementById("document-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+                  }
+                }}
               >
                 <strong>{item.title}</strong>
                 <small>{item.category} · v{item.version}</small>
-                <Badge>{isObjectArchived(item) ? "Archived" : item.acknowledgementStatus}</Badge>
+                <Badge>{isObjectArchived(item) ? "Archived" : acknowledgementLabel(item)}</Badge>
               </button>
             ))}
             {!visible.length ? <div className="empty-table">No documents in this view.</div> : null}
           </div>
         </Panel>
         {selected && (
+          <div id="document-detail">
           <Panel
             title="Document Detail"
             icon={BookOpen}
-            action={selected.acknowledgementStatus === "Pending" && isObjectVisibleInActiveList(selected) ? (
-              <button className="text-button" onClick={() => acknowledge(selected.id)}>Acknowledge</button>
+            action={requiresAcknowledgement(selected) && isObjectVisibleInActiveList(selected) && myAckKeys.length ? (
+              hasAcknowledged(selected, myAckKeys)
+                ? <span className="panel-count">You acknowledged this</span>
+                : <button className="text-button" onClick={() => acknowledge(selected.id)}>Acknowledge</button>
             ) : null}
           >
             <div className="cert-detail-grid">
@@ -204,7 +256,8 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
                 ["Effective", selected.effectiveDate],
                 ["Uploaded By", selected.uploadedBy],
                 ["File Type", selected.fileType],
-                ["Acknowledgement", selected.acknowledgementStatus],
+                ["Acknowledgement", acknowledgementLabel(selected)],
+                ["Acknowledged By", acknowledgementList(selected).map((entry) => entry.name).join(", ") || "No one yet"],
                 ["Lifecycle", isObjectArchived(selected) ? "Archived" : "Active"],
                 ["Tags", selected.tags],
                 ["Description", selected.description],
@@ -213,9 +266,35 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
               ))}
             </div>
             {selected.fileUrl && selected.fileUrl !== "#" ? (
-              <a className="primary-button" href={selected.fileUrl} target="_blank" rel="noreferrer" style={{ marginTop: 12, display: "inline-flex" }}>
-                Open Document
-              </a>
+              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <a className="primary-button" href={selected.fileUrl} target="_blank" rel="noreferrer" style={{ display: "inline-flex" }}>
+                  Open Document
+                </a>
+                {canEdit ? (
+                  <button className="secondary-button" type="button" onClick={() => { setAttachToId(selected.id); setShowUpload(true); }}>
+                    Replace file
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="document-missing-file" role="status">
+                <span>No file is attached to this document yet.</span>
+                {canEdit ? (
+                  <button className="primary-button" type="button" onClick={() => { setAttachToId(selected.id); setShowUpload(true); }} disabled={!departmentId}>
+                    Attach file
+                  </button>
+                ) : <span> Ask an administrator to add it.</span>}
+              </div>
+            )}
+            {canEdit && isObjectVisibleInActiveList(selected) ? (
+              <label className="inline-check" style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={requiresAcknowledgement(selected)}
+                  onChange={(event) => setRequiresAcknowledgement(selected.id, event.target.checked)}
+                />
+                <span>Everyone must acknowledge this document</span>
+              </label>
             ) : null}
             {canEdit ? (
               <div style={{ marginTop: 12 }}>
@@ -230,11 +309,15 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
               </div>
             ) : null}
           </Panel>
+          </div>
         )}
       </section>
       {showUpload && canEdit ? (
-        <Modal title="Upload Document" onClose={() => setShowUpload(false)}>
-          <div className="upload-form" style={{ marginBottom: 12 }}>
+        <Modal
+          title={attachToId ? `Attach file: ${records.find((item) => item.id === attachToId)?.title || "Document"}` : "Upload Document"}
+          onClose={() => { setShowUpload(false); setAttachToId(""); }}
+        >
+          {attachToId ? null : <div className="upload-form" style={{ marginBottom: 12 }}>
             <label>
               <span>Title</span>
               <input
@@ -262,7 +345,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
                 placeholder="Optional description"
               />
             </label>
-          </div>
+          </div>}
           <ObjectUploadField
             label="Upload to document library"
             hint="PDF, Office, or image files up to 12 MB"
@@ -271,7 +354,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
             onUploaded={handleUploaded}
           />
           <div className="modal-actions">
-            <button className="secondary-button" type="button" onClick={() => setShowUpload(false)}>Cancel</button>
+            <button className="secondary-button" type="button" onClick={() => { setShowUpload(false); setAttachToId(""); }}>Cancel</button>
           </div>
         </Modal>
       ) : null}
@@ -316,40 +399,132 @@ export function PreplansPage({ query, records = [], setRecords }) {
   );
 }
 
-export function HoseTestingPage({ records = [], setRecords, query }) {
-  const visible = records.filter((item) => Object.values(item).join(" ").toLowerCase().includes(query.toLowerCase()));
-  return (
-    <div className="module-page">
-      <section className="module-heading"><div><span className="module-icon"><Gauge size={22} /></span><div><h1>Hose Testing</h1><p>Hose inventory test records, due dates, and failure tracking by apparatus.</p></div></div></section>
-      <FleetSummary items={[["Sections", records.length, "info"], ["Current", records.filter((r) => r.status === "Current").length, "success"], ["Due Soon", records.filter((r) => r.status === "Due Soon").length, "warning"], ["Overdue", records.filter((r) => r.status === "Overdue").length, "critical"]]} />
-      <Panel title="Hose Test Records" icon={Gauge}><div className="work-order-table"><div className="work-order-row work-order-head"><span>Apparatus</span><span>Section</span><span>Last Test</span><span>Next Due</span><span>Result</span><span>Status</span></div>{visible.map((item) => <div className="work-order-row" key={item.id}><strong>{item.apparatus}</strong><span>{item.section}</span><span>{item.lastTest}</span><span>{item.nextDue}</span><span>{item.result}</span><Badge>{item.status}</Badge></div>)}</div></Panel>
-    </div>
-  );
+export { default as HoseTestingPage } from "./HoseTestingPage.jsx";
+
+const ANALYTICS_PREVIEW_ROWS = 8;
+const CLOSED_WORK_ORDER = /^(complete|completed|closed|cancel+ed|void)$/i;
+
+function analyticsPercent(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return "—";
+  const n = Number(value);
+  return Number.isFinite(n) ? `${n}%` : "—";
+}
+
+function analyticsText(value) {
+  return value === null || value === undefined || String(value).trim() === "" ? "—" : value;
+}
+
+/**
+ * Card definitions for the Analytics page. `dateOf` is the record date the range
+ * filter uses; cards without one show current status and say the range doesn't apply.
+ */
+function buildAnalyticsSections({ scheduleDays, training, apparatus, certifications, inspections }, today) {
+  return [
+    {
+      key: "staffing",
+      title: "Staffing",
+      records: scheduleDays,
+      dateOf: (day) => day.id || day.date,
+      dateLabel: "shift date",
+      note: "Staffed and minimum counts as saved on each schedule day.",
+      toRow: (day) => ({ Date: analyticsText(day.date || day.id), Shift: analyticsText(day.shift), Staffed: analyticsText(day.staffed), Minimum: analyticsText(day.minimum), Status: analyticsText(day.status) }),
+    },
+    {
+      key: "training",
+      title: "Training",
+      records: training,
+      dateOf: (item) => item.date,
+      dateLabel: "class date",
+      toRow: (item) => ({ Course: analyticsText(item.course), Category: analyticsText(item.category), Date: analyticsText(item.date), Completion: analyticsPercent(item.completion), Status: analyticsText(item.status) }),
+    },
+    {
+      key: "inspections",
+      title: "Inspections",
+      records: inspections,
+      dateOf: (item) => item.due,
+      dateLabel: "due date",
+      toRow: (item) => ({ Occupancy: analyticsText(item.occupancy), "Due date": analyticsText(item.due), Status: analyticsText(item.status) }),
+    },
+    {
+      key: "fleet",
+      title: "Fleet",
+      records: apparatus,
+      dateOf: null,
+      note: "Current status. The date range doesn't apply to this card.",
+      toRow: (item) => ({ Unit: analyticsText(item.unit), Status: analyticsText(item.status), "PM due": analyticsText(item.pmDue) }),
+    },
+    {
+      key: "certifications",
+      title: "Certifications",
+      records: certifications,
+      dateOf: null,
+      note: "Current certifications. The date range doesn't apply to this card. Days left is counted from today.",
+      toRow: (item) => {
+        const days = daysFromToday(item.expires, today);
+        return {
+          Person: analyticsText(item.person),
+          Certification: analyticsText(item.type),
+          Expires: analyticsText(item.expires),
+          "Days left": days === null ? "—" : days < 0 ? `Expired ${Math.abs(days)}d ago` : String(days),
+          Status: analyticsText(item.status),
+        };
+      },
+    },
+  ];
 }
 
 export function AnalyticsPage({
-  personnel, certifications, training, apparatus, workOrders, assets, inspections, scheduleDays
+  personnel = [], certifications = [], training = [], apparatus = [], workOrders = [], assets = [], inspections = [], scheduleDays = []
 }) {
   const [range, setRange] = useState("30");
-  const sections = useMemo(() => ({
-    staffing: scheduleDays.map((day) => ({ shift: day.shift, staffed: day.staffed, minimum: day.minimum, status: day.status })),
-    training: training.map((item) => ({ course: item.course, category: item.category, completion: item.completion, status: item.status })),
-    fleet: apparatus.map((item) => ({ unit: item.unit, status: item.status, pmDue: item.pmDue })),
-    certifications: certifications.map((item) => ({ person: item.person, type: item.type, days: item.days, status: item.status })),
-    inspections: inspections.map((item) => ({ occupancy: item.occupancy, due: item.due, status: item.status }))
-  }), [scheduleDays, training, apparatus, certifications, inspections]);
+  const span = useMemo(() => rangeWindow(range), [range]);
+  const sections = useMemo(() => {
+    const today = new Date();
+    return buildAnalyticsSections({ scheduleDays, training, apparatus, certifications, inspections }, today).map((section) => {
+      if (!section.dateOf) {
+        return { ...section, filtered: false, rows: section.records.map(section.toRow), undated: 0 };
+      }
+      const result = filterByRange(section.records, section.dateOf, range, today);
+      return { ...section, filtered: true, rows: result.rows.map(section.toRow), undated: result.undated };
+    });
+  }, [range, scheduleDays, training, apparatus, certifications, inspections]);
+
+  const trainingInRange = sections.find((s) => s.key === "training")?.rows.length ?? 0;
+  const openWorkOrders = workOrders.filter((w) => !CLOSED_WORK_ORDER.test(String(w.status || "").trim())).length;
+  const rangeName = ANALYTICS_RANGES.find((r) => r.id === range)?.label || range;
 
   return (
     <div className="module-page analytics-page">
-      <section className="module-heading"><div><span className="module-icon"><BarChart3 size={22} /></span><div><h1>Analytics</h1><p>Cross-module command analytics with exportable operational metrics.</p></div></div>
-        <div className="heading-actions"><div className="segmented-control">{["30", "60", "90", "YTD"].map((item) => <button key={item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item === "YTD" ? "YTD" : `${item} days`}</button>)}</div></div>
+      <section className="module-heading"><div><span className="module-icon"><BarChart3 size={22} /></span><div><h1>Analytics</h1><p>Cross-module numbers with CSV export. Dated cards follow the range you pick; the others show current status.</p></div></div>
+        <div className="heading-actions"><div className="segmented-control">{ANALYTICS_RANGES.map((item) => <button key={item.id} type="button" className={range === item.id ? "active" : ""} onClick={() => setRange(item.id)}>{item.label}</button>)}</div></div>
       </section>
-      <FleetSummary items={[["Personnel", personnel.length, "info"], ["Training Events", training.length, "success"], ["Fleet Units", apparatus.length, "info"], ["Open Work Orders", workOrders.filter((w) => w.status !== "Complete").length, "warning"], ["Assets", assets.length, "info"]]} />
-      {Object.entries(sections).map(([key, rows]) => (
-        <Panel key={key} title={key.charAt(0).toUpperCase() + key.slice(1)} icon={BarChart3} action={<button className="text-button" onClick={() => exportCsv(`${key}-${range}-days.csv`, rows)}>Export CSV</button>}>
-          <div className="mini-table"><div className="mini-row mini-head" style={{ gridTemplateColumns: `repeat(${Object.keys(rows[0] || {}).length}, minmax(0,1fr))` }}>{Object.keys(rows[0] || {}).map((col) => <span key={col}>{col}</span>)}</div>{rows.slice(0, 8).map((row) => <div className="mini-row" key={JSON.stringify(row)} style={{ gridTemplateColumns: `repeat(${Object.keys(row).length}, minmax(0,1fr))` }}>{Object.values(row).map((val, i) => <span key={i}>{val}</span>)}</div>)}</div>
-        </Panel>
-      ))}
+      <p className="analytics-range-note">Showing {span.label} ({span.start.toLocaleDateString()} – {new Date().toLocaleDateString()}) for Staffing, Training and Inspections.</p>
+      <FleetSummary items={[["Personnel (current)", personnel.length, "info"], [`Training events (${rangeName.toLowerCase()})`, trainingInRange, "success"], ["Fleet units (current)", apparatus.length, "info"], ["Open work orders (now)", openWorkOrders, "warning"], ["Assets (current)", assets.length, "info"]]} />
+      {sections.map((section) => {
+        const columns = Object.keys(section.rows[0] || {});
+        const fileName = `${section.key}-${section.filtered ? (range === "YTD" ? "ytd" : `${range}-days`) : "current"}.csv`;
+        return (
+          <Panel
+            key={section.key}
+            title={section.title}
+            icon={BarChart3}
+            action={<button type="button" className="text-button" disabled={!section.rows.length} onClick={() => exportCsv(fileName, section.rows)}>Export CSV</button>}
+          >
+            {section.filtered
+              ? <p className="analytics-panel-note">{section.rows.length} {section.rows.length === 1 ? "record" : "records"} by {section.dateLabel}, {span.label}.{section.undated ? ` ${section.undated} ${section.undated === 1 ? "record has" : "records have"} no usable ${section.dateLabel} and ${section.undated === 1 ? "isn't" : "aren't"} included.` : ""}{section.note ? ` ${section.note}` : ""}</p>
+              : <p className="analytics-panel-note">{section.note}</p>}
+            {section.rows.length ? (
+              <div className="mini-table">
+                <div className="mini-row mini-head" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0,1fr))` }}>{columns.map((col) => <span key={col}>{col}</span>)}</div>
+                {section.rows.slice(0, ANALYTICS_PREVIEW_ROWS).map((row, index) => <div className="mini-row" key={index} style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0,1fr))` }}>{columns.map((col) => <span key={col}>{row[col]}</span>)}</div>)}
+                {section.rows.length > ANALYTICS_PREVIEW_ROWS ? <p className="analytics-panel-note">Showing {ANALYTICS_PREVIEW_ROWS} of {section.rows.length}. Export CSV for all.</p> : null}
+              </div>
+            ) : (
+              <p className="analytics-empty">{section.filtered ? `No ${section.title.toLowerCase()} records in the ${span.label}.` : `No ${section.title.toLowerCase()} records yet.`}</p>
+            )}
+          </Panel>
+        );
+      })}
     </div>
   );
 }

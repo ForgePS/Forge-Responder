@@ -6,7 +6,6 @@ import {
   ExternalLink,
   Film,
   LayoutGrid,
-  LayoutTemplate,
   MonitorPlay,
   Pencil,
   Play,
@@ -18,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext.jsx";
-import { buildAlertDashboardUrl } from "../../lib/alertDashboard.js";
+import { buildAlertDashboardUrl, publicDisplayKeyFrom } from "../../lib/alertDashboard.js";
 import IntegrationsPanel from "./IntegrationsPanel.jsx";
 import AlertDashboardSettingsPanel from "./AlertDashboardSettingsPanel.jsx";
 import AddMediaModal from "./AddMediaModal.jsx";
@@ -56,7 +55,6 @@ const VIEWS = [
   { id: "displays", label: "Devices", icon: Tv },
   { id: "media", label: "Media", icon: Film },
   { id: "playlists", label: "Playlists", icon: MonitorPlay },
-  { id: "layouts", label: "Layouts", icon: LayoutTemplate },
   { id: "schedules", label: "Publish", icon: CloudUpload },
   { id: "alerts", label: "Alert Dashboard", icon: Siren },
   { id: "integrations", label: "Integrations", icon: Plug },
@@ -480,7 +478,7 @@ export default function DigitalDashboardPanel({
             canEdit={canEdit}
           />
           <div className="dd-panel-body dd-mvix-guide-wrap">
-            <MvixProvisioningGuide gatewaySlug={gatewaySlug} displays={displays} />
+            <MvixProvisioningGuide gatewaySlug={gatewaySlug} displays={displays} displayKey={publicDisplayKeyFrom(alertDashboardConfig)} />
           </div>
           <div className="dd-panel-body">
           {filteredDisplays.length ? (
@@ -518,7 +516,7 @@ export default function DigitalDashboardPanel({
                         <td>
                           {gatewaySlug && display.id ? (
                             <a
-                              href={buildAlertDashboardUrl(gatewaySlug, display.id)}
+                              href={buildAlertDashboardUrl(gatewaySlug, display.id, publicDisplayKeyFrom(alertDashboardConfig)) || undefined}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="dd-table-link"
@@ -722,27 +720,6 @@ export default function DigitalDashboardPanel({
         </section>
       ) : null}
 
-      {view === "layouts" ? (
-        <section className="dd-panel dd-library-panel">
-          <DigitalDashboardLibraryBar
-            title="Layout Library"
-            count={0}
-            search={libraryQuery}
-            onSearchChange={setLibraryQuery}
-            searchPlaceholder="Search layouts…"
-            addLabel="Add Layout"
-            onAdd={() => {}}
-            canEdit={false}
-          />
-          <div className="dd-panel-body">
-            <EmptyState
-              title="Layout templates coming soon"
-              detail="Zone-based screen layouts and multi-region templates will let you mirror station boards, lobby tickers, and training room displays."
-            />
-          </div>
-        </section>
-      ) : null}
-
       {view === "schedules" ? (
         <section className="dd-panel dd-library-panel">
           <DigitalDashboardLibraryBar
@@ -930,7 +907,7 @@ export default function DigitalDashboardPanel({
               </label>
             ) : (
               <DisplayAlertUrlField
-                url={modal.form.id && gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, modal.form.id) : ""}
+                url={modal.form.id && gatewaySlug ? buildAlertDashboardUrl(gatewaySlug, modal.form.id, publicDisplayKeyFrom(alertDashboardConfig)) : ""}
                 label="MVIX / signage stick home URL"
               />
             )}

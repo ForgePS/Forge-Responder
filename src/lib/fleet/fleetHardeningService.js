@@ -185,7 +185,7 @@ export async function runFleetHardeningChecks(departmentId, options = {}) {
       case "docs_guides":
       case "docs_deploy":
         status = "pass";
-        detail = "See docs/fleet/ guides committed with Phase 15";
+        detail = "See the fleet guides in docs/fleet/";
         break;
       case "indexes_committed":
         status = "pass";

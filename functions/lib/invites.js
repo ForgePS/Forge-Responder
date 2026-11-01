@@ -107,8 +107,22 @@ async function loadDepartmentName(db, departmentId) {
   return String(profile.data()?.name || registry.data()?.name || departmentId);
 }
 
-/** Enforce the plan's maxPortalUsers (0 or missing = unlimited). */
-async function assertSeatAvailable(db, departmentId) {
+/** True when an invite's expiresAt is in the past (expired invites don't hold a seat). */
+function isInviteExpired(invite = {}, nowMillis = Date.now()) {
+  const expiresAt = invite.expiresAt;
+  const millis = typeof expiresAt?.toMillis === "function"
+    ? expiresAt.toMillis()
+    : (expiresAt ? new Date(expiresAt).getTime() : NaN);
+  return Number.isFinite(millis) && millis < nowMillis;
+}
+
+/**
+ * Enforce the plan's maxPortalUsers (0 or missing = unlimited).
+ * Seats = active members (excluding platform creators) + unexpired pending
+ * invites. `ignoreInviteIds` are pending invites about to be replaced (a resend),
+ * so they don't count against the new one.
+ */
+async function assertSeatAvailable(db, departmentId, { ignoreInviteIds = [] } = {}) {
   const subscription = await db.doc(`platformSubscriptions/${departmentId}`).get();
   const sub = subscription.data() || {};
   if (BLOCKED_SUBSCRIPTION_STATUSES.has(sub.status)) {
@@ -126,7 +140,12 @@ async function assertSeatAvailable(db, departmentId) {
       .where("status", "==", "pending")
       .get(),
   ]);
-  const seatsUsed = members.docs.filter((d) => !d.data().isPlatformCreator).length + pending.size;
+  const ignored = new Set(ignoreInviteIds);
+  const nowMillis = Date.now();
+  const pendingSeats = pending.docs
+    .filter((d) => !ignored.has(d.id) && !isInviteExpired(d.data(), nowMillis))
+    .length;
+  const seatsUsed = members.docs.filter((d) => !d.data().isPlatformCreator).length + pendingSeats;
   if (seatsUsed >= maxUsers) {
     throw new HttpsError(
       "resource-exhausted",
@@ -183,7 +202,8 @@ async function createInvite(db, request) {
     .where("status", "==", "pending")
     .get();
 
-  await assertSeatAvailable(db, departmentId);
+  // A resend replaces the older pending invite, so it doesn't need a second seat.
+  await assertSeatAvailable(db, departmentId, { ignoreInviteIds: existing.docs.map((doc) => doc.id) });
 
   const token = newToken();
   const inviteId = hashToken(token);
@@ -222,12 +242,17 @@ async function createInvite(db, request) {
     });
   await db.doc(`invites/${inviteId}`).update({ emailStatus });
 
+  const createdIso = new Date().toISOString();
   await db.collection(`departments/${departmentId}/auditLogs`).add({
     action: "invite.created",
+    module: "Users",
     actorUid: request.auth.uid,
+    actorName: request.auth.token?.name || request.auth.token?.email || "Administrator",
+    summary: `Invited ${email}`,
     target: email,
     roleIds,
-    createdAt: new Date().toISOString(),
+    created_at: createdIso,
+    createdAt: createdIso,
   });
 
   return { inviteId, inviteUrl, emailStatus, expiresAt: expiresAt.toDate().toISOString() };
@@ -243,6 +268,17 @@ async function revokeInvite(db, request) {
   await assertDepartmentAdmin(db, invite.departmentId, request.auth);
   if (invite.status !== "pending") return { status: invite.status };
   await ref.update({ status: "revoked", revokedAt: Timestamp.now(), revokedBy: request.auth.uid });
+  const revokedIso = new Date().toISOString();
+  await db.collection(`departments/${invite.departmentId}/auditLogs`).add({
+    action: "invite.revoked",
+    module: "Users",
+    actorUid: request.auth.uid,
+    actorName: request.auth.token?.name || request.auth.token?.email || "Administrator",
+    summary: `Cancelled the invite for ${invite.email}`,
+    target: invite.email,
+    created_at: revokedIso,
+    createdAt: revokedIso,
+  });
   return { status: "revoked" };
 }
 
@@ -271,6 +307,7 @@ async function acceptInvite(db, request) {
   const ref = db.doc(`invites/${hashToken(token)}`);
   const uid = request.auth.uid;
   const userEmail = normalizeEmail(request.auth.token?.email);
+  const emailVerified = request.auth.token?.email_verified === true;
 
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -287,6 +324,13 @@ async function acceptInvite(db, request) {
       throw new HttpsError(
         "permission-denied",
         `This invite is for ${maskEmail(invite.email)}. Sign in with that email address to accept it.`
+      );
+    }
+    // Only a verified address proves the person owns the invited mailbox.
+    if (!emailVerified) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Verify your email address first: check your inbox for the verification link, then open the invite again."
       );
     }
 
@@ -318,9 +362,13 @@ async function acceptInvite(db, request) {
     tx.update(ref, { status: "accepted", acceptedAt: Timestamp.now(), acceptedBy: uid });
     tx.set(db.collection(`departments/${invite.departmentId}/auditLogs`).doc(), {
       action: "invite.accepted",
+      module: "Users",
       actorUid: uid,
+      actorName: membership.displayName || userEmail,
+      summary: `${userEmail} accepted their invite`,
       target: userEmail,
       roleIds: membership.roleIds,
+      created_at: nowIso,
       createdAt: nowIso,
     });
     return { departmentId: invite.departmentId, departmentName: invite.departmentName };
@@ -332,6 +380,7 @@ module.exports = {
   assertDepartmentAdmin,
   createInvite,
   hashToken,
+  isInviteExpired,
   maskEmail,
   previewInvite,
   revokeInvite,

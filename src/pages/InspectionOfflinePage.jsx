@@ -25,7 +25,7 @@ import {
   labelForOfflineQueueStatus,
   loadInspectionOfflineBoard,
   purgeInspectionLocalData,
-  queueInspectionAttachmentStub,
+  queueInspectionAttachment,
   resolveInspectionConflictAndSync,
   saveInspectionDevicePolicy,
   syncInspectionOfflineQueue,
@@ -71,10 +71,11 @@ export default function InspectionOfflinePage({ onNavigate }) {
   const [policyDraft, setPolicyDraft] = useState(null);
   const [attachDraft, setAttachDraft] = useState({
     inspectionId: "",
-    fileName: "",
+    file: null,
     kind: "photo",
     note: "",
   });
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const actor = {
     actorUid: user?.uid || "system",
@@ -338,7 +339,7 @@ export default function InspectionOfflinePage({ onNavigate }) {
             <header><div><strong>Attachment upload queue</strong></div></header>
             <div className="panel-body">
               <p className="occupancy-muted">
-                Photos/signatures are queued as metadata on-device. Binary Storage upload is stubbed on sync for this MVP.
+                Photos, signatures and documents are kept on this device until you sync. Sync uploads them and adds them to the inspection.
               </p>
               {canManage ? (
                 <div className="occupancy-form-grid" style={{ marginBottom: 12 }}>
@@ -349,11 +350,13 @@ export default function InspectionOfflinePage({ onNavigate }) {
                       placeholder="INS-…"
                     />
                   </Field>
-                  <Field label="File name">
+                  <Field label="File">
                     <input
-                      value={attachDraft.fileName}
-                      onChange={(e) => setAttachDraft((c) => ({ ...c, fileName: e.target.value }))}
-                      placeholder="front-exit.jpg"
+                      key={fileInputKey}
+                      type="file"
+                      accept={attachDraft.kind === "photo" ? "image/*" : undefined}
+                      capture={attachDraft.kind === "photo" ? "environment" : undefined}
+                      onChange={(e) => setAttachDraft((c) => ({ ...c, file: e.target.files?.[0] || null }))}
                     />
                   </Field>
                   <Field label="Kind">
@@ -375,22 +378,22 @@ export default function InspectionOfflinePage({ onNavigate }) {
                   <button
                     className="secondary-button"
                     type="button"
-                    disabled={saving || !attachDraft.inspectionId || !attachDraft.fileName}
+                    disabled={saving || !attachDraft.inspectionId || !attachDraft.file}
                     onClick={() => run(
-                      () => queueInspectionAttachmentStub(departmentId, {
-                        ...attachDraft,
-                        mimeType: attachDraft.kind === "photo" ? "image/jpeg" : "application/octet-stream",
-                        sizeBytes: 0,
-                      }, actor),
-                      "Attachment queued."
+                      async () => {
+                        await queueInspectionAttachment(departmentId, attachDraft, actor);
+                        setAttachDraft((c) => ({ ...c, file: null, note: "" }));
+                        setFileInputKey((k) => k + 1);
+                      },
+                      "Attachment saved on this device. It uploads on the next sync."
                     )}
                   >
-                    Queue attachment stub
+                    Save attachment
                   </button>
                 </div>
               ) : null}
               {!(board?.attachments || []).length ? (
-                <InspectionEmptyState title="No attachments queued" description="Queue photo/signature stubs while working offline." />
+                <InspectionEmptyState title="No attachments queued" description="Save photos, signatures or documents here while working offline." />
               ) : (
                 <div className="personnel-list">
                   {(board.attachments || []).map((row) => (
@@ -399,6 +402,7 @@ export default function InspectionOfflinePage({ onNavigate }) {
                         <strong>{row.fileName}</strong>
                         <small className="occupancy-muted">
                           {" "}{row.kind} · {row.inspectionId} · {formatWhen(row.clientUpdatedAt)}
+                          {row.lastError ? ` · ${row.lastError}` : ""}
                         </small>
                       </span>
                       <InspectionStatusBadge status={row.status} />

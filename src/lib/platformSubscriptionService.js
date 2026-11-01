@@ -392,7 +392,9 @@ export async function ensureCustomerSubscription(departmentId, userId = "", opti
     billingCycle: isDefault ? "complimentary" : "monthly",
     currency: "USD",
     amountCents: 0,
-    trialEndsAt: isDefault ? "" : addDaysIso(today, 30),
+    // The trial runs for the term chosen when the department was created (billing
+    // reminders key off this date), not a fixed 30 days.
+    trialEndsAt: isDefault ? "" : periodEnd,
     currentPeriodStart: periodStart,
     currentPeriodEnd: periodEnd,
     renewalDate: periodEnd,

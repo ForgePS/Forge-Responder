@@ -568,7 +568,7 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
               ) : null}
             </header>
             <div className="panel-body">
-              <p className="occupancy-muted">Outbound webhook delivery is stubbed — Test records a signed-post simulation.</p>
+              <p className="occupancy-muted">Webhooks aren't sent yet. "Test" records what would have been sent.</p>
               {!(board?.webhooks || []).length ? (
                 <InspectionEmptyState title="No webhooks" description="Register endpoints for inspection lifecycle events." />
               ) : (

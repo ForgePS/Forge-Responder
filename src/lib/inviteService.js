@@ -85,7 +85,18 @@ export function revokeInvite(inviteId) {
   return call("revokeDepartmentInvite", { inviteId });
 }
 
-/** Pending invites for a department (rules allow department admins only). */
+function inviteExpiryMillis(invite = {}) {
+  const value = invite.expiresAt;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  const millis = value ? new Date(value).getTime() : NaN;
+  return Number.isFinite(millis) ? millis : NaN;
+}
+
+/**
+ * Pending invites for a department (rules allow department admins only).
+ * Invites past their expiry date are still returned, flagged `expired: true`
+ * (they no longer hold a seat and can only be resent or cancelled).
+ */
 export async function listPendingInvites(departmentId) {
   const db = getFirestoreDb();
   if (!db || !departmentId) return [];
@@ -94,13 +105,28 @@ export async function listPendingInvites(departmentId) {
     where("departmentId", "==", departmentId),
     where("status", "==", "pending")
   ));
+  const now = Date.now();
   return snap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
+    .map((d) => {
+      const data = { id: d.id, ...d.data() };
+      const expiry = inviteExpiryMillis(data);
+      return { ...data, expired: Number.isFinite(expiry) && expiry < now };
+    })
     .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+}
+
+/**
+ * The invite is fine but the signed-in account's email address isn't verified
+ * yet (the server refuses until it is). The token stays usable.
+ */
+export function isEmailNotVerifiedInviteError(error) {
+  const code = String(error?.code || "").replace(/^functions\//, "");
+  return code === "failed-precondition" && /verify your email/i.test(String(error?.message || ""));
 }
 
 /** Invite errors that mean the token will never work — stop retrying it. */
 export function isTerminalInviteError(error) {
+  if (isEmailNotVerifiedInviteError(error)) return false;
   const code = String(error?.code || "").replace(/^functions\//, "");
   return ["not-found", "failed-precondition", "deadline-exceeded", "invalid-argument"].includes(code);
 }

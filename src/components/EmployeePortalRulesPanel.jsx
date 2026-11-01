@@ -26,8 +26,8 @@ export default function EmployeePortalRulesPanel({
       <header className="employee-portal-rules-heading">
         <strong>Employee Portal Rules</strong>
         <p className="auth-help">
-          Standard defaults apply to every department branch. Adjust pay periods, vacation advance limits,
-          and shift trade windows here for this branch — changes apply to the Employee Portal immediately after save.
+          Set pay periods, how far ahead members can request vacation, and shift trade windows.
+          Changes apply to the Employee Portal as soon as you save.
         </p>
       </header>
 

@@ -66,7 +66,11 @@ export const WARRANTY_CLAIM_STATUSES = [
   { id: "appealed", label: "Appealed" },
 ];
 
-export const STARTER_RECALLS = [
+// No made-up recalls: departments add real campaigns themselves. (The old
+// sample "DEMO-2026-001" brake bulletin is removed by scripts/cleanup-fleet-seeds.mjs.)
+export const STARTER_RECALLS = [];
+
+export const LEGACY_SAMPLE_RECALLS = [
   {
     id: "recall-demo-brake",
     campaignNumber: "DEMO-2026-001",

@@ -15,6 +15,9 @@ import DepartmentStationsEditor from "../DepartmentStationsEditor.jsx";
 import ShiftRotationPanel from "../ShiftRotationPanel.jsx";
 import PersonnelImportModal from "../personnel/PersonnelImportModal.jsx";
 import DepartmentInvitesPanel from "../DepartmentInvitesPanel.jsx";
+import { useTenant } from "../../context/TenantContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { limitCheck, limitMessage } from "../../lib/moduleAccess.js";
 
 const STEPS = [
   { id: "department", label: "Department", icon: Building2 },
@@ -46,8 +49,11 @@ export default function DepartmentSetupWizard({
   user,
   onClose,
 }) {
-  const savedStep = STEPS.findIndex((s) => s.id === settings?.onboarding?.step);
-  const [stepIndex, setStepIndex] = useState(savedStep > 0 ? savedStep : 0);
+  const { entitlements } = useTenant();
+  const { isCreator } = useAuth();
+  const setupFinished = Boolean(settings?.onboarding?.completedAt || settings?.onboardingCompletedAt);
+  const savedStep = setupFinished ? -1 : STEPS.findIndex((s) => s.id === settings?.onboarding?.step);
+  const [stepIndex, setStepIndex] = useState(savedStep > 0 && STEPS[savedStep]?.id !== "done" ? savedStep : 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -116,7 +122,7 @@ export default function DepartmentSetupWizard({
       await saveProfile({
         name: details.name.trim(),
         shortName: details.shortName.trim() || details.name.trim(),
-        displayTitle: details.name.trim(),
+        ...(profile.displayTitle ? {} : { displayTitle: details.name.trim() }),
         address: details.address.trim(),
         city: details.city.trim(),
         stateId: details.stateId,
@@ -188,6 +194,15 @@ export default function DepartmentSetupWizard({
 
   async function handleImport(outcome = {}) {
     if (!outcome.records) return;
+    const adding = Number(outcome.created || 0);
+    if (adding > 0 && !isCreator) {
+      const used = Math.max(Array.isArray(personnel) ? personnel.length : 0, Number(entitlements?.usage?.personnel || 0));
+      const check = limitCheck({ ...entitlements, usage: { personnel: used } }, "maxPersonnel", "personnel", adding);
+      if (!check.allowed) {
+        setError(limitMessage("personnel records", check));
+        return;
+      }
+    }
     try {
       const records = await attachForgePersonIds(departmentId, outcome.records);
       setPersonnel?.(records);

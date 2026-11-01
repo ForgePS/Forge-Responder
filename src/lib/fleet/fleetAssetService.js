@@ -396,3 +396,47 @@ export async function classicApparatusListExists(departmentId) {
     return false;
   }
 }
+
+/** Units that no longer take part in checks (soft-removed; history kept). */
+export function isRetiredFleetAsset(asset = {}) {
+  return /decommissioned|retired|disposed|sold/i.test(String(asset.status || ""));
+}
+
+/**
+ * Add any unit from the classic Apparatus list that isn't in fleetAssets yet, so
+ * a unit added on the Apparatus page also shows up for apparatus checks.
+ * Matching is by legacy id, then by unit name. Never removes anything.
+ * @returns {Promise<object[]>} the fleet assets that were added
+ */
+export async function syncFleetAssetsFromApparatus(departmentId, legacyItems = null, audit = {}) {
+  if (!departmentId) return [];
+  const legacy = Array.isArray(legacyItems) ? legacyItems : await loadLegacyApparatusListItems(departmentId);
+  if (!legacy.length) return [];
+  const existing = await listFleetAssets(departmentId);
+  const byLegacyId = new Set(existing.map((row) => row.legacyApparatusId || row.id).filter(Boolean));
+  const byName = new Set(existing.map((row) => String(row.unitDesignation || row.fleetNumber || "").trim().toLowerCase()).filter(Boolean));
+  const added = [];
+  const stamp = new Date().toISOString();
+  for (const item of legacy) {
+    const record = legacyApparatusToFleetAsset(item, departmentId);
+    if (!record.id) continue;
+    const name = String(record.unitDesignation || record.fleetNumber || "").trim().toLowerCase();
+    if (byLegacyId.has(record.id) || (name && byName.has(name))) continue;
+    record.createdAt = stamp;
+    record.updatedAt = stamp;
+    await createRecord(departmentId, FLEET_ASSETS_COLLECTION, record.id, sanitizeForFirestore(record));
+    added.push(normalizeFleetAssetRecord(record, departmentId));
+    byLegacyId.add(record.id);
+    if (name) byName.add(name);
+  }
+  if (added.length) {
+    await writeFleetAuditLog(departmentId, {
+      action: "import",
+      recordId: FLEET_ASSETS_COLLECTION,
+      summary: `Added ${added.length} unit(s) from the Apparatus list: ${added.map((row) => row.unitDesignation || row.fleetNumber).join(", ")}`,
+      actorUid: audit.actorUid || "system",
+      actorName: audit.actorName || "System",
+    }).catch(() => null);
+  }
+  return added;
+}

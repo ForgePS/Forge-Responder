@@ -10,7 +10,7 @@ export const WEB_TABS = [
   { id: "stock-quote", label: "Stock Quote", enabled: false },
   { id: "radio", label: "Radio", enabled: false },
   { id: "news", label: "News", enabled: true },
-];
+].filter((tab) => tab.enabled !== false);
 
 export const LOCAL_TABS = [
   { id: "weather", label: "Weather", enabled: true },
@@ -22,7 +22,7 @@ export const LOCAL_TABS = [
   { id: "poi", label: "Point Of Interest", enabled: false },
   { id: "directories", label: "Directories", enabled: false },
   { id: "wayfinding", label: "Wayfinding", enabled: false },
-];
+].filter((tab) => tab.enabled !== false);
 
 export const SOCIAL_TABS = [
   { id: "facebook", label: "Facebook", enabled: true },
@@ -31,9 +31,9 @@ export const SOCIAL_TABS = [
   { id: "teams", label: "Microsoft Teams", enabled: true },
   { id: "youtube-social", label: "YouTube", enabled: false },
   { id: "linkedin", label: "LinkedIn", enabled: false },
-];
+].filter((tab) => tab.enabled !== false);
 
-export const CATEGORY_HUB_TABS = {
+const ALL_CATEGORY_HUB_TABS = {
   favorites: [
     { id: "saved", label: "Saved Items", enabled: true },
     { id: "pinned", label: "Pinned Loops", enabled: true },
@@ -63,6 +63,13 @@ export const CATEGORY_HUB_TABS = {
     { id: "image", label: "AI Image", enabled: false },
   ],
 };
+
+// Only working apps; categories with none are left out.
+export const CATEGORY_HUB_TABS = Object.fromEntries(
+  Object.entries(ALL_CATEGORY_HUB_TABS)
+    .map(([key, tabs]) => [key, tabs.filter((tab) => tab.enabled !== false)])
+    .filter(([, tabs]) => tabs.length),
+);
 
 export const WEATHER_TEMPLATES = [
   { id: "weather-classic", label: "Classic Forecast", accent: "#2563eb" },

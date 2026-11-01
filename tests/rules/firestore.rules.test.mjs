@@ -175,23 +175,33 @@ describe("per-item lists", () => {
     await assertSucceeds(setDoc(doc(db, `departments/${A}/lists/hlfd-rms-personnel`), { items: [{ id: "P2" }] }, { merge: true }));
   });
 
-  it("public alert lists stay readable per item", async () => {
+  it("dispatch alerts are not readable without signing in (TV screens use the keyed server call)", async () => {
     const db = env.unauthenticatedContext().firestore();
-    await assertSucceeds(getDoc(doc(db, `departments/${A}/lists/hlfd-rms-active911-alerts/items/a1`)));
+    await assertFails(getDoc(doc(db, `departments/${A}/lists/hlfd-rms-active911-alerts/items/a1`)));
+    await assertFails(getDoc(doc(db, `departments/${A}/lists/hlfd-rms-active911-alerts`)));
     await assertFails(getDoc(doc(db, `${header}/items/T1`)));
+    await assertSucceeds(getDoc(doc(memberA().firestore(), `departments/${A}/lists/hlfd-rms-active911-alerts/items/a1`)));
   });
 });
 
-describe("two-factor login", () => {
+// Two-step sign-in codes are optional for everyone (2026-10-29).
+describe("two-factor login (optional)", () => {
   const setDeadline = (date) => env.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), "platformConfig/main"), { mfaAdminDeadline: date }, { merge: true });
   });
 
-  it("creator powers need a session signed in with a code", async () => {
+  it("creators have their powers with or without a code", async () => {
     await assertSucceeds(getDoc(doc(creator().firestore(), `departments/${B}/incidents/i9`)));
-    await assertFails(getDoc(doc(creatorNo2fa().firestore(), `departments/${A}/incidents/i1`)));
-    await assertFails(setDoc(doc(creatorNo2fa().firestore(), `departments/${A}/users/new-user`), membership("new-user", A)));
-    await assertSucceeds(setDoc(doc(creator().firestore(), `departments/${A}/users/new-user`), membership("new-user", A)));
+    await assertSucceeds(getDoc(doc(creatorNo2fa().firestore(), `departments/${A}/incidents/i1`)));
+    await assertSucceeds(setDoc(doc(creatorNo2fa().firestore(), `departments/${A}/users/new-user`), membership("new-user", A)));
+  });
+
+  it("a removed creator has no creator powers", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "platformCreators/ex-creator"), { status: "removed" });
+    });
+    const db = as("ex-creator", { email: "ex@forge.test", email_verified: true }).firestore();
+    await assertFails(getDoc(doc(db, `departments/${A}/incidents/i1`)));
   });
 
   it("department admins keep admin powers until the deadline", async () => {
@@ -199,11 +209,10 @@ describe("two-factor login", () => {
     await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
   });
 
-  it("after the deadline, admin powers need a code; ordinary member access does not", async () => {
+  it("an old deadline no longer locks admins out", async () => {
     await setDeadline(new Date(Date.now() - 24 * 3600 * 1000));
-    await assertFails(updateDoc(doc(adminA().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
-    await assertFails(setDoc(doc(adminA().firestore(), `departments/${A}/roles/firefighter`), { name: "FF", permissions: {} }));
-    await assertSucceeds(updateDoc(doc(adminA2fa().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
+    await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/users/member-a`), { roleIds: ["captain"] }));
+    await assertSucceeds(setDoc(doc(adminA().firestore(), `departments/${A}/roles/firefighter`), { name: "FF", permissions: {} }));
     await assertSucceeds(getDoc(doc(adminA().firestore(), `departments/${A}/incidents/i1`)));
   });
 
@@ -329,11 +338,41 @@ describe("department admins", () => {
     await assertSucceeds(setDoc(doc(db, `departments/${A}/users/new-user`), membership("new-user", A)));
   });
 
+  it("can change someone's role, including promoting to Fire Chief", async () => {
+    const db = adminA().firestore();
+    await assertSucceeds(updateDoc(doc(db, `departments/${A}/users/member-a`), { role: "department_admin", roleIds: ["fireChief"] }));
+    await assertSucceeds(updateDoc(doc(db, `departments/${A}/users/member-a`), { role: "captain", roleIds: ["captain"] }));
+  });
+
   it("cannot grant platform-creator flags", async () => {
     const db = adminA().firestore();
     await assertFails(setDoc(doc(db, `departments/${A}/users/new-user`), membership("new-user", A, { role: "creator", roleIds: ["creator"] })));
     await assertFails(updateDoc(doc(db, `departments/${A}/users/member-a`), { isPlatformCreator: true }));
     await assertFails(updateDoc(doc(db, `departments/${A}/users/member-a`), { roleIds: ["creator"] }));
+    await assertFails(updateDoc(doc(db, `departments/${A}/users/member-a`), { role: "creator" }));
+  });
+
+  it("are the only ones who change department settings", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `departments/${A}/settings/main`), { payRules: { overtimeMultiplier: 1.5 } });
+      await setDoc(doc(ctx.firestore(), `departments/${A}/settings/damageFormJotform`), { formUrl: "https://form.jotform.com/1" });
+    });
+    const member = memberA().firestore();
+    await assertSucceeds(getDoc(doc(member, `departments/${A}/settings/main`)));
+    await assertFails(setDoc(doc(member, `departments/${A}/settings/main`), { payRules: { overtimeMultiplier: 3 } }, { merge: true }));
+    await assertFails(setDoc(doc(member, `departments/${A}/settings/damageFormJotform`), { formUrl: "https://evil.example" }, { merge: true }));
+    await assertFails(setDoc(doc(member, `departments/${A}/settings/other`), { anything: true }));
+    // Distribution groups are the one thing members may save (the app checks the permission).
+    await assertSucceeds(setDoc(doc(member, `departments/${A}/settings/main`), { internalEmailGroups: [], updatedAt: "now" }, { merge: true }));
+    await assertSucceeds(setDoc(doc(adminA().firestore(), `departments/${A}/settings/main`), { payRules: { overtimeMultiplier: 2 } }, { merge: true }));
+  });
+
+  it("can delete notifications; members can't", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `departments/${A}/notifications/n1`), { title: "x" });
+    });
+    await assertFails(deleteDoc(doc(memberA().firestore(), `departments/${A}/notifications/n1`)));
+    await assertSucceeds(deleteDoc(doc(adminA().firestore(), `departments/${A}/notifications/n1`)));
   });
 
   it("cannot manage another department's members", async () => {
@@ -552,10 +591,21 @@ describe("platform creators and demo", () => {
     await assertSucceeds(setDoc(doc(db, `departments/${B}/users/creator-1`), membership("creator-1", B, { role: "creator", roleIds: ["creator"], isPlatformCreator: true })));
   });
 
-  it("anyone can self-join the demo department, but not as a creator", async () => {
+  it("only the shared demo account can self-join the demo department, and never as a creator", async () => {
+    const demo = as("demo-user", { email: "demo@forge.demo", email_verified: true }).firestore();
+    await assertSucceeds(setDoc(doc(demo, "departments/forge-demo/users/demo-user"), membership("demo-user", "forge-demo", { roleIds: ["fireChief"] })));
+    await assertFails(setDoc(doc(demo, "departments/forge-demo/users/demo-user"), { isPlatformCreator: true }, { merge: true }));
     const db = stranger().firestore();
-    await assertSucceeds(setDoc(doc(db, "departments/forge-demo/users/stranger"), membership("stranger", "forge-demo", { roleIds: ["fireChief"] })));
-    await assertFails(setDoc(doc(db, "departments/forge-demo/users/stranger"), { isPlatformCreator: true }, { merge: true }));
+    await assertFails(setDoc(doc(db, "departments/forge-demo/users/stranger"), membership("stranger", "forge-demo", { roleIds: ["fireChief"] })));
+  });
+
+  it("other signed-in users can't read or write the demo department", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "departments/forge-demo/incidents/d1"), { title: "x" });
+    });
+    const db = stranger().firestore();
+    await assertFails(getDoc(doc(db, "departments/forge-demo/incidents/d1")));
+    await assertFails(setDoc(doc(db, "platformDepartments/forge-demo"), { name: "Vandalised" }, { merge: true }));
   });
 });
 

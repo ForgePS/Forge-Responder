@@ -11,6 +11,7 @@ import { recordMeterReading } from "./fleetMeterService.js";
 import { createDefectsFromCheckFailures } from "./fleetDefectService.js";
 import { applyFleetStatusDecision } from "./fleetStatusControlService.js";
 import { FLEET_CHECKS_COLLECTION } from "./paths.js";
+import { checkProblems } from "./checkProgress.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -260,6 +261,10 @@ export async function completeFleetCheck(departmentId, checkId, payload = {}, au
   const answers = payload.answers ?? existing.answers;
   const failNotes = payload.failNotes ?? existing.failNotes;
   const working = { ...existing, answers, failNotes };
+  const { missing } = checkProblems(existing.templateSnapshot?.sections || [], answers, failNotes);
+  if (missing.length) {
+    throw new Error(`Answer the required item${missing.length === 1 ? "" : "s"} first: ${missing.map((field) => field.label).join(", ")}`);
+  }
   const failedItems = evaluateCheckFailures(working);
 
   for (const item of failedItems) {

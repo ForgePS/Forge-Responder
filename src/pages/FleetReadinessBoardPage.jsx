@@ -190,11 +190,10 @@ export default function FleetReadinessBoardPage({ onNavigate, legacyApparatus = 
                 actor={actor}
                 permissions={permissions}
                 isCreator={isCreator}
+                autoStart
                 onClose={() => setActiveCard(null)}
-                onCompleted={() => {
-                  setActiveCard(null);
-                  reload();
-                }}
+                // The panel shows a summary; Done closes it.
+                onCompleted={() => reload()}
                 onMessage={setMessage}
                 onError={setError}
               />

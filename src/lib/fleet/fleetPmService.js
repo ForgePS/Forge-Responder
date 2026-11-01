@@ -9,10 +9,16 @@ import { listFleetAssets } from "./fleetAssetService.js";
 import { createFleetWorkOrder, listFleetWorkOrders } from "./fleetWorkOrderService.js";
 import {
   STARTER_PM_PROGRAMS,
-  addCalendarInterval,
-  daysBetween,
   PM_TRIGGER_TYPES,
 } from "./pmDefaults.js";
+import {
+  buildScheduleSyncPatch,
+  computeNextDue,
+  distributeHours,
+  evaluatePmScheduleStatus,
+  programAppliesToAsset,
+  resolveAssetMeter,
+} from "./pmProgramLogic.js";
 import {
   FLEET_PM_PROGRAMS_COLLECTION,
   FLEET_PM_SCHEDULES_COLLECTION,
@@ -22,11 +28,7 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function parseNumber(value) {
-  if (value === "" || value == null) return null;
-  const n = Number(String(value).replace(/[^0-9.-]/g, ""));
-  return Number.isFinite(n) ? n : null;
-}
+export { computeNextDue, evaluatePmScheduleStatus, resolveAssetMeter };
 
 /**
  * @param {object} raw
@@ -37,7 +39,7 @@ export function normalizePmProgram(raw = {}, departmentId = "") {
   return {
     id: data.id || "",
     departmentId: departmentId || data.departmentId || "",
-    name: String(data.name || "Untitled PM program").trim(),
+    name: String(data.name || "Untitled maintenance schedule").trim(),
     description: data.description || "",
     version: Number(data.version) || 1,
     triggerType: data.triggerType || "calendar_months",
@@ -56,7 +58,9 @@ export function normalizePmProgram(raw = {}, departmentId = "") {
         description: task.description || "",
       }))
       : [],
-    active: data.active !== false,
+    active: data.active !== false && !data.archived,
+    archived: data.archived === true,
+    archivedAt: data.archivedAt || "",
     createdAt: data.createdAt || "",
     updatedAt: data.updatedAt || "",
   };
@@ -145,11 +149,80 @@ export async function savePmProgram(departmentId, record = {}, audit = {}) {
   await writeFleetAuditLog(departmentId, {
     action: exists ? "update" : "create",
     recordId: normalized.id,
-    summary: `${exists ? "Updated" : "Created"} PM program ${normalized.name}`,
+    summary: `${exists ? "Updated" : "Created"} maintenance schedule ${normalized.name}`,
     actorUid: audit.actorUid || "system",
     actorName: audit.actorName || "System",
   }).catch(() => null);
-  return normalized;
+  const updatedSchedules = exists ? await syncPmSchedulesForProgram(departmentId, normalized, audit) : 0;
+  return { ...normalized, updatedSchedules };
+}
+
+/**
+ * Push a program's settings onto the units already scheduled for it.
+ * Keeps each unit's last-completed date/reading; recalculates next due only when
+ * the interval or trigger changed. Turns schedules off when the program is off,
+ * removed, or no longer applies to that unit's vehicle type (and back on again).
+ * Idempotent: schedules that already match are not written.
+ * @param {string} departmentId
+ * @param {object} program normalized program
+ * @param {{ actorUid?: string, actorName?: string }} [audit]
+ * @returns {Promise<number>} number of schedules updated
+ */
+export async function syncPmSchedulesForProgram(departmentId, program, audit = {}) {
+  if (!departmentId || !program?.id) return 0;
+  const [schedules, assets] = await Promise.all([
+    listPmSchedules(departmentId, { programId: program.id }),
+    listFleetAssets(departmentId),
+  ]);
+  if (!schedules.length) return 0;
+  const assetById = Object.fromEntries(assets.map((row) => [row.id, row]));
+  const stamp = nowIso();
+  let updated = 0;
+  for (const schedule of schedules) {
+    const patch = buildScheduleSyncPatch(program, schedule, assetById[schedule.fleetAssetId] || null, stamp);
+    if (!patch) continue;
+    await updateRecord(departmentId, FLEET_PM_SCHEDULES_COLLECTION, schedule.id, { ...patch, updatedAt: stamp });
+    updated += 1;
+  }
+  if (updated) {
+    await writeFleetAuditLog(departmentId, {
+      action: "pm_sync",
+      recordId: program.id,
+      summary: `Updated ${updated} scheduled unit(s) for ${program.name}`,
+      actorUid: audit.actorUid || "system",
+      actorName: audit.actorName || "System",
+    }).catch(() => null);
+  }
+  return updated;
+}
+
+/**
+ * Remove a maintenance schedule (soft delete). The program is archived and every unit's
+ * schedule for it is turned off, so it disappears from the forecast. Completed history,
+ * existing work orders and the records themselves are kept.
+ * @param {string} departmentId
+ * @param {string} programId
+ * @param {{ actorUid?: string, actorName?: string }} [audit]
+ */
+export async function removePmProgram(departmentId, programId, audit = {}) {
+  const raw = await getRecord(departmentId, FLEET_PM_PROGRAMS_COLLECTION, programId);
+  if (!raw) throw new Error("That maintenance schedule no longer exists.");
+  const stamp = nowIso();
+  const program = normalizePmProgram({ ...raw, id: programId, active: false, archived: true, archivedAt: stamp }, departmentId);
+  await updateRecord(departmentId, FLEET_PM_PROGRAMS_COLLECTION, programId, {
+    active: false,
+    archived: true,
+    archivedAt: stamp,
+  });
+  const turnedOff = await syncPmSchedulesForProgram(departmentId, program, audit);
+  await writeFleetAuditLog(departmentId, {
+    action: "archive",
+    recordId: programId,
+    summary: `Removed maintenance schedule ${program.name}`,
+    actorUid: audit.actorUid || "system",
+    actorName: audit.actorName || "System",
+  }).catch(() => null);
+  return { program, turnedOff };
 }
 
 /**
@@ -164,101 +237,6 @@ export async function listPmSchedules(departmentId, filters = {}) {
   if (filters.programId) list = list.filter((row) => row.programId === filters.programId);
   if (filters.openOnly) list = list.filter((row) => row.active !== false);
   return list.sort((a, b) => String(a.fleetNumber).localeCompare(String(b.fleetNumber)));
-}
-
-/**
- * Resolve current meter value for a trigger type from an asset.
- * @param {object} asset
- * @param {string} triggerType
- */
-export function resolveAssetMeter(asset = {}, triggerType = "") {
-  if (triggerType === "mileage") return parseNumber(asset.mileage);
-  if (triggerType === "engine_hours") return parseNumber(asset.engineHours);
-  if (triggerType === "pump_hours") return parseNumber(asset.pumpHours);
-  return null;
-}
-
-/**
- * Compute next due fields after a completion (or initial baseline).
- * @param {object} program
- * @param {{ completedAt?: string, completedMeter?: number|string|null }} [basis]
- */
-export function computeNextDue(program = {}, basis = {}) {
-  const triggerType = program.triggerType || "calendar_months";
-  const interval = Number(program.intervalValue) || 0;
-  const completedAt = basis.completedAt || nowIso();
-  const completedMeter = parseNumber(basis.completedMeter);
-
-  if (triggerType === "calendar_days") {
-    return {
-      nextDueAt: addCalendarInterval(completedAt, "days", interval),
-      nextDueMeter: "",
-      lastCompletedAt: completedAt,
-      lastCompletedMeter: completedMeter ?? "",
-    };
-  }
-  if (triggerType === "calendar_months") {
-    return {
-      nextDueAt: addCalendarInterval(completedAt, "months", interval),
-      nextDueMeter: "",
-      lastCompletedAt: completedAt,
-      lastCompletedMeter: completedMeter ?? "",
-    };
-  }
-  if (["mileage", "engine_hours", "pump_hours"].includes(triggerType)) {
-    const nextMeter = completedMeter == null ? "" : completedMeter + interval;
-    return {
-      nextDueAt: "",
-      nextDueMeter: nextMeter,
-      lastCompletedAt: completedAt,
-      lastCompletedMeter: completedMeter ?? "",
-    };
-  }
-  return {
-    nextDueAt: basis.nextDueAt || "",
-    nextDueMeter: basis.nextDueMeter ?? "",
-    lastCompletedAt: completedAt,
-    lastCompletedMeter: completedMeter ?? "",
-  };
-}
-
-/**
- * Evaluate schedule due status against asset meters / calendar.
- * @param {object} schedule
- * @param {object} [asset]
- * @param {string} [now]
- */
-export function evaluatePmScheduleStatus(schedule = {}, asset = {}, now = nowIso()) {
-  const triggerType = schedule.triggerType || "calendar_months";
-  const grace = Number(schedule.graceValue) || 0;
-  const dueSoon = Number(schedule.dueSoonValue) || 0;
-
-  if (["mileage", "engine_hours", "pump_hours"].includes(triggerType)) {
-    const current = resolveAssetMeter(asset, triggerType);
-    const due = parseNumber(schedule.nextDueMeter);
-    if (current == null || due == null) {
-      return { status: "ok", remaining: null, label: "No meter baseline" };
-    }
-    const remaining = due - current;
-    if (remaining < -grace) return { status: "overdue", remaining, label: `${Math.abs(remaining)} over` };
-    if (remaining <= 0) return { status: "due_now", remaining, label: "Due now" };
-    if (dueSoon > 0 && remaining <= dueSoon) {
-      return { status: "due_soon", remaining, label: `${remaining} remaining` };
-    }
-    return { status: "ok", remaining, label: `${remaining} remaining` };
-  }
-
-  if (!schedule.nextDueAt) {
-    return { status: "ok", remaining: null, label: "No due date" };
-  }
-  const days = daysBetween(now, schedule.nextDueAt);
-  if (days == null) return { status: "ok", remaining: null, label: "Invalid due date" };
-  if (days < -grace) return { status: "overdue", remaining: days, label: `${Math.abs(days)} days overdue` };
-  if (days <= 0) return { status: "due_now", remaining: days, label: "Due now" };
-  if (dueSoon > 0 && days <= dueSoon) {
-    return { status: "due_soon", remaining: days, label: `Due in ${days} days` };
-  }
-  return { status: "ok", remaining: days, label: `Due in ${days} days` };
 }
 
 /**
@@ -344,10 +322,7 @@ export async function applyPmProgramsToFleet(departmentId, options = {}, audit =
   const created = [];
 
   for (const program of programs) {
-    const eligible = assets.filter((asset) => {
-      if (!program.applicableClassIds?.length) return true;
-      return program.applicableClassIds.includes(asset.fleetClassId);
-    });
+    const eligible = assets.filter((asset) => programAppliesToAsset(program, asset));
     for (const asset of eligible) {
       const key = `${program.id}::${asset.id}`;
       if (existingKeys.has(key)) continue;
@@ -411,6 +386,20 @@ export async function buildPmForecast(departmentId) {
   return { rows, summary };
 }
 
+function pmWorkOrderTasks(program, schedule) {
+  const source = program?.tasks?.length ? program.tasks : (schedule.tasks || []);
+  const tasks = source.length
+    ? source
+    : [{ id: "task-1", description: schedule.programName || program?.name || "Preventive maintenance" }];
+  const hours = distributeHours(program?.estimatedHours || 0, tasks.length);
+  return tasks.map((task, index) => ({
+    id: task.id || `task-${index + 1}`,
+    description: task.description || "",
+    estimatedHours: hours[index] || 0,
+    status: "open",
+  }));
+}
+
 /**
  * Generate a preventive work order for a schedule (deduped by openWorkOrderId / open WOs).
  * @param {string} departmentId
@@ -461,12 +450,7 @@ export async function generatePmWorkOrder(departmentId, scheduleId, audit = {}) 
     category: "PM",
     shopId: program?.defaultShopId || "",
     vendorId: program?.defaultVendorId || "",
-    tasks: (program?.tasks || schedule.tasks || []).map((task, index) => ({
-      id: task.id || `task-${index + 1}`,
-      description: task.description || "",
-      estimatedHours: 0,
-      status: "open",
-    })),
+    tasks: pmWorkOrderTasks(program, schedule),
   }, audit);
 
   const next = normalizePmSchedule({

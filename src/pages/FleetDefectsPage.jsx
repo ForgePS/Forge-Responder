@@ -27,6 +27,7 @@ import {
   updateDefect,
   updateReserveRequest,
 } from "../lib/fleet/index.js";
+import { activeOptionsWithSelected, firstActiveId } from "../lib/fleet/repairsConfig.js";
 
 function Field({ label, children }) {
   return (
@@ -94,7 +95,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
       setCreateDraft((c) => ({
         ...c,
         fleetAssetId: c.fleetAssetId || nextAssets[0]?.id || "",
-        categoryId: c.categoryId || nextCategories[0]?.id || "",
+        categoryId: c.categoryId || firstActiveId(nextCategories),
       }));
     } catch (loadError) {
       console.error(loadError);
@@ -532,7 +533,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
                     value={createDraft.categoryId}
                     onChange={(e) => setCreateDraft((c) => ({ ...c, categoryId: e.target.value }))}
                   >
-                    {categories.map((row) => (
+                    {activeOptionsWithSelected(categories, createDraft.categoryId).map((row) => (
                       <option key={row.id} value={row.id}>{row.name}</option>
                     ))}
                   </select>

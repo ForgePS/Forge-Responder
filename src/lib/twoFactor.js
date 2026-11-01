@@ -6,7 +6,6 @@
  */
 import {
   EmailAuthProvider,
-  sendEmailVerification,
   TotpMultiFactorGenerator,
   getMultiFactorResolver,
   multiFactor,
@@ -61,11 +60,6 @@ export async function finishAuthenticatorSetup(user, secret, code, displayName =
   await multiFactor(user).enroll(assertion, displayName);
 }
 
-/** Firebase only allows two-factor on accounts with a verified email address. */
-export async function sendVerificationEmail(user) {
-  await sendEmailVerification(user, { url: `${window.location.origin}${window.location.pathname}` });
-}
-
 /** Re-reads the account; true once the email link has been clicked. */
 export async function emailNowVerified(user) {
   await user.reload();
@@ -96,7 +90,12 @@ function toDate(value) {
  *  - "grace": a department admin before the deadline (daysLeft);
  *  - "none": not required (everyone else, the demo, or no deadline set).
  */
+// Two-step sign-in codes are optional for everyone (2026-10-29): no setup screen
+// and no reminder. Flip to true to bring back the rules below.
+export const SECOND_FACTOR_ENFORCED = false;
+
 export function twoFactorRequirement({ isCreator, membership, departmentId, demo, deadline, now = new Date() }) {
+  if (!SECOND_FACTOR_ENFORCED) return { level: "none" };
   if (demo) return { level: "none" };
   if (isCreator) return { level: "required" };
   if (!isDepartmentAdminMembership(membership) || departmentId === "forge-demo") return { level: "none" };
