@@ -1,0 +1,25 @@
+/* Certifications "Add certification" form and Digital Dashboard honesty notes. */
+.form-errors {
+  margin: 10px 0 0;
+  padding: 8px 12px 8px 28px;
+  border: 1px solid var(--rms-danger, #c0392b);
+  border-radius: 4px;
+  color: var(--rms-danger, #c0392b);
+  font-size: 14px;
+}
+
+.cert-add-form-zone { margin-top: 10px; }
+
+.signage-not-live-note {
+  display: block;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--rms-border);
+  border-left: 4px solid var(--rms-warning, #d4a017);
+  border-radius: 4px;
+  background: var(--rms-bg-input);
+  color: var(--rms-text-strong);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.signage-not-live-note strong { display: block; margin-bottom: 2px; }

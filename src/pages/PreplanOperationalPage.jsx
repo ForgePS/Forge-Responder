@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { MapPin, QrCode, Radio, ShieldAlert } from "lucide-react";
+import { MapPin, Radio, ShieldAlert } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import {
@@ -7,6 +7,7 @@ import {
   getDepartmentPreplanFeatures,
   getPreplanOfflineFlushPlan,
   isPreplanFeatureEnabled,
+  labelForPreplanStatus,
   listPreplans,
 } from "../lib/inspections/index.js";
 import InspectionPermissionGate from "../components/inspections/InspectionPermissionGate.jsx";
@@ -14,9 +15,12 @@ import InspectionsModuleLayout from "../components/inspections/InspectionsModule
 import InspectionEmptyState from "../components/inspections/InspectionEmptyState.jsx";
 
 /**
- * Phase 6/7 operational surfaces — Nearby / District / Target Hazards / Offline / QR.
- * Full maps + offline flush land in later hardening; this is the gated shell.
+ * Operational preplan lists — Target Hazards / Offline.
+ * "nearby" and "qr" are not built yet (no location/map, nothing scans a QR
+ * code); their menu items are hidden and, if reached directly, the page says
+ * so plainly instead of showing a placeholder.
  */
+const NOT_BUILT_VARIANTS = new Set(["nearby", "qr"]);
 export default function PreplanOperationalPage({
   onNavigate,
   variant = "operational",
@@ -24,7 +28,8 @@ export default function PreplanOperationalPage({
   description = "Field-facing preplan summary for response.",
 }) {
   const { departmentId } = useTenant();
-  const { permissions, isCreator, user } = useAuth();
+  const { permissions, isCreator } = useAuth();
+  const notBuilt = NOT_BUILT_VARIANTS.has(variant);
   const allowed = canViewPreplans(permissions, isCreator);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -35,7 +40,7 @@ export default function PreplanOperationalPage({
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!departmentId || !allowed) {
+      if (!departmentId || !allowed || notBuilt) {
         setLoading(false);
         return;
       }
@@ -58,7 +63,7 @@ export default function PreplanOperationalPage({
     }
     load();
     return () => { cancelled = true; };
-  }, [departmentId, allowed]);
+  }, [departmentId, allowed, notBuilt]);
 
   const filtered = useMemo(() => {
     if (variant === "targetHazards") {
@@ -77,8 +82,6 @@ export default function PreplanOperationalPage({
   }, [records, variant]);
 
   const offlineEnabled = isPreplanFeatureEnabled(features || {}, "offlineAccess");
-  const qrEnabled = isPreplanFeatureEnabled(features || {}, "qrCodes");
-  const mapEnabled = isPreplanFeatureEnabled(features || {}, "mapIntegration");
 
   return (
     <InspectionPermissionGate allowed={allowed} title={title}>
@@ -102,38 +105,22 @@ export default function PreplanOperationalPage({
               ) : (
                 <>
                   <p className="occupancy-muted">
-                    Queued mutations: {flushPlan?.queued || 0} · Local drafts: {flushPlan?.drafts || 0}
+                    Changes waiting to sync: {flushPlan?.queued || 0} · Drafts saved on this device: {flushPlan?.drafts || 0}
                   </p>
-                  <p className="occupancy-muted">{flushPlan?.note}</p>
                 </>
               )}
             </div>
           </section>
         ) : null}
 
-        {!loading && variant === "qr" ? (
-          <section className="panel">
-            <header>
-              <div><QrCode size={15} /><strong>QR access</strong></div>
-            </header>
-            <div className="panel-body">
-              {!qrEnabled ? (
-                <p className="occupancy-muted">QR codes are disabled for this department.</p>
-              ) : (
-                <p className="occupancy-muted">
-                  QR codes are managed from each preplan's detail page.
-                  Tokens are hashed at rest; raw IDs are never used as scan credentials.
-                </p>
-              )}
-            </div>
-          </section>
+        {notBuilt ? (
+          <InspectionEmptyState
+            title="Not available yet"
+            description="This preplan view is not built yet. Use All Preplans or Target Hazards to find a preplan."
+          />
         ) : null}
 
-        {!loading && variant === "nearby" && !mapEnabled ? (
-          <p className="occupancy-muted">Map integration is disabled. Showing operational list without map overlay.</p>
-        ) : null}
-
-        {!loading ? (
+        {!loading && !notBuilt ? (
           <section className="panel">
             <header>
               <div>
@@ -160,8 +147,8 @@ export default function PreplanOperationalPage({
                     <div key={row.id} className="cert-row">
                       <strong>{row.preplanNumber}</strong>
                       <span>{row.facilityName || row.occupancyName || row.address || "—"}</span>
-                      <span>{row.status}</span>
-                      <span>{row.riskLevel}</span>
+                      <span>{labelForPreplanStatus(row.status)}</span>
+                      <span>{row.riskLevel || "—"}</span>
                       <span>{row.stationId || row.responsibleStation || "—"}</span>
                     </div>
                   ))}
@@ -171,9 +158,6 @@ export default function PreplanOperationalPage({
           </section>
         ) : null}
 
-        {!loading && user?.uid ? (
-          <p className="occupancy-muted">Signed in as operational viewer · department {departmentId}</p>
-        ) : null}
       </InspectionsModuleLayout>
     </InspectionPermissionGate>
   );

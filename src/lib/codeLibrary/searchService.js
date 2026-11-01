@@ -84,7 +84,6 @@ export async function searchCodeLibrary(publicationId, options = {}) {
 
   const nodes = await listCodeNodes(publicationId, {
     chapterNumber: options.chapterNumber || "",
-    max: 1000,
   });
 
   const allowedTypes = Array.isArray(options.nodeTypes) && options.nodeTypes.length
@@ -106,13 +105,14 @@ export async function searchCodeLibrary(publicationId, options = {}) {
       };
     })
     .filter((row) => (queryText ? row.score > 0 : true))
-    .sort((a, b) => b.score - a.score || String(a.node.number).localeCompare(String(b.node.number), undefined, { numeric: true }))
-    .slice(0, max);
+    .sort((a, b) => b.score - a.score || String(a.node.number).localeCompare(String(b.node.number), undefined, { numeric: true }));
 
   return {
     query: queryText,
     terms,
-    results: scored,
+    results: scored.slice(0, max),
+    searchedCount: nodes.length,
+    totalMatches: scored.length,
   };
 }
 
@@ -121,8 +121,8 @@ export async function searchCodeLibrary(publicationId, options = {}) {
  */
 export async function compareCodeEditions(publicationIdA, publicationIdB, sectionNumber) {
   const [aNodes, bNodes] = await Promise.all([
-    listCodeNodes(publicationIdA, { max: 1000 }),
-    listCodeNodes(publicationIdB, { max: 1000 }),
+    listCodeNodes(publicationIdA),
+    listCodeNodes(publicationIdB),
   ]);
   const a = aNodes.find((n) => n.number === sectionNumber && n.nodeType !== CODE_NODE_TYPES.COMMENTARY) || null;
   const b = bNodes.find((n) => n.number === sectionNumber && n.nodeType !== CODE_NODE_TYPES.COMMENTARY) || null;

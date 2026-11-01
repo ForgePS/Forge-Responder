@@ -61,57 +61,115 @@ function generateHydrantDamagePdfBuffer(report = {}, branding = {}) {
   });
 }
 
-async function sendWithSendGrid({
-  apiKey,
-  fromEmail,
-  fromName,
-  to,
+/**
+ * Email delivery for hydrant damage reports (PDF attached).
+ *
+ * Uses the same provider settings as the shared mailer (functions/lib/mailer.js):
+ *  - RESEND_API_KEY (Firebase secret; the callable must declare it) + EMAIL_FROM
+ *  - SendGrid (SENDGRID_API_KEY + SENDGRID_FROM_EMAIL) only as a legacy fallback
+ *  - EMAIL_DELIVERY=log: nothing is sent; the attempt is reported as "logged"
+ * The shared mailer is text-only, so the attachment request is built here.
+ *
+ * Returns { outcome, ok, status, providerMessageId, errorText } where outcome is
+ * "sent" | "logged" | "not_configured" | "failed". Only "sent" means delivered
+ * to the provider.
+ */
+const { DEFAULT_FROM } = require("./mailer");
+
+function cleanEmails(list = []) {
+  return [...new Set(list.map((e) => String(e || "").trim().toLowerCase()).filter(Boolean))];
+}
+
+async function sendViaResend({ apiKey, from, to, replyTo, subject, text, pdfBuffer, filename, fetchImpl }) {
+  const body = {
+    from,
+    to,
+    subject,
+    text,
+    attachments: [{ filename, content: pdfBuffer.toString("base64") }],
+  };
+  if (replyTo) body.reply_to = replyTo;
+  const response = await fetchImpl("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    console.error("Resend error (hydrant damage report)", response.status, errorText);
+    return { outcome: "failed", ok: false, status: response.status, providerMessageId: "", errorText: errorText || `Email provider returned HTTP ${response.status}` };
+  }
+  const data = await response.json().catch(() => ({}));
+  return { outcome: "sent", ok: true, status: response.status, providerMessageId: String(data?.id || ""), errorText: "" };
+}
+
+async function sendViaSendGrid({ apiKey, fromEmail, fromName, to, replyTo, subject, text, pdfBuffer, filename, fetchImpl }) {
+  const body = {
+    personalizations: [{ to: to.map((email) => ({ email })) }],
+    from: { email: fromEmail, name: fromName || "Forge Public Safety" },
+    subject,
+    content: [{ type: "text/plain", value: text }],
+    attachments: [{
+      content: pdfBuffer.toString("base64"),
+      filename,
+      type: "application/pdf",
+      disposition: "attachment",
+    }],
+  };
+  if (replyTo) body.reply_to = { email: replyTo };
+  const response = await fetchImpl("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const providerMessageId = response.headers?.get?.("x-message-id") || "";
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    console.error("SendGrid error (hydrant damage report)", response.status, errorText);
+    return { outcome: "failed", ok: false, status: response.status, providerMessageId, errorText: errorText || `Email provider returned HTTP ${response.status}` };
+  }
+  return { outcome: "sent", ok: true, status: response.status, providerMessageId, errorText: "" };
+}
+
+async function sendHydrantDamageEmail({
+  to = [],
+  replyTo = "",
   subject,
   text,
   pdfBuffer,
-  filename,
-}) {
-  const body = {
-    personalizations: [{ to: to.map((email) => ({ email })) }],
-    from: { email: fromEmail, name: fromName || "FORGE RMS" },
-    subject,
-    content: [{ type: "text/plain", value: text }],
-    attachments: [
-      {
-        content: pdfBuffer.toString("base64"),
-        filename: filename || "hydrant-damage-report.pdf",
-        type: "application/pdf",
-        disposition: "attachment",
-      },
-    ],
-  };
-
-  // Staging (functions/.env.forge-rms-staging): log instead of emailing anyone.
-  if (process.env.EMAIL_DELIVERY === "log") {
-    console.log("[email not sent: EMAIL_DELIVERY=log]", JSON.stringify({ to, subject, attachment: filename || "hydrant-damage-report.pdf" }));
-    return { ok: true, status: 202, providerMessageId: "logged", errorText: "" };
+  filename = "hydrant-damage-report.pdf",
+  env = process.env,
+  fetchImpl = fetch,
+} = {}) {
+  const toList = cleanEmails(to);
+  if (!toList.length) {
+    return { outcome: "failed", ok: false, status: 0, providerMessageId: "", errorText: "No recipient email addresses." };
   }
 
-  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  if (env.EMAIL_DELIVERY === "log") {
+    console.log("[email not sent: EMAIL_DELIVERY=log]", JSON.stringify({ to: toList, subject, attachment: filename, text: String(text || "").slice(0, 2000) }));
+    return { outcome: "logged", ok: false, status: 0, providerMessageId: "", errorText: "Email delivery is switched off on this server (log-only mode), so nothing was sent." };
+  }
 
-  const providerMessageId = response.headers.get("x-message-id") || "";
-  const errorText = response.ok ? "" : await response.text();
-  return {
-    ok: response.status === 202 || response.ok,
-    status: response.status,
-    providerMessageId,
-    errorText,
-  };
+  const resendKey = String(env.RESEND_API_KEY || "").trim();
+  const sendGridKey = String(env.SENDGRID_API_KEY || "").trim();
+  const sendGridFrom = String(env.SENDGRID_FROM_EMAIL || "").trim();
+  try {
+    if (resendKey) {
+      const from = String(env.EMAIL_FROM || DEFAULT_FROM).trim();
+      return await sendViaResend({ apiKey: resendKey, from, to: toList, replyTo, subject, text, pdfBuffer, filename, fetchImpl });
+    }
+    if (sendGridKey && sendGridFrom) {
+      return await sendViaSendGrid({ apiKey: sendGridKey, fromEmail: sendGridFrom, to: toList, replyTo, subject, text, pdfBuffer, filename, fetchImpl });
+    }
+  } catch (error) {
+    console.error("Hydrant damage email request failed", error);
+    return { outcome: "failed", ok: false, status: 0, providerMessageId: "", errorText: error?.message || "Email request failed." };
+  }
+  return { outcome: "not_configured", ok: false, status: 0, providerMessageId: "", errorText: "Email is not set up on the server yet (no email provider key), so nothing was sent." };
 }
 
 module.exports = {
   generateHydrantDamagePdfBuffer,
-  sendWithSendGrid,
+  sendHydrantDamageEmail,
 };

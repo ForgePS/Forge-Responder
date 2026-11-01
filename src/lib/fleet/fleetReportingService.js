@@ -879,13 +879,11 @@ export async function testIntegrationAdapter(departmentId, adapterId, audit = {}
   );
   if (!existing.id) throw new Error("Adapter not found");
   const stamp = nowIso();
-  const ok = existing.adapterType === "cad" ? !existing.overwriteCadStatus || true : true;
-  const result = ok
-    ? `Connection check OK for ${existing.adapterType} (schema ${existing.schemaVersion})`
-    : "Connection check failed";
+  // No outside system is called yet, so never report a working connection.
+  const result = "Not tested: this connector isn't built yet, so nothing was contacted.";
   const next = normalizeIntegrationAdapter({
     ...existing,
-    status: ok ? "connected" : "error",
+    status: "not_connected",
     lastTestAt: stamp,
     lastTestResult: result,
     updatedAt: stamp,

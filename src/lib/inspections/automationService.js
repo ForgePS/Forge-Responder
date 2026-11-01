@@ -295,7 +295,8 @@ async function matchAutomationTrigger(departmentId, trigger) {
 }
 
 /**
- * Dry-run or execute automation against live prevention data (actions are logged stubs except queue counts).
+ * Preview (dry run) or log a test run of an automation against live prevention data.
+ * Matching is real; no action is carried out because automations aren't connected yet.
  */
 export async function runInspectionAutomation(departmentId, automationId, options = {}, actor = {}) {
   const automation = normalizeAutomation(
@@ -311,8 +312,8 @@ export async function runInspectionAutomation(departmentId, automationId, option
   const matched = await matchAutomationTrigger(departmentId, automation.trigger);
   const stamp = nowIso();
   const message = dryRun
-    ? `Dry run: would ${automation.action} for ${matched.length} match(es)`
-    : `Executed ${automation.action} for ${matched.length} match(es) (logged only; delivery not connected yet)`;
+    ? `Preview: ${matched.length} record(s) match this rule. Nothing was sent.`
+    : `Test run logged: ${matched.length} match(es). Nothing was sent or changed — automations aren't connected yet.`;
 
   const runId = newId("ARUN");
   const run = normalizeAutomationRun({
@@ -465,33 +466,14 @@ export async function saveInspectionWebhook(departmentId, draft = {}, actor = {}
   return record;
 }
 
-/** Stub webhook test — does not perform a real network POST. */
-export async function testInspectionWebhook(departmentId, webhookId, actor = {}) {
-  const webhook = normalizeWebhook(
-    await getRecord(departmentId, INSPECTION_WEBHOOKS_COLLECTION, webhookId) || {},
-    departmentId
-  );
-  if (!webhook.id) throw new Error("Webhook not found.");
-  if (!webhook.url) throw new Error("Webhook URL is required.");
-  const stamp = nowIso();
-  const result = `Stub OK — would POST ${webhook.events.join(", ") || "events"} to ${webhook.url}`;
-  const next = normalizeWebhook({
-    ...webhook,
-    lastTestAt: stamp,
-    lastTestResult: result,
-    status: webhook.status === "draft" ? "active" : webhook.status,
-    updatedAt: stamp,
-  }, departmentId);
-  await updateRecord(departmentId, INSPECTION_WEBHOOKS_COLLECTION, webhookId, next);
-  await writeInspectionAuditLog(departmentId, {
-    action: "webhook.test",
-    entityType: "webhook",
-    entityId: webhookId,
-    summary: result,
-    actorUid: actor.actorUid,
-    actorName: actor.actorName,
-  });
-  return next;
+export const INTEGRATION_TESTING_UNAVAILABLE = "Testing isn't available yet. Webhooks and adapters are saved settings only and aren't connected.";
+
+/**
+ * Webhooks aren't delivered yet, so there is nothing real to test. Refuse instead of
+ * recording a fake success (the old stub marked the webhook active with "Stub OK").
+ */
+export async function testInspectionWebhook() {
+  throw new Error(INTEGRATION_TESTING_UNAVAILABLE);
 }
 
 export async function listInspectionCalendarEvents(departmentId) {
@@ -587,31 +569,9 @@ export async function saveInspectionIntegrationAdapter(departmentId, draft = {},
   return record;
 }
 
-export async function testInspectionIntegrationAdapter(departmentId, adapterId, actor = {}) {
-  const adapter = normalizeIntegrationAdapter(
-    await getRecord(departmentId, INSPECTION_INTEGRATION_ADAPTERS_COLLECTION, adapterId) || {},
-    departmentId
-  );
-  if (!adapter.id) throw new Error("Adapter not found.");
-  const stamp = nowIso();
-  const result = `Stub OK — ${adapter.adapterType} adapter "${adapter.name}" reachable configuration validated`;
-  const next = normalizeIntegrationAdapter({
-    ...adapter,
-    lastTestAt: stamp,
-    lastTestResult: result,
-    status: adapter.status === "draft" ? "active" : adapter.status,
-    updatedAt: stamp,
-  }, departmentId);
-  await updateRecord(departmentId, INSPECTION_INTEGRATION_ADAPTERS_COLLECTION, adapterId, next);
-  await writeInspectionAuditLog(departmentId, {
-    action: "integration.test",
-    entityType: "integration_adapter",
-    entityId: adapterId,
-    summary: result,
-    actorUid: actor.actorUid,
-    actorName: actor.actorName,
-  });
-  return next;
+/** Adapters aren't connected yet; refuse rather than report a fake "reachable" result. */
+export async function testInspectionIntegrationAdapter() {
+  throw new Error(INTEGRATION_TESTING_UNAVAILABLE);
 }
 
 export async function loadInspectionAutomationBoard(departmentId) {

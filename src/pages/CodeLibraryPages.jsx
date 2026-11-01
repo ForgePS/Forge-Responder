@@ -35,6 +35,7 @@ import {
   searchCodeLibrary,
   reportCodeExtractionIssue,
 } from "../lib/codeLibrary/index.js";
+import { setPendingCodeCitation } from "../lib/codeLibrary/pendingCitation.js";
 import { createViolation } from "../lib/inspections/violationService.js";
 import {
   canCiteCodeSections,
@@ -92,6 +93,7 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
   const [showCommentary, setShowCommentary] = useState(true);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [searchSummary, setSearchSummary] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -136,7 +138,7 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
           setChapterNumber((current) => current || chapterRows[0].number);
         } else {
           // No chapter nodes — still load flat node list
-          const rows = await listCodeNodes(publicationId, { max: 1000 });
+          const rows = await listCodeNodes(publicationId);
           if (!active) return;
           setNodes(rows.filter((n) => showCommentary || n.nodeType !== "commentary"));
         }
@@ -159,7 +161,6 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
       try {
         const rows = await listCodeNodes(publicationId, {
           chapterNumber: chapterNumber || "",
-          max: 1000,
         });
         if (!active) return;
         setNodes(rows.filter((n) => showCommentary || n.nodeType !== "commentary"));
@@ -199,6 +200,15 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
         limit: 60,
       });
       setSearchResults(result.results);
+      const scope = mode === "browse" && chapterNumber ? ` in chapter ${chapterNumber}` : "";
+      const searched = Number(result.searchedCount || 0).toLocaleString();
+      if (!result.totalMatches) {
+        setSearchSummary(`No matches in ${searched} sections searched${scope}.`);
+      } else if (result.totalMatches > result.results.length) {
+        setSearchSummary(`Showing the best ${result.results.length} of ${Number(result.totalMatches).toLocaleString()} matches · ${searched} sections searched${scope}. Narrow your search to see more.`);
+      } else {
+        setSearchSummary(`${result.totalMatches} matches · ${searched} sections searched${scope}.`);
+      }
       await recordSearchHistory(departmentId, user?.uid || "", query);
       setHistory(await listSearchHistory(departmentId, user?.uid || "", 10));
     } catch (err) {
@@ -284,12 +294,11 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
       citedText: selected.bodyText?.slice(0, 4000) || "",
       citedAt: new Date().toISOString(),
     };
-    try {
-      window.sessionStorage.setItem("forgePendingCodeCitation", JSON.stringify(payload));
-      setMessage(`Queued ${selected.number} for inspection. Open an inspection and apply the pending citation.`);
+    if (setPendingCodeCitation(payload)) {
+      setMessage(`${selected.number} is ready to cite. Open an inspection and choose "Issue violation" or "Use in field" on the code section banner.`);
       onNavigate?.("Work Queue");
-    } catch {
-      setMessage("Unable to queue citation for inspection.");
+    } else {
+      setError("Couldn't hold this section for an inspection in this browser. Use Copy citation instead.");
     }
   }
 
@@ -433,9 +442,13 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
         </Panel>
 
         <Panel title={selected ? `${selected.number} ${selected.title}` : "Section detail"}>
+          {searchSummary && !searchResults.length ? (
+            <p className="mb-4 text-xs text-slate-500">{searchSummary}</p>
+          ) : null}
           {searchResults.length ? (
             <div className="mb-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Search results</p>
+              {searchSummary ? <p className="text-xs text-slate-500">{searchSummary}</p> : null}
               {searchResults.map((row) => (
                 <button
                   key={row.node.id}

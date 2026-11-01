@@ -1,4 +1,12 @@
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import { getFirestoreDb } from "../firebaseClient.js";
 import { createRecord, getRecord, updateRecord } from "../firestoreService.js";
+import { findMissingRequiredFields, formatMissingFieldsMessage } from "./checklistFields.js";
+import {
+  inspectionNumberYearPrefix,
+  nextInspectionNumber,
+  resolveNumberingFormat,
+} from "./inspectionNumbering.js";
 import { writeInspectionAuditLog } from "./inspectionAudit.js";
 import { listInspectionRecords } from "./inspectionRecords.js";
 import { loadInspectionSettings } from "./inspectionSettings.js";
@@ -112,14 +120,51 @@ export function getInspectionResultOptions() {
  */
 export async function allocateInspectionNumber(departmentId, settings = null) {
   const resolved = settings || await loadInspectionSettings(departmentId);
-  const prefix = resolved?.numbering?.prefix || "INS";
-  const separator = resolved?.numbering?.separator ?? "-";
-  const padding = Number(resolved?.numbering?.sequencePadding) || 4;
-  const year = new Date().getFullYear();
-  const existing = await listInspectionRecords(departmentId, { max: 1000 });
-  const sequence = existing.length + 1;
-  const padded = String(sequence).padStart(padding, "0");
-  return `${prefix}${separator}${year}${separator}${padded}`;
+  const format = resolveNumberingFormat(resolved);
+  const used = await listInspectionNumbersForYear(departmentId, format);
+  // Re-check the chosen number right before use; if another inspector just took it, move on.
+  const taken = [...used];
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = nextInspectionNumber(format, taken);
+    if (!(await inspectionNumberInUse(departmentId, candidate))) return candidate;
+    taken.push(candidate);
+  }
+  return nextInspectionNumber(format, taken);
+}
+
+/** Numbers already used this year (server-side prefix range, falling back to a broad read). */
+async function listInspectionNumbersForYear(departmentId, format) {
+  const db = getFirestoreDb();
+  const head = inspectionNumberYearPrefix(format);
+  if (db) {
+    try {
+      const snap = await getDocs(query(
+        collection(db, "departments", departmentId, INSPECTIONS_COLLECTION),
+        where("inspectionNumber", ">=", head),
+        where("inspectionNumber", "<", `${head}`),
+      ));
+      return snap.docs.map((item) => String(item.data()?.inspectionNumber || ""));
+    } catch {
+      // Fall through to the broad read below.
+    }
+  }
+  const rows = await listInspectionRecords(departmentId, { max: 10000 });
+  return rows.map((row) => String(row.inspectionNumber || ""));
+}
+
+async function inspectionNumberInUse(departmentId, inspectionNumber) {
+  const db = getFirestoreDb();
+  if (!db) return false;
+  try {
+    const snap = await getDocs(query(
+      collection(db, "departments", departmentId, INSPECTIONS_COLLECTION),
+      where("inspectionNumber", "==", inspectionNumber),
+      limit(1),
+    ));
+    return !snap.empty;
+  } catch {
+    return false;
+  }
 }
 
 function buildEmptyAnswers(templateSnapshot) {
@@ -373,7 +418,7 @@ export async function saveInspectionDraft(departmentId, inspectionId, {
 export async function completeInspection(departmentId, inspectionId, {
   answers = {},
   summary = "",
-  result = "Passed",
+  result = "",
   reinspectionRequired = false,
   nextReinspectionAt = "",
   requireApproval = false,
@@ -383,6 +428,9 @@ export async function completeInspection(departmentId, inspectionId, {
   assertEditable(existing);
 
   const mergedAnswers = { ...(existing.answers || {}), ...answers };
+  const missing = findMissingRequiredFields(existing.templateSnapshot, mergedAnswers);
+  if (missing.length) throw new Error(formatMissingFieldsMessage(missing));
+  if (!String(result || "").trim()) throw new Error("Choose a result before completing the inspection.");
   const failCount = countFailedAnswers(mergedAnswers, existing.templateSnapshot);
   const stamp = nowIso();
   const nextStatus = requireApproval ? "awaiting_approval" : "completed";

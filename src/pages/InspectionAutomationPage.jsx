@@ -39,8 +39,6 @@ import {
   saveInspectionNerisMapping,
   saveInspectionWebhook,
   saveInspectionWorkflow,
-  testInspectionIntegrationAdapter,
-  testInspectionWebhook,
 } from "../lib/inspections/index.js";
 
 function Field({ label, children, wide = false }) {
@@ -190,7 +188,7 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
     <InspectionPermissionGate allowed={allowed} title="Automation & Integrations">
       <InspectionsModuleLayout
         title="Automation & Integrations"
-        description="Automation rules, workflow templates, webhooks, calendar stubs, NERIS relationship mappings, and adapters."
+        description="Automation rules, workflow templates, webhooks, calendar entries, NERIS relationship mappings, and adapters. These are set up here but not connected yet: nothing is sent automatically."
         activeNavName="Automation & Integrations"
         onNavigate={onNavigate}
         tabs={PREVENTION_TOOL_TABS}
@@ -465,6 +463,10 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
           <section className="panel">
             <header><div><Zap size={15} /><strong>Automations</strong></div></header>
             <div className="panel-body">
+              <p className="occupancy-muted">
+                Automations aren't connected yet: nothing is sent or changed automatically. "Preview matches" shows which
+                records a rule would act on; "Log a test run" records that check in the run history.
+              </p>
               {!(board?.automations || []).filter(matchesQuery).length ? (
                 <InspectionEmptyState title="No automations" description="Create trigger → action rules for prevention workflows." />
               ) : (
@@ -490,9 +492,9 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
                                 const result = await runInspectionAutomation(departmentId, row.id, { dryRun: true }, actor);
                                 setRunPreview(result);
                                 return result;
-                              }, (result) => result?.run?.message || "Dry run complete.")}
+                              }, (result) => result?.run?.message || "Preview complete.")}
                             >
-                              <Play size={14} /> Dry run
+                              <Play size={14} /> Preview matches
                             </button>
                             <button
                               className="secondary-button"
@@ -502,9 +504,10 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
                                 const result = await runInspectionAutomation(departmentId, row.id, { dryRun: false }, actor);
                                 setRunPreview(result);
                                 return result;
-                              }, (result) => result?.run?.message || "Run complete.")}
+                              }, (result) => result?.run?.message || "Test run logged.")}
+                              title="Records a test run in the history. Nothing is sent."
                             >
-                              <Play size={14} /> Run
+                              <Play size={14} /> Log a test run
                             </button>
                           </>
                         ) : null}
@@ -568,7 +571,7 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
               ) : null}
             </header>
             <div className="panel-body">
-              <p className="occupancy-muted">Webhooks aren't sent yet. "Test" records what would have been sent.</p>
+              <p className="occupancy-muted">Webhooks aren't sent yet, and testing a webhook isn't available yet.</p>
               {!(board?.webhooks || []).length ? (
                 <InspectionEmptyState title="No webhooks" description="Register endpoints for inspection lifecycle events." />
               ) : (
@@ -585,13 +588,10 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
                           <button
                             className="secondary-button"
                             type="button"
-                            disabled={saving}
-                            onClick={() => run(
-                              () => testInspectionWebhook(departmentId, row.id, actor),
-                              (result) => result?.lastTestResult || "Webhook tested."
-                            )}
+                            disabled
+                            title="Testing isn't available yet"
                           >
-                            Test
+                            Test (not available yet)
                           </button>
                         ) : null}
                       </div>
@@ -681,6 +681,7 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
               ) : null}
             </header>
             <div className="panel-body">
+              <p className="occupancy-muted">Adapters are saved settings only. They aren't connected and can't be tested yet.</p>
               {!(board?.adapters || []).length ? (
                 <InspectionEmptyState title="No adapters" description="Register webhook, NERIS, calendar, CAD, GIS, or accounting adapters." />
               ) : (
@@ -697,13 +698,10 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
                           <button
                             className="secondary-button"
                             type="button"
-                            disabled={saving}
-                            onClick={() => run(
-                              () => testInspectionIntegrationAdapter(departmentId, row.id, actor),
-                              (result) => result?.lastTestResult || "Adapter tested."
-                            )}
+                            disabled
+                            title="Testing isn't available yet"
                           >
-                            Test
+                            Test (not available yet)
                           </button>
                         ) : null}
                       </div>
@@ -719,7 +717,7 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
           <section className="panel">
             <header>
               <div>
-                <strong>{runPreview.dryRun ? "Dry run" : "Run"} result</strong>
+                <strong>{runPreview.dryRun ? "Preview" : "Test run"} result</strong>
                 <small className="occupancy-muted"> {runPreview.run?.message}</small>
               </div>
             </header>
@@ -752,7 +750,7 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
                     <span>
                       <strong>{row.automationName}</strong>
                       <small className="occupancy-muted">
-                        {" "}{row.dryRun ? "dry run" : "live"} · {row.matchedCount} matches · {row.message}
+                        {" "}{row.dryRun ? "preview" : "test run (nothing sent)"} · {row.matchedCount} matches · {row.message}
                       </small>
                     </span>
                     <small className="occupancy-muted">{formatWhen(row.createdAt)}</small>

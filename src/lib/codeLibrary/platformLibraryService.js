@@ -3,9 +3,12 @@ import {
   doc,
   getDoc,
   getDocs,
+  documentId,
   limit,
+  orderBy,
   query,
   setDoc,
+  startAfter,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -64,27 +67,64 @@ export async function saveCodePublication(publicationId, input, actorUid = "") {
   return payload;
 }
 
-export async function listCodeNodes(publicationId, { chapterNumber, nodeType, parentId, max = 500 } = {}) {
-  if (!publicationId) return [];
-  const db = dbOrNull();
-  if (!db) throw new Error("Firestore is not available.");
+const NODE_PAGE_SIZE = 1000;
+// Hard stop so a runaway collection can't loop forever; far above any real code book.
+const NODE_SAFETY_LIMIT = 100000;
+const NODE_CACHE_TTL_MS = 5 * 60 * 1000;
+const nodeCache = new Map();
 
-  const pageSize = Math.min(Math.max(Number(max) || 500, 1), 1000);
-  const snap = await getDocs(
-    query(
-      collection(db, CODE_NODES_COLLECTION),
-      where("publicationId", "==", publicationId),
-      limit(pageSize),
-    ),
-  );
+/** Forget cached code sections (called after publishing or editing a code book). */
+export function clearCodeNodeCache(publicationId = "") {
+  if (publicationId) nodeCache.delete(publicationId);
+  else nodeCache.clear();
+}
+
+/**
+ * Every node in a publication, read page by page (1,000 at a time) so large codes
+ * are never cut off. Cached in memory for a few minutes per publication.
+ */
+function loadAllPublicationNodes(publicationId) {
+  const cached = nodeCache.get(publicationId);
+  if (cached && Date.now() - cached.at < NODE_CACHE_TTL_MS) return cached.promise;
+
+  const promise = (async () => {
+    const db = dbOrNull();
+    if (!db) throw new Error("Firestore is not available.");
+    const rows = [];
+    let cursor = null;
+    while (rows.length < NODE_SAFETY_LIMIT) {
+      const constraints = cursor
+        ? [where("publicationId", "==", publicationId), orderBy(documentId()), startAfter(cursor), limit(NODE_PAGE_SIZE)]
+        : [where("publicationId", "==", publicationId), orderBy(documentId()), limit(NODE_PAGE_SIZE)];
+      const snap = await getDocs(query(collection(db, CODE_NODES_COLLECTION), ...constraints));
+      for (const item of snap.docs) rows.push(normalizeCodeNode({ id: item.id, ...item.data() }));
+      if (snap.docs.length < NODE_PAGE_SIZE) break;
+      cursor = snap.docs[snap.docs.length - 1];
+    }
+    return rows;
+  })();
+  nodeCache.set(publicationId, { at: Date.now(), promise });
+  promise.catch(() => nodeCache.delete(publicationId));
+  return promise;
+}
+
+/**
+ * Active code nodes for a publication, optionally narrowed by chapter / type / parent.
+ * Reads the whole publication (paged), so results are complete. `max` only trims the
+ * returned list when a caller explicitly asks for fewer rows.
+ */
+export async function listCodeNodes(publicationId, { chapterNumber, nodeType, parentId, max } = {}) {
+  if (!publicationId) return [];
+  const all = await loadAllPublicationNodes(publicationId);
   const chapterKey = chapterNumber == null || chapterNumber === "" ? "" : String(chapterNumber);
-  return snap.docs
-    .map((item) => normalizeCodeNode({ id: item.id, ...item.data() }))
+  const rows = all
     .filter((row) => row.active)
     .filter((row) => !chapterKey || String(row.chapterNumber) === chapterKey)
     .filter((row) => !nodeType || row.nodeType === nodeType)
     .filter((row) => parentId == null || row.parentId === parentId)
     .sort((a, b) => String(a.sortKey).localeCompare(String(b.sortKey), undefined, { numeric: true }));
+  const cap = Number(max);
+  return Number.isFinite(cap) && cap > 0 ? rows.slice(0, cap) : rows;
 }
 
 export async function getCodeNode(nodeId) {
@@ -100,14 +140,14 @@ export async function getCodeNode(nodeId) {
  * Prefer explicit chapter nodes; otherwise derive chapters from section chapterNumber values.
  */
 export async function listChapters(publicationId) {
-  const chapters = await listCodeNodes(publicationId, { nodeType: "chapter", max: 500 });
+  const chapters = await listCodeNodes(publicationId, { nodeType: "chapter" });
   if (chapters.length) {
     return chapters.sort((a, b) =>
       String(a.number).localeCompare(String(b.number), undefined, { numeric: true }),
     );
   }
 
-  const nodes = await listCodeNodes(publicationId, { max: 1000 });
+  const nodes = await listCodeNodes(publicationId);
   const byNumber = new Map();
   for (const node of nodes) {
     const number = String(node.chapterNumber || "").trim();
@@ -153,6 +193,7 @@ export async function upsertCodeNodes(nodes = []) {
     }
     await batch.commit();
   }
+  clearCodeNodeCache();
   return written;
 }
 

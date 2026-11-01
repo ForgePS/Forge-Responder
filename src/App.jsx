@@ -203,19 +203,26 @@ import {
   findFleetAssetForUnit,
   fleetDecisionForClassicStatus,
 } from "./lib/fleet/fleetStatusOverlay.js";
+import { isFleetPageVisible } from "./lib/fleet/fleetNavVisibility.js";
 
 const navGroups = [
   { label: "", items: [["Dashboard", Home]] },
   { label: "RMS", items: [["Personnel", Users], ["Certifications", FileCheck2], ["Training", BookOpen], ["Academy Class Schedule", GraduationCap, FORGE_ACADEMY_CLASS_SCHEDULE_URL], ["Scheduling", CalendarDays], ["Time Sheets", Clock3], ["Daily Log", ClipboardCheck]] },
   { label: "Fleet", items: [
-    ["Fleet Dashboard", Truck],
     ["Readiness Board", ClipboardCheck],
-    ["Apparatus Check Setup", ClipboardCheck],
     ["Fleet Defects", AlertTriangle],
     ["Fleet Work Orders", Wrench],
     ["PM Forecast", CalendarDays],
     ["Fleet Tests", Gauge],
+    ["Hose Testing", Gauge],
     ["Fuel & Energy", Activity],
+    ["All Fleet Assets", LayoutList],
+    ["Apparatus", Truck],
+    ["Assets", PackageSearch],
+    ["Apparatus Check Setup", ClipboardCheck],
+    ["Fleet Configuration Studio", Settings2],
+    // FORGE staff only (see src/lib/fleet/fleetNavVisibility.js)
+    ["Fleet Dashboard", Truck],
     ["Components & Warranty", ShieldCheck],
     ["Fleet Operations", MapPin],
     ["Accident & Risk", AlertTriangle],
@@ -224,11 +231,6 @@ const navGroups = [
     ["Reporting & Automation", FileBarChart2],
     ["Vendor Portal", Store],
     ["Fleet Hardening", ShieldCheck],
-    ["All Fleet Assets", LayoutList],
-    ["Fleet Configuration Studio", Settings2],
-    ["Apparatus", Truck],
-    ["Assets", PackageSearch],
-    ["Hose Testing", Gauge],
   ] },
   {
     label: "Prevention",
@@ -819,7 +821,7 @@ function AppShell() {
   const academyConnected = Boolean(settings?.academy?.connected);
   const visibleNavGroups = useMemo(() => {
     const permissionFiltered = filterNavGroups(navGroups, permissions, { isCreator })
-      .map((group) => (isCreator ? group : { ...group, items: (group.items || []).filter(([name]) => name !== "Fleet Hardening") }));
+      .map((group) => (isCreator ? group : { ...group, items: (group.items || []).filter(([name]) => isFleetPageVisible(name, false)) }));
     const moduleFiltered = filterNavByEnabledModules(permissionFiltered, isModuleEnabled, {
       isCreator,
       isPlatformScope: inPlatformScope,
@@ -1353,6 +1355,7 @@ function AppShell() {
       <CertificationsPage
         query={query}
         records={liveCertifications}
+        personnel={personnel}
         setRecords={setCertifications}
         departmentId={departmentId}
         canEdit={
