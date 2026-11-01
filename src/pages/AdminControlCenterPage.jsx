@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ChevronDown, Database, History, KeyRound, LayoutGrid, Settings, Users, Wand2, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Database, History, KeyRound, LayoutGrid, Settings, Smartphone, Users, Wand2, X } from "lucide-react";
 import DataEditorPanel from "../components/DataEditorPanel.jsx";
 import DepartmentConfigPanel from "../components/DepartmentConfigPanel.jsx";
+import FieldAppSettingsPanel from "../components/FieldAppSettingsPanel.jsx";
 import GoogleApisIntegrationPanel from "../components/digitalDashboard/GoogleApisIntegrationPanel.jsx";
 import Active911IntegrationPanel from "../components/digitalDashboard/Active911IntegrationPanel.jsx";
 import DamageFormJotformIntegrationPanel from "../components/digitalDashboard/DamageFormJotformIntegrationPanel.jsx";
@@ -293,6 +294,17 @@ export default function AdminControlCenterPage({
               canMigrateLegacy={isCreator}
             />
           </div>
+        </AdminSectionPill>
+
+        <AdminSectionPill
+          id="field-app"
+          label="FORGE Field (field app)"
+          description="What crews see in the offline field app: workflows, form fields, check-off lists, and plan updates."
+          icon={Smartphone}
+          isOpen={isOpen("field-app")}
+          onToggle={toggleSection}
+        >
+          <FieldAppSettingsPanel onMessage={setMessage} apparatus={apparatus} />
         </AdminSectionPill>
 
         <AdminSectionPill

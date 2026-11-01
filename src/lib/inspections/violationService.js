@@ -1,5 +1,6 @@
 import {
   createRecord,
+  getRecord,
   listRecords,
   updateRecord,
 } from "../firestoreService.js";
@@ -195,6 +196,10 @@ export async function saveViolationCatalogItem(departmentId, record = {}, audit 
 export async function createViolation(departmentId, input = {}, audit = {}) {
   if (!departmentId) throw new Error("departmentId is required");
   if (!input.catalogItemId && !input.name) throw new Error("Catalog item or name is required");
+  if (input.id) {
+    const existing = await getRecord(departmentId, VIOLATIONS_COLLECTION, input.id);
+    if (existing) return normalizeViolationRecord(existing, departmentId);
+  }
 
   const [catalog, sections, amendments] = await Promise.all([
     listViolationCatalog(departmentId),
@@ -216,7 +221,8 @@ export async function createViolation(departmentId, input = {}, audit = {}) {
     ?? section?.defaultCorrectionDays
     ?? 14);
   const stamp = nowIso();
-  const id = `VIO-${Date.now().toString(36).toUpperCase()}`;
+  // Field app violations bring their own id so a retried sync can't duplicate them.
+  const id = input.id || `VIO-${Date.now().toString(36).toUpperCase()}`;
 
   const record = normalizeViolationRecord({
     id,

@@ -169,10 +169,15 @@ export function filterDamageReportsByQueue(reports = [], queueId = "all") {
  */
 export async function createHydrantDamageReport(departmentId, input = {}, actor = {}) {
   const hydrant = input.hydrant || {};
+  // Field reports bring their own id so a retried sync can't create a duplicate.
+  if (input.id) {
+    const existing = await getHydrantDamageReport(departmentId, input.id);
+    if (existing) return existing;
+  }
   const resolution = await resolveOwnershipForHydrant(departmentId, hydrant);
   const ownershipNeeded = !resolution.company || resolution.requiresConfirmation;
-  const id = newReportId();
-  const reportNumber = newReportNumber();
+  const id = input.id || newReportId();
+  const reportNumber = input.reportNumber || newReportNumber();
   const severity = input.severity || "moderate";
   const severityMeta = DAMAGE_SEVERITIES.find((row) => row.id === severity);
   const company = resolution.company;
@@ -224,11 +229,12 @@ export async function createHydrantDamageReport(departmentId, input = {}, actor 
     operationalStatus: input.operationalStatus
       || (isOutOfServiceHydrant(hydrant) ? "out_of_service" : "unknown"),
     damageCategoryIds: input.damageCategoryIds || [],
-    discoveredAt: nowIso(),
+    discoveredAt: input.discoveredAt || nowIso(),
     discoveredBy: actor.actorName || "User",
     sourceType: input.sourceType || "manual",
     sourceRecordId: input.sourceRecordId || "",
     description: input.description || "",
+    ...(input.details && typeof input.details === "object" ? input.details : {}),
     recipientSnapshot: recipients,
     wizardStep: 1,
     acknowledgmentDueAt,

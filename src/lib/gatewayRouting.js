@@ -3,6 +3,7 @@ import { resolveRmsAppUrl } from "./rmsAppUrl.js";
 import { DEMO_DEPARTMENT_ID, PLATFORM_SCOPE_ID, isPlatformScope } from "./tenantPaths.js";
 import { isHydrantAppPath, isBrandedHydrantHost, brandedHostDepartmentId } from "./hydrantAppRouting.js";
 import { parseTenantSubdomain, tenantOrigin, useTenantSubdomains } from "./tenantDomains.js";
+import { isFieldAppPath } from "../field/fieldPaths.js";
 
 const DEMO_MODE_SESSION_KEY = "rms-demo-mode";
 
@@ -50,6 +51,7 @@ export const RESERVED_GATEWAY_PATHS = new Set([
   "null",
   "undefined",
   "utility-ack",
+  "field",
 ]);
 
 /** Accidental / mistyped branch IDs that should be soft-disabled from the creator registry. */
@@ -218,6 +220,8 @@ export function resolveActiveDepartmentId() {
 
 export function shouldSyncGatewayUrl(departmentId) {
   if (!departmentId || typeof window === "undefined") return false;
+  // The field app keeps its own /field address.
+  if (isFieldAppPath(window.location.pathname)) return false;
   if (parseTenantSubdomain()) return false;
   if (isBrandedHydrantHost(window.location.hostname)) return false;
   if (isHydrantAppPath(window.location.pathname)) return false;
