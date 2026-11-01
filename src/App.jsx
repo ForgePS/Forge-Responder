@@ -1416,7 +1416,7 @@ function AppShell() {
       />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Time Sheets" ? (
-    hasPermission(permissions, "viewSchedule") ? (
+    canEditScheduleRoster(permissions, isCreator) ? (
       <TimeSheetsPage
         personnel={personnel}
         timeCards={timeCards}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Biohazard, ChevronRight, CirclePlus, ClipboardList, FileText, Flame, HandHelping, HeartPulse, LifeBuoy, Search,
   ShieldQuestion, Sparkles, Wifi, WifiOff, X,
@@ -16,6 +16,8 @@ import {
   INCIDENT_KINDS, STATUS_GROUPS, applicability, checklistProgress, primaryTypeLabel, statusTone,
 } from "../lib/neris/reportModel.js";
 import { uniqueRecordId } from "../lib/recordIds.js";
+import { allocateRecordNumber } from "../lib/recordCounters.js";
+import { nerisReportNumberFormat } from "../lib/recordNumbering.js";
 
 export { NERIS_REPORT_STATUSES };
 
@@ -26,20 +28,20 @@ function todayIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Next report number for the year, e.g. NERIS-2026-014 (never reuses a number). */
-function nextReportNumber(records = []) {
-  const year = new Date().getFullYear();
-  const prefix = `NERIS-${year}-`;
-  const highest = records.reduce((max, r) => {
-    const n = String(r.reportNumber || "").startsWith(prefix) ? Number(String(r.reportNumber).slice(prefix.length)) : 0;
-    return Number.isFinite(n) && n > max ? n : max;
-  }, 0);
-  return `${prefix}${String(highest + 1).padStart(3, "0")}`;
+/**
+ * Next report number for the year, e.g. NERIS-2026-014, from the department's shared
+ * counter (counters/neris-YYYY) so two people starting reports at once never share a
+ * number. Offline it falls back to "highest loaded + 1".
+ */
+async function nextReportNumber(departmentId, records = []) {
+  const { number } = await allocateRecordNumber(
+    departmentId, "neris", nerisReportNumberFormat(), records.map((r) => r.reportNumber),
+  );
+  return number;
 }
 
-function buildNewReport(records, { disciplines = [], incidentDate, incidentAddress }) {
+function buildNewReport(reportNumber, { disciplines = [], incidentDate, incidentAddress }) {
   const now = new Date().toISOString();
-  const reportNumber = nextReportNumber(records);
   return {
     id: uniqueRecordId("NERIS"),
     reportNumber,
@@ -98,6 +100,7 @@ export default function NerisFireReportsPage({
   const [message, setMessage] = useState("");
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [savedAt, setSavedAt] = useState("");
+  const creatingRef = useRef(false);
   const reviewerName = membership?.displayName || user?.displayName || user?.email || "";
 
   const sources = useMemo(() => ({ personnel, apparatus, occupancies, preplans, inspections, scheduleDays, hydrants }),
@@ -176,11 +179,18 @@ export default function NerisFireReportsPage({
     });
   }
 
-  function startReport(details) {
-    const next = buildNewReport(records, details);
-    setRecords((current) => [next, ...current]);
-    setSelectedId(next.id);
-    setStarting(false);
+  async function startReport(details) {
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+    try {
+      const reportNumber = await nextReportNumber(departmentId, records);
+      const next = buildNewReport(reportNumber, details);
+      setRecords((current) => [next, ...current]);
+      setSelectedId(next.id);
+      setStarting(false);
+    } finally {
+      creatingRef.current = false;
+    }
   }
 
   function autoFill() {

@@ -1,5 +1,6 @@
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { getFirestoreDb } from "../firebaseClient.js";
+import { allocateRecordNumber } from "../recordCounters.js";
 import { createRecord, getRecord, updateRecord } from "../firestoreService.js";
 import { findMissingRequiredFields, formatMissingFieldsMessage } from "./checklistFields.js";
 import {
@@ -122,10 +123,12 @@ export async function allocateInspectionNumber(departmentId, settings = null) {
   const resolved = settings || await loadInspectionSettings(departmentId);
   const format = resolveNumberingFormat(resolved);
   const used = await listInspectionNumbersForYear(departmentId, format);
-  // Re-check the chosen number right before use; if another inspector just took it, move on.
+  // The shared counter (counters/inspection-YYYY) hands each number out once, even when
+  // two inspectors create at the same moment. As a last guard, re-check the number right
+  // before use and move on if it is somehow already on a record.
   const taken = [...used];
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const candidate = nextInspectionNumber(format, taken);
+    const { number: candidate } = await allocateRecordNumber(departmentId, "inspection", format, taken);
     if (!(await inspectionNumberInUse(departmentId, candidate))) return candidate;
     taken.push(candidate);
   }

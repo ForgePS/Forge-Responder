@@ -45,28 +45,34 @@ async function assertDepartmentAccess(db, departmentId, auth) {
   }
 }
 
-async function assertDepartmentManage(db, departmentId, auth) {
+/**
+ * The caller's permissions in a department, worked out the same way as the app
+ * (roles + personal overrides; see lib/memberGrants.js). Creators get everything.
+ */
+async function memberPermissions(db, departmentId, auth) {
+  const { computeMemberPermissions } = require("./memberGrants");
+  if (await isPlatformCreator(db, auth)) return computeMemberPermissions({ roleIds: ["creator"] });
+  const [userSnap, rolesSnap] = await Promise.all([
+    db.doc(`departments/${departmentId}/users/${auth.uid}`).get(),
+    db.collection(`departments/${departmentId}/roles`).get(),
+  ]);
+  const roles = Object.fromEntries(rolesSnap.docs.map((doc) => [doc.id, doc.data() || {}]));
+  return computeMemberPermissions(userSnap.data() || {}, roles);
+}
+
+/** Active member who holds at least one of the given permissions (creators always pass). */
+async function assertMemberPermission(db, departmentId, auth, anyOf = [], message = "You don't have permission to do that.") {
   await assertDepartmentAccess(db, departmentId, auth);
-  if (await isPlatformCreator(db, auth)) return;
+  const permissions = await memberPermissions(db, departmentId, auth);
+  if (anyOf.some((key) => permissions[key] === true)) return permissions;
+  throw new HttpsError("permission-denied", message);
+}
 
-  const userSnap = await db.doc(`departments/${departmentId}/users/${auth.uid}`).get();
-  const roleId = userSnap.data()?.roleId;
-  if (!roleId) {
-    throw new HttpsError("permission-denied", "Administrator access is required.");
-  }
-
-  const roleSnap = await db.doc(`departments/${departmentId}/roles/${roleId}`).get();
-  const permissions = roleSnap.data()?.permissions || {};
-  if (
-    permissions.manageDigitalDashboard
-    || permissions.manageSystemSettings
-    || permissions.managePermissions
-  ) {
-    await assertAdminSecondFactor(db, departmentId, auth);
-    return;
-  }
-
-  throw new HttpsError("permission-denied", "Administrator access is required.");
+async function assertDepartmentManage(db, departmentId, auth) {
+  await assertMemberPermission(db, departmentId, auth,
+    ["manageDigitalDashboard", "manageSystemSettings", "managePermissions"],
+    "Administrator access is required.");
+  await assertAdminSecondFactor(db, departmentId, auth);
 }
 
 const { resolveGatewayDepartmentId } = require("./gatewayResolver");
@@ -116,7 +122,9 @@ module.exports = {
   assertDepartmentAccess,
   assertDepartmentAccessOrPublicGateway,
   assertDepartmentManage,
+  assertMemberPermission,
   assertPlatformSuperAdmin,
+  memberPermissions,
   isPlatformCreator,
   isDepartmentActive,
   isDepartmentMember,

@@ -18,6 +18,8 @@ import {
   itemsFromRecords,
   planListWrites,
 } from "./listItemsPlan.js";
+import { listHasPrivateFields, splitPersonnelList, stripBlankPrivateKeys } from "./personnelPrivateFields.js";
+import { savePersonnelPrivateMany } from "./personnelPrivateService.js";
 
 const BATCH_LIMIT = 450;
 
@@ -52,6 +54,29 @@ export async function readTenantList(db, departmentId, listKey) {
   };
 }
 
+/**
+ * Every write of a list goes through here first. The personnel list never
+ * stores private details (SSN, birth date, demographics, license number):
+ * any values found are saved to personnelPrivate/{id} and removed from the
+ * items. If that save is refused (someone without access, or before the rules
+ * allow it), real values stay on the item so nothing is lost; blank private
+ * keys are always dropped.
+ * @returns {Promise<{ items: object[], movedIds: string[], moveError: unknown }>}
+ */
+export async function prepareListItemsForWrite(db, departmentId, listKey, items = [], userId = "") {
+  if (!listHasPrivateFields(listKey)) return { items, movedIds: [], moveError: null };
+  const split = splitPersonnelList(items);
+  const ids = Object.keys(split.privateById);
+  if (!ids.length) return { items: split.items, movedIds: [], moveError: null };
+  try {
+    await savePersonnelPrivateMany(db, departmentId, split.privateById, userId);
+    return { items: split.items, movedIds: ids, moveError: null };
+  } catch (error) {
+    console.warn(`Couldn't move private details for ${ids.length} personnel record(s); leaving them where they are`, error?.code || error);
+    return { items: stripBlankPrivateKeys(items), movedIds: [], moveError: error };
+  }
+}
+
 /** Commit planned per-item writes in batches. */
 export async function commitListPlan(db, departmentId, listKey, plan) {
   const base = departmentListSegments(departmentId, listKey);
@@ -73,6 +98,9 @@ export async function commitListPlan(db, departmentId, listKey, plan) {
  */
 export async function replaceTenantList(db, departmentId, listKey, items, { userId = "system", headerFields = {} } = {}) {
   const current = await readTenantList(db, departmentId, listKey);
+  if (listHasPrivateFields(listKey)) {
+    ({ items } = await prepareListItemsForWrite(db, departmentId, listKey, ensureItemIds(items).items, userId));
+  }
   // New lists start per item; existing array lists stay arrays until migrated.
   if (current.storage === "items" || !current.exists) {
     const { items: withIds } = ensureItemIds(sanitizeItemsForFirestore(items));

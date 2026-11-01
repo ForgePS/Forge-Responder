@@ -23,6 +23,7 @@ import {
   canUploadPreplanFiles,
   canViewPreplanSensitive,
   canViewPreplans,
+  changedAnswersForSave,
   createPreplan,
   createPreplanFromOccupancy,
   ensureOccupancyRecords,
@@ -31,6 +32,7 @@ import {
   getPreplanRevision,
   getPreplanStatusOptions,
   getPreplanTypeOptions,
+  isPreplanFieldSensitive,
   labelForPreplanStatus,
   listDropdownOptions,
   listPreplanDiagrams,
@@ -38,6 +40,8 @@ import {
   listPreplanOfflineQueue,
   listPreplanRevisions,
   listPreplans,
+  preplanSensitiveKeys,
+  PREPLAN_RESTRICTED_LABEL,
   publishPreplanRevision,
   recordPreplanVerification,
   returnPreplanForRevision,
@@ -363,8 +367,14 @@ function PreplanDetailWorkspace({
     )));
   }
 
+  // Restricted answers are only sent when changed, so a save never blanks
+  // values this viewer couldn't load.
   const draftPayload = {
-    sectionAnswers: answers,
+    sectionAnswers: changedAnswersForSave(
+      answers,
+      revision?.sectionAnswers || {},
+      preplanSensitiveKeys(revision?.templateSnapshot),
+    ),
     dispatchSummary,
     notes,
     symbolChecklist,
@@ -522,11 +532,26 @@ function PreplanDetailWorkspace({
             <strong>{section.title}</strong>
             <div className="template-fields">
               {(section.fields || []).filter(fieldVisible).map((field) => {
-                if (field.sensitive && !canViewSensitive && !editable) {
+                // Restricted values are stored separately and only load for
+                // people allowed to see them.
+                const hidden = isPreplanFieldSensitive(field) && !revision?.restrictedLoaded;
+                if (hidden && !editable) {
                   return (
                     <div key={field.key} className="config-field">
                       <span>{field.label}</span>
-                      <em className="occupancy-muted">Restricted</em>
+                      <em className="occupancy-muted">{PREPLAN_RESTRICTED_LABEL}</em>
+                    </div>
+                  );
+                }
+                if (hidden) {
+                  return (
+                    <div key={field.key} className="config-field">
+                      <span>{field.label}</span>
+                      <input
+                        value={answers[field.key] || ""}
+                        placeholder="Restricted — type a new value to replace it"
+                        onChange={(e) => setAnswer(field.key, e.target.value)}
+                      />
                     </div>
                   );
                 }
@@ -651,6 +676,9 @@ function PreplansShell({
   const canApprove = canApprovePreplans(permissions, isCreator);
   const canUpload = canUploadPreplanFiles(permissions, isCreator);
   const canViewSensitive = canViewPreplanSensitive(permissions, isCreator);
+  // Officers and editors load restricted answers (gate codes, shutoffs, hazmat);
+  // the database decides in the end, and the screen shows "Restricted" if it says no.
+  const restrictedOptions = { withRestricted: canViewSensitive || canEdit };
 
   const bootstrapOccupancyId = initialOccupancyId || (
     typeof sessionStorage !== "undefined"
@@ -771,7 +799,7 @@ function PreplansShell({
       }
       try {
         const [rev, diags] = await Promise.all([
-          getPreplanRevision(departmentId, active.currentRevisionId),
+          getPreplanRevision(departmentId, active.currentRevisionId, restrictedOptions),
           listPreplanDiagrams(departmentId, active.id),
         ]);
         if (!cancelled) {
@@ -784,7 +812,7 @@ function PreplansShell({
     }
     loadDetail();
     return () => { cancelled = true; };
-  }, [departmentId, active?.id, active?.currentRevisionId, active?.updatedAt]);
+  }, [departmentId, active?.id, active?.currentRevisionId, active?.updatedAt, restrictedOptions.withRestricted]);
 
   function upsert(next) {
     setRecords((current) => [next, ...current.filter((row) => row.id !== next.id)]);
@@ -797,8 +825,8 @@ function PreplansShell({
     setMessage("");
     try {
       const result = payload.occupancyId
-        ? await createPreplanFromOccupancy(departmentId, payload.occupancyId, payload, actor)
-        : await createPreplan(departmentId, payload, actor);
+        ? await createPreplanFromOccupancy(departmentId, payload.occupancyId, payload, actor, restrictedOptions)
+        : await createPreplan(departmentId, payload, actor, restrictedOptions);
       upsert(result.preplan);
       setRevision(result.revision);
       setMessage(`Created ${result.preplan.preplanNumber}`);
@@ -958,7 +986,7 @@ function PreplansShell({
             onMessage={setMessage}
             onError={setError}
             onSaveRevision={(payload) => runAction(
-              () => updatePreplanRevision(departmentId, revision.id, payload, actor).then(async (rev) => {
+              () => updatePreplanRevision(departmentId, revision.id, payload, actor, restrictedOptions).then(async (rev) => {
                 const next = await getPreplan(departmentId, active.id);
                 return { preplan: next, revision: rev };
               }),
@@ -977,11 +1005,11 @@ function PreplansShell({
               "Approved."
             )}
             onPublish={() => runAction(
-              () => publishPreplanRevision(departmentId, active.id, actor),
+              () => publishPreplanRevision(departmentId, active.id, actor, restrictedOptions),
               "Published — now operational."
             )}
             onNewRevision={() => runAction(
-              () => startPreplanRevision(departmentId, active.id, actor),
+              () => startPreplanRevision(departmentId, active.id, actor, restrictedOptions),
               "New revision started."
             )}
             onVerify={(payload) => runAction(

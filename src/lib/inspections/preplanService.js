@@ -1,9 +1,12 @@
+import { deleteField } from "firebase/firestore";
 import {
   createRecord,
   getRecord,
   listRecords,
   updateRecord,
 } from "../firestoreService.js";
+import { allocateRecordNumber } from "../recordCounters.js";
+import { preplanNumberFormat } from "../recordNumbering.js";
 import { writeInspectionAuditLog } from "./inspectionAudit.js";
 import { getInspectionRecord } from "./inspectionWorkflow.js";
 import { listOccupancyRecords } from "./occupancyService.js";
@@ -11,6 +14,16 @@ import {
   enqueuePreplanOfflineMutation,
   savePreplanLocalDraft,
 } from "./preplanOfflineQueue.js";
+import {
+  PREPLAN_RESTRICTED_COLLECTION,
+  buildPreplanRestrictedRecord,
+  hasRestrictedValues,
+  mergeRestrictedIntoRevision,
+  preplanSensitiveKeys,
+  presentPreplanRevision,
+  splitPreplanAnswers,
+  syncPreplanNarrative,
+} from "./preplanRestricted.js";
 import {
   DEFAULT_VERIFICATION_CYCLE_DAYS,
   PREPLAN_OPERATIONAL_VALIDITY,
@@ -257,19 +270,62 @@ function computeMissingCritical(revision = {}, preplan = {}) {
   return missing;
 }
 
-function syncRevisionNarrative(revision) {
-  const a = revision.sectionAnswers || {};
+/**
+ * Narrative fields for the stored revision, built only from answers every
+ * member may read. `restrictedAnswers` are kept out of any typed-in text.
+ * `revision.sectionAnswers` must already be the public answers.
+ */
+function syncRevisionNarrative(revision, restrictedAnswers = {}, sensitiveKeys = null) {
+  const keys = sensitiveKeys || preplanSensitiveKeys(revision.templateSnapshot);
+  return syncPreplanNarrative(revision, keys, restrictedAnswers);
+}
+
+/**
+ * Read the restricted answers for a revision.
+ * @returns {Promise<Record<string, unknown>|null>} answers ({} when there is no doc yet), or null when
+ *   they couldn't be read (no permission / offline).
+ */
+async function readRestrictedAnswers(departmentId, revisionId) {
+  try {
+    const row = await getRecord(departmentId, PREPLAN_RESTRICTED_COLLECTION, revisionId);
+    const answers = row?.answers;
+    return answers && typeof answers === "object" ? answers : {};
+  } catch (error) {
+    if (error?.code !== "permission-denied") {
+      console.warn("Restricted preplan details not loaded:", error?.message || error);
+    }
+    return null;
+  }
+}
+
+/** Merge-writes restricted answers (only the keys given) to preplanRestricted/{revisionId}. */
+async function writeRestrictedAnswers(departmentId, { preplanId, revisionId, answers, actorUid }) {
+  const record = buildPreplanRestrictedRecord({ preplanId, revisionId, answers, updatedBy: actorUid });
+  await updateRecord(departmentId, PREPLAN_RESTRICTED_COLLECTION, revisionId, record);
+}
+
+/**
+ * What the caller may see of a stored revision. With `withRestricted` the
+ * restricted doc is loaded and merged (falling back to inline values from
+ * before the move); otherwise restricted answers are left out.
+ * @param {{ withRestricted?: boolean }} [options]
+ */
+async function presentRevision(departmentId, revision, options = {}) {
+  if (!options.withRestricted) return presentPreplanRevision(revision, { allowed: false });
+  const restrictedAnswers = revision.id ? await readRestrictedAnswers(departmentId, revision.id) : {};
+  return presentPreplanRevision(revision, { allowed: true, restrictedAnswers });
+}
+
+/** Firestore payload for a revision: public answers, plus deletes for restricted keys still stored inline. */
+function revisionWritePayload(revision, storedAnswers = {}, sensitiveKeys = null) {
+  const keys = sensitiveKeys || preplanSensitiveKeys(revision.templateSnapshot);
+  const deletes = Object.keys(storedAnswers || {})
+    .filter((key) => keys.has(key))
+    .map((key) => [key, deleteField()]);
+  if (!deletes.length) return revision;
   return {
     ...revision,
-    accessPlan: revision.accessPlan || [a.primaryAccess, a.secondaryAccess, a.knoxBox].filter(Boolean).join("\n"),
-    waterSupply: revision.waterSupply || [a.nearestHydrants, a.fdcLocation, a.supplyNotes].filter(Boolean).join("\n"),
-    fireProtection: revision.fireProtection
-      || [a.sprinkler, a.standpipe, a.alarm, a.panelLocation].filter(Boolean).join("\n"),
-    utilities: revision.utilities || [a.gas, a.electric, a.water, a.hvac].filter(Boolean).join("\n"),
-    hazards: revision.hazards || [a.construction, a.hazmat, a.occupancyNotes, a.exposures].filter(Boolean).join("\n"),
-    tacticalPlan: revision.tacticalPlan
-      || [a.initialActions, a.staging, a.evacuation, a.specialOps].filter(Boolean).join("\n"),
-    dispatchSummary: revision.dispatchSummary || a.dispatchSummary || "",
+    sectionAnswers: { ...(revision.sectionAnswers || {}), ...Object.fromEntries(deletes) },
   };
 }
 
@@ -404,19 +460,27 @@ export async function getPreplan(departmentId, preplanId) {
   return row ? normalizePreplanRecord(row, departmentId) : null;
 }
 
+/** Revision list without restricted answers (open a single revision to see those). */
 export async function listPreplanRevisions(departmentId, preplanId) {
   if (!departmentId) return [];
   const rows = await listRecords(departmentId, PREPLAN_REVISIONS_COLLECTION);
   return rows
-    .map((row) => normalizePreplanRevision(row, departmentId))
+    .map((row) => presentPreplanRevision(normalizePreplanRevision(row, departmentId), { allowed: false }))
     .filter((row) => !preplanId || row.preplanId === preplanId)
     .sort((a, b) => Number(b.revisionNumber) - Number(a.revisionNumber));
 }
 
-export async function getPreplanRevision(departmentId, revisionId) {
+/**
+ * @param {string} departmentId
+ * @param {string} revisionId
+ * @param {{ withRestricted?: boolean }} [options] withRestricted: the viewer may see restricted
+ *   answers (canViewPreplanSensitive or an editor). `restrictedLoaded` on the result says whether
+ *   they were actually loaded.
+ */
+export async function getPreplanRevision(departmentId, revisionId, options = {}) {
   if (!departmentId || !revisionId) return null;
   const row = await getRecord(departmentId, PREPLAN_REVISIONS_COLLECTION, revisionId);
-  return row ? normalizePreplanRevision(row, departmentId) : null;
+  return row ? presentRevision(departmentId, normalizePreplanRevision(row, departmentId), options) : null;
 }
 
 async function resolveOccupancy(departmentId, occupancyId) {
@@ -425,11 +489,12 @@ async function resolveOccupancy(departmentId, occupancyId) {
   return list.find((row) => row.id === occupancyId) || null;
 }
 
+/** PP-YYYY-NNNN from the department's shared counter (never repeats, even after deletions). */
 async function nextPreplanNumber(departmentId) {
   const existing = await listPreplans(departmentId);
-  const year = new Date().getFullYear();
-  const seq = existing.length + 1;
-  return `PP-${year}-${String(seq).padStart(4, "0")}`;
+  const used = existing.map((row) => row.preplanNumber);
+  const { number } = await allocateRecordNumber(departmentId, "preplan", preplanNumberFormat(), used);
+  return number;
 }
 
 /**
@@ -437,7 +502,7 @@ async function nextPreplanNumber(departmentId) {
  * @param {object} payload
  * @param {{ actorUid?: string, actorName?: string }} [audit]
  */
-export async function createPreplan(departmentId, payload = {}, audit = {}) {
+export async function createPreplan(departmentId, payload = {}, audit = {}, options = {}) {
   if (!departmentId) throw new Error("Department required.");
   const seeded = await ensurePreplanConfigSeeded(departmentId, audit);
   const templates = seeded.templates;
@@ -453,10 +518,11 @@ export async function createPreplan(departmentId, payload = {}, audit = {}) {
   const revisionId = newId("PPR");
   const preplanNumber = payload.preplanNumber || await nextPreplanNumber(departmentId);
 
-  const sectionAnswers = {
+  const sensitiveKeys = preplanSensitiveKeys(template);
+  const { publicAnswers: sectionAnswers, restrictedAnswers } = splitPreplanAnswers({
     ...emptySectionAnswers(template?.sections || []),
     ...(payload.sectionAnswers || {}),
-  };
+  }, sensitiveKeys);
 
   const pinnedTemplateVersion = Number(template?.publishedVersion) || Number(template?.version) || 1;
 
@@ -493,7 +559,7 @@ export async function createPreplan(departmentId, payload = {}, audit = {}) {
     createdAt: stamp,
     updatedAt: stamp,
   }, departmentId);
-  revision = syncRevisionNarrative(revision);
+  revision = syncRevisionNarrative(revision, restrictedAnswers);
 
   const preplan = normalizePreplanRecord({
     id: preplanId,
@@ -542,6 +608,17 @@ export async function createPreplan(departmentId, payload = {}, audit = {}) {
     createdByName: audit.actorName || "",
   }, departmentId);
 
+  // Restricted answers go first and are never queued on the device: if this
+  // fails nothing is created and the user sees the error.
+  if (hasRestrictedValues(restrictedAnswers)) {
+    await writeRestrictedAnswers(departmentId, {
+      preplanId,
+      revisionId,
+      answers: restrictedAnswers,
+      actorUid: audit.actorUid || "",
+    });
+  }
+
   try {
     await createRecord(departmentId, PREPLANS_COLLECTION, preplanId, preplan);
     await createRecord(departmentId, PREPLAN_REVISIONS_COLLECTION, revisionId, revision);
@@ -580,10 +657,13 @@ export async function createPreplan(departmentId, payload = {}, audit = {}) {
     actorName: audit.actorName || "",
   });
 
-  return { preplan, revision };
+  const shown = options.withRestricted
+    ? { ...mergeRestrictedIntoRevision(revision, restrictedAnswers, sensitiveKeys), restrictedLoaded: true }
+    : { ...revision, restrictedLoaded: false };
+  return { preplan, revision: shown };
 }
 
-export async function createPreplanFromOccupancy(departmentId, occupancyId, payload = {}, audit = {}) {
+export async function createPreplanFromOccupancy(departmentId, occupancyId, payload = {}, audit = {}, options = {}) {
   if (!occupancyId) throw new Error("Occupancy required.");
   const occupancy = await resolveOccupancy(departmentId, occupancyId);
   if (!occupancy) throw new Error("Occupancy not found.");
@@ -594,7 +674,7 @@ export async function createPreplanFromOccupancy(departmentId, occupancyId, payl
     address: occupancy.address,
     propertyId: occupancy.propertyId,
     riskLevel: occupancy.hazard || occupancy.riskLevel || payload.riskLevel,
-  }, audit);
+  }, audit, options);
 }
 
 /**
@@ -697,10 +777,17 @@ export async function updatePreplan(departmentId, preplanId, patch = {}, audit =
   return next;
 }
 
-export async function updatePreplanRevision(departmentId, revisionId, patch = {}, audit = {}) {
+/**
+ * Save changes to a revision. Restricted answers in `patch.sectionAnswers`
+ * (only send the ones that changed) go to preplanRestricted; any restricted
+ * answers still stored inline on the revision are moved there too.
+ * @param {{ withRestricted?: boolean }} [options] return the revision with restricted answers merged
+ */
+export async function updatePreplanRevision(departmentId, revisionId, patch = {}, audit = {}, options = {}) {
   if (!departmentId || !revisionId) throw new Error("Revision required.");
-  const existing = await getPreplanRevision(departmentId, revisionId);
-  if (!existing) throw new Error("Revision not found.");
+  const raw = await getRecord(departmentId, PREPLAN_REVISIONS_COLLECTION, revisionId);
+  if (!raw) throw new Error("Revision not found.");
+  const existing = normalizePreplanRevision(raw, departmentId);
   const stamp = nowIso();
   let next = normalizePreplanRevision({
     ...existing,
@@ -713,10 +800,26 @@ export async function updatePreplanRevision(departmentId, revisionId, patch = {}
     departmentId,
     updatedAt: stamp,
   }, departmentId);
-  next = syncRevisionNarrative(next);
+  const sensitiveKeys = preplanSensitiveKeys(existing.templateSnapshot, next.templateSnapshot);
+  const { restrictedAnswers: inlineRestricted } = splitPreplanAnswers(existing.sectionAnswers, sensitiveKeys);
+  const { restrictedAnswers: patchRestricted } = splitPreplanAnswers(patch.sectionAnswers, sensitiveKeys);
+  const { publicAnswers } = splitPreplanAnswers(next.sectionAnswers, sensitiveKeys);
+  const restrictedWrite = { ...inlineRestricted, ...patchRestricted };
+  next = syncRevisionNarrative({ ...next, sectionAnswers: publicAnswers }, restrictedWrite, sensitiveKeys);
+
+  // Restricted answers first: if that write fails the revision (and any
+  // inline values on it) is left exactly as it was.
+  if (Object.keys(restrictedWrite).length) {
+    await writeRestrictedAnswers(departmentId, {
+      preplanId: next.preplanId,
+      revisionId,
+      answers: restrictedWrite,
+      actorUid: audit.actorUid || "",
+    });
+  }
 
   try {
-    await updateRecord(departmentId, PREPLAN_REVISIONS_COLLECTION, revisionId, next);
+    await updateRecord(departmentId, PREPLAN_REVISIONS_COLLECTION, revisionId, revisionWritePayload(next, raw.sectionAnswers, sensitiveKeys));
   } catch (error) {
     enqueuePreplanOfflineMutation(departmentId, {
       collection: PREPLAN_REVISIONS_COLLECTION,
@@ -744,7 +847,7 @@ export async function updatePreplanRevision(departmentId, revisionId, patch = {}
     actorUid: audit.actorUid || "",
     actorName: audit.actorName || "",
   });
-  return next;
+  return options.withRestricted ? presentRevision(departmentId, next, options) : { ...next, restrictedLoaded: false };
 }
 
 export async function submitPreplanForReview(departmentId, preplanId, audit = {}) {
@@ -781,7 +884,7 @@ export async function approvePreplan(departmentId, preplanId, audit = {}) {
 /**
  * Publish current revision snapshot as the operational published revision.
  */
-export async function publishPreplanRevision(departmentId, preplanId, audit = {}) {
+export async function publishPreplanRevision(departmentId, preplanId, audit = {}, options = {}) {
   const preplan = await getPreplan(departmentId, preplanId);
   if (!preplan) throw new Error("Preplan not found.");
   const revision = await getPreplanRevision(departmentId, preplan.currentRevisionId);
@@ -794,7 +897,7 @@ export async function publishPreplanRevision(departmentId, preplanId, audit = {}
     approvedAt: revision.approvedAt || stamp,
     reviewedBy: revision.reviewedBy || audit.actorUid || "",
     reviewedByName: revision.reviewedByName || audit.actorName || "",
-  }, audit);
+  }, audit, options);
 
   const verificationDueAt = addDaysIso(preplan.verificationCycleDays || DEFAULT_VERIFICATION_CYCLE_DAYS);
 
@@ -822,10 +925,26 @@ export async function publishPreplanRevision(departmentId, preplanId, audit = {}
   return { preplan: next, revision: published };
 }
 
-export async function startPreplanRevision(departmentId, preplanId, audit = {}) {
+export async function startPreplanRevision(departmentId, preplanId, audit = {}, options = {}) {
   const preplan = await getPreplan(departmentId, preplanId);
   if (!preplan) throw new Error("Preplan not found.");
-  const current = await getPreplanRevision(departmentId, preplan.currentRevisionId);
+  const currentRaw = preplan.currentRevisionId
+    ? await getRecord(departmentId, PREPLAN_REVISIONS_COLLECTION, preplan.currentRevisionId)
+    : null;
+  const current = currentRaw ? normalizePreplanRevision(currentRaw, departmentId) : null;
+  // The new revision starts as a copy, so it needs the restricted answers too.
+  let carriedRestricted = {};
+  if (current?.id) {
+    const stored = await readRestrictedAnswers(departmentId, current.id);
+    if (stored === null) {
+      throw new Error(
+        "Couldn't copy the restricted details (gate codes, shutoffs, hazmat) into a new revision. "
+        + "Ask an officer who can see restricted preplan details to start it.",
+      );
+    }
+    const { restrictedAnswers: inline } = splitPreplanAnswers(current.sectionAnswers, preplanSensitiveKeys(current.templateSnapshot));
+    carriedRestricted = { ...inline, ...stored };
+  }
   const stamp = nowIso();
   const revisionNumber = (preplan.currentRevisionNumber || 0) + 1;
   const revisionId = newId("PPR");
@@ -858,7 +977,26 @@ export async function startPreplanRevision(departmentId, preplanId, audit = {}) 
     createdAt: stamp,
     updatedAt: stamp,
   }, departmentId);
+  // Split by the new revision's template (it may flag different fields).
+  const sensitiveKeys = preplanSensitiveKeys(revision.templateSnapshot);
+  const { publicAnswers, restrictedAnswers } = splitPreplanAnswers({
+    ...(revision.sectionAnswers || {}),
+    ...carriedRestricted,
+  }, sensitiveKeys);
+  revision = syncRevisionNarrative(
+    { ...revision, sectionAnswers: publicAnswers },
+    { ...carriedRestricted, ...restrictedAnswers },
+    sensitiveKeys,
+  );
 
+  if (hasRestrictedValues(restrictedAnswers)) {
+    await writeRestrictedAnswers(departmentId, {
+      preplanId,
+      revisionId,
+      answers: restrictedAnswers,
+      actorUid: audit.actorUid || "",
+    });
+  }
   await createRecord(departmentId, PREPLAN_REVISIONS_COLLECTION, revisionId, revision);
 
   if (current?.id && current.status === "published") {
@@ -873,7 +1011,10 @@ export async function startPreplanRevision(departmentId, preplanId, audit = {}) 
     currentRevisionNumber: revisionNumber,
   }, audit);
 
-  return { preplan: next, revision };
+  const shown = options.withRestricted
+    ? { ...mergeRestrictedIntoRevision(revision, restrictedAnswers, sensitiveKeys), restrictedLoaded: true }
+    : { ...revision, restrictedLoaded: false };
+  return { preplan: next, revision: shown };
 }
 
 export async function recordPreplanVerification(departmentId, preplanId, payload = {}, audit = {}) {

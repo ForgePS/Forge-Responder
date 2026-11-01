@@ -48,6 +48,7 @@ function PersonalDetailsSection({
   draft,
   canEdit,
   canViewPrivateInfo,
+  privateStatus = "off",
   updateDraftField,
   setEmergencySameAddress,
   showFormActions = false,
@@ -56,14 +57,27 @@ function PersonalDetailsSection({
   isNewRecord = false,
 }) {
   const canEditPrivate = canEdit && canViewPrivateInfo;
-  // Private details (SSN, birth date, demographics) are hidden, not just locked, for people without access.
-  const privateValue = (value) => (canViewPrivateInfo ? (value || "") : (value ? "Hidden" : ""));
+  // Private details (SSN, birth date, demographics, license number) are stored
+  // apart from the personnel list. Without access they read "Restricted" whether
+  // or not anything is on file; with access they can be changed once loaded.
+  const canEditPrivateDetails = canEditPrivate && privateStatus === "ready";
+  const privateValue = (value) => (canViewPrivateInfo ? (value || "") : "Restricted");
+  const privateDateType = canViewPrivateInfo ? "date" : "text";
 
   return (
     <div className="personnel-form-card">
       <header className="personnel-form-card-header">
         <strong>Personnel</strong>
       </header>
+
+      {canViewPrivateInfo && privateStatus === "loading" ? (
+        <p className="hint-text personnel-private-note">Loading private details…</p>
+      ) : null}
+      {canViewPrivateInfo && privateStatus === "error" ? (
+        <p className="hint-text personnel-private-note">
+          Private details (birth date, SSN, demographics, license number) couldn&apos;t be loaded, so they can&apos;t be changed right now. Refresh the page to try again.
+        </p>
+      ) : null}
 
       <div className={`personnel-form-flow ${canEdit ? "is-editing" : "is-viewing"}`}>
         <FormRow columns={3}>
@@ -91,11 +105,11 @@ function PersonalDetailsSection({
         <FormRow columns={3}>
           <ProfilePhoneField flow label="Phone" value={draft.phone || ""} editing={canEdit} onChange={(value) => updateDraftField("phone", value)} />
           <ProfileField flow label="IAFF Local number" value={draft.iaffLocalNumber || ""} editing={canEdit} onChange={(value) => updateDraftField("iaffLocalNumber", value)} />
-          <ProfileField flow label="Birth Date" value={privateValue(draft.birthDate)} editing={canEditPrivate} type={canViewPrivateInfo ? "date" : "text"} onChange={(value) => updateDraftField("birthDate", value)} />
+          <ProfileField flow label="Birth Date" value={privateValue(draft.birthDate)} editing={canEditPrivateDetails} type={privateDateType} onChange={(value) => updateDraftField("birthDate", value)} />
         </FormRow>
 
         <FormRow columns="citizenship-only">
-          <ProfileField flow label="Citizenship" value={privateValue(draft.citizenship)} editing={canEditPrivate} dropdownId="citizenshipOptions" onChange={(value) => updateDraftField("citizenship", value)} />
+          <ProfileField flow label="Citizenship" value={privateValue(draft.citizenship)} editing={canEditPrivateDetails} dropdownId="citizenshipOptions" onChange={(value) => updateDraftField("citizenship", value)} />
         </FormRow>
 
         <EmergencyContactSection
@@ -109,7 +123,7 @@ function PersonalDetailsSection({
         />
 
         <FormRow columns={4}>
-          <ProfileField flow label="Driver's Lic. Number" value={draft.driversLicenseNumber || ""} editing={canEdit} onChange={(value) => updateDraftField("driversLicenseNumber", value)} />
+          <ProfileField flow label="Driver's Lic. Number" value={privateValue(draft.driversLicenseNumber)} editing={canEditPrivateDetails} onChange={(value) => updateDraftField("driversLicenseNumber", value)} />
           <ProfileField flow label="Driver's Lic. State" value={draft.driversLicenseState || ""} editing={canEdit} dropdownId="usStates" onChange={(value) => updateDraftField("driversLicenseState", value)} />
           <ProfileField flow label="Driver's Lic. Class" value={draft.driversLicenseClass || ""} editing={canEdit} dropdownId="driversLicenseClasses" onChange={(value) => updateDraftField("driversLicenseClass", value)} />
           <ProfileField flow label="Driver's Lic. Expiration Date" value={draft.driversLicenseExpiration || ""} editing={canEdit} type="date" onChange={(value) => updateDraftField("driversLicenseExpiration", value)} />
@@ -123,11 +137,11 @@ function PersonalDetailsSection({
         </FormRow>
 
         <FormRow columns={5}>
-          <ProfileField flow label="Race" value={privateValue(draft.race)} editing={canEditPrivate} dropdownId="raceOptions" onChange={(value) => updateDraftField("race", value)} />
-          <ProfileField flow label="Ethnicity" value={privateValue(draft.ethnicity)} editing={canEditPrivate} dropdownId="ethnicityOptions" onChange={(value) => updateDraftField("ethnicity", value)} />
-          <ProfileField flow label="Gender" value={privateValue(draft.gender)} editing={canEditPrivate} dropdownId="genderOptions" onChange={(value) => updateDraftField("gender", value)} />
-          <ProfileField flow label="Marital Status" value={privateValue(draft.maritalStatus)} editing={canEditPrivate} dropdownId="maritalStatusOptions" onChange={(value) => updateDraftField("maritalStatus", value)} />
-          <ProfileField flow label="Social Security Number" value={privateValue(draft.socialSecurityNumber)} editing={canEditPrivate} onChange={(value) => updateDraftField("socialSecurityNumber", value)} />
+          <ProfileField flow label="Race" value={privateValue(draft.race)} editing={canEditPrivateDetails} dropdownId="raceOptions" onChange={(value) => updateDraftField("race", value)} />
+          <ProfileField flow label="Ethnicity" value={privateValue(draft.ethnicity)} editing={canEditPrivateDetails} dropdownId="ethnicityOptions" onChange={(value) => updateDraftField("ethnicity", value)} />
+          <ProfileField flow label="Gender" value={privateValue(draft.gender)} editing={canEditPrivateDetails} dropdownId="genderOptions" onChange={(value) => updateDraftField("gender", value)} />
+          <ProfileField flow label="Marital Status" value={privateValue(draft.maritalStatus)} editing={canEditPrivateDetails} dropdownId="maritalStatusOptions" onChange={(value) => updateDraftField("maritalStatus", value)} />
+          <ProfileField flow label="Social Security Number" value={privateValue(draft.socialSecurityNumber)} editing={canEditPrivateDetails} onChange={(value) => updateDraftField("socialSecurityNumber", value)} />
         </FormRow>
 
         <FormRow columns={5}>
@@ -241,6 +255,7 @@ export default function PersonnelProfileForm({
   editing,
   canEditProfile,
   canViewPrivateInfo,
+  privateStatus = "off",
   updateDraftField,
   setEmergencySameAddress,
   training = [],
@@ -291,6 +306,7 @@ export default function PersonnelProfileForm({
           draft={draft}
           canEdit={canEdit}
           canViewPrivateInfo={canViewPrivateInfo}
+          privateStatus={privateStatus}
           updateDraftField={updateDraftField}
           setEmergencySameAddress={setEmergencySameAddress}
           showFormActions={canEdit}
@@ -362,7 +378,8 @@ export default function PersonnelProfileForm({
       return (
         <div className="personnel-form-card">
           <header className="personnel-form-card-header"><strong>Academy</strong></header>
-          <PersonnelAcademyPanel person={selected || draft} />
+          {/* Birth date comes from the private record (merged into the draft) when the viewer may see it. */}
+          <PersonnelAcademyPanel person={selected ? { ...selected, birthDate: canViewPrivateInfo ? (draft?.birthDate || "") : "" } : draft} />
         </div>
       );
     case "accruals":

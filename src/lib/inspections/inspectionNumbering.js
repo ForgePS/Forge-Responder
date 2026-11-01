@@ -3,6 +3,8 @@
  * already used this year + 1" (not "how many records exist + 1"), so deleting or
  * archiving records, or loading only part of the list, never hands out a
  * number that is already taken. Firebase-free so it can be unit tested.
+ * New numbers are claimed from the shared counter counters/inspection-YYYY
+ * (src/lib/recordCounters.js); this "highest + 1" choice is the offline fallback.
  */
 
 function escapeRegExp(value) {

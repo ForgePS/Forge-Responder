@@ -20,6 +20,14 @@ import PersonnelListView from "../components/personnel/PersonnelListView.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { limitCheck, limitMessage } from "../lib/moduleAccess.js";
+import { usePersonnelPrivate } from "../hooks/usePersonnelPrivate.js";
+import { savePersonnelPrivate } from "../lib/personnelPrivateService.js";
+import {
+  hasPrivateValue,
+  mergePersonnelPrivate,
+  privateFieldsPatch,
+  stripPersonnelPrivateKeys,
+} from "../lib/personnelPrivateFields.js";
 
 export default function PersonnelPage({
   query,
@@ -35,7 +43,7 @@ export default function PersonnelPage({
   onOpenEmployeeProfile,
 }) {
   const { entitlements } = useTenant();
-  const { isCreator } = useAuth();
+  const { isCreator, user } = useAuth();
   const safeRecords = Array.isArray(records) ? records : [];
   const [view, setView] = useState("list");
   const [selectedId, setSelectedId] = useState("");
@@ -51,6 +59,22 @@ export default function PersonnelPage({
   const selected = safeRecords.find((person) => person.id === selectedId) || null;
   const [draft, setDraft] = useState(selected || {});
 
+  // Private details (SSN, birth date, demographics, license number) are kept
+  // apart from the personnel list and loaded only for people allowed to see them.
+  const privateInfo = usePersonnelPrivate(departmentId, view === "detail" ? selectedId : "", canViewPrivateInfo);
+  const privateReady = privateInfo.status === "ready" && privateInfo.personnelId === selectedId;
+  const privateStatus = !canViewPrivateInfo
+    ? "off"
+    : privateInfo.personnelId === selectedId ? privateInfo.status : "loading";
+
+  /** The record as shown on the profile: list record plus private details when loaded. */
+  function profileRecord(person) {
+    const normalized = normalizePersonnelRecord(person);
+    return privateReady && person?.id === selectedId
+      ? mergePersonnelPrivate(normalized, privateInfo.fields)
+      : normalized;
+  }
+
   useEffect(() => {
     if (!initialPersonId) return;
     openPerson(initialPersonId);
@@ -59,8 +83,15 @@ export default function PersonnelPage({
 
   useEffect(() => {
     if (view !== "detail" || editing) return;
-    if (selected) setDraft(normalizePersonnelRecord(selected));
-  }, [selectedId, editing, selected, view]);
+    if (selected) setDraft(profileRecord(selected));
+  }, [selectedId, editing, selected, view, privateReady, privateInfo.fields]);
+
+  // Private details arriving while already editing: fill them in (their fields
+  // stay locked until loaded, so nothing typed is overwritten).
+  useEffect(() => {
+    if (!privateReady || !editing) return;
+    setDraft((current) => (current?.id === selectedId ? mergePersonnelPrivate(current, privateInfo.fields) : current));
+  }, [privateReady, privateInfo.personnelId]);
 
   function openPerson(id, options = {}) {
     const person = options.person || safeRecords.find((item) => item.id === id);
@@ -92,11 +123,15 @@ export default function PersonnelPage({
       return;
     }
     setEditing(false);
-    if (selected) setDraft(normalizePersonnelRecord(selected));
+    if (selected) setDraft(profileRecord(selected));
   }
 
   async function saveProfile() {
     if (!draft?.id || !setRecords) return;
+    if (privateStatus === "loading") {
+      setSavedMessage("Private details are still loading. Try saving again in a moment.");
+      return;
+    }
 
     try {
       let forgePersonId = String(selected?.forgePersonId || draft.forgePersonId || "").trim();
@@ -116,8 +151,29 @@ export default function PersonnelPage({
         }
       }
 
+      // Private details are saved to their own record first; the personnel
+      // list never gets them. If that save fails, nothing is saved.
+      let storedPrivate = privateInfo.fields;
+      if (privateReady) {
+        const privatePatch = privateFieldsPatch(draft, privateInfo.fields);
+        if (Object.keys(privatePatch).length) {
+          try {
+            await savePersonnelPrivate(departmentId, draft.id, privatePatch, { userId: user?.uid });
+          } catch (privateError) {
+            console.error("Failed to save private personnel details", privateError);
+            throw new Error("Private details (birth date, SSN, demographics, license number) couldn't be saved, so the profile wasn't saved. Try again.");
+          }
+          privateInfo.applySaved(privatePatch);
+          storedPrivate = Object.fromEntries(
+            Object.entries({ ...privateInfo.fields, ...privatePatch }).filter(([, value]) => hasPrivateValue(value))
+          );
+        }
+      }
+
       const updatedPerson = normalizePersonnelRecord({
-        ...draft,
+        // Without the private record loaded, leave whatever is on the list
+        // record alone; the list store moves it once someone allowed saves.
+        ...(privateReady ? stripPersonnelPrivateKeys(draft) : draft),
         forgePersonId,
         activityLog: selected?.activityLog || [],
         updated_at: new Date().toISOString(),
@@ -139,7 +195,7 @@ export default function PersonnelPage({
         return [updatedPerson, ...current];
       });
 
-      setDraft(updatedPerson);
+      setDraft(privateReady ? mergePersonnelPrivate(updatedPerson, storedPrivate, { inlineFallback: false }) : updatedPerson);
       setSelectedId(updatedPerson.id);
       setEditing(false);
       setIsNewRecord(false);
@@ -195,15 +251,13 @@ export default function PersonnelPage({
       const uploaded = await uploadFirebaseFile(storagePath, file);
       if (!uploaded?.downloadUrl) throw new Error("Upload failed");
 
-      const updatedPerson = normalizePersonnelRecord({
-        ...draft,
-        photoUrl: uploaded.downloadUrl,
-        updated_at: new Date().toISOString(),
-      });
-
-      setDraft(updatedPerson);
+      // Only the photo changes on the list record (unsaved edits and private
+      // details in the open form stay in the form).
+      const photoUrl = uploaded.downloadUrl;
+      const updatedAt = new Date().toISOString();
+      setDraft((current) => ({ ...current, photoUrl, updated_at: updatedAt }));
       setRecords((current) => current.map((person) => (
-        person.id === updatedPerson.id ? updatedPerson : person
+        person.id === draft.id ? normalizePersonnelRecord({ ...person, photoUrl, updated_at: updatedAt }) : person
       )));
       setSavedMessage("Profile photo updated");
       setPendingPhotoFile(null);
@@ -395,6 +449,7 @@ export default function PersonnelPage({
           canEditProfile={canEditProfile}
           canEditPhoto={canEditPhoto}
           canViewPrivateInfo={canViewPrivateInfo}
+          privateStatus={privateStatus}
           updateDraftField={updateDraftField}
           setEmergencySameAddress={setEmergencySameAddress}
           savedMessage={savedMessage}

@@ -14,6 +14,7 @@ export * from "./violationService.js";
 export * from "./preplanDefaults.js";
 export * from "./preplanOfflineQueue.js";
 export * from "./preplanService.js";
+export * from "./preplanRestricted.js";
 export * from "./preplanFeatures.js";
 export * from "./preplanDropdownDefaults.js";
 export * from "./preplanDropdownService.js";

@@ -5,6 +5,7 @@ import {
   updateRecord,
 } from "../firestoreService.js";
 import { writeInspectionAuditLog } from "./inspectionAudit.js";
+import { allocateRecordNumber } from "../recordCounters.js";
 import { getInspectionRecord } from "./inspectionWorkflow.js";
 import { listViolations } from "./violationService.js";
 import {
@@ -267,16 +268,17 @@ export async function listNoticeDeliveries(departmentId, noticeId) {
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
+// Numbers come from a department counter so two people can't get the same one.
 async function nextNoticeNumber(departmentId) {
   const existing = await listInspectionNotices(departmentId);
-  const year = new Date().getFullYear();
-  return `NTC-${year}-${String(existing.length + 1).padStart(4, "0")}`;
+  const format = { prefix: "NTC", separator: "-", padding: 4, year: new Date().getFullYear() };
+  return (await allocateRecordNumber(departmentId, "notice", format, existing.map((row) => row.noticeNumber))).number;
 }
 
 async function nextCertificateNumber(departmentId) {
   const existing = await listInspectionCertificates(departmentId);
-  const year = new Date().getFullYear();
-  return `CRT-${year}-${String(existing.length + 1).padStart(4, "0")}`;
+  const format = { prefix: "CRT", separator: "-", padding: 4, year: new Date().getFullYear() };
+  return (await allocateRecordNumber(departmentId, "certificate", format, existing.map((row) => row.certificateNumber))).number;
 }
 
 function snapshotViolations(rows = []) {

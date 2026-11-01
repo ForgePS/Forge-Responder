@@ -29,6 +29,21 @@ service firebase.storage {
         || (isAuthenticated() && departmentId == "forge-demo" && request.auth.token.get("email", "") == "demo@forge.demo");
     }
 
+    // Deleting files needs an editing permission (see firestore.rules memberGrants).
+    // Firefighters and Read Only can upload (photos on checks) but not delete.
+    function canDeleteFiles(departmentId) {
+      return isPlatformCreator()
+        || (isAuthenticated() && departmentId == "forge-demo" && request.auth.token.get("email", "") == "demo@forge.demo")
+        || (isDepartmentMember(departmentId)
+            && firestore.exists(/databases/(default)/documents/departments/$(departmentId)/memberGrants/$(request.auth.uid))
+            && firestore.get(/databases/(default)/documents/departments/$(departmentId)/memberGrants/$(request.auth.uid))
+                 .data.get("permissions", {}).keys().hasAny([
+                   "manageSystemSettings", "manageUsers", "editPersonnel", "editCertifications", "editTraining",
+                   "editDocuments", "editApparatus", "editAssets", "editFleetAssets", "manageFleetConfig",
+                   "editFleetDefects", "editFleetWorkOrders", "editInspections", "editPreplans", "createPreplans",
+                   "editHydrants", "editNerisReports", "editDigitalDashboard", "manageDigitalDashboard"]));
+    }
+
     // The shared demo account can't host large files.
     function isAllowedDemoUpload(departmentId) {
       return departmentId != "forge-demo" || request.resource == null || request.resource.size < 10 * 1024 * 1024;
@@ -42,7 +57,7 @@ service firebase.storage {
     match /departments/{departmentId}/{allPaths=**} {
       allow read: if canAccessDepartment(departmentId);
       allow create, update: if canAccessDepartment(departmentId) && isAllowedUpload() && isAllowedDemoUpload(departmentId);
-      allow delete: if canAccessDepartment(departmentId);
+      allow delete: if canDeleteFiles(departmentId);
     }
 
     // Platform-wide branding (creator console logo uploads).

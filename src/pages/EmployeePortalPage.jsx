@@ -83,6 +83,7 @@ import { resolveEmployeeVacancyDays, formatVacancyPickupSummary, buildVacancyPic
 import { hasPermission } from "../lib/permissions.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
+import { uniqueRecordId } from "../lib/recordIds.js";
 import { acknowledgementKeys, pendingForPerson, withAcknowledgement } from "../lib/documentAcknowledgement.js";
 import { loadDepartmentMembership } from "../lib/departmentMembership.js";
 import CallShiftOffers from "../components/employee/CallShiftOffers.jsx";
@@ -570,7 +571,7 @@ export default function EmployeePortalPage({
 
     const endTime = calculateEndTime(leaveForm.startTime, totalHours);
     const approvalMeta = buildLeaveApprovalMeta(myPerson || {}, personnel, leaveForm.type);
-    const id = `L-${300 + leaveRequests.length}`;
+    const id = uniqueRecordId("L");
     const record = {
       id,
       person: myPerson?.name || membership?.displayName || "Employee",
@@ -619,7 +620,7 @@ export default function EmployeePortalPage({
     }
 
     const approvalMeta = buildShiftTradeApprovalMeta(personnel, tradeForm, rotation);
-    const id = `TR-${500 + shiftTrades.length}`;
+    const id = uniqueRecordId("TR");
     const record = {
       id,
       requestedBy: myPerson?.name || membership?.displayName || "Employee",

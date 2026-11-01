@@ -2,7 +2,7 @@ const admin = require("firebase-admin");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const twilio = require("twilio");
-const { assertDepartmentAccess, assertDepartmentAccessOrPublicGateway, assertDepartmentManage, assertPlatformSuperAdmin, isPlatformCreator } = require("./lib/access");
+const { assertDepartmentAccess, assertDepartmentAccessOrPublicGateway, assertMemberPermission, assertPlatformSuperAdmin, isPlatformCreator } = require("./lib/access");
 const { resolvePersonnelPhones } = require("./lib/personnel");
 const { toUsE164 } = require("./lib/phone");
 const {
@@ -104,6 +104,9 @@ function createTwilioClient(secrets) {
   };
 }
 
+const SMS_BROADCAST_MAX_RECIPIENTS = 200;
+const SMS_BROADCAST_MAX_CHARS = 640;
+
 exports.sendShiftBroadcastSms = onCall(
   {
     secrets: [twilioAccountSid, twilioAuthToken, twilioFromNumber],
@@ -119,7 +122,15 @@ exports.sendShiftBroadcastSms = onCall(
       record = {},
     } = request.data || {};
 
-    await assertDepartmentAccess(db, departmentId, request.auth);
+    // Same people who can manage call shifts in the app; one broadcast is capped.
+    await assertMemberPermission(db, departmentId, request.auth, ["editSchedule", "manageSystemSettings"],
+      "Only schedulers can send shift texts.");
+    if (!Array.isArray(personnelIds) || personnelIds.length > SMS_BROADCAST_MAX_RECIPIENTS) {
+      throw new HttpsError("invalid-argument", `A shift text can go to at most ${SMS_BROADCAST_MAX_RECIPIENTS} people.`);
+    }
+    if (String(message || "").length > SMS_BROADCAST_MAX_CHARS) {
+      throw new HttpsError("invalid-argument", `Keep the message under ${SMS_BROADCAST_MAX_CHARS} characters.`);
+    }
 
     const secrets = {
       TWILIO_ACCOUNT_SID: twilioAccountSid.value(),
@@ -1074,6 +1085,20 @@ exports.entitlementsOnProfile = onDocumentWritten("departments/{departmentId}/pr
 
 exports.entitlementsOnMembers = onDocumentWritten("departments/{departmentId}/users/{uid}", (event) =>
   refreshEntitlementsFor(event.params.departmentId));
+
+// departments/<id>/memberGrants/<uid>: each member's permissions, which the
+// Firestore rules check. Kept current when a membership or a role changes.
+const memberGrants = require("./lib/memberGrants");
+
+exports.memberGrantsOnMember = onDocumentWritten("departments/{departmentId}/users/{uid}", (event) =>
+  memberGrants.refreshMember(admin.firestore(), event.params.departmentId, event.params.uid)
+    .catch((error) => console.error(`Member grant refresh failed for ${event.params.departmentId}/${event.params.uid}`, error)));
+
+exports.memberGrantsOnRole = onDocumentWritten("departments/{departmentId}/roles/{roleId}", (event) => {
+  if (!memberGrants.rolePermissionsChanged(event.data?.before?.data(), event.data?.after?.data())) return null;
+  return memberGrants.refreshDepartment(admin.firestore(), event.params.departmentId)
+    .catch((error) => console.error(`Member grant refresh failed for ${event.params.departmentId}`, error));
+});
 
 exports.entitlementsOnPersonnel = onDocumentWritten(
   `departments/{departmentId}/lists/${entitlements.PERSONNEL_LIST}/items/{itemId}`,
