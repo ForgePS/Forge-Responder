@@ -56,6 +56,7 @@ export default function CommandDashboard({
   shiftTrades,
   shiftRotation,
   liveDayMetrics = {},
+  dutyDayId = "",
 }) {
   const [hydrants, setHydrants] = useState([]);
   const [hydrantsLoading, setHydrantsLoading] = useState(Boolean(departmentId));
@@ -101,6 +102,8 @@ export default function CommandDashboard({
     scheduleDays,
     leaveRequests,
     shiftTrades,
+    liveDayMetrics,
+    dutyDayId,
     // Documents waiting on the person looking at the dashboard.
     acknowledgementKeys: acknowledgementKeys({ personnelId: viewerPerson?.id || membership?.personnelId, uid: user?.uid }),
   });
@@ -112,8 +115,8 @@ export default function CommandDashboard({
   });
 
   const kpis = [
-    ["Personnel On Duty", metrics.onDuty, `of ${personnel.length} Assigned`, "info", Users, "Personnel"],
-    ["Staffing Deficit", metrics.staffingDeficit, metrics.staffingDeficit ? "Below Target" : "Covered", metrics.staffingDeficit ? "critical" : "success", Users, "Scheduling"],
+    ["Personnel On Duty", metrics.onDuty ?? "—", metrics.onDuty === null ? "Roster not set up" : `of ${metrics.minimum} needed this shift`, "info", Users, "Scheduling"],
+    ["Staffing Deficit", metrics.staffingDeficit ?? "—", metrics.staffingDeficit === null ? "Roster not set up" : metrics.staffingDeficit ? `${metrics.staffingDeficit} short this shift` : "Fully staffed", metrics.staffingDeficit ? "critical" : "success", Users, "Scheduling"],
     ["Certifications Expiring", metrics.certsExpiring90, "Next 90 Days", "warning", FileCheck2, "Certifications"],
     ["Training Compliance", `${metrics.trainingCompliance}%`, "Department-wide", metrics.trainingCompliance >= 85 ? "success" : "warning", GraduationCap, "Training"],
     ["Units Available", metrics.unitsAvailable, `of ${apparatus.length} Total`, "success", Truck, "Apparatus"],

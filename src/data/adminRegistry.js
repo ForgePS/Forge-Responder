@@ -28,6 +28,7 @@ export const NAV_MODULE_MAP = {
   "Fleet Hardening": "apparatus",
   "All Fleet Assets": "apparatus",
   "Fleet Configuration Studio": "apparatus",
+  "Apparatus Check Setup": "apparatus",
   Assets: "assets",
   Maintenance: "maintenance",
   "Hose Testing": "hoseTesting",

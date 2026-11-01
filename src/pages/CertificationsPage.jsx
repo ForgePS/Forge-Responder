@@ -9,6 +9,14 @@ import ObjectLifecycleActions from "../components/ObjectLifecycleActions.jsx";
 import { Badge, Panel, Modal } from "../components/shell/ui.jsx";
 import { exportCsv } from "../utils/dashboardMetrics.js";
 
+// The 30/60/90-day tiles filter to certifications expiring in that window.
+const DUE_WINDOWS = { "Due in 30 Days": [0, 30], "Due in 60 Days": [31, 60], "Due in 90 Days": [61, 90] };
+function inDueWindow(record, filter) {
+  const window = DUE_WINDOWS[filter];
+  const days = Number(record.days);
+  return Boolean(window) && Number.isFinite(days) && days >= window[0] && days <= window[1];
+}
+
 export default function CertificationsPage({ query, records = [], setRecords, canEdit = false, departmentId = "" }) {
   const [filter, setFilter] = useState("All");
   const [lifecycleView, setLifecycleView] = useState("active");
@@ -23,7 +31,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
     lifecycleView === "archived" ? isObjectVisibleInArchivedList(record) : isObjectVisibleInActiveList(record)
   ));
   const filtered = scoped.filter((record) => (
-    (filter === "All" || record.status === filter || record.category === filter)
+    (filter === "All" || record.status === filter || record.category === filter || inDueWindow(record, filter))
     && Object.values(record).join(" ").toLowerCase().includes(query.toLowerCase())
   ));
   const activeRecords = records.filter((record) => isObjectVisibleInActiveList(record));
@@ -143,7 +151,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
             className={`cert-stat stat-${tone}`}
             onClick={() => {
               setLifecycleView("active");
-              setFilter(label === "Expired" ? "Expired" : label === "Active" ? "Active" : "All");
+              setFilter(label);
             }}
           >
             <strong>{value}</strong>

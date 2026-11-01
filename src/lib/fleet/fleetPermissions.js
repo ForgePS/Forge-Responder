@@ -514,4 +514,5 @@ export const FLEET_NAV_PERMISSION_MAP = {
   "Fleet Hardening": FLEET_PERMISSION_KEYS.manageConfig,
   "All Fleet Assets": FLEET_PERMISSION_KEYS.viewAssets,
   "Fleet Configuration Studio": FLEET_PERMISSION_KEYS.manageConfig,
+  "Apparatus Check Setup": FLEET_PERMISSION_KEYS.manageConfig,
 };

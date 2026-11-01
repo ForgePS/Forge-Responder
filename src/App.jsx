@@ -22,6 +22,7 @@ import ThemeToggle from "./components/ThemeToggle.jsx";
 import { useTenant } from "./context/TenantContext.jsx";
 import { isPlatformScope } from "./lib/tenantPaths.js";
 import { isValidTimezone } from "./lib/timezone.js";
+import { dutyDayId, withLiveCertDays } from "./lib/liveDates.js";
 import { useTenantPersistentState } from "./hooks/useTenantPersistentState.js";
 import { formatRoleLabel, membershipInitials } from "./lib/departmentMembership.js";
 import AccessDeniedPage from "./pages/AccessDeniedPage.jsx";
@@ -180,6 +181,7 @@ import {
 const FleetDashboardPage = lazyPage(() => import("./pages/FleetDashboardPage.jsx"));
 const FleetAssetsMasterPage = lazyPage(() => import("./pages/FleetAssetsMasterPage.jsx"));
 const FleetConfigStudioPage = lazyPage(() => import("./pages/FleetConfigStudioPage.jsx"));
+const ApparatusCheckSetupPage = lazyPage(() => import("./pages/ApparatusCheckSetupPage.jsx"));
 const FleetReadinessBoardPage = lazyPage(() => import("./pages/FleetReadinessBoardPage.jsx"));
 const FleetDefectsPage = lazyPage(() => import("./pages/FleetDefectsPage.jsx"));
 const FleetWorkOrdersPage = lazyPage(() => import("./pages/FleetWorkOrdersPage.jsx"));
@@ -202,6 +204,7 @@ const navGroups = [
   { label: "Fleet", items: [
     ["Fleet Dashboard", Truck],
     ["Readiness Board", ClipboardCheck],
+    ["Apparatus Check Setup", ClipboardCheck],
     ["Fleet Defects", AlertTriangle],
     ["Fleet Work Orders", Wrench],
     ["PM Forecast", CalendarDays],
@@ -1118,9 +1121,12 @@ function AppShell() {
     () => personnel.find((person) => person.id === employeePreviewPersonId) || null,
     [personnel, employeePreviewPersonId]
   );
+  // The shift on duty now (a 07:00 shift change means 02:00 still belongs to yesterday).
+  const currentDutyDayId = dutyDayId(new Date(), dailyLogSettings.shiftChangeTime);
   const dashboardLiveDayMetrics = useMemo(
     () => buildLiveScheduleDayMetrics({
-      referenceDayId: formatDayId(new Date()),
+      referenceDayId: currentDutyDayId,
+      shiftChangeTime: dailyLogSettings.shiftChangeTime,
       dayCount: 7,
       scheduleDays,
       rotation: shiftRotation,
@@ -1132,6 +1138,8 @@ function AppShell() {
       apparatus,
     }),
     [
+      currentDutyDayId,
+      dailyLogSettings.shiftChangeTime,
       scheduleDays,
       shiftRotation,
       roster,
@@ -1141,6 +1149,11 @@ function AppShell() {
       schedulingSettings,
       apparatus,
     ]
+  );
+  // Days left and Expired/Due Soon worked out from each expiration date, every time.
+  const liveCertifications = useMemo(
+    () => (Array.isArray(certifications) ? certifications : []).map((cert) => withLiveCertDays(cert)),
+    [certifications]
   );
 
   function openPersonnelProfile(personnelId = "") {
@@ -1216,7 +1229,7 @@ function AppShell() {
       permissions={permissions}
       showInternalEmail={isModuleEnabled("internalEmail")}
       personnel={personnel}
-      certifications={certifications}
+      certifications={liveCertifications}
       training={training}
       documents={documents}
       setDocuments={setDocuments}
@@ -1259,7 +1272,7 @@ function AppShell() {
       }}
     />
   ) : current === "Dashboard" ? (
-    <CommandDashboard onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={certifications} apparatus={apparatus} workOrders={workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} />
+    <CommandDashboard onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={liveCertifications} apparatus={apparatus} workOrders={workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} dutyDayId={currentDutyDayId} />
   ) : current === "Personnel" ? (
     hasPermission(permissions, "viewPersonnel") ? (
       <PersonnelPage
@@ -1280,7 +1293,7 @@ function AppShell() {
     hasPermission(permissions, "viewCertifications") ? (
       <CertificationsPage
         query={query}
-        records={certifications}
+        records={liveCertifications}
         setRecords={setCertifications}
         departmentId={departmentId}
         canEdit={
@@ -1512,6 +1525,13 @@ function AppShell() {
   ) : current === "All Fleet Assets" ? (
     hasPermission(permissions, "viewFleetAssets") || hasPermission(permissions, "viewApparatus") || isCreator
       ? <FleetAssetsMasterPage query={query} onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Apparatus Check Setup" ? (
+    hasPermission(permissions, "manageFleetConfig")
+      || hasPermission(permissions, "manageSystemSettings")
+      || hasPermission(permissions, "editApparatus")
+      || isCreator
+      ? <ApparatusCheckSetupPage legacyApparatus={apparatus} />
       : <AccessDeniedModule name={current} />
   ) : current === "Fleet Configuration Studio" ? (
     hasPermission(permissions, "manageFleetConfig")
@@ -1748,7 +1768,7 @@ function AppShell() {
       <NerisAnalyticsPage reports={nerisFireReports} />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Analytics" ? (
-    hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={certifications} training={training} apparatus={apparatus} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={liveCertifications} training={training} apparatus={apparatus} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />
   ) : current === "Messages" ? (
     hasPermission(permissions, "viewInternalEmail") ? <InternalEmailBoardPage personnel={personnel} /> : <AccessDeniedModule name={current} />
   ) : current === "Digital Dashboard" ? (

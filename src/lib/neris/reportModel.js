@@ -175,6 +175,11 @@ export function reportChecklist(report = {}) {
   const dispatch = time(cad.dispatchTime);
   const arrival = time(cad.arrivalTime);
   const clear = time(cad.clearTime);
+  const received = time(cad.receivedTime);
+  const enroute = time(cad.enrouteTime);
+  if (received && dispatch && dispatch < received) add("order-received", "response", "Dispatch is before call received — check the times", false, true, true);
+  if (dispatch && enroute && enroute < dispatch) add("order-enroute", "response", "En route is before dispatch — check the times", false, true, true);
+  if (enroute && arrival && arrival < enroute) add("order-arrival-enroute", "response", "Arrival is before en route — check the times", false, true, true);
   if (dispatch && arrival && arrival < dispatch) add("order-arrival", "response", "Arrival is before dispatch — check the times", false, true, true);
   if (arrival && clear && clear < arrival) add("order-clear", "response", "Clear is before arrival — check the times", false, true, true);
   (ws.units || []).forEach((unit, index) => {

@@ -1,5 +1,6 @@
 import {
   createRecord,
+  deleteRecord,
   getRecord,
   listRecords,
   updateRecord,
@@ -162,6 +163,26 @@ export async function saveDefectCategory(departmentId, record = {}, audit = {}) 
     actorName: audit.actorName || "System",
   }).catch(() => null);
   return normalized;
+}
+
+/**
+ * Permanently remove a defect category. Existing defects keep their copied
+ * category name, so history still reads correctly.
+ * @param {string} departmentId
+ * @param {{ id: string, name?: string }} record
+ * @param {{ actorUid?: string, actorName?: string }} [audit]
+ */
+export async function deleteDefectCategory(departmentId, record = {}, audit = {}) {
+  if (!departmentId || !record?.id) throw new Error("Nothing to remove.");
+  await deleteRecord(departmentId, FLEET_DEFECT_CATEGORIES_COLLECTION, record.id);
+  await writeFleetAuditLog(departmentId, {
+    action: "delete",
+    recordId: record.id,
+    summary: `Removed defect category ${record.name || ""}`.trim(),
+    actorUid: audit.actorUid || "system",
+    actorName: audit.actorName || "System",
+  }).catch(() => null);
+  return true;
 }
 
 /**

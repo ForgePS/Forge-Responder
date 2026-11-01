@@ -282,14 +282,14 @@ export default function FleetAssetsMasterPage({
                         onChange={(e) => setDraft((c) => ({ ...c, type: e.target.value }))}
                       />
                     </Field>
-                    <Field label="Fleet class">
+                    <Field label="Vehicle type">
                       <select
                         value={draft.fleetClassId || ""}
                         disabled={!canEdit}
                         onChange={(e) => setDraft((c) => ({ ...c, fleetClassId: e.target.value }))}
                       >
-                        <option value="">Select class</option>
-                        {classes.map((item) => (
+                        <option value="">Select type</option>
+                        {classes.filter((item) => item.active !== false || item.id === draft.fleetClassId).map((item) => (
                           <option key={item.id} value={item.id}>{item.name}</option>
                         ))}
                       </select>

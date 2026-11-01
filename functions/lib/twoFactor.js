@@ -35,7 +35,12 @@ async function adminSecondFactorRequired(db, departmentId, now = new Date()) {
   return Boolean(deadline && now >= deadline);
 }
 
+// Two-step sign-in codes are optional for everyone (2026-10-29). Set to true to
+// require them again for department admins after platformConfig/main.mfaAdminDeadline.
+const ADMIN_SECOND_FACTOR_ENFORCED = false;
+
 async function assertAdminSecondFactor(db, departmentId, auth) {
+  if (!ADMIN_SECOND_FACTOR_ENFORCED) return;
   if (hasSecondFactor(auth)) return;
   if (await adminSecondFactorRequired(db, departmentId)) {
     throw new HttpsError(

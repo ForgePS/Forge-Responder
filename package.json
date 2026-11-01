@@ -28,7 +28,7 @@
     "deploy:staging:rules": "firebase deploy --only firestore:rules,storage --project staging",
     "backfill:memberships": "node scripts/backfill-memberships.mjs",
     "backfill:memberships:apply": "node scripts/backfill-memberships.mjs --apply",
-    "test:functions": "firebase emulators:exec --only firestore,storage --project demo-forge-rms \"node --test --test-concurrency=1 tests/functions/invites.test.mjs tests/functions/billing.test.mjs tests/functions/platformConsole.test.mjs tests/functions/listStore.test.mjs tests/functions/entitlements.test.mjs tests/functions/twoFactor.test.mjs tests/functions/jotformSetup.test.mjs\"",
+    "test:functions": "firebase emulators:exec --only firestore,storage --project demo-forge-rms \"node --test --test-concurrency=1 tests/functions/invites.test.mjs tests/functions/billing.test.mjs tests/functions/platformConsole.test.mjs tests/functions/listStore.test.mjs tests/functions/entitlements.test.mjs tests/functions/twoFactor.test.mjs tests/functions/jotformSetup.test.mjs tests/functions/publicAlertDashboard.test.mjs\"",
     "inventory:legacy": "node scripts/inventory-legacy-data.mjs",
     "cleanup:phase2": "node scripts/phase2-cleanup.mjs",
     "test:unit": "node --test \"tests/unit/*.test.mjs\"",
