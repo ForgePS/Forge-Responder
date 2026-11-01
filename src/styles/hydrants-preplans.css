@@ -1,0 +1,22 @@
+/* Hydrant & preplan status styles (Batch 4: honest screens). */
+
+/* A save that did not reach the department: warning colour, not a success toast. */
+.hydrant-module-root .toast.toast-warn,
+.app-shell .toast.toast-warn,
+.command-app-root .toast.toast-warn,
+.toast.toast-warn {
+  background: #92400e;
+  color: #fff;
+  border-color: #b45309;
+}
+
+.hydrant-form-error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hydrant-form-error {
+    color: #fca5a5;
+  }
+}

@@ -26,15 +26,17 @@ export const NOTICE_STATUS_LABELS = {
   superseded: "Superseded",
 };
 
+// Forge can't send email or text messages yet, so only channels a person carries out
+// (print, hand delivery, mailing) are offered. Nothing here claims an electronic send.
 export const DELIVERY_CHANNELS = [
-  { id: "print", label: "Print / PDF" },
-  { id: "email", label: "Email" },
-  { id: "sms", label: "SMS" },
-  { id: "in_person", label: "In person" },
-  { id: "mail", label: "Mail" },
-  { id: "portal", label: "Portal" },
-  { id: "other", label: "Other" },
+  { id: "print", label: "Print / save as PDF" },
+  { id: "in_person", label: "Delivered by hand" },
+  { id: "mail", label: "Mailed by the department" },
+  { id: "other", label: "Other (recorded by hand)" },
 ];
+
+/** Channels Forge can't carry out yet; recording them would imply something was sent. */
+export const UNAVAILABLE_DELIVERY_CHANNELS = ["email", "sms", "portal"];
 
 export const DELIVERY_STATUSES = [
   "draft",
@@ -43,15 +45,20 @@ export const DELIVERY_STATUSES = [
   "failed",
   "printed",
   "in_person",
+  "mailed",
+  "recorded",
 ];
 
 export const DELIVERY_STATUS_LABELS = {
   draft: "Draft",
   queued: "Queued",
-  sent_stub: "Sent (stub)",
+  // Older records from before email/SMS were removed; nothing was actually sent.
+  sent_stub: "Recorded only (not sent)",
   failed: "Failed",
   printed: "Printed",
-  in_person: "In person",
+  in_person: "Marked delivered by hand",
+  mailed: "Marked mailed",
+  recorded: "Marked delivered",
 };
 
 export const NOTICE_MERGE_FIELDS = [

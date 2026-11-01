@@ -1,4 +1,6 @@
 import { Truck } from "lucide-react";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { isFleetPageVisible } from "../../lib/fleet/fleetNavVisibility.js";
 
 const DEFAULT_TABS = [
   { id: "dashboard", label: "Dashboard", navName: "Fleet Dashboard" },
@@ -16,6 +18,7 @@ const DEFAULT_TABS = [
   { id: "reporting", label: "Reporting & Automation", navName: "Reporting & Automation" },
   { id: "vendorPortal", label: "Vendor Portal", navName: "Vendor Portal" },
   { id: "assets", label: "All Fleet Assets", navName: "All Fleet Assets" },
+  { id: "checks", label: "Apparatus Checks", navName: "Apparatus Check Setup" },
   { id: "hardening", label: "Fleet Hardening", navName: "Fleet Hardening" },
   { id: "config", label: "Configuration", navName: "Fleet Configuration Studio" },
 ];
@@ -29,6 +32,8 @@ export default function FleetModuleLayout({
   actions = null,
   children,
 } = {}) {
+  const { isCreator } = useAuth();
+  const visibleTabs = Array.isArray(tabs) ? tabs.filter((tab) => isFleetPageVisible(tab.navName, isCreator)) : tabs;
   return (
     <div className="fleet-module inspections-module">
       <a className="fleet-skip-link" href="#fleet-module-main">Skip to fleet content</a>
@@ -40,9 +45,9 @@ export default function FleetModuleLayout({
         {actions}
       </header>
 
-      {Array.isArray(tabs) && tabs.length > 0 && onNavigate ? (
+      {Array.isArray(visibleTabs) && visibleTabs.length > 0 && onNavigate ? (
         <nav className="inspections-subnav" aria-label="Fleet module" aria-describedby="fleet-module-title">
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const isActive = activeNavName === tab.navName;
             return (
               <button

@@ -9,8 +9,20 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+/**
+ * Features with no real implementation yet. They default to off so a new
+ * department never sees a placeholder; a department can still switch them on.
+ *  - mapIntegration: Nearby Preplans has no location, map or distance.
+ *  - qrCodes: nothing scans or redeems a preplan QR token.
+ *  - reports: Preplan Reports only repeats the All Preplans table.
+ */
+export const PREPLAN_FEATURES_OFF_BY_DEFAULT = ["mapIntegration", "qrCodes", "reports"];
+
 export function defaultPreplanFeatures() {
-  return Object.fromEntries(Object.keys(PREPLAN_FEATURE_KEYS).map((key) => [key, true]));
+  return Object.fromEntries(Object.keys(PREPLAN_FEATURE_KEYS).map((key) => [
+    key,
+    !PREPLAN_FEATURES_OFF_BY_DEFAULT.includes(key),
+  ]));
 }
 
 export function normalizePreplanFeatures(raw = {}) {

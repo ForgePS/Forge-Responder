@@ -46,8 +46,10 @@ import {
   syncOfflineDamageDrafts,
   updateHydrantDamageReport,
 } from "../lib/hydrantDamage/index.js";
-import { loadTenantHydrantRecords, loadStaticHydrants } from "../lib/hydrantTenantService.js";
+import { loadTenantHydrantRecords, loadStaticHydrants, persistHydrantUpdate } from "../lib/hydrantTenantService.js";
 import { isOutOfServiceHydrant } from "../lib/hydrantCompletionStats.js";
+import { applyHydrantStatusChange } from "../lib/hydrantStatusSync.js";
+import { hydrantMatchesDamageReport, shouldOfferReturnToService } from "../lib/hydrantDamage/returnToService.js";
 
 function queueIdFromNav(navName = "") {
   const views = getDamageQueueViews();
@@ -395,10 +397,12 @@ export default function HydrantDamageReportsPage({
         departmentName,
       });
       setReports((current) => [saved, ...current.filter((row) => row.id !== saved.id)]);
-      setMessage(`Email accepted by provider. Status: ${saved.emailStatusLabel}.`);
+      const sentTo = (saved.recipientSnapshot || []).map((row) => row.email).filter(Boolean);
+      setMessage(`Sent to ${sentTo.length ? sentTo.join(", ") : "the water company"} with the PDF report attached.`);
     } catch (sendError) {
-      setError(sendError?.message || "Unable to send report.");
+      // reload() clears the error banner, so refresh first and show the reason after.
       await reload();
+      setError(`Not sent: ${sendError?.message || "the email could not be sent."}`);
     } finally {
       setSaving(false);
     }
@@ -513,9 +517,36 @@ export default function HydrantDamageReportsPage({
     setError("");
     setMessage("");
     try {
+      const reportBefore = reports.find((row) => row.id === draft.id) || draft;
       const result = await submitHydrantDamageVerification(departmentId, draft.id, verifyDraft, actor);
       setReports((current) => [result.report, ...current.filter((row) => row.id !== result.report.id)]);
-      setMessage(`Verification ${result.verification.resultLabel}. Status: ${result.report.statusLabel}.`);
+      let summary = `Verification ${result.verification.resultLabel}. Status: ${result.report.statusLabel}.`;
+
+      // Offer to put the hydrant back in service only when it is out of service
+      // because of this report (and no other open report keeps it out).
+      const hydrant = hydrants.find((row) => hydrantMatchesDamageReport(row, result.report)) || null;
+      if (shouldOfferReturnToService({ reportBefore, reportAfter: result.report, hydrant, allReports: reports })) {
+        const label = hydrant.hydrant_id || result.report.hydrantLabel || "this hydrant";
+        if (window.confirm(`Report closed. Hydrant ${label} is still marked Out of Service. Put it back in service now?`)) {
+          try {
+            const patch = {
+              ...applyHydrantStatusChange(hydrant, "status", "In Service"),
+              edited_by: actor.actorName,
+              edited_date: new Date().toISOString().slice(0, 10),
+              edit_source: `Damage report ${result.report.reportNumber || ""} closed`.trim(),
+            };
+            const savedHydrant = await persistHydrantUpdate(departmentId, hydrant, patch);
+            setHydrants((current) => current.map((row) => (row === hydrant ? { ...row, ...savedHydrant } : row)));
+            summary += ` Hydrant ${label} is back in service.`;
+          } catch (hydrantError) {
+            console.error(hydrantError);
+            setError(`Report closed, but hydrant ${label} could not be put back in service (${hydrantError?.message || "save failed"}). Update it in Hydrants.`);
+          }
+        } else {
+          summary += ` Hydrant ${label} is still Out of Service.`;
+        }
+      }
+      setMessage(summary);
     } catch (verifyError) {
       setError(verifyError?.message || "Unable to submit verification.");
     } finally {

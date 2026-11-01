@@ -3829,3 +3829,15 @@ html[data-theme="light"] .check-progress,
 html[data-theme="light"] .check-actions { background: #fff; }
 html[data-theme="light"] .check-progress-bar { background: #e9ecef; }
 html[data-theme="light"] .apparatus-check-card { background: #fff; border-color: #dee2e6; color: #212529; }
+
+/* Older screens (Academy, Hydrants, NERIS) use these class names; they had no styles and
+   rendered as plain browser buttons. Give them the standard button look. */
+.btn-primary, .btn-secondary, .button-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 33px; padding: 0 11px; border-radius: 5px; font-size: 14px; font-weight: 800; cursor: pointer;
+}
+.btn-primary { border: 1px solid transparent; background: var(--rms-primary-solid); color: var(--rms-text-strong); }
+.btn-secondary, .button-secondary { border: 1px solid var(--rms-border); background: var(--rms-bg-surface-3); color: var(--rms-text-body); }
+.btn-primary:disabled, .btn-secondary:disabled, .button-secondary:disabled { opacity: .55; cursor: default; }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-secondary:hover:not(:disabled), .button-secondary:hover:not(:disabled) { border-color: var(--rms-primary-solid); }

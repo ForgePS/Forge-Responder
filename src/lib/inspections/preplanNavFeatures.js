@@ -32,7 +32,23 @@ export function resolveEffectivePreplanFeatures(tenantFeatures, creatorAllowlist
   );
 }
 
+/**
+ * Menu items whose pages are not built yet. They are hidden for everyone
+ * (creators included) whatever the department flags say, so nobody lands on a
+ * placeholder screen. Remove a name here once its page is real.
+ *  - Preplan Dashboard / Preplan Reports: only repeat the All Preplans table.
+ *  - Nearby Preplans: no location, map or distance yet.
+ *  - QR Scan: nothing scans or redeems a QR code yet.
+ */
+export const PREPLAN_NAV_NOT_BUILT = new Set([
+  "Preplan Dashboard",
+  "Preplan Reports",
+  "Nearby Preplans",
+  "QR Scan",
+]);
+
 export function isPreplanNavLeafEnabled(leafName, features = {}) {
+  if (PREPLAN_NAV_NOT_BUILT.has(leafName)) return false;
   const key = PREPLAN_NAV_FEATURE_MAP[leafName];
   if (!key) return true;
   return isPreplanFeatureEnabled(features, key);
@@ -40,11 +56,14 @@ export function isPreplanNavLeafEnabled(leafName, features = {}) {
 
 export function filterNavGroupsByPreplanFeatures(navGroups = [], features = {}, options = {}) {
   const { isCreator = false } = options;
-  if (isCreator) return navGroups;
+  // Creators bypass department flags, but never see pages that aren't built.
+  const isLeafShown = isCreator
+    ? (name) => !PREPLAN_NAV_NOT_BUILT.has(name)
+    : (name) => isPreplanNavLeafEnabled(name, features);
   return navGroups
     .map((group) => {
       if (Array.isArray(group.tree)) {
-        const tree = filterNavTree(group.tree, (leaf) => isPreplanNavLeafEnabled(leaf.name, features));
+        const tree = filterNavTree(group.tree, (leaf) => isLeafShown(leaf.name));
         return {
           ...group,
           tree,
@@ -54,7 +73,7 @@ export function filterNavGroupsByPreplanFeatures(navGroups = [], features = {}, 
       if (Array.isArray(group.items)) {
         return {
           ...group,
-          items: group.items.filter(([name]) => isPreplanNavLeafEnabled(name, features)),
+          items: group.items.filter(([name]) => isLeafShown(name)),
         };
       }
       return group;

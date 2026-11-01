@@ -10,7 +10,7 @@ const navPermissionMap = {
   Certifications: "viewCertifications",
   Training: "viewTraining",
   Scheduling: "viewSchedule",
-  "Time Sheets": "viewSchedule",
+  "Time Sheets": "editSchedule",
   "Daily Log": "viewDailyLog",
   Apparatus: "viewApparatus",
   Assets: "viewAssets",
@@ -210,6 +210,10 @@ export function canViewPersonnelPrivateInfo(permissions = {}, isCreator = false)
 export function canAccessNavItem(itemName, permissions = {}, options = {}) {
   if (itemName === "System Admin") {
     return canAccessSystemAdmin(permissions, options.isCreator);
+  }
+  // Time Sheets edits everyone's cards; members use their own card in the Employee Portal.
+  if (itemName === "Time Sheets") {
+    return canEditScheduleRoster(permissions, options.isCreator);
   }
   const required = navPermissionMap[itemName];
   if (!required) return true;

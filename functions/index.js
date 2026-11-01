@@ -2,7 +2,7 @@ const admin = require("firebase-admin");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const twilio = require("twilio");
-const { assertDepartmentAccess, assertDepartmentAccessOrPublicGateway, assertDepartmentManage, assertPlatformSuperAdmin, isPlatformCreator } = require("./lib/access");
+const { assertDepartmentAccess, assertDepartmentAccessOrPublicGateway, assertMemberPermission, assertPlatformSuperAdmin, isPlatformCreator } = require("./lib/access");
 const { resolvePersonnelPhones } = require("./lib/personnel");
 const { toUsE164 } = require("./lib/phone");
 const {
@@ -38,7 +38,7 @@ const { generateDamageFormPdfBuffer } = require("./lib/damageFormPdfGenerator");
 const { syncFormSubmissions } = require("./lib/jotformSubmissionApi");
 const {
   generateHydrantDamagePdfBuffer,
-  sendWithSendGrid,
+  sendHydrantDamageEmail,
 } = require("./lib/hydrantDamageEmail");
 const {
   issueHydrantDamageAckToken,
@@ -104,6 +104,9 @@ function createTwilioClient(secrets) {
   };
 }
 
+const SMS_BROADCAST_MAX_RECIPIENTS = 200;
+const SMS_BROADCAST_MAX_CHARS = 640;
+
 exports.sendShiftBroadcastSms = onCall(
   {
     secrets: [twilioAccountSid, twilioAuthToken, twilioFromNumber],
@@ -119,7 +122,15 @@ exports.sendShiftBroadcastSms = onCall(
       record = {},
     } = request.data || {};
 
-    await assertDepartmentAccess(db, departmentId, request.auth);
+    // Same people who can manage call shifts in the app; one broadcast is capped.
+    await assertMemberPermission(db, departmentId, request.auth, ["editSchedule", "manageSystemSettings"],
+      "Only schedulers can send shift texts.");
+    if (!Array.isArray(personnelIds) || personnelIds.length > SMS_BROADCAST_MAX_RECIPIENTS) {
+      throw new HttpsError("invalid-argument", `A shift text can go to at most ${SMS_BROADCAST_MAX_RECIPIENTS} people.`);
+    }
+    if (String(message || "").length > SMS_BROADCAST_MAX_CHARS) {
+      throw new HttpsError("invalid-argument", `Keep the message under ${SMS_BROADCAST_MAX_CHARS} characters.`);
+    }
 
     const secrets = {
       TWILIO_ACCOUNT_SID: twilioAccountSid.value(),
@@ -811,12 +822,16 @@ exports.trainingCompletedWebhook = onRequest({ invoker: "public" }, async (req, 
 });
 
 /**
- * Send a hydrant damage report email with PDF attachment via SendGrid.
- * Never claims success unless the provider accepts (HTTP 202).
+ * Send a hydrant damage report email with PDF attachment (Resend, same
+ * settings as the rest of the platform; see lib/hydrantDamageEmail.js).
+ * Never claims success unless the provider accepts the message. In log-only
+ * mode (EMAIL_DELIVERY=log) or with no provider configured it reports
+ * accepted:false with a plain reason.
  */
 exports.sendHydrantDamageReport = onCall(
   {
     region: "us-central1",
+    secrets: EMAIL_SECRETS,
   },
   async (request) => {
     const db = admin.firestore();
@@ -862,21 +877,6 @@ exports.sendHydrantDamageReport = onCall(
       throw new HttpsError("failed-precondition", "Report description is required.");
     }
 
-    const apiKey = String(process.env.SENDGRID_API_KEY || "").trim();
-    const fromEmail = String(
-      process.env.SENDGRID_FROM_EMAIL
-      || process.env.DAILY_ACTIVITY_FROM_EMAIL
-      || ""
-    ).trim();
-
-    if (!apiKey || !fromEmail) {
-      return {
-        accepted: false,
-        error: "SendGrid is not configured. Set SENDGRID_API_KEY and SENDGRID_FROM_EMAIL on Cloud Functions.",
-        providerStatus: "not_configured",
-      };
-    }
-
     const pdfBuffer = await generateHydrantDamagePdfBuffer(report, {
       departmentName: departmentName || "Fire Department",
     });
@@ -898,11 +898,10 @@ ${ackToken.url}
 
 Do not forward this link outside your utility. Internal fire-department notes are never included.`;
 
-    const sendResult = await sendWithSendGrid({
-      apiKey,
-      fromEmail,
-      fromName: departmentName || "FORGE RMS Hydrants",
+    const sendResult = await sendHydrantDamageEmail({
       to: recipients,
+      // Replies go to the firefighter who sent it, not the no-reply sender.
+      replyTo: String(request.auth?.token?.email || "").trim(),
       subject: subject || `Hydrant Damage Report ${report.reportNumber || reportId}`,
       text: bodyWithAck,
       pdfBuffer,
@@ -911,10 +910,10 @@ Do not forward this link outside your utility. Internal fire-department notes ar
 
     if (attemptId) {
       await db.doc(`departments/${departmentId}/hydrantDamageEmailAttempts/${attemptId}`).set({
-        status: sendResult.ok ? "accepted" : "failed",
-        providerStatus: String(sendResult.status || ""),
+        status: sendResult.ok ? "accepted" : (sendResult.outcome === "logged" ? "logged" : "failed"),
+        providerStatus: sendResult.outcome === "sent" ? String(sendResult.status || "") : sendResult.outcome,
         providerMessageId: sendResult.providerMessageId || "",
-        error: sendResult.ok ? "" : (sendResult.errorText || "SendGrid rejected the request."),
+        error: sendResult.ok ? "" : (sendResult.errorText || "The email provider rejected the message."),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
     }
@@ -922,8 +921,8 @@ Do not forward this link outside your utility. Internal fire-department notes ar
     if (!sendResult.ok) {
       return {
         accepted: false,
-        error: sendResult.errorText || `SendGrid returned HTTP ${sendResult.status}`,
-        providerStatus: String(sendResult.status || ""),
+        error: sendResult.errorText || "The email provider rejected the message.",
+        providerStatus: sendResult.outcome === "failed" ? String(sendResult.status || "failed") : sendResult.outcome,
         providerMessageId: sendResult.providerMessageId || "",
       };
     }
@@ -1086,6 +1085,20 @@ exports.entitlementsOnProfile = onDocumentWritten("departments/{departmentId}/pr
 
 exports.entitlementsOnMembers = onDocumentWritten("departments/{departmentId}/users/{uid}", (event) =>
   refreshEntitlementsFor(event.params.departmentId));
+
+// departments/<id>/memberGrants/<uid>: each member's permissions, which the
+// Firestore rules check. Kept current when a membership or a role changes.
+const memberGrants = require("./lib/memberGrants");
+
+exports.memberGrantsOnMember = onDocumentWritten("departments/{departmentId}/users/{uid}", (event) =>
+  memberGrants.refreshMember(admin.firestore(), event.params.departmentId, event.params.uid)
+    .catch((error) => console.error(`Member grant refresh failed for ${event.params.departmentId}/${event.params.uid}`, error)));
+
+exports.memberGrantsOnRole = onDocumentWritten("departments/{departmentId}/roles/{roleId}", (event) => {
+  if (!memberGrants.rolePermissionsChanged(event.data?.before?.data(), event.data?.after?.data())) return null;
+  return memberGrants.refreshDepartment(admin.firestore(), event.params.departmentId)
+    .catch((error) => console.error(`Member grant refresh failed for ${event.params.departmentId}`, error));
+});
 
 exports.entitlementsOnPersonnel = onDocumentWritten(
   `departments/{departmentId}/lists/${entitlements.PERSONNEL_LIST}/items/{itemId}`,

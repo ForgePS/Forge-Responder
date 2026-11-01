@@ -16,6 +16,10 @@ import {
   savePreplanBuilding,
 } from "../../lib/inspections/index.js";
 
+// QR tokens can be created but nothing scans or redeems them yet, so the QR
+// tab stays hidden until a scan page exists.
+const QR_TOKENS_AVAILABLE = false;
+
 const PHOTO_CATEGORIES = [
   { id: "exterior", label: "Exterior" },
   { id: "access", label: "Access / approach" },
@@ -102,7 +106,8 @@ export default function PreplanWorkspacePanels({
     if (!canEdit || !onUpdateLinks) return;
     setBusy(true);
     try {
-      await onUpdateLinks({
+      // onUpdateLinks resolves false when the save failed (the parent shows the error).
+      const ok = await onUpdateLinks({
         hydrantIds: selectedHydrantIds,
         systemIds: selectedSystemIds,
         riskLevel: riskOverride || risk.level,
@@ -110,7 +115,7 @@ export default function PreplanWorkspacePanels({
         riskOverrideLevel: riskOverride,
         riskOverrideReason: riskReason,
       });
-      onMessage?.("Linked assets and risk saved.");
+      if (ok !== false) onMessage?.("Linked assets and risk saved.");
     } catch (error) {
       onError?.(error?.message || "Unable to save links.");
     } finally {
@@ -197,7 +202,7 @@ export default function PreplanWorkspacePanels({
     { id: "buildings", label: "Buildings" },
     { id: "files", label: "Files & plans" },
     { id: "risk", label: "Risk" },
-    { id: "qr", label: "QR" },
+    ...(QR_TOKENS_AVAILABLE ? [{ id: "qr", label: "QR" }] : []),
   ];
 
   return (
@@ -223,7 +228,7 @@ export default function PreplanWorkspacePanels({
           <div className="config-split">
             <div>
               <strong>Hydrants</strong>
-              <p className="occupancy-muted">Select nearby hydrants to pin on this preplan.</p>
+              <p className="occupancy-muted">Select the hydrants to pin on this preplan.</p>
               <div className="config-list" style={{ maxHeight: 220, overflow: "auto" }}>
                 {hydrants.map((row) => {
                   const id = row.id || `${row.location_id}-${row.hydrant_id}`;
@@ -303,7 +308,7 @@ export default function PreplanWorkspacePanels({
             {(canUpload || canEdit) ? (
               <ObjectUploadField
                 label="Upload photo or plan"
-                hint="Stored under pre-fire-plans path; metadata registered on the preplan."
+                hint="Photos and plans are attached to this preplan."
                 disabled={busy || saving}
                 buildPath={(file) => buildPreFirePlanPath(departmentId, preplan.id, file.name)}
                 onUploaded={handleUploaded}
@@ -364,7 +369,7 @@ export default function PreplanWorkspacePanels({
           </div>
         ) : null}
 
-        {tab === "qr" ? (
+        {QR_TOKENS_AVAILABLE && tab === "qr" ? (
           <div>
             <p className="occupancy-muted">
               <QrCode size={14} /> Authenticated tokens are hashed at rest. Raw preplan IDs are never used as scan credentials.

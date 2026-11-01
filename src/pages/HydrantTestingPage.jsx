@@ -4,6 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "../hydrant-testing.css";
 import "../theme/hydrant-theme-bridge.css";
+import "../styles/hydrants-preplans.css";
 import { Activity, AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, ClipboardList, Download, Droplets, Edit3, ExternalLink, FileText, Flame, Gauge, Home, LocateFixed, Mail, MapPin, Save, Search, Settings, ShieldCheck, UploadCloud, Wrench } from "lucide-react";
 import { defaultEmsProtocols, defaultFireCodeDocxSections, defaultFireCodeIndex, defaultFireCodePdfSections, defaultFireCodes, defaultFireSogDetails, defaultFireSogs, defaultHoseInventory } from "../data/defaultAppData";
 import { firebaseEnabled, loadFirebaseList, uploadFirebaseFile } from "../lib/firebaseClient";
@@ -1191,7 +1192,7 @@ function HydrantEditorModal({ hydrant, crew, onClose, onSaved }) {
       onSaved(savedHydrant, "Hydrant information updated");
     } catch (error) {
       console.error("Hydrant save failed", error);
-      onSaved(mergeHydrantUpdate(hydrant, { ...payload, updated_at: new Date().toISOString() }), "Hydrant saved locally — cloud sync failed");
+      onSaved(mergeHydrantUpdate(hydrant, { ...payload, updated_at: new Date().toISOString() }), `Hydrant NOT saved to the department (${error?.message || "save failed"}). Changes are kept on this device only.`, "warn");
     } finally {
       setSaving(false);
     }
@@ -1311,10 +1312,14 @@ function Inspection({ selected, crew, onSaved, onClose }) {
   const [rows, setRows] = useState([]);
   const [generalNotes, setGeneralNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const unansweredCount = rows.filter((row) => !row.result).length;
   const sessionReady = hasActiveShiftSession(crew);
   useEffect(() => {
-    setRows(inspectionItems.map(([item, note]) => ({ item, result: "Yes", notes: note, repair_needed: "No", photo_name: "", photo_data: "" })));
+    // Every item starts unanswered: the crew must record what they actually found.
+    setRows(inspectionItems.map(([item, hint]) => ({ item, result: "", notes: "", hint, repair_needed: "No", photo_name: "", photo_data: "" })));
     setGeneralNotes("");
+    setFormError("");
   }, [selected?.location_id]);
 
   function updateRow(index, patch) {
@@ -1389,15 +1394,24 @@ function Inspection({ selected, crew, onSaved, onClose }) {
       onSaved(savedHydrant, "Hydrant information saved");
     } catch (error) {
       console.error("Hydrant save failed", error);
-      onSaved(mergeHydrantUpdate(selected, { ...payload, updated_at: new Date().toISOString() }), "Hydrant saved locally — cloud sync failed");
+      onSaved(mergeHydrantUpdate(selected, { ...payload, updated_at: new Date().toISOString() }), `Hydrant NOT saved to the department (${error?.message || "save failed"}). Changes are kept on this device only.`, "warn");
     }
   }
 
   async function save() {
     if (!selected || !sessionReady) return;
+    if (unansweredCount) {
+      setFormError(`Answer every item before completing the inspection (${unansweredCount} left). Use N/A where an item doesn't apply.`);
+      return;
+    }
+    setFormError("");
     setSaving(true);
     const inspectedAt = `${crew.date || today()}T12:00:00.000Z`;
-    const payload = { id: firebaseDocId("inspection", selected.location_id, selected.hydrant_id, inspectedAt), location_id: selected.location_id, hydrant_id: selected.hydrant_id, inspected_at: inspectedAt, tested_by: crew.tested_by, shift: crew.shift, checklist: rows, notes: generalNotes, created_at: new Date().toISOString() };
+    // Record ID uses the real save time so two inspections of the same hydrant on
+    // the same day don't overwrite each other (inspected_at keeps the shift date).
+    const recordStamp = new Date().toISOString();
+    const checklist = rows.map(({ hint: _hint, ...row }) => row);
+    const payload = { id: firebaseDocId("inspection", selected.location_id, selected.hydrant_id, recordStamp), location_id: selected.location_id, hydrant_id: selected.hydrant_id, inspected_at: inspectedAt, tested_by: crew.tested_by, shift: crew.shift, checklist, notes: generalNotes, created_at: recordStamp };
     const firebasePayload = inspectionForFirebase(payload);
     const statusFields = inspectionStatusPatch(selected, rows);
     const hydrantPatch = {
@@ -1431,10 +1445,14 @@ function Inspection({ selected, crew, onSaved, onClose }) {
         savedHydrant = await persistHydrantUpdateWithDevMirror(hydrantDepartmentId, selected, hydrantPatch);
         cloudSynced = true;
       }
-      onSaved(savedHydrant, cloudSynced ? "Inspection saved" : "Inspection saved locally — sign in to sync to cloud");
+      onSaved(
+        savedHydrant,
+        cloudSynced ? "Inspection saved" : "Inspection kept on this device only — sign in to save it to the department",
+        cloudSynced ? "ok" : "warn",
+      );
     } catch (error) {
       console.error("Inspection save failed", error);
-      onSaved(savedHydrant, "Inspection saved locally — cloud sync failed");
+      onSaved(savedHydrant, `Inspection NOT saved to the department (${error?.message || "save failed"}). It is kept on this device only.`, "warn");
     } finally {
       setSaving(false);
     }
@@ -1465,7 +1483,7 @@ function Inspection({ selected, crew, onSaved, onClose }) {
               {["Yes", "No", "N/A"].map((choice) => (
                 <button key={choice} className={row.result === choice ? "choice active" : "choice"} onClick={() => updateRow(index, { result: choice })}>{choice}</button>
               ))}
-              <input value={row.notes} onChange={(e) => updateRow(index, { notes: e.target.value })} />
+              <input value={row.notes} placeholder={row.hint || ""} onChange={(e) => updateRow(index, { notes: e.target.value })} />
               <label className="photo-upload">
                 <input type="file" accept="image/*" capture="environment" onChange={(e) => uploadPhoto(index, e.target.files?.[0])} />
                 <span>{row.photo_name ? row.photo_name : "Photo"}{row.photo_url ? " ✓" : ""}</span>
@@ -1478,6 +1496,8 @@ function Inspection({ selected, crew, onSaved, onClose }) {
           ))}
         </div>
         <Field label="General Notes"><textarea value={generalNotes} onChange={(e) => setGeneralNotes(e.target.value)} rows={3} placeholder="Inspection notes..." /></Field>
+        {formError ? <p className="status-line hydrant-form-error" role="alert">{formError}</p> : null}
+        {!formError && unansweredCount ? <p className="status-line">{unansweredCount} item(s) still to answer.</p> : null}
         <div className="inspection-actions">
           <button className="secondary" onClick={addNote}><FileText size={16} /> Add Note</button>
           <button className="secondary" disabled={!selected} onClick={saveHydrantInfo}><Save size={16} /> Save Hydrant Info</button>
@@ -1597,7 +1617,7 @@ function FlowTest({ selected, crew, onSaved, onClose }) {
       onSaved(savedHydrant, "Hydrant information saved");
     } catch (error) {
       console.error("Hydrant save failed", error);
-      onSaved(mergeHydrantUpdate(selected, { ...payload, updated_at: new Date().toISOString() }), "Hydrant saved locally — cloud sync failed");
+      onSaved(mergeHydrantUpdate(selected, { ...payload, updated_at: new Date().toISOString() }), `Hydrant NOT saved to the department (${error?.message || "save failed"}). Changes are kept on this device only.`, "warn");
     }
   }
 
@@ -1607,10 +1627,12 @@ function FlowTest({ selected, crew, onSaved, onClose }) {
     const computedClass = synced.nfpa_class;
     const flowCode = synced.flow_result;
     const testedAt = `${crew.date || today()}T12:00:00.000Z`;
+    // Unique per save so a second test the same day doesn't overwrite the first.
+    const recordStamp = new Date().toISOString();
     const test = {
       ...form,
       ...statusFields,
-      id: firebaseDocId("flow", selected.location_id, info.hydrant_id || selected.hydrant_id, testedAt),
+      id: firebaseDocId("flow", selected.location_id, info.hydrant_id || selected.hydrant_id, recordStamp),
       nfpa_class: computedClass,
       nfpa_color: synced.nfpa_color || nfpaColorNameForClass(computedClass),
       flow_gpm: calculatedFlow,
@@ -1665,10 +1687,14 @@ function FlowTest({ selected, crew, onSaved, onClose }) {
         savedHydrant = await persistHydrantUpdateWithDevMirror(hydrantDepartmentId, selected, hydrantPatch);
         cloudSynced = true;
       }
-      onSaved(savedHydrant, cloudSynced ? "Flow test saved" : "Flow test saved locally — sign in to sync to cloud");
+      onSaved(
+        savedHydrant,
+        cloudSynced ? "Flow test saved" : "Flow test kept on this device only — sign in to save it to the department",
+        cloudSynced ? "ok" : "warn",
+      );
     } catch (error) {
       console.error("Flow test save failed", error);
-      onSaved(savedHydrant, "Flow test saved locally — cloud sync failed");
+      onSaved(savedHydrant, `Flow test NOT saved to the department (${error?.message || "save failed"}). It is kept on this device only.`, "warn");
     }
   }
   if (!sessionReady) {
@@ -1767,26 +1793,41 @@ function Reports({
   useEffect(() => {
     setActivityRows(dailyActivityRows(date));
   }, [date]);
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityLoadError, setActivityLoadError] = useState("");
+  const [activityLoadedAt, setActivityLoadedAt] = useState(null);
+  // Reads the department's activity once per date, then every 5 minutes or when
+  // Refresh is pressed (it used to re-read the whole collection every 2 seconds).
   useEffect(() => {
     let mounted = true;
+    const refreshLocal = () => mounted && setActivityRows((current) => mergeRecords(dailyActivityRows(date), current));
     const refresh = () => {
       const localRows = dailyActivityRows(date);
+      setActivityLoading(true);
       loadTenantHydrantCollection(hydrantDepartmentId, "dailyActivity", [])
         .then((cloudRows) => {
           if (!mounted) return;
           setActivityRows(mergeRecords(localRows, cloudRows.filter((row) => activityRowDate(row) === date)));
+          setActivityLoadError("");
+          setActivityLoadedAt(new Date());
         })
-        .catch(() => mounted && setActivityRows(localRows));
+        .catch((error) => {
+          if (!mounted) return;
+          setActivityRows(localRows);
+          setActivityLoadError(`Couldn't load department activity (${error?.message || "load failed"}). Showing this device's records only.`);
+        })
+        .finally(() => mounted && setActivityLoading(false));
     };
     refresh();
-    window.addEventListener("storage", refresh);
-    const timer = setInterval(refresh, 2000);
+    window.addEventListener("storage", refreshLocal);
+    const timer = setInterval(refresh, 5 * 60 * 1000);
     return () => {
       mounted = false;
-      window.removeEventListener("storage", refresh);
+      window.removeEventListener("storage", refreshLocal);
       clearInterval(timer);
     };
-  }, [date]);
+  }, [date, activityRefreshKey]);
 
   useEffect(() => {
     let mounted = true;
@@ -2171,10 +2212,15 @@ function Reports({
       <div className="daily-report-head">
         <div>
           <strong>Daily Activity Report</strong>
-          <span>{reportRows.length} hydrants done for {date}</span>
+          <span>
+            {reportRows.length} hydrants done for {date}
+            {activityLoading ? " · Loading…" : activityLoadedAt ? ` · Updated ${activityLoadedAt.toLocaleTimeString()}` : ""}
+          </span>
         </div>
         <Field label="Report Date"><input type="date" value={date} onChange={(event) => setReportDate(event.target.value)} /></Field>
+        <button type="button" className="secondary" disabled={activityLoading} onClick={() => setActivityRefreshKey((n) => n + 1)}>Refresh</button>
       </div>
+      {activityLoadError ? <p className="status-line hydrant-form-error" role="alert">{activityLoadError}</p> : null}
       <div className="daily-report-stats" aria-label="Daily activity live counts">
         <div><span>Total Done</span><strong>{activityCounts.total}</strong></div>
         <div><span>Inspections</span><strong>{activityCounts.inspections}</strong></div>
@@ -3851,7 +3897,10 @@ export default function HydrantTestingPage({
       window.removeEventListener("popstate", syncTabFromNavigation);
     };
   }, [embedded]);
-  const [toast, setToast] = useState("");
+  const [toastState, setToastState] = useState(null);
+  const toast = toastState?.text || "";
+  const toastWarn = toastState?.tone === "warn";
+  const setToast = (text, tone = "ok") => setToastState(text ? { text, tone } : null);
   const [crew, setCrew] = useState(newBlankCrew);
   const [draftCrew, setDraftCrew] = useState(newBlankCrew);
   const shiftOptions = useMemo(() => resolveShiftOptions(profile), [profile]);
@@ -3886,7 +3935,8 @@ export default function HydrantTestingPage({
     }, 60000);
     return () => clearInterval(timer);
   }, [departmentId]);
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 2600); return () => clearTimeout(t); }, [toast]);
+  // Warnings (e.g. a save that didn't reach the department) stay up longer.
+  useEffect(() => { if (!toastState) return; const t = setTimeout(() => setToastState(null), toastState.tone === "warn" ? 9000 : 2600); return () => clearTimeout(t); }, [toastState]);
 
   function setCrewSession() {
     if (!draftCrew.tested_by || !draftCrew.shift) {
@@ -3908,13 +3958,13 @@ export default function HydrantTestingPage({
     setToast("Shift session reset");
   }
 
-  function saved(hydrant, msg) {
+  function saved(hydrant, msg, tone = "ok") {
     saveLocalHydrant(hydrant);
     setHydrants((list) => updateList(list, hydrant));
     setSelected(hydrant);
     setDetailHydrant(null);
     setEditorHydrant(null);
-    setToast(msg);
+    setToast(msg, tone);
   }
   function chooseHydrant(hydrant) {
     setSelected(hydrant);
@@ -3960,7 +4010,7 @@ export default function HydrantTestingPage({
     return (
       <div className="hydrant-module-root hydrant-rms-theme">
         <datalist id="tested-by-options">{crewUserOptions.map((name) => <option key={name} value={name} />)}</datalist>
-        {toast && <div className="toast"><CheckCircle2 size={16} /> {toast}</div>}
+        {toast && <div className={toastWarn ? "toast toast-warn" : "toast"} role={toastWarn ? "alert" : "status"}>{toastWarn ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {toast}</div>}
         <nav className="hydrant-work-tabs" aria-label="Hydrant tools">
           {hydrantTabs.map(([id, label, Icon]) => (
             <button key={id} className={tab === id ? "active" : ""} onClick={() => selectHydrantTab(id)}><Icon size={16} /> {label}</button>
@@ -3977,7 +4027,7 @@ export default function HydrantTestingPage({
     return (
       <main className="command-app-root">
         <datalist id="tested-by-options">{crewUserOptions.map((name) => <option key={name} value={name} />)}</datalist>
-        {toast && <div className="toast"><CheckCircle2 size={16} /> {toast}</div>}
+        {toast && <div className={toastWarn ? "toast toast-warn" : "toast"} role={toastWarn ? "alert" : "status"}>{toastWarn ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {toast}</div>}
         <AppHome setTab={setTab} />
       </main>
     );
@@ -4011,7 +4061,7 @@ export default function HydrantTestingPage({
           <button className={tab === "importantNumbers" ? "active" : ""} onClick={() => setTab("importantNumbers")}><Mail size={16} /> Numbers</button>
           <button className={tab === "settings" ? "active" : ""} onClick={() => setTab("settings")}><Settings size={16} /> Settings</button>
         </nav>
-        {toast && <div className="toast"><CheckCircle2 size={16} /> {toast}</div>}
+        {toast && <div className={toastWarn ? "toast toast-warn" : "toast"} role={toastWarn ? "alert" : "status"}>{toastWarn ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {toast}</div>}
         {hydrantTabs.some(([id]) => id === tab) && (
           <>
             <FireQuickTabs active="hydrants" setTab={selectHydrantTab} setFireFormsView={setFireFormsView} />

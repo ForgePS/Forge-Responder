@@ -6,6 +6,14 @@ import InspectionEmptyState from "../components/inspections/InspectionEmptyState
 import InspectionPermissionGate from "../components/inspections/InspectionPermissionGate.jsx";
 import InspectionStatusBadge from "../components/inspections/InspectionStatusBadge.jsx";
 import InspectionsModuleLayout from "../components/inspections/InspectionsModuleLayout.jsx";
+import ChecklistFieldInput from "../components/inspections/ChecklistFieldInput.jsx";
+import { findMissingRequiredFields, formatMissingFieldsMessage } from "../lib/inspections/checklistFields.js";
+import { describeNumberingFormat } from "../lib/inspections/inspectionNumbering.js";
+import {
+  clearPendingCodeCitation,
+  formatCitationLabel,
+  readPendingCodeCitation,
+} from "../lib/codeLibrary/pendingCitation.js";
 import ViolationsPage from "./ViolationsPage.jsx";
 import InspectionNoticesPage from "./InspectionNoticesPage.jsx";
 import {
@@ -23,6 +31,7 @@ import {
   canViewInspectionsModule,
   completeInspection,
   createInspection,
+  createViolation,
   createOrUpdatePreplanFromInspection,
   ensureInspectionConfigSeeded,
   ensureOccupancyRecords,
@@ -173,73 +182,110 @@ function InspectionWorkspace({
   onOpenFireProtectionSystems,
   onAddFee,
   onViolationChanged,
+  departmentId,
+  actor,
 }) {
   const [answers, setAnswers] = useState(record?.answers || {});
   const [summary, setSummary] = useState(record?.summary || "");
   const [internalNotes, setInternalNotes] = useState(record?.internalNotes || "");
-  const [result, setResult] = useState(record?.result || "Passed");
+  const [result, setResult] = useState(record?.result || "");
   const [reinspectionRequired, setReinspectionRequired] = useState(Boolean(record?.reinspectionRequired));
   const [nextReinspectionAt, setNextReinspectionAt] = useState(record?.nextReinspectionAt || "");
   const [requireApproval, setRequireApproval] = useState(false);
+  const [missingFields, setMissingFields] = useState([]);
+  const [completeError, setCompleteError] = useState("");
+  const [pendingCitation, setPendingCitation] = useState(() => readPendingCodeCitation());
+  const [citationBusy, setCitationBusy] = useState(false);
+  const [citationMessage, setCitationMessage] = useState("");
+  const [violationsVersion, setViolationsVersion] = useState(0);
 
+  // Reset local edits only when a different inspection is opened. Refreshes of the same
+  // record (a violation added, a photo uploaded) must not wipe unsaved answers.
   useEffect(() => {
     setAnswers(record?.answers || {});
     setSummary(record?.summary || "");
     setInternalNotes(record?.internalNotes || "");
-    setResult(record?.result || "Passed");
+    setResult(record?.result || "");
     setReinspectionRequired(Boolean(record?.reinspectionRequired));
     setNextReinspectionAt(record?.nextReinspectionAt || "");
-  }, [record]);
+    setMissingFields([]);
+    setCompleteError("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [record?.id]);
 
   const sections = Array.isArray(record?.templateSnapshot?.sections)
     ? record.templateSnapshot.sections
     : [];
   const locked = Boolean(record?.lockedAt) || record?.status === "archived";
   const editable = canEdit && !locked;
+  const missingKeys = new Set(missingFields.map((item) => item.key));
 
   function setAnswer(key, value) {
     setAnswers((current) => ({ ...current, [key]: value }));
+    if (missingKeys.has(key)) {
+      setMissingFields((current) => current.filter((item) => item.key !== key));
+    }
   }
 
-  function renderFieldInput(field) {
-    const value = answers[field.key] ?? "";
-    const type = field.type || "short_text";
-    if (type === "heading" || type === "instruction") {
-      return <p className="occupancy-muted">{field.helpText || field.label}</p>;
+  function focusField(key) {
+    const target = typeof document !== "undefined"
+      ? document.querySelector(`[data-checklist-key="${CSS.escape(key)}"]`)
+      : null;
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.querySelector("input, select, textarea, button")?.focus?.({ preventScroll: true });
+  }
+
+  function handleCompleteClick() {
+    const missing = findMissingRequiredFields(record?.templateSnapshot, answers);
+    setMissingFields(missing);
+    if (missing.length) {
+      setCompleteError(formatMissingFieldsMessage(missing));
+      focusField(missing[0].key);
+      return;
     }
-    if (["pass_fail", "pass_fail_na", "yes_no", "compliant"].includes(type)) {
-      const options = type === "yes_no"
-        ? ["Yes", "No"]
-        : type === "pass_fail_na"
-          ? ["Pass", "Fail", "N/A"]
-          : type === "compliant"
-            ? ["Compliant", "Noncompliant", "Not observed"]
-            : ["Pass", "Fail"];
-      return (
-        <select value={value} disabled={!editable} onChange={(e) => setAnswer(field.key, e.target.value)}>
-          <option value="">Select</option>
-          {options.map((option) => <option key={option} value={option}>{option}</option>)}
-        </select>
-      );
+    if (!result) {
+      setCompleteError("Choose a result before completing the inspection.");
+      return;
     }
-    if (type === "long_text") {
-      return (
-        <textarea
-          rows={3}
-          value={value}
-          disabled={!editable}
-          onChange={(e) => setAnswer(field.key, e.target.value)}
-        />
-      );
+    setCompleteError("");
+    onComplete({ ...draftPayload, requireApproval });
+  }
+
+  function dismissPendingCitation() {
+    clearPendingCodeCitation();
+    setPendingCitation(null);
+    setCitationMessage("");
+  }
+
+  async function issueViolationFromCitation() {
+    if (!pendingCitation || !departmentId) return;
+    setCitationBusy(true);
+    setCitationMessage("");
+    try {
+      await createViolation(departmentId, {
+        inspectionId: record.id,
+        name: formatCitationLabel(pendingCitation),
+        codeCitation: pendingCitation.sectionNumber,
+        description: pendingCitation.citedText.slice(0, 1500) || pendingCitation.sectionTitle,
+        severity: "moderate",
+        publicationId: pendingCitation.publicationId,
+        sectionNumber: pendingCitation.sectionNumber,
+        sectionTitle: pendingCitation.sectionTitle,
+        citedText: pendingCitation.citedText,
+        codeNodeId: pendingCitation.codeNodeId,
+        citedAt: pendingCitation.citedAt || undefined,
+      }, actor);
+      clearPendingCodeCitation();
+      setPendingCitation(null);
+      setViolationsVersion((value) => value + 1);
+      setCitationMessage(`Violation issued citing ${pendingCitation.sectionNumber}.`);
+      onViolationChanged?.();
+    } catch (citeError) {
+      setCitationMessage(`Couldn't issue the violation: ${citeError?.message || "unknown error"}`);
+    } finally {
+      setCitationBusy(false);
     }
-    return (
-      <input
-        value={value}
-        disabled={!editable}
-        placeholder={field.placeholder || ""}
-        onChange={(e) => setAnswer(field.key, e.target.value)}
-      />
-    );
   }
 
   const draftPayload = {
@@ -294,7 +340,7 @@ function InspectionWorkspace({
               className="primary-button"
               type="button"
               disabled={saving}
-              onClick={() => onComplete({ ...draftPayload, requireApproval })}
+              onClick={handleCompleteClick}
             >
               <UploadCloud size={14} /> Complete
             </button>
@@ -341,6 +387,44 @@ function InspectionWorkspace({
           ) : null}
         </div>
 
+        {pendingCitation && editable ? (
+          <div className="pending-citation-banner" role="status">
+            <span>
+              From the Code Library: <strong>{formatCitationLabel(pendingCitation)}</strong>.
+              Issue it as a violation on this inspection, or use it in a code section item below.
+            </span>
+            <button
+              className="primary-button"
+              type="button"
+              disabled={citationBusy || saving}
+              onClick={issueViolationFromCitation}
+            >
+              {citationBusy ? "Issuing..." : "Issue violation"}
+            </button>
+            <button className="text-button" type="button" disabled={citationBusy} onClick={dismissPendingCitation}>
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+        {citationMessage ? <p className="occupancy-message">{citationMessage}</p> : null}
+
+        {completeError ? (
+          <div className="checklist-missing-alert" role="alert">
+            <strong>{missingFields.length ? "Some required items aren't answered yet." : completeError}</strong>
+            {missingFields.length ? (
+              <ul>
+                {missingFields.map((item) => (
+                  <li key={item.key}>
+                    <button type="button" onClick={() => focusField(item.key)}>
+                      {item.label}{item.sectionTitle ? ` (${item.sectionTitle})` : ""}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
         {!sections.length ? (
           <InspectionEmptyState
             title="No template linked"
@@ -351,25 +435,55 @@ function InspectionWorkspace({
             <div key={section.id} className="template-section-card">
               <strong>{section.title}</strong>
               <div className="template-fields">
-                {(section.fields || []).map((field) => (
-                  <div key={field.id || field.key} className="config-field">
-                    <span>
-                      {field.label}
-                      {field.required ? " *" : ""}
-                    </span>
-                    {renderFieldInput(field)}
-                    {field.helpText ? <small className="occupancy-muted">{field.helpText}</small> : null}
-                  </div>
-                ))}
+                {(section.fields || []).map((field) => {
+                  const isDisplay = field.type === "heading" || field.type === "instruction";
+                  if (isDisplay) {
+                    return (
+                      <div key={field.id || field.key} className="config-field">
+                        <span>{field.label}</span>
+                        {field.helpText ? <small className="occupancy-muted">{field.helpText}</small> : null}
+                      </div>
+                    );
+                  }
+                  const isMissing = missingKeys.has(field.key);
+                  return (
+                    <div
+                      key={field.id || field.key}
+                      className={`config-field${isMissing ? " checklist-field-missing" : ""}`}
+                      data-checklist-key={field.key}
+                    >
+                      <span>
+                        {field.label}
+                        {field.required ? " *" : ""}
+                        {isMissing ? " — required" : ""}
+                      </span>
+                      <ChecklistFieldInput
+                        field={field}
+                        value={answers[field.key]}
+                        editable={editable}
+                        invalid={isMissing}
+                        departmentId={departmentId}
+                        inspectionId={record.id}
+                        actor={actor}
+                        signerName={record.occupancySnapshot?.primaryContactName || ""}
+                        pendingCitation={pendingCitation}
+                        onChange={(next) => setAnswer(field.key, next)}
+                      />
+                      {field.helpText ? <small className="occupancy-muted">{field.helpText}</small> : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))
         )}
 
         <div className="occupancy-form-grid">
-          <Field label="Result">
+          <Field label="Result *">
             <select value={result} disabled={!editable} onChange={(e) => setResult(e.target.value)}>
-              {getInspectionResultOptions().map((option) => <option key={option}>{option}</option>)}
+              <option value="">Select result</option>
+              {result && !getInspectionResultOptions().includes(result) ? <option value={result}>{result}</option> : null}
+              {getInspectionResultOptions().map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </Field>
           <label className="occupancy-primary-toggle">
@@ -425,6 +539,7 @@ function InspectionWorkspace({
 
         <section className="occupancy-section inspection-violations-embed">
           <ViolationsPage
+            key={`${record.id}-${violationsVersion}`}
             inspectionId={record.id}
             embedded
             onChanged={onViolationChanged}
@@ -734,6 +849,8 @@ function InspectionsShellPage({
             canScheduleReinspection={canScheduleReinspection}
             canViewFps={canViewFps}
             canEditFees={canEditFees}
+            departmentId={departmentId}
+            actor={actor}
             saving={saving}
             onClose={() => setActiveId("")}
             onStart={() => runAction(
@@ -850,7 +967,7 @@ function InspectionsShellPage({
 
         {settings?.numbering?.prefix ? (
           <p className="inspections-settings-hint">
-            Numbering format: {settings.numbering.prefix}{settings.numbering.separator || "-"}####
+            Numbering format: {describeNumberingFormat(settings)}
           </p>
         ) : null}
       </InspectionsModuleLayout>

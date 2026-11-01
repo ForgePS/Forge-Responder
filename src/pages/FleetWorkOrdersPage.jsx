@@ -23,10 +23,19 @@ import {
   getAllowedWorkOrderTransitions,
   getWorkOrderPriorityOptions,
   getWorkOrderTypeOptions,
+  syncLegacyWorkOrders,
   transitionFleetWorkOrder,
   updateFleetWorkOrder,
 } from "../lib/fleet/index.js";
 import { activeOptionsWithSelected, firstActiveId } from "../lib/fleet/repairsConfig.js";
+import {
+  buildCompletionMessage,
+  isUnitDown,
+  unitDownLabel,
+  workOrderPriorityLabel,
+  workOrderStatusLabel,
+  workOrderTypeLabel,
+} from "../lib/fleet/workOrderLoopLogic.js";
 
 function Field({ label, children }) {
   return (
@@ -91,12 +100,23 @@ export default function FleetWorkOrdersPage({
     setLoading(true);
     setError("");
     try {
-      const [nextAssets, nextShops, nextVendors, nextOrders] = await Promise.all([
+      const [nextAssets, nextShops, nextVendors] = await Promise.all([
         ensureFleetAssets(departmentId, legacyApparatus, actor),
         ensureFleetShopsSeeded(departmentId, actor),
         ensureFleetVendorsSeeded(departmentId, actor),
-        ensureFleetWorkOrders(departmentId, legacyWorkOrders, actor),
       ]);
+      // Editors copy any classic Maintenance orders that never reached Fleet (never deletes).
+      // Read-only viewers can't write, so they just see what is already here.
+      let nextOrders;
+      if (canEdit) {
+        const sync = await syncLegacyWorkOrders(departmentId, legacyWorkOrders, { ...actor, assets: nextAssets });
+        nextOrders = sync.workOrders;
+        if (sync.added.length) {
+          setMessage(`${sync.added.length} work order${sync.added.length === 1 ? "" : "s"} from the old Maintenance list ${sync.added.length === 1 ? "was" : "were"} added here.`);
+        }
+      } else {
+        nextOrders = await ensureFleetWorkOrders(departmentId, legacyWorkOrders, actor);
+      }
       setAssets(nextAssets);
       setShops(nextShops);
       setVendors(nextVendors);
@@ -151,6 +171,45 @@ export default function FleetWorkOrdersPage({
   function upsert(next) {
     setRecords((current) => [next, ...current.filter((row) => row.id !== next.id)]);
     setSelectedId(next.id);
+  }
+
+  /**
+   * Complete a work order (status change or passed QC) and report what else closed.
+   * When the unit is out of service or restricted, ask whether to put it back in service.
+   * @param {(audit: object) => Promise<object>} run
+   */
+  async function completeWorkOrder(workOrder, run) {
+    const asset = assets.find((row) => row.id === workOrder.fleetAssetId) || null;
+    const unitName = asset?.unitDesignation || asset?.fleetNumber || workOrder.fleetNumber || "This unit";
+    let returnToService = false;
+    if (isUnitDown(asset)) {
+      returnToService = window.confirm(
+        `${unitName} is ${unitDownLabel(asset)}.\n\nPut ${unitName} back in service now that this work is done?\n\nOK = back in service. Cancel = leave its status as it is.`
+      );
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const result = await run({ ...actor, returnToService });
+      const { completion, ...next } = result || {};
+      upsert(next);
+      if (completion?.returnedToService) {
+        setAssets((current) => current.map((row) => (
+          row.id === asset?.id ? { ...row, status: "in_service", activeRestriction: "" } : row
+        )));
+      }
+      const warnings = [...(completion?.warnings || [])];
+      if (asset && isUnitDown(asset) && !completion?.returnedToService && !returnToService) {
+        warnings.push(`${unitName} is still ${unitDownLabel(asset)}.`);
+      }
+      setMessage(completion
+        ? buildCompletionMessage({ ...completion, unitName: completion.unitName || unitName, warnings })
+        : `Work order ${next.workOrderNumber} completed.`);
+    } catch (completeError) {
+      setError(completeError?.message || "Unable to complete the work order.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleCreate() {
@@ -221,7 +280,7 @@ export default function FleetWorkOrdersPage({
         {!loading && !records.length ? (
           <FleetEmptyState
             title="No work orders"
-            description="Create a work order or migrate classic Maintenance records (auto-imports when empty)."
+            description="Create a work order here. Reports members send from the Employee Portal, and anything left in the old Maintenance list, show up here automatically."
             icon={Wrench}
           />
         ) : null}
@@ -266,8 +325,8 @@ export default function FleetWorkOrdersPage({
                 <div className="panel-body config-studio-body">
                   <div className="occupancy-form-grid">
                     <div><span className="occupancy-muted">Unit</span><strong>{selected.fleetNumber || "—"}</strong></div>
-                    <div><span className="occupancy-muted">Type</span><strong>{selected.workOrderType}</strong></div>
-                    <div><span className="occupancy-muted">Priority</span><strong>{selected.priority}</strong></div>
+                    <div><span className="occupancy-muted">Type</span><strong>{workOrderTypeLabel(selected.workOrderType)}</strong></div>
+                    <div><span className="occupancy-muted">Priority</span><strong>{workOrderPriorityLabel(selected.priority)}</strong></div>
                     <div><span className="occupancy-muted">Shop</span><strong>{selected.shopName || "—"}</strong></div>
                     <div><span className="occupancy-muted">Vendor</span><strong>{selected.vendorName || "—"}</strong></div>
                     <div><span className="occupancy-muted">Actual cost</span><strong>${Number(selected.actualCost || 0).toFixed(2)}</strong></div>
@@ -286,19 +345,26 @@ export default function FleetWorkOrdersPage({
                             type="button"
                             disabled={saving}
                             onClick={async () => {
+                              if (status === "completed") {
+                                await completeWorkOrder(selected, (audit) => (
+                                  transitionFleetWorkOrder(departmentId, selected.id, status, audit)
+                                ));
+                                return;
+                              }
                               setSaving(true);
+                              setError("");
                               try {
                                 const next = await transitionFleetWorkOrder(departmentId, selected.id, status, actor);
                                 upsert(next);
-                                setMessage(`Moved to ${status.replace(/_/g, " ")}.`);
+                                setMessage(`Work order ${next.workOrderNumber} moved to ${workOrderStatusLabel(status)}.`);
                               } catch (transitionError) {
-                                setError(transitionError?.message || "Unable to transition.");
+                                setError(transitionError?.message || "Unable to change the status.");
                               } finally {
                                 setSaving(false);
                               }
                             }}
                           >
-                            → {status.replace(/_/g, " ")}
+                            {status === "completed" ? "Mark completed" : `Move to ${workOrderStatusLabel(status)}`}
                           </button>
                         ))}
                       </div>
@@ -472,6 +538,12 @@ export default function FleetWorkOrdersPage({
                               type="button"
                               disabled={saving}
                               onClick={async () => {
+                                if (selected.status !== "completed") {
+                                  await completeWorkOrder(selected, (audit) => (
+                                    completeWorkOrderQc(departmentId, selected.id, { passed: true, notes: qcNotes }, audit)
+                                  ));
+                                  return;
+                                }
                                 setSaving(true);
                                 try {
                                   const next = await completeWorkOrderQc(departmentId, selected.id, {

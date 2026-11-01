@@ -23,6 +23,7 @@ import {
   canUploadPreplanFiles,
   canViewPreplanSensitive,
   canViewPreplans,
+  changedAnswersForSave,
   createPreplan,
   createPreplanFromOccupancy,
   ensureOccupancyRecords,
@@ -31,6 +32,7 @@ import {
   getPreplanRevision,
   getPreplanStatusOptions,
   getPreplanTypeOptions,
+  isPreplanFieldSensitive,
   labelForPreplanStatus,
   listDropdownOptions,
   listPreplanDiagrams,
@@ -38,6 +40,8 @@ import {
   listPreplanOfflineQueue,
   listPreplanRevisions,
   listPreplans,
+  preplanSensitiveKeys,
+  PREPLAN_RESTRICTED_LABEL,
   publishPreplanRevision,
   recordPreplanVerification,
   returnPreplanForRevision,
@@ -63,6 +67,19 @@ function Field({ label, children, wide = false }) {
       {children}
     </label>
   );
+}
+
+const PREPLAN_TYPE_LABELS = Object.fromEntries(getPreplanTypeOptions().map((row) => [row.id, row.label]));
+
+function labelForPreplanType(typeId) {
+  if (!typeId) return "—";
+  return PREPLAN_TYPE_LABELS[typeId] || String(typeId).replace(/_/g, " ");
+}
+
+function labelForRisk(value) {
+  if (!value) return "—";
+  const text = String(value).replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function formatDate(value) {
@@ -275,7 +292,33 @@ function PreplanDetailWorkspace({
   const [notes, setNotes] = useState(revision?.notes || "");
   const [symbolChecklist, setSymbolChecklist] = useState(revision?.symbolChecklist || []);
   const [verifyNotes, setVerifyNotes] = useState("");
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [verifyChecked, setVerifyChecked] = useState({});
   const [returnNotes, setReturnNotes] = useState("");
+  const verifyAllTicked = VERIFICATION_CHECKLIST_ITEMS.every((item) => verifyChecked[item.id]);
+
+  function openVerification() {
+    setVerifyChecked({});
+    setVerifyOpen(true);
+  }
+
+  async function submitVerification() {
+    if (!verifyAllTicked) return;
+    const ok = await onVerify({
+      notes: verifyNotes,
+      checklist: VERIFICATION_CHECKLIST_ITEMS.map((item) => ({
+        id: item.id,
+        label: item.label,
+        checked: Boolean(verifyChecked[item.id]),
+        notes: "",
+      })),
+    });
+    if (ok !== false) {
+      setVerifyOpen(false);
+      setVerifyChecked({});
+      setVerifyNotes("");
+    }
+  }
   const [dropdownMap, setDropdownMap] = useState({});
 
   useEffect(() => {
@@ -324,8 +367,14 @@ function PreplanDetailWorkspace({
     )));
   }
 
+  // Restricted answers are only sent when changed, so a save never blanks
+  // values this viewer couldn't load.
   const draftPayload = {
-    sectionAnswers: answers,
+    sectionAnswers: changedAnswersForSave(
+      answers,
+      revision?.sectionAnswers || {},
+      preplanSensitiveKeys(revision?.templateSnapshot),
+    ),
     dispatchSummary,
     notes,
     symbolChecklist,
@@ -347,10 +396,10 @@ function PreplanDetailWorkspace({
       </header>
       <div className="panel-body config-studio-body">
         <div className="occupancy-form-grid">
-          <div><span className="occupancy-muted">Type</span><strong>{preplan.preplanTypeId}</strong></div>
-          <div><span className="occupancy-muted">Risk</span><strong>{preplan.riskLevel}</strong></div>
-          <div><span className="occupancy-muted">Validity</span><strong>{preplan.operationalValidity}</strong></div>
-          <div><span className="occupancy-muted">Revision</span><strong>#{preplan.currentRevisionNumber} ({revision?.status})</strong></div>
+          <div><span className="occupancy-muted">Type</span><strong>{labelForPreplanType(preplan.preplanTypeId)}</strong></div>
+          <div><span className="occupancy-muted">Risk</span><strong>{labelForRisk(preplan.riskLevel)}</strong></div>
+          <div><span className="occupancy-muted">Validity</span><strong>{labelForRisk(preplan.operationalValidity)}</strong></div>
+          <div><span className="occupancy-muted">Revision</span><strong>#{preplan.currentRevisionNumber} ({labelForPreplanStatus(revision?.status)})</strong></div>
           <div><span className="occupancy-muted">Verified</span><strong>{formatDate(preplan.lastVerifiedAt)}</strong></div>
           <div><span className="occupancy-muted">Verification due</span><strong>{formatDate(preplan.verificationDueAt)}</strong></div>
           <div><span className="occupancy-muted">Template version</span><strong>{preplan.templateVersion || revision?.templateVersion || "—"}</strong></div>
@@ -364,22 +413,56 @@ function PreplanDetailWorkspace({
             </button>
           ) : null}
           {canEdit && ["draft", "field_survey_in_progress", "returned_for_revision", "revision_in_progress"].includes(preplan.status) ? (
-            <button className="primary-button" type="button" disabled={saving} onClick={onSubmitReview}>
+            <button
+              className="primary-button"
+              type="button"
+              disabled={saving}
+              onClick={async () => {
+                // Save the survey first so unsaved edits go into review with it.
+                if (editable) {
+                  const saved = await onSaveRevision(draftPayload);
+                  if (saved === false) return;
+                }
+                onSubmitReview();
+              }}
+            >
               Submit for review
             </button>
           ) : null}
           {canApprove && preplan.status === "ready_for_review" ? (
             <>
-              <button className="secondary-button" type="button" disabled={saving} onClick={() => onReturn(returnNotes)}>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  if (window.confirm("Return this preplan to the author for revision?")) onReturn(returnNotes);
+                }}
+              >
                 Return
               </button>
-              <button className="primary-button" type="button" disabled={saving} onClick={onApprove}>
+              <button
+                className="primary-button"
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  if (window.confirm("Approve this preplan? It can then be published to crews.")) onApprove();
+                }}
+              >
                 Approve
               </button>
             </>
           ) : null}
-          {canApprove && ["approved", "ready_for_review"].includes(preplan.status) ? (
-            <button className="primary-button" type="button" disabled={saving} onClick={onPublish}>
+          {/* Publish only after approval — a preplan can't skip review. */}
+          {canApprove && preplan.status === "approved" ? (
+            <button
+              className="primary-button"
+              type="button"
+              disabled={saving}
+              onClick={() => {
+                if (window.confirm("Publish this preplan? Crews will see it as the operational plan.")) onPublish();
+              }}
+            >
               <UploadCloud size={14} /> Publish
             </button>
           ) : null}
@@ -389,11 +472,54 @@ function PreplanDetailWorkspace({
             </button>
           ) : null}
           {canEdit && ["operational", "published", "verification_due", "verification_overdue"].includes(preplan.status) ? (
-            <button className="secondary-button" type="button" disabled={saving} onClick={() => onVerify({ notes: verifyNotes })}>
+            <button className="secondary-button" type="button" disabled={saving || verifyOpen} onClick={openVerification}>
               <CheckSquare size={14} /> Record verification
             </button>
           ) : null}
         </div>
+
+        {verifyOpen ? (
+          <div className="template-section-card">
+            <strong><CheckSquare size={14} /> Verification checklist</strong>
+            <p className="occupancy-muted">
+              Tick each item you checked on site. If something has changed, close this and start a new revision instead.
+            </p>
+            <div className="occupancy-form-grid">
+              {VERIFICATION_CHECKLIST_ITEMS.map((item) => (
+                <label key={item.id} className="occupancy-primary-toggle">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(verifyChecked[item.id])}
+                    disabled={saving}
+                    onChange={() => setVerifyChecked((current) => ({ ...current, [item.id]: !current[item.id] }))}
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+            <Field label="Verification notes" wide>
+              <input value={verifyNotes} onChange={(e) => setVerifyNotes(e.target.value)} placeholder="Optional notes" />
+            </Field>
+            <div className="occupancy-detail-actions">
+              <button
+                className="primary-button"
+                type="button"
+                disabled={saving || !verifyAllTicked}
+                onClick={submitVerification}
+              >
+                Save verification
+              </button>
+              <button className="secondary-button" type="button" disabled={saving} onClick={() => setVerifyOpen(false)}>
+                Cancel
+              </button>
+              {!verifyAllTicked ? (
+                <span className="occupancy-muted">
+                  {VERIFICATION_CHECKLIST_ITEMS.filter((item) => !verifyChecked[item.id]).length} item(s) still to check.
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {canApprove && preplan.status === "ready_for_review" ? (
           <Field label="Return notes" wide>
@@ -406,11 +532,26 @@ function PreplanDetailWorkspace({
             <strong>{section.title}</strong>
             <div className="template-fields">
               {(section.fields || []).filter(fieldVisible).map((field) => {
-                if (field.sensitive && !canViewSensitive && !editable) {
+                // Restricted values are stored separately and only load for
+                // people allowed to see them.
+                const hidden = isPreplanFieldSensitive(field) && !revision?.restrictedLoaded;
+                if (hidden && !editable) {
                   return (
                     <div key={field.key} className="config-field">
                       <span>{field.label}</span>
-                      <em className="occupancy-muted">Restricted</em>
+                      <em className="occupancy-muted">{PREPLAN_RESTRICTED_LABEL}</em>
+                    </div>
+                  );
+                }
+                if (hidden) {
+                  return (
+                    <div key={field.key} className="config-field">
+                      <span>{field.label}</span>
+                      <input
+                        value={answers[field.key] || ""}
+                        placeholder="Restricted — type a new value to replace it"
+                        onChange={(e) => setAnswer(field.key, e.target.value)}
+                      />
                     </div>
                   );
                 }
@@ -501,10 +642,6 @@ function PreplanDetailWorkspace({
           ) : null}
         </div>
 
-        <Field label="Verification notes" wide>
-          <input value={verifyNotes} onChange={(e) => setVerifyNotes(e.target.value)} placeholder="Optional notes for verification" />
-        </Field>
-
         <PreplanWorkspacePanels
           departmentId={departmentId}
           preplan={{ ...preplan, sectionAnswers: answers }}
@@ -539,6 +676,9 @@ function PreplansShell({
   const canApprove = canApprovePreplans(permissions, isCreator);
   const canUpload = canUploadPreplanFiles(permissions, isCreator);
   const canViewSensitive = canViewPreplanSensitive(permissions, isCreator);
+  // Officers and editors load restricted answers (gate codes, shutoffs, hazmat);
+  // the database decides in the end, and the screen shows "Restricted" if it says no.
+  const restrictedOptions = { withRestricted: canViewSensitive || canEdit };
 
   const bootstrapOccupancyId = initialOccupancyId || (
     typeof sessionStorage !== "undefined"
@@ -577,13 +717,17 @@ function PreplansShell({
 
   const types = getPreplanTypeOptions();
 
-  async function reload() {
+  // quiet: refresh data without the loading state, so the open preplan stays
+  // mounted and unsaved survey edits are kept.
+  async function reload({ quiet = false } = {}) {
     if (!departmentId || !allowed) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    setError("");
+    if (!quiet) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const seeded = await ensurePreplanConfigSeeded(departmentId, actor);
       const [nextRecords, nextOccupancies] = await Promise.all([
@@ -597,7 +741,7 @@ function PreplansShell({
         listPreplanOfflineQueue(departmentId).length
         + Object.keys(listPreplanLocalDrafts(departmentId)).length
       );
-          if (openPreplanId || bootstrapPreplanId) setActiveId(openPreplanId || bootstrapPreplanId);
+      if (!quiet && (openPreplanId || bootstrapPreplanId)) setActiveId(openPreplanId || bootstrapPreplanId);
     } catch (loadError) {
       console.error(loadError);
       setError(loadError?.message || "Unable to load preplans.");
@@ -655,7 +799,7 @@ function PreplansShell({
       }
       try {
         const [rev, diags] = await Promise.all([
-          getPreplanRevision(departmentId, active.currentRevisionId),
+          getPreplanRevision(departmentId, active.currentRevisionId, restrictedOptions),
           listPreplanDiagrams(departmentId, active.id),
         ]);
         if (!cancelled) {
@@ -668,7 +812,7 @@ function PreplansShell({
     }
     loadDetail();
     return () => { cancelled = true; };
-  }, [departmentId, active?.id, active?.currentRevisionId, active?.updatedAt]);
+  }, [departmentId, active?.id, active?.currentRevisionId, active?.updatedAt, restrictedOptions.withRestricted]);
 
   function upsert(next) {
     setRecords((current) => [next, ...current.filter((row) => row.id !== next.id)]);
@@ -681,8 +825,8 @@ function PreplansShell({
     setMessage("");
     try {
       const result = payload.occupancyId
-        ? await createPreplanFromOccupancy(departmentId, payload.occupancyId, payload, actor)
-        : await createPreplan(departmentId, payload, actor);
+        ? await createPreplanFromOccupancy(departmentId, payload.occupancyId, payload, actor, restrictedOptions)
+        : await createPreplan(departmentId, payload, actor, restrictedOptions);
       upsert(result.preplan);
       setRevision(result.revision);
       setMessage(`Created ${result.preplan.preplanNumber}`);
@@ -694,6 +838,7 @@ function PreplansShell({
     }
   }
 
+  /** Runs a preplan action. Resolves true on success, false on failure. */
   async function runAction(fn, successMessage) {
     setSaving(true);
     setError("");
@@ -704,9 +849,11 @@ function PreplansShell({
       else if (result?.id) upsert(result);
       if (result?.revision) setRevision(result.revision);
       if (successMessage) setMessage(successMessage);
-      await reload();
+      await reload({ quiet: true });
+      return true;
     } catch (actionError) {
       setError(actionError?.message || "Action failed.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -796,9 +943,9 @@ function PreplansShell({
                       >
                         <strong>{row.preplanNumber}</strong>
                         <span>{row.occupancyName || "—"}</span>
-                        <span>{row.preplanTypeId}</span>
+                        <span>{labelForPreplanType(row.preplanTypeId)}</span>
                         <span>{labelForPreplanStatus(row.status)}</span>
-                        <span>{row.riskLevel}</span>
+                        <span>{labelForRisk(row.riskLevel)}</span>
                         <span>{formatDate(row.lastVerifiedAt)}</span>
                         <span>{formatDate(row.updatedAt)}</span>
                       </button>
@@ -839,7 +986,7 @@ function PreplansShell({
             onMessage={setMessage}
             onError={setError}
             onSaveRevision={(payload) => runAction(
-              () => updatePreplanRevision(departmentId, revision.id, payload, actor).then(async (rev) => {
+              () => updatePreplanRevision(departmentId, revision.id, payload, actor, restrictedOptions).then(async (rev) => {
                 const next = await getPreplan(departmentId, active.id);
                 return { preplan: next, revision: rev };
               }),
@@ -858,23 +1005,15 @@ function PreplansShell({
               "Approved."
             )}
             onPublish={() => runAction(
-              () => publishPreplanRevision(departmentId, active.id, actor),
+              () => publishPreplanRevision(departmentId, active.id, actor, restrictedOptions),
               "Published — now operational."
             )}
             onNewRevision={() => runAction(
-              () => startPreplanRevision(departmentId, active.id, actor),
+              () => startPreplanRevision(departmentId, active.id, actor, restrictedOptions),
               "New revision started."
             )}
             onVerify={(payload) => runAction(
-              () => recordPreplanVerification(departmentId, active.id, {
-                ...payload,
-                checklist: VERIFICATION_CHECKLIST_ITEMS.map((item) => ({
-                  id: item.id,
-                  label: item.label,
-                  checked: true,
-                  notes: "",
-                })),
-              }, actor),
+              () => recordPreplanVerification(departmentId, active.id, payload, actor),
               "Verification recorded."
             )}
             onUpdateDiagram={(diagramId, patch) => runAction(

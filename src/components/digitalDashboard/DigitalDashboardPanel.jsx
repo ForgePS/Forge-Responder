@@ -13,7 +13,6 @@ import {
   Siren,
   Trash2,
   Tv,
-  Wifi,
   X,
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext.jsx";
@@ -49,6 +48,7 @@ import {
   TRANSITION_TYPES,
 } from "../../lib/digitalDashboard.js";
 import "../../theme/digital-dashboard.css";
+import "../../styles/certs-signage.css";
 
 const VIEWS = [
   { id: "overview", label: "Dashboard", icon: LayoutGrid },
@@ -61,17 +61,30 @@ const VIEWS = [
 ];
 
 const KPI_CONFIG = [
-  { key: "displayCount", label: "Displays", metaKey: "onlineCount", metaSuffix: " online", icon: Tv },
+  { key: "displayCount", label: "Displays", meta: "Status set manually", icon: Tv },
   { key: "mediaCount", label: "Media items", meta: "Library assets", icon: Film },
-  { key: "playlistCount", label: "Playlists", meta: "Published loops", icon: MonitorPlay },
-  { key: "activeScheduleCount", label: "Schedules", meta: "Currently active", icon: CalendarClock },
+  { key: "playlistCount", label: "Playlists", meta: "Saved for later — not playing", icon: MonitorPlay },
+  { key: "activeScheduleCount", label: "Schedules", meta: "Saved for later — not playing", icon: CalendarClock },
 ];
+
+// Screens don't report in yet: this status is whatever someone picked in the device form.
+const MANUAL_STATUS_TITLE = "Set by hand — FORGE can't yet see whether this screen is actually on.";
 
 function StatusPill({ status }) {
   return (
-    <span className={`dd-status-pill dd-status-${displayStatusTone(status)}`}>
+    <span className={`dd-status-pill dd-status-${displayStatusTone(status)}`} title={MANUAL_STATUS_TITLE}>
       {formatDisplayStatus(status)}
     </span>
+  );
+}
+
+/** Plain note that signage playlists/schedules are stored but no screen plays them yet. */
+function SignageNotLiveNote({ children }) {
+  return (
+    <div className="signage-not-live-note" role="note">
+      <strong>Signage playlists are saved for later — screens currently show the live alert dashboard only.</strong>
+      {children}
+    </div>
   );
 }
 
@@ -245,7 +258,7 @@ export default function DigitalDashboardPanel({
     const record = {
       ...form,
       id: form.id || createDigitalDashboardId("DDX"),
-      lastSyncAt: form.lastSyncAt || new Date().toISOString(),
+      lastSyncAt: new Date().toISOString(),
     };
     upsertRecord(displays, setDisplays, record);
   }
@@ -351,10 +364,10 @@ export default function DigitalDashboardPanel({
           </nav>
         </div>
         <div className="dd-header-stats">
-          <span className="dd-stat-chip">
-            <Wifi size={14} />
-            <strong>{stats.onlineCount}/{stats.displayCount}</strong>
-            online
+          <span className="dd-stat-chip" title={MANUAL_STATUS_TITLE}>
+            <Tv size={14} />
+            <strong>{stats.displayCount}</strong>
+            {stats.displayCount === 1 ? "display" : "displays"} · status set manually
           </span>
           <span className="dd-stat-chip">
             <Film size={14} />
@@ -364,7 +377,7 @@ export default function DigitalDashboardPanel({
           <span className="dd-stat-chip">
             <CalendarClock size={14} />
             <strong>{stats.activeScheduleCount}</strong>
-            schedules
+            saved schedules
           </span>
         </div>
       </header>
@@ -373,7 +386,7 @@ export default function DigitalDashboardPanel({
       {view === "overview" ? (
         <section className="dd-overview">
           <div className="dd-kpi-grid">
-            {KPI_CONFIG.map(({ key, label, metaKey, metaSuffix, meta, icon: Icon }) => (
+            {KPI_CONFIG.map(({ key, label, meta, icon: Icon }) => (
               <article key={key} className="dd-kpi-card">
                 <div className="dd-kpi-top">
                   <span className="dd-kpi-label">{label}</span>
@@ -381,7 +394,7 @@ export default function DigitalDashboardPanel({
                 </div>
                 <strong>{stats[key]}</strong>
                 <span className="dd-kpi-meta">
-                  {metaKey ? `${stats[metaKey]}${metaSuffix || ""}` : meta}
+                  {meta}
                 </span>
               </article>
             ))}
@@ -418,7 +431,7 @@ export default function DigitalDashboardPanel({
                       <dl className="dd-display-meta">
                         <div><dt>Playlist</dt><dd>{playlist?.name || "Unassigned"}</dd></div>
                         <div><dt>Resolution</dt><dd>{display.resolution}</dd></div>
-                        <div><dt>Last sync</dt><dd>{formatLastSync(display.lastSyncAt)}</dd></div>
+                        <div><dt>Last edited</dt><dd>{formatLastSync(display.lastSyncAt)}</dd></div>
                       </dl>
                       <div className="dd-display-actions">
                         <button type="button" className="dd-action-button" onClick={() => setPreviewDisplay(display)}>
@@ -443,7 +456,7 @@ export default function DigitalDashboardPanel({
             ) : (
               <EmptyState
                 title="No displays registered"
-                detail="Add wall-mounted players, lobby screens, or training room projectors to start publishing content."
+                detail="Add wall-mounted players, lobby screens, or training room projectors. Each one gets a link to the live alert dashboard."
                 actionLabel={canEdit ? "Add display" : undefined}
                 onAction={canEdit ? () => setModal({ type: "display", form: defaultDisplayForm() }) : undefined}
               />
@@ -477,6 +490,11 @@ export default function DigitalDashboardPanel({
             onAdd={() => setModal({ type: "display", form: defaultDisplayForm() })}
             canEdit={canEdit}
           />
+          <div className="dd-panel-body">
+            <SignageNotLiveNote>
+              Device status is set by hand in each device's form — FORGE can't yet see whether a screen is on.
+            </SignageNotLiveNote>
+          </div>
           <div className="dd-panel-body dd-mvix-guide-wrap">
             <MvixProvisioningGuide gatewaySlug={gatewaySlug} displays={displays} displayKey={publicDisplayKeyFrom(alertDashboardConfig)} />
           </div>
@@ -490,10 +508,10 @@ export default function DigitalDashboardPanel({
                     <th>Name</th>
                     <th>Station</th>
                     <th>Mode</th>
-                    <th>Status</th>
+                    <th title={MANUAL_STATUS_TITLE}>Status (set manually)</th>
                     <th>Playlist</th>
                     <th>Alert URL</th>
-                    <th>Last sync</th>
+                    <th>Last edited</th>
                     <th aria-label="Actions" />
                   </tr>
                 </thead>
@@ -657,6 +675,11 @@ export default function DigitalDashboardPanel({
             canEdit={canEdit}
           />
           <div className="dd-panel-body">
+            <SignageNotLiveNote>
+              You can build playlists and preview them here, but no screen plays them yet.
+            </SignageNotLiveNote>
+          </div>
+          <div className="dd-panel-body">
           {filteredPlaylists.length ? (
             <div className="dd-table-wrap">
               <table className="dd-table dd-library-table">
@@ -711,7 +734,7 @@ export default function DigitalDashboardPanel({
           ) : (
             <EmptyState
               title={playlists.length ? "No playlists match your search" : "No playlists yet"}
-              detail="Group media into loops before assigning them to displays or schedules."
+              detail="Group media into loops. They're saved for when screens can play signage."
               actionLabel={canEdit && !playlists.length ? "Add playlist" : undefined}
               onAction={canEdit && !playlists.length ? () => setModal({ type: "playlist", form: defaultPlaylistForm() }) : undefined}
             />
@@ -745,6 +768,11 @@ export default function DigitalDashboardPanel({
             onAdd={() => setModal({ type: "schedule", form: defaultScheduleForm() })}
             canEdit={canEdit}
           />
+          <div className="dd-panel-body">
+            <SignageNotLiveNote>
+              Schedules are saved, but nothing is published to screens yet.
+            </SignageNotLiveNote>
+          </div>
           <div className="dd-panel-body">
           {filteredSchedules.length ? (
             <div className="dd-table-wrap">
@@ -807,7 +835,7 @@ export default function DigitalDashboardPanel({
           ) : (
             <EmptyState
               title={schedules.length ? "No schedules match your filters" : "No schedules configured"}
-              detail="Time-box playlists to specific displays for shift change, training nights, or weekend lobby loops."
+              detail="Schedules are saved for when screens can play signage — nothing is published to screens yet."
               actionLabel={canEdit && !schedules.length ? "Create schedule" : undefined}
               onAction={canEdit && !schedules.length ? () => setModal({ type: "schedule", form: defaultScheduleForm() }) : undefined}
             />
@@ -891,14 +919,17 @@ export default function DigitalDashboardPanel({
                 </select>
               </label>
               <label>
-                Status
-                <select value={modal.form.status} onChange={(event) => setModal({ ...modal, form: { ...modal.form, status: event.target.value } })}>
+                Status (set manually)
+                <select title={MANUAL_STATUS_TITLE} value={modal.form.status} onChange={(event) => setModal({ ...modal, form: { ...modal.form, status: event.target.value } })}>
                   {DISPLAY_STATUSES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                 </select>
               </label>
             </div>
             {(modal.form.playerMode || "alert") === "signage" ? (
               <label>
+                <span className="signage-not-live-note" role="note">
+                  Playlist signage isn't playing on screens yet — this screen will still show the live alert dashboard.
+                </span>
                 Playlist
                 <select value={modal.form.playlistId} onChange={(event) => setModal({ ...modal, form: { ...modal.form, playlistId: event.target.value } })}>
                   <option value="">Unassigned</option>

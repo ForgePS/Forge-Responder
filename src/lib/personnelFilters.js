@@ -1,4 +1,5 @@
 import { getPersonDisplayName } from "./personnelSchema.js";
+import { stripPersonnelPrivateKeys } from "./personnelPrivateFields.js";
 
 export const EMPTY_PERSONNEL_FILTERS = {
   firstName: "",
@@ -34,7 +35,8 @@ function matchesBoolean(value, filter) {
 
 export function filterPersonnelRecords(records = [], filters = {}, globalQuery = "") {
   return records.filter((person) => {
-    const haystack = Object.values(person).join(" ").toLowerCase();
+    // Private details (even ones still on older list records) are never searchable.
+    const haystack = Object.values(stripPersonnelPrivateKeys(person)).join(" ").toLowerCase();
     if (globalQuery && !haystack.includes(globalQuery.toLowerCase())) return false;
 
     if (!matchesText(person.firstName, filters.firstName)) return false;

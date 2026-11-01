@@ -9,7 +9,8 @@ import { loadTenantListFromFirestore, resolveTenantListItems } from "../lib/tena
 import { migrateTenantListItems, tenantListItemsChanged } from "../lib/dataMigrations.js";
 import { withTenantListPayload } from "../lib/tenantRecord.js";
 import { ensureItemIds, entriesFromRecords, isItemsStorage, itemsFromRecords, planListWrites } from "../lib/listItemsPlan.js";
-import { commitListPlan, itemsHeaderPayload, listHeaderRef, listItemsQuery, recordsFromSnapshot } from "../lib/tenantListStore.js";
+import { commitListPlan, itemsHeaderPayload, listHeaderRef, listItemsQuery, prepareListItemsForWrite, recordsFromSnapshot } from "../lib/tenantListStore.js";
+import { stripPersonnelPrivateKeys } from "../lib/personnelPrivateFields.js";
 
 import { LIST_MODULE_NAMES } from "../lib/tenantListKeys.js";
 import { notifySaveFailed } from "../lib/saveNotice.js";
@@ -69,12 +70,46 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
     loadedRef.current = loaded;
   }, [loaded]);
 
-  /** Save the whole list in whichever format it uses. */
-  async function persistItems(normalizedItems) {
+  const persistQueueRef = useRef(Promise.resolve());
+
+  /** Once private values are saved in personnelPrivate, stop holding (and caching) them here. */
+  function forgetMovedPrivateValues(movedIds = []) {
+    const moved = new Set(movedIds);
+    setItems((current) => {
+      let changed = false;
+      const next = current.map((item) => {
+        if (!item || !moved.has(String(item.id ?? "").trim())) return item;
+        changed = true;
+        return stripPersonnelPrivateKeys(item);
+      });
+      if (!changed) return current;
+      try {
+        window.localStorage.setItem(cacheKey, JSON.stringify(next));
+      } catch (error) {
+        console.warn(`Local cache save failed for ${cacheKey}`, error);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * Save the whole list in whichever format it uses. Saves run one after
+   * another so a slower save can't land after (and undo) a newer one.
+   */
+  function persistItems(normalizedItems) {
+    const run = persistQueueRef.current.then(() => writeItems(normalizedItems));
+    persistQueueRef.current = run.catch(() => {});
+    return run;
+  }
+
+  async function writeItems(normalizedItems) {
     const firestoreDb = getFirestoreDb();
     const uid = userRef.current?.uid;
     if (!firebaseEnabled || !firestoreDb || !storageDepartmentId || !uid) return false;
-    const firestoreItems = sanitizeItemsForFirestore(normalizedItems);
+    // Personnel: private details go to personnelPrivate, never into the list.
+    const prepared = await prepareListItemsForWrite(firestoreDb, storageDepartmentId, listKey, normalizedItems, uid);
+    if (prepared.movedIds.length) forgetMovedPrivateValues(prepared.movedIds);
+    const firestoreItems = sanitizeItemsForFirestore(prepared.items);
 
     if (modeRef.current === "items" || modeRef.current === "missing") {
       const plan = planListWrites(entriesRef.current, firestoreItems);

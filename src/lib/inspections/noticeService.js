@@ -5,10 +5,12 @@ import {
   updateRecord,
 } from "../firestoreService.js";
 import { writeInspectionAuditLog } from "./inspectionAudit.js";
+import { allocateRecordNumber } from "../recordCounters.js";
 import { getInspectionRecord } from "./inspectionWorkflow.js";
 import { listViolations } from "./violationService.js";
 import {
   STARTER_DOCUMENT_TEMPLATES,
+  UNAVAILABLE_DELIVERY_CHANNELS,
 } from "./noticeDefaults.js";
 import { printNoticeRecord } from "./noticePrint.js";
 import {
@@ -266,16 +268,17 @@ export async function listNoticeDeliveries(departmentId, noticeId) {
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
+// Numbers come from a department counter so two people can't get the same one.
 async function nextNoticeNumber(departmentId) {
   const existing = await listInspectionNotices(departmentId);
-  const year = new Date().getFullYear();
-  return `NTC-${year}-${String(existing.length + 1).padStart(4, "0")}`;
+  const format = { prefix: "NTC", separator: "-", padding: 4, year: new Date().getFullYear() };
+  return (await allocateRecordNumber(departmentId, "notice", format, existing.map((row) => row.noticeNumber))).number;
 }
 
 async function nextCertificateNumber(departmentId) {
   const existing = await listInspectionCertificates(departmentId);
-  const year = new Date().getFullYear();
-  return `CRT-${year}-${String(existing.length + 1).padStart(4, "0")}`;
+  const format = { prefix: "CRT", separator: "-", padding: 4, year: new Date().getFullYear() };
+  return (await allocateRecordNumber(departmentId, "certificate", format, existing.map((row) => row.certificateNumber))).number;
 }
 
 function snapshotViolations(rows = []) {
@@ -499,20 +502,26 @@ export async function issueCertificateFromNotice(departmentId, noticeId, audit =
   return { certificate, notice: nextNotice };
 }
 
+const HAND_DELIVERY_STATUSES = ["printed", "in_person", "mailed", "recorded"];
+
 /**
- * Record a delivery attempt. Outbound email/SMS are stubbed as sent_stub.
+ * Record how a notice reached the recipient. Only things a person did (print, hand
+ * delivery, mailing) can be recorded; email/SMS aren't available and are refused.
  */
 export async function recordNoticeDelivery(departmentId, noticeId, payload = {}, audit = {}) {
   const notice = await getInspectionNotice(departmentId, noticeId);
   if (!notice) throw new Error("Notice not found.");
 
   const channel = payload.channel || "print";
+  if (UNAVAILABLE_DELIVERY_CHANNELS.includes(channel)) {
+    throw new Error("Forge can't send notices by email or text yet. Print the notice, or record a hand delivery or mailing.");
+  }
   let status = payload.status || "";
   if (!status) {
     if (channel === "print") status = "printed";
     else if (channel === "in_person") status = "in_person";
-    else if (channel === "email" || channel === "sms") status = "sent_stub";
-    else status = "queued";
+    else if (channel === "mail") status = "mailed";
+    else status = "recorded";
   }
 
   const stamp = nowIso();
@@ -527,14 +536,11 @@ export async function recordNoticeDelivery(departmentId, noticeId, payload = {},
     recipientAddress: payload.recipientAddress || notice.address || "",
     recipientEmail: payload.recipientEmail || notice.recipientEmail || "",
     recipientPhone: payload.recipientPhone || notice.recipientPhone || "",
-    provider: payload.provider || (status === "sent_stub" ? "stub" : ""),
+    provider: payload.provider || "",
     messageId: payload.messageId || "",
     trackingNumber: payload.trackingNumber || "",
-    resultNotes: payload.resultNotes
-      || (status === "sent_stub"
-        ? "Outbound provider not wired — delivery recorded as stub."
-        : ""),
-    sentAt: ["sent_stub", "printed", "in_person"].includes(status) ? stamp : "",
+    resultNotes: payload.resultNotes || "",
+    sentAt: HAND_DELIVERY_STATUSES.includes(status) ? stamp : "",
     createdAt: stamp,
     updatedAt: stamp,
     createdBy: audit.actorUid || "",
@@ -547,7 +553,7 @@ export async function recordNoticeDelivery(departmentId, noticeId, payload = {},
     lastDeliveryId: id,
     lastDeliveryStatus: status,
     lastDeliveryChannel: channel,
-    status: ["printed", "in_person", "sent_stub"].includes(status) ? "delivered" : notice.status,
+    status: HAND_DELIVERY_STATUSES.includes(status) ? "delivered" : notice.status,
     issuedAt: notice.issuedAt || stamp,
   }, audit);
 

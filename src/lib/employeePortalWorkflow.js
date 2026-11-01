@@ -411,12 +411,15 @@ export function buildShiftTradeApprovalMeta(
   const giveShift = tradeForm.giveShift || shiftLabelForDay(tradeForm.giveDayId, rotation);
   const receiveShift = tradeForm.receiveShift || shiftLabelForDay(tradeForm.receiveDayId, rotation);
 
+  const assignedBattalionChiefs = resolveAffectedBattalionChiefs(personnel, giveShift, receiveShift);
   return {
     approvalStage: "coverageMember",
     status: "Awaiting Member",
     assignedCoverageMember: coveragePerson?.name || tradeForm.coverage,
     coveragePersonnelId: coveragePerson?.id || "",
-    assignedBattalionChiefs: resolveAffectedBattalionChiefs(personnel, giveShift, receiveShift),
+    assignedBattalionChiefs,
+    // Plain id list so the security rules can tell who may approve this trade.
+    assignedBattalionChiefIds: assignedBattalionChiefs.map((chief) => chief.personnelId).filter(Boolean),
     battalionApprovals: [],
   };
 }

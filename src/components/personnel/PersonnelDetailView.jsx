@@ -23,6 +23,7 @@ export default function PersonnelDetailView({
   canEditProfile,
   canEditPhoto,
   canViewPrivateInfo,
+  privateStatus = "off",
   updateDraftField,
   setEmergencySameAddress,
   savedMessage,
@@ -145,6 +146,7 @@ export default function PersonnelDetailView({
             editing={editing}
             canEditProfile={canEditProfile}
             canViewPrivateInfo={canViewPrivateInfo}
+            privateStatus={privateStatus}
             updateDraftField={updateDraftField}
             setEmergencySameAddress={setEmergencySameAddress}
             training={training}

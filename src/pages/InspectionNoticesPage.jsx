@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CirclePlus,
+  ClipboardCheck,
   FileText,
   Printer,
   Save,
-  Send,
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { DELIVERY_CHANNELS } from "../lib/inspections/noticeDefaults.js";
+
+const OLD_CHANNEL_LABELS = { email: "Email (not sent)", sms: "Text (not sent)", portal: "Portal (not sent)" };
+function channelLabel(id = "") {
+  return DELIVERY_CHANNELS.find((row) => row.id === id)?.label || OLD_CHANNEL_LABELS[id] || id || "—";
+}
 import { useTenant } from "../context/TenantContext.jsx";
 import InspectionEmptyState from "../components/inspections/InspectionEmptyState.jsx";
 import InspectionPermissionGate from "../components/inspections/InspectionPermissionGate.jsx";
@@ -474,7 +480,7 @@ export default function InspectionNoticesPage({
                       <input value={deliveryRecipient} onChange={(e) => setDeliveryRecipient(e.target.value)} />
                     </Field>
                     <button className="primary-button" type="button" disabled={saving} onClick={handleDelivery}>
-                      <Send size={14} /> Record delivery
+                      <ClipboardCheck size={14} /> Record how it was delivered
                     </button>
                   </div>
                 ) : null}
@@ -491,7 +497,7 @@ export default function InspectionNoticesPage({
                       </div>
                       {deliveries.map((row) => (
                         <div className="cert-row" key={row.id}>
-                          <span>{row.channel}</span>
+                          <span>{channelLabel(row.channel)}</span>
                           <span>{labelForDeliveryStatus(row.status)}</span>
                           <span>{row.recipientName || row.recipientEmail || "—"}</span>
                           <span>{formatDate(row.sentAt || row.createdAt)}</span>

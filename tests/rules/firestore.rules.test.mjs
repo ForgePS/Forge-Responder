@@ -25,6 +25,9 @@ const as = (uid, token = {}) => env.authenticatedContext(uid, token);
 const stranger = () => as("stranger", { email: "stranger@example.com", email_verified: true });
 const adminA = () => as("admin-a", { email: "chief@a.gov", email_verified: true });
 const memberA = () => as("member-a", { email: "ff@a.gov", email_verified: true });
+// Officer-level member (custom role) and a firefighter linked to personnel record P-FF.
+const editorA = () => as("editor-a", { email: "capt@a.gov", email_verified: true });
+const ffA = () => as("ff-a", { email: "ff2@a.gov", email_verified: true });
 const memberB = () => as("member-b", { email: "ff@b.gov", email_verified: true });
 // Creators sign in with a two-factor code (creator powers need one).
 const SECOND_FACTOR = { firebase: { sign_in_provider: "password", sign_in_second_factor: "totp" } };
@@ -67,6 +70,17 @@ beforeEach(async () => {
     await setDoc(doc(db, `departments/${A}/users/member-a`), membership("member-a", A));
     await setDoc(doc(db, `departments/${A}/users/disabled-admin-a`), membership("disabled-admin-a", A, { roleIds: ["fireChief"], status: "disabled" }));
     await setDoc(doc(db, `departments/${B}/users/member-b`), membership("member-b", B));
+    await setDoc(doc(db, `departments/${A}/users/editor-a`), membership("editor-a", A, { role: "captain", roleIds: ["captain"] }));
+    await setDoc(doc(db, `departments/${A}/users/ff-a`), membership("ff-a", A, { personnelId: "P-FF" }));
+    // Grants as functions/lib/memberGrants.js writes them.
+    const ffGrant = { viewCertifications: true, viewTraining: true, viewSchedule: true, viewDailyLog: true, editDailyLog: true,
+      viewDocuments: true, accessEmployeePortal: true, submitLeaveRequests: true, submitShiftTrades: true,
+      submitVacancyPickups: true, submitMaintenanceIssues: true, viewInternalEmail: true, sendInternalEmail: true };
+    await setDoc(doc(db, `departments/${A}/memberGrants/member-a`), { permissions: ffGrant });
+    await setDoc(doc(db, `departments/${A}/memberGrants/ff-a`), { permissions: ffGrant });
+    await setDoc(doc(db, `departments/${A}/memberGrants/editor-a`), { permissions: {
+      editPersonnel: true, editTraining: true, editSchedule: true, editPreplans: true, createPreplans: true,
+      editInspections: true, conductInspections: true, editApparatus: true, editFleetDefects: true } });
     await setDoc(doc(db, `departments/${A}/lists/hlfd-rms-personnel`), { items: [{ id: "P1", name: "Secret Person" }] });
     await setDoc(doc(db, `departments/${A}/incidents/i1`), { summary: "fire" });
     await setDoc(doc(db, `departments/${A}/roles/firefighter`), { name: "Firefighter", permissions: {} });
@@ -151,8 +165,11 @@ describe("per-item lists", () => {
     });
   });
 
-  it("members read and write their own department's items", async () => {
-    const db = memberA().firestore();
+  it("members read items; people with the list's permission change them", async () => {
+    await assertSucceeds(getDoc(doc(memberA().firestore(), `${header}/items/T1`)));
+    await assertFails(setDoc(doc(memberA().firestore(), `${header}/items/T2`), { id: "T2", _order: 2048 }));
+    await assertFails(deleteDoc(doc(memberA().firestore(), `${header}/items/T1`)));
+    const db = editorA().firestore();
     await assertSucceeds(getDoc(doc(db, `${header}/items/T1`)));
     await assertSucceeds(setDoc(doc(db, `${header}/items/T2`), { id: "T2", _order: 2048 }));
     await assertSucceeds(deleteDoc(doc(db, `${header}/items/T1`)));
@@ -170,8 +187,9 @@ describe("per-item lists", () => {
     await assertSucceeds(setDoc(doc(db, header), { updatedAt: "now" }, { merge: true }));
   });
 
-  it("an older array list can still be saved", async () => {
-    const db = memberA().firestore();
+  it("an older array list can still be saved by people who manage it", async () => {
+    await assertFails(setDoc(doc(memberA().firestore(), `departments/${A}/lists/hlfd-rms-personnel`), { items: [{ id: "P2" }] }, { merge: true }));
+    const db = editorA().firestore();
     await assertSucceeds(setDoc(doc(db, `departments/${A}/lists/hlfd-rms-personnel`), { items: [{ id: "P2" }] }, { merge: true }));
   });
 
@@ -262,7 +280,7 @@ describe("plan entitlements", () => {
 
   it("switched-on modules work as normal", async () => {
     const db = memberA().firestore();
-    await assertSucceeds(setDoc(doc(db, `departments/${A}/lists/hlfd-rms-training/items/T1`), { id: "T1", _order: 1 }));
+    await assertSucceeds(setDoc(doc(editorA().firestore(), `departments/${A}/lists/hlfd-rms-training/items/T1`), { id: "T1", _order: 1 }));
     // Collections that belong to no module are not gated.
     await assertSucceeds(setDoc(doc(db, `departments/${A}/auditLogs/l2`), { action: "x" }));
     // Incidents belong to NERIS Fire Reports, which is off here.
@@ -276,7 +294,7 @@ describe("plan entitlements", () => {
   });
 
   it("personnel can be added up to the plan limit, never past it", async () => {
-    const db = memberA().firestore();
+    const db = editorA().firestore();
     await assertSucceeds(setDoc(doc(db, `${people}/items/P2`), { id: "P2", _order: 2 }));
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), `platformEntitlements/${A}`), ent({ usage: { personnel: 2 } }));
@@ -291,7 +309,7 @@ describe("plan entitlements", () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), people), { items: [{ id: "P1" }, { id: "P2" }] });
     });
-    const db = memberA().firestore();
+    const db = editorA().firestore();
     await assertFails(setDoc(doc(db, people), { items: [{ id: "P1" }, { id: "P2" }, { id: "P3" }] }));
     await assertSucceeds(setDoc(doc(db, people), { items: [{ id: "P1" }, { id: "P2", rank: "FF" }] }));
   });
@@ -320,7 +338,7 @@ describe("plan entitlements", () => {
     await env.withSecurityRulesDisabled(async (ctx) => deleteDoc(doc(ctx.firestore(), `platformEntitlements/${A}`)));
     const db = memberA().firestore();
     await assertSucceeds(setDoc(doc(db, `departments/${A}/hydrants/h4`), { id: "h4" }));
-    await assertSucceeds(setDoc(doc(db, `${people}/items/P5`), { id: "P5", _order: 5 }));
+    await assertSucceeds(setDoc(doc(editorA().firestore(), `${people}/items/P5`), { id: "P5", _order: 5 }));
   });
 });
 
@@ -636,6 +654,12 @@ describe("storage", () => {
     await assertSucceeds(uploadString(ref(storage, `departments/${A}/document-library/x.txt`), "x"));
   });
 
+  it("only people with an editing permission delete files", async () => {
+    const { deleteObject } = await import("firebase/storage");
+    await assertFails(deleteObject(ref(memberA().storage(), `departments/${A}/personnel-photos/P1/photo.jpg`)));
+    await assertSucceeds(deleteObject(ref(editorA().storage(), `departments/${A}/personnel-photos/P1/photo.jpg`)));
+  });
+
   it("legacy paths are closed to new reads and writes", async () => {
     const storage = memberA().storage();
     await assertFails(getBytes(ref(storage, "old-uploads/file.pdf")));
@@ -645,6 +669,161 @@ describe("storage", () => {
   it("only platform creators can upload platform branding", async () => {
     await assertFails(uploadString(ref(memberA().storage(), "platform/branding/logo.png"), "x"));
     await assertSucceeds(uploadString(ref(creator().storage(), "platform/branding/logo.png"), "x"));
+  });
+});
+
+// Batch 5: writes need the member's permissions (departments/<id>/memberGrants/<uid>).
+describe("role-aware rules", () => {
+  const lists = `departments/${A}/lists`;
+  const put = (ctx, path, data) => setDoc(doc(ctx.firestore(), path), data);
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const key of ["hlfd-rms-leave-requests", "hlfd-rms-shift-trades", "hlfd-rms-time-cards",
+        "hlfd-rms-documents", "hlfd-rms-call-shifts", "hlfd-rms-personnel"]) {
+        await setDoc(doc(db, `${lists}/${key}`), { storage: "items" });
+      }
+      await setDoc(doc(db, `${lists}/hlfd-rms-leave-requests/items/L-OTHER`), { id: "L-OTHER", personnelId: "P-X", status: "Pending Officer Approval", _order: 1 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-leave-requests/items/L-MINE`), { id: "L-MINE", personnelId: "P-FF", status: "Pending Officer Approval", _order: 2 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-leave-requests/items/L-TOAPPROVE`), { id: "L-TOAPPROVE", personnelId: "P-X", assignedOfficerId: "P-FF", status: "Pending Officer Approval", _order: 3 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-shift-trades/items/TR-1`), { id: "TR-1", personnelId: "P-X", coveragePersonnelId: "P-Y", assignedBattalionChiefIds: ["P-FF"], status: "Pending Battalion Chief", _order: 1 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-time-cards/items/P-X-1`), { id: "P-X-1", personnelId: "P-X", employeeSignature: "", _order: 1 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-time-cards/items/P-FF-1`), { id: "P-FF-1", personnelId: "P-FF", employeeSignature: "", departmentHeadSignature: "", _order: 2 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-documents/items/D1`), { id: "D1", title: "SOG 1", acknowledgements: {}, _order: 1 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-call-shifts/items/C1`), { id: "C1", status: "active", responses: [], _order: 1 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-personnel/items/P-X`), { id: "P-X", name: "Pat", activityLog: [], _order: 1 });
+      await setDoc(doc(db, `departments/${A}/personnelPrivate/P-FF`), { socialSecurityNumber: "x" });
+      await setDoc(doc(db, `departments/${A}/personnelPrivate/P-X`), { socialSecurityNumber: "y" });
+      await setDoc(doc(db, `departments/${A}/preplans/PP1`), { status: "ready_for_review" });
+      await setDoc(doc(db, `departments/${A}/preplanRevisions/RV1`), { sectionAnswers: { address: "1 Main" } });
+      await setDoc(doc(db, `departments/${A}/preplanRestricted/R1`), { answers: { gatesCodes: "1234" } });
+      await setDoc(doc(db, `departments/${A}/inspections/I1`), { status: "awaiting_approval" });
+      await setDoc(doc(db, `departments/${A}/fleetDefects/FD1`), { status: "submitted" });
+      await setDoc(doc(db, `departments/${A}/fleetClasses/FC1`), { name: "Engine" });
+      await setDoc(doc(db, `departments/${A}/counters/preplan-2026`), { value: 5 });
+      await setDoc(doc(db, `departments/${A}/internalEmails/M1`), { fromUid: "editor-a", recipients: ["all"], readBy: {}, subject: "Hi" });
+      await setDoc(doc(db, `departments/${A}/notifications/N1`), { userId: "all", status: "unread", message: "x" });
+      await setDoc(doc(db, `departments/${A}/profile/main`), { name: "A" });
+      await setDoc(doc(db, `departments/${A}/dropdowns/ranks`), { options: ["FF"] });
+    });
+  });
+
+  it("firefighters can't change personnel or read others' private records", async () => {
+    await assertFails(put(ffA(), `${lists}/hlfd-rms-personnel/items/P-X`, { id: "P-X", name: "Changed", _order: 1 }));
+    await assertFails(getDoc(doc(ffA().firestore(), `departments/${A}/personnelPrivate/P-X`)));
+    await assertSucceeds(getDoc(doc(ffA().firestore(), `departments/${A}/personnelPrivate/P-FF`)));
+    await assertFails(put(ffA(), `departments/${A}/personnelPrivate/P-FF`, { socialSecurityNumber: "z" }));
+    await assertSucceeds(getDoc(doc(editorA().firestore(), `departments/${A}/personnelPrivate/P-X`)));
+    await assertSucceeds(put(editorA(), `departments/${A}/personnelPrivate/P-X`, { socialSecurityNumber: "z" }));
+  });
+
+  it("private fields can't go back into the shared personnel list", async () => {
+    await assertFails(put(editorA(), `${lists}/hlfd-rms-personnel/items/P-X`, { id: "P-X", name: "Pat", socialSecurityNumber: "1", _order: 1 }));
+    await assertSucceeds(put(editorA(), `${lists}/hlfd-rms-personnel/items/P-X`, { id: "P-X", name: "Pat R", _order: 1 }));
+  });
+
+  it("a battalion chief's trade approval may note it on the requester's record", async () => {
+    await assertSucceeds(put(ffA(), `${lists}/hlfd-rms-personnel/items/P-X`, { id: "P-X", name: "Pat", activityLog: [{ id: "a" }], _order: 1 }));
+  });
+
+  it("leave: members file their own, approvers decide, nobody approves their own", async () => {
+    const ff = ffA();
+    await assertSucceeds(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-NEW`, { id: "L-NEW", personnelId: "P-FF", status: "Pending Officer Approval", _order: 0 }));
+    await assertFails(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-NEW2`, { id: "L-NEW2", personnelId: "P-X", status: "Pending Officer Approval", _order: 0 }));
+    await assertFails(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-NEW3`, { id: "L-NEW3", personnelId: "P-FF", status: "Approved", _order: 0 }));
+    await assertFails(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-MINE`, { id: "L-MINE", personnelId: "P-FF", status: "Approved", _order: 2 }));
+    await assertFails(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-OTHER`, { id: "L-OTHER", personnelId: "P-X", status: "Approved", _order: 1 }));
+    await assertSucceeds(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-TOAPPROVE`, { id: "L-TOAPPROVE", personnelId: "P-X", assignedOfficerId: "P-FF", status: "Approved", _order: 3 }));
+    await assertFails(deleteDoc(doc(ff.firestore(), `${lists}/hlfd-rms-leave-requests/items/L-OTHER`)));
+    await assertSucceeds(deleteDoc(doc(ff.firestore(), `${lists}/hlfd-rms-leave-requests/items/L-MINE`)));
+    // Schedulers decide any request.
+    await assertSucceeds(put(editorA(), `${lists}/hlfd-rms-leave-requests/items/L-OTHER`, { id: "L-OTHER", personnelId: "P-X", status: "Denied", _order: 1 }));
+  });
+
+  it("trades: the assigned battalion chief can act on someone else's trade", async () => {
+    await assertSucceeds(put(ffA(), `${lists}/hlfd-rms-shift-trades/items/TR-1`, { id: "TR-1", personnelId: "P-X", coveragePersonnelId: "P-Y", assignedBattalionChiefIds: ["P-FF"], status: "Approved", _order: 1 }));
+    await assertFails(put(memberA(), `${lists}/hlfd-rms-shift-trades/items/TR-1`, { id: "TR-1", personnelId: "P-X", status: "Denied", _order: 1 }));
+  });
+
+  it("time cards: your own card, never the department head's signature", async () => {
+    const ff = ffA();
+    await assertSucceeds(put(ff, `${lists}/hlfd-rms-time-cards/items/P-FF-1`, { id: "P-FF-1", personnelId: "P-FF", employeeSignature: "Me", departmentHeadSignature: "", _order: 2 }));
+    await assertFails(put(ff, `${lists}/hlfd-rms-time-cards/items/P-FF-1`, { id: "P-FF-1", personnelId: "P-FF", employeeSignature: "Me", departmentHeadSignature: "Chief", _order: 2 }));
+    await assertFails(put(ff, `${lists}/hlfd-rms-time-cards/items/P-X-1`, { id: "P-X-1", personnelId: "P-X", employeeSignature: "Forged", _order: 1 }));
+    await assertSucceeds(put(editorA(), `${lists}/hlfd-rms-time-cards/items/P-X-1`, { id: "P-X-1", personnelId: "P-X", departmentHeadSignature: "Chief", _order: 1 }));
+  });
+
+  it("documents: members acknowledge but don't edit; call shifts: members reply", async () => {
+    const ff = ffA();
+    await assertSucceeds(put(ff, `${lists}/hlfd-rms-documents/items/D1`, { id: "D1", title: "SOG 1", acknowledgements: { "P-FF": { at: "now" } }, _order: 1 }));
+    await assertFails(put(ff, `${lists}/hlfd-rms-documents/items/D1`, { id: "D1", title: "Changed", acknowledgements: {}, _order: 1 }));
+    await assertSucceeds(put(ff, `${lists}/hlfd-rms-call-shifts/items/C1`, { id: "C1", status: "active", responses: [{ personnelId: "P-FF" }], _order: 1 }));
+    await assertFails(put(ff, `${lists}/hlfd-rms-call-shifts/items/C1`, { id: "C1", status: "filled", responses: [], _order: 1 }));
+  });
+
+  it("preplans: approving needs approvePreplans; restricted answers need a preplan role", async () => {
+    await assertFails(updateDoc(doc(ffA().firestore(), `departments/${A}/preplans/PP1`), { status: "draft" }));
+    await assertSucceeds(updateDoc(doc(editorA().firestore(), `departments/${A}/preplans/PP1`), { status: "returned_for_revision" }));
+    await assertFails(updateDoc(doc(editorA().firestore(), `departments/${A}/preplans/PP1`), { status: "approved" }));
+    await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/preplans/PP1`), { status: "approved" }));
+    await assertFails(getDoc(doc(ffA().firestore(), `departments/${A}/preplanRestricted/R1`)));
+    await assertSucceeds(getDoc(doc(editorA().firestore(), `departments/${A}/preplanRestricted/R1`)));
+    // Gate codes and shutoffs never go into the revision everyone can read.
+    await assertFails(setDoc(doc(editorA().firestore(), `departments/${A}/preplanRevisions/RV1`), { sectionAnswers: { address: "1 Main", gatesCodes: "1234" } }));
+    await assertSucceeds(setDoc(doc(editorA().firestore(), `departments/${A}/preplanRevisions/RV1`), { sectionAnswers: { address: "2 Main" } }));
+  });
+
+  it("inspections: signing off one awaiting approval needs approveInspections", async () => {
+    await assertFails(updateDoc(doc(editorA().firestore(), `departments/${A}/inspections/I1`), { status: "completed" }));
+    await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/inspections/I1`), { status: "completed" }));
+    await assertFails(setDoc(doc(ffA().firestore(), `departments/${A}/inspections/I2`), { status: "draft" }));
+  });
+
+  it("fleet: anyone can run a check and report a defect; setup needs fleet permissions", async () => {
+    const ff = ffA();
+    await assertSucceeds(put(ff, `departments/${A}/fleetChecks/C1`, { status: "in_progress", operatorId: "ff-a" }));
+    await assertSucceeds(put(ff, `departments/${A}/fleetDefects/FD2`, { status: "submitted" }));
+    await assertFails(updateDoc(doc(ff.firestore(), `departments/${A}/fleetDefects/FD1`), { status: "closed" }));
+    await assertSucceeds(updateDoc(doc(editorA().firestore(), `departments/${A}/fleetDefects/FD1`), { status: "closed" }));
+    await assertSucceeds(put(ff, `departments/${A}/fleetClasses/FC2`, { name: "Default" }));
+    await assertFails(updateDoc(doc(ff.firestore(), `departments/${A}/fleetClasses/FC1`), { name: "Changed" }));
+    await assertFails(deleteDoc(doc(ff.firestore(), `departments/${A}/fleetAssets/anything`)));
+  });
+
+  it("record counters only count up", async () => {
+    const db = ffA().firestore();
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/counters/preplan-2026`), { value: 6, updatedAt: "now" }));
+    await assertFails(setDoc(doc(db, `departments/${A}/counters/preplan-2026`), { value: 3, updatedAt: "now" }));
+    await assertFails(setDoc(doc(db, `departments/${A}/counters/preplan-2026`), { value: 9, other: true }));
+    await assertFails(deleteDoc(doc(db, `departments/${A}/counters/preplan-2026`)));
+  });
+
+  it("messages: send as yourself, mark only your own read, don't edit others'", async () => {
+    const db = ffA().firestore();
+    await assertSucceeds(put(ffA(), `departments/${A}/internalEmails/M2`, { fromUid: "ff-a", recipients: ["all"], readBy: {} }));
+    await assertFails(put(ffA(), `departments/${A}/internalEmails/M3`, { fromUid: "editor-a", recipients: ["all"], readBy: {} }));
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/internalEmails/M1`), { readBy: { "ff-a": "now" }, updatedAt: "now" }, { merge: true }));
+    await assertFails(setDoc(doc(db, `departments/${A}/internalEmails/M1`), { readBy: { "someone-else": "now" } }, { merge: true }));
+    await assertFails(setDoc(doc(db, `departments/${A}/internalEmails/M1`), { subject: "Edited" }, { merge: true }));
+    await assertFails(deleteDoc(doc(db, `departments/${A}/internalEmails/M1`)));
+    await assertSucceeds(deleteDoc(doc(editorA().firestore(), `departments/${A}/internalEmails/M1`)));
+  });
+
+  it("notifications are only marked read; department settings need admin permissions", async () => {
+    const db = ffA().firestore();
+    await assertSucceeds(updateDoc(doc(db, `departments/${A}/notifications/N1`), { status: "read", updatedAt: "now" }));
+    await assertFails(updateDoc(doc(db, `departments/${A}/notifications/N1`), { message: "changed" }));
+    await assertFails(updateDoc(doc(db, `departments/${A}/profile/main`), { name: "Hijacked" }));
+    await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/profile/main`), { name: "Renamed" }));
+    await assertFails(updateDoc(doc(db, `departments/${A}/dropdowns/ranks`), { options: [] }));
+    await assertFails(setDoc(doc(db, `departments/${A}/public/alert-dashboard`), { x: 1 }));
+  });
+
+  it("member grants: read your own, nobody writes them from the app", async () => {
+    await assertSucceeds(getDoc(doc(ffA().firestore(), `departments/${A}/memberGrants/ff-a`)));
+    await assertFails(getDoc(doc(ffA().firestore(), `departments/${A}/memberGrants/editor-a`)));
+    await assertFails(setDoc(doc(ffA().firestore(), `departments/${A}/memberGrants/ff-a`), { permissions: { editPersonnel: true } }));
+    await assertFails(setDoc(doc(adminA().firestore(), `departments/${A}/memberGrants/ff-a`), { permissions: {} }));
   });
 });
 

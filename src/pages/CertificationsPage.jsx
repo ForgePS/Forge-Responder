@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { FileCheck2, Upload, UploadCloud, X } from "lucide-react";
+import { FileCheck2, Plus, UploadCloud, X } from "lucide-react";
 import ManagedSelect from "../components/ManagedSelect.jsx";
 import { uploadFirebaseFile, deleteFirebaseFile } from "../lib/firebaseClient.js";
 import { buildCertificationDocPath } from "../lib/storagePaths.js";
 import { archiveObject, isObjectArchived, isObjectDeleted, isObjectVisibleInActiveList, isObjectVisibleInArchivedList, restoreObject, softDeleteObject } from "../lib/objectLifecycle.js";
 import ObjectLifecycleActions from "../components/ObjectLifecycleActions.jsx";
+import AddCertificationModal from "../components/certifications/AddCertificationModal.jsx";
+import { daysUntil } from "../lib/liveDates.js";
+import { toDateInputValue } from "../lib/certificationRecords.js";
 
 import { Badge, Panel, Modal } from "../components/shell/ui.jsx";
 import { exportCsv } from "../utils/dashboardMetrics.js";
@@ -17,7 +20,8 @@ function inDueWindow(record, filter) {
   return Boolean(window) && Number.isFinite(days) && days >= window[0] && days <= window[1];
 }
 
-export default function CertificationsPage({ query, records = [], setRecords, canEdit = false, departmentId = "" }) {
+// `personnel` is optional: when passed, the "Add certification" person picker lists the roster.
+export default function CertificationsPage({ query, records = [], setRecords, canEdit = false, departmentId = "", personnel = [] }) {
   const [filter, setFilter] = useState("All");
   const [lifecycleView, setLifecycleView] = useState("active");
   const [selected, setSelected] = useState(null);
@@ -26,6 +30,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyId, setBusyId] = useState("");
+  const [adding, setAdding] = useState(false);
 
   const scoped = records.filter((record) => !isObjectDeleted(record)).filter((record) => (
     lifecycleView === "archived" ? isObjectVisibleInArchivedList(record) : isObjectVisibleInActiveList(record)
@@ -41,8 +46,8 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
     if (!canEdit || !record || isObjectArchived(record)) return;
     setUploading(record);
     setUploadDraft({
-      issue: record.issue || "",
-      expires: record.expires || "",
+      issue: toDateInputValue(record.issue),
+      expires: toDateInputValue(record.expires),
       file: null,
     });
   }
@@ -66,9 +71,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
       if (!uploaded?.downloadUrl) throw new Error("Upload failed");
       const issue = uploadDraft.issue || uploading.issue;
       const expires = uploadDraft.expires || uploading.expires;
-      const days = expires
-        ? Math.ceil((new Date(`${expires}T12:00:00`) - new Date()) / (1000 * 60 * 60 * 24))
-        : uploading.days;
+      const days = daysUntil(expires) ?? uploading.days;
       setRecords((current) => current.map((record) => (
         record.id === uploading.id
           ? {
@@ -80,7 +83,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
               documentUrl: uploaded.downloadUrl,
               documentStoragePath: uploaded.storagePath,
               renewal: "Submitted",
-              status: days < 0 ? "Expired" : record.status === "Expired" && days >= 0 ? "Active" : record.status,
+              status: Number.isFinite(days) && days < 0 ? "Expired" : record.status === "Expired" && days >= 0 ? "Active" : record.status,
             }
           : record
       )));
@@ -97,6 +100,11 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
 
   async function runLifecycle(record, action) {
     if (!canEdit || !record) return;
+    const label = [record.person, record.type].filter(Boolean).join(" · ") || "this certification";
+    if (action === "archive" && !window.confirm(`Archive ${label}? It moves to the Archived list and can be restored later.`)) return;
+    if (action === "delete" && !window.confirm(
+      `Delete ${label}?${record.documentStoragePath ? " The uploaded card or certificate file is removed too." : ""} This can't be undone.`
+    )) return;
     setBusyId(record.id);
     try {
       if (action === "archive") {
@@ -108,7 +116,15 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
         setLifecycleView("active");
         setMessage("Certification restored.");
       } else if (action === "delete") {
-        if (record.documentStoragePath) await deleteFirebaseFile(record.documentStoragePath);
+        if (record.documentStoragePath) {
+          try {
+            await deleteFirebaseFile(record.documentStoragePath);
+          } catch (error) {
+            console.error("Certification file delete failed", error);
+            setMessage("The file couldn't be removed, so the certification wasn't deleted. Try again.");
+            return;
+          }
+        }
         setRecords((current) => current.map((item) => item.id === record.id ? softDeleteObject(item) : item));
         if (selected?.id === record.id) setSelected(null);
         if (uploading?.id === record.id) setUploading(null);
@@ -132,8 +148,8 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
         <div className="heading-actions">
           <button className="secondary-button" disabled={!filtered.length} onClick={() => exportCsv(`certifications-${new Date().toISOString().slice(0, 10)}.csv`, filtered.map((r) => ({ Personnel: r.person, Certification: r.type, Category: r.category, "Issue date": r.issue, Expires: r.expires, "Days left": r.days, Renewal: r.renewal, Status: r.status })))}>Export Compliance</button>
           {canEdit ? (
-            <button className="primary-button" onClick={() => openUpload(activeRecords[0])} disabled={!activeRecords[0]}>
-              <UploadCloud size={14} /> Upload Certification
+            <button className="primary-button" onClick={() => setAdding(true)}>
+              <Plus size={14} /> Add certification
             </button>
           ) : null}
         </div>
@@ -185,6 +201,17 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
             <span>Personnel</span><span>Certification</span><span>Category</span><span>Issue Date</span>
             <span>Expiration</span><span>Days</span><span>Renewal</span><span>Status</span><span />
           </div>
+          {!filtered.length ? (
+            <p className="empty-table">
+              {!scoped.length
+                ? lifecycleView === "archived"
+                  ? "No archived certifications."
+                  : canEdit
+                    ? "No certifications yet — add the first one with “Add certification”."
+                    : "No certifications yet."
+                : "No certifications match this filter or search."}
+            </p>
+          ) : null}
           {filtered.map((record) => (
             <div className="cert-row" key={record.id}>
               <button className="link-button" onClick={() => setSelected(record)}>{record.person}</button>
@@ -203,8 +230,8 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
               <Badge>{isObjectArchived(record) ? "Archived" : record.status}</Badge>
               <div className="inline-actions">
                 {canEdit && !isObjectArchived(record) ? (
-                  <button className="row-action" onClick={() => openUpload(record)}>
-                    {record.document || record.documentUrl ? "Replace" : "Upload"}
+                  <button className="row-action" onClick={() => openUpload(record)} title="Upload a new card or renewal for this certification">
+                    {record.document || record.documentUrl ? "Renew" : "Add card"}
                   </button>
                 ) : null}
                 <ObjectLifecycleActions
@@ -225,7 +252,6 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
         <Modal title={`${selected.person} · ${selected.type}`} onClose={() => setSelected(null)}>
           <div className="cert-detail-grid">
             {[
-              ["Certification ID", selected.id],
               ["Category", selected.category],
               ["Issue Date", selected.issue],
               ["Expiration Date", selected.expires],
@@ -253,14 +279,29 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
             />
             {canEdit && !isObjectArchived(selected) ? (
               <button className="primary-button" onClick={() => { openUpload(selected); setSelected(null); }}>
-                <UploadCloud size={14} /> Upload Renewal
+                <UploadCloud size={14} /> Upload new card / renew
               </button>
             ) : null}
           </div>
         </Modal>
       ) : null}
+      {adding && canEdit ? (
+        <AddCertificationModal
+          records={records}
+          personnel={personnel}
+          departmentId={departmentId}
+          onClose={() => setAdding(false)}
+          onSave={(record) => {
+            setRecords((current) => [record, ...(Array.isArray(current) ? current : [])]);
+            setAdding(false);
+            setLifecycleView("active");
+            setFilter("All");
+            setMessage(`Added ${record.person} · ${record.type}`);
+          }}
+        />
+      ) : null}
       {uploading && canEdit ? (
-        <Modal title="Upload Certification Document" onClose={() => !busy && setUploading(null)}>
+        <Modal title="Upload new card / renew" onClose={() => !busy && setUploading(null)}>
           <div className="upload-zone">
             <UploadCloud size={28} />
             <strong>{uploading.person} · {uploading.type}</strong>

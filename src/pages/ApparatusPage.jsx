@@ -6,6 +6,7 @@ import { groupApparatusByStation, APPARATUS_UNASSIGNED_STATION } from "../lib/ap
 
 import { Badge, FleetSummary, Panel } from "../components/shell/ui.jsx";
 import WorkOrderModal from "../components/fleet/WorkOrderModal.jsx";
+import { uniqueRecordId } from "../lib/recordIds.js";
 
 export default function ApparatusPage({
   units = [],
@@ -65,7 +66,8 @@ export default function ApparatusPage({
     setMessage(`${nextUnit.unit || selected.unit} updated`);
   }
   function addUnit() {
-    const nextId = `APP-${String(units.length + 1).padStart(2, "0")}`;
+    // Random-suffixed id: "count + 1" could match an existing unit and overwrite it.
+    const nextId = uniqueRecordId("APP");
     const nextUnit = {
       id: nextId,
       unit: "New Apparatus",

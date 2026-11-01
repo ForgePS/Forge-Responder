@@ -134,6 +134,211 @@ service cloud.firestore {
     function canWriteModule(departmentId, moduleKey) {
       return canAccessDepartment(departmentId) && (isPlatformCreator() || moduleOn(departmentId, moduleKey));
     }
+    // ---- Member permissions (batch 5) ----
+    // departments/<id>/memberGrants/<uid>.permissions holds the member's granted
+    // permission keys (true only), kept by Cloud Functions (functions/lib/memberGrants.js)
+    // from their roles and personal overrides, the same way the app works them out.
+    function grantPath(departmentId) {
+      return /databases/$(database)/documents/departments/$(departmentId)/memberGrants/$(request.auth.uid);
+    }
+    // Holds at least one of the permission keys. Platform creators, department
+    // admins and the shared demo account in forge-demo always pass.
+    function memberCanAny(departmentId, keys) {
+      return isPlatformCreator()
+        || isDepartmentAdmin(departmentId)
+        || (isDemoAccount() && isDemoDepartment(departmentId))
+        || (exists(grantPath(departmentId))
+            && get(grantPath(departmentId)).data.get("permissions", {}).keys().hasAny(keys));
+    }
+    // Write a module's data AND hold one of the permissions for it.
+    function canManageModule(departmentId, moduleKey, keys) {
+      return canWriteModule(departmentId, moduleKey) && memberCanAny(departmentId, keys);
+    }
+    // Permission groups used by the module rules below.
+    function inspectionWorkKeys() {
+      return ["editInspections", "conductInspections", "approveInspections", "editViolations",
+        "editInspectionNotices", "manageInspectionDocuments", "editInspectionEnforcement",
+        "editFireProtectionSystems", "editInspectionFees", "editInspectionReports",
+        "manageInspectionConfig", "manageInspectionOffline", "manageInspectionAutomation",
+        "manageInspectionHardening"];
+    }
+    function inspectionConfigKeys() {
+      return ["manageInspectionConfig", "manageSystemSettings"];
+    }
+    function codeLibraryKeys() {
+      return ["manageCodeLibrary", "manageAdoptedCodes", "manageInspectionConfig"];
+    }
+    function preplanWorkKeys() {
+      return ["editPreplans", "createPreplans", "approvePreplans", "managePreplanConfig", "editInspections"];
+    }
+    function preplanApproveKeys() {
+      return ["approvePreplans", "managePreplanConfig"];
+    }
+    function preplanConfigKeys() {
+      return ["managePreplanConfig", "manageInspectionConfig", "manageSystemSettings"];
+    }
+    function preplanRestrictedReadKeys() {
+      return ["viewPreplanSensitive", "viewPreplanKnox", "viewPreplanUtilities", "viewPreplanHazmat",
+        "approvePreplans", "managePreplanConfig", "editPreplans", "createPreplans"];
+    }
+    function fleetWorkKeys() {
+      return ["editApparatus", "editFleetAssets", "manageFleetConfig", "conductFleetChecks", "editFleetDefects",
+        "manageFleetStatus", "editFleetWorkOrders", "editFleetPm", "editFleetTests", "editFleetFuel",
+        "editFleetTelematics", "editFleetComponents", "editFleetOperations", "editFleetRisk",
+        "editFleetProcurement", "editFleetCost", "editFleetReporting", "editFleetVendorPortal"];
+    }
+    function fleetConfigKeys() {
+      return ["manageFleetConfig", "editFleetAssets", "editApparatus", "manageSystemSettings"];
+    }
+    function hydrantAdminKeys() {
+      return ["manageWaterCompanies", "manageWaterDistricts", "editHydrants", "manageSystemSettings"];
+    }
+
+    // ---- Lists: who may change what ----
+    // The personnel record a member is linked to ("" if not linked yet).
+    function myPersonnelId(departmentId) {
+      return membershipData(departmentId).get("personnelId", "");
+    }
+    function scheduleManageKeys() {
+      return ["editSchedule", "manageSystemSettings", "editPersonnel"];
+    }
+    // Which permission group lets someone change ANY item in a list. Lists not
+    // named here keep the module check only.
+    function listGroup(listKey) {
+      return {
+        "hlfd-rms-personnel": "personnel",
+        "hlfd-rms-certifications": "certifications",
+        "hlfd-rms-training": "training",
+        "hlfd-rms-schedule-days": "schedule",
+        "hlfd-rms-roster": "schedule",
+        "hlfd-rms-leave-requests": "schedule",
+        "hlfd-rms-overtime-offers": "schedule",
+        "hlfd-rms-vacancy-pickups": "schedule",
+        "hlfd-rms-shift-trades": "schedule",
+        "hlfd-rms-call-shifts": "schedule",
+        "hlfd-rms-time-cards": "timeCards",
+        "hlfd-rms-daily-logs": "dailyLog",
+        "hlfd-rms-apparatus": "apparatus",
+        "hlfd-rms-assets": "assets",
+        "hlfd-rms-work-orders": "workOrders",
+        "hlfd-rms-hose-tests": "hoseTests",
+        "hlfd-rms-occupancies": "occupancies",
+        "hlfd-rms-inspections": "inspections",
+        "hlfd-rms-preplans": "preplans",
+        "hlfd-rms-documents": "documents",
+        "hlfd-rms-neris-fire-reports": "neris",
+        "hlfd-rms-dd-displays": "signage",
+        "hlfd-rms-dd-media": "signage",
+        "hlfd-rms-dd-playlists": "signage",
+        "hlfd-rms-dd-schedules": "signage"
+      }.get(listKey, "");
+    }
+    function listGroupKeys(group) {
+      return group == "personnel" ? ["editPersonnel", "manageUsers", "manageSystemSettings"]
+        : group == "certifications" ? ["editCertifications", "editPersonnel"]
+        : group == "training" ? ["editTraining"]
+        : group == "schedule" ? scheduleManageKeys()
+        : group == "timeCards" ? ["editSchedule", "manageSystemSettings"]
+        : group == "dailyLog" ? ["editDailyLog"]
+        : group == "apparatus" ? ["editApparatus", "editFleetAssets", "manageFleetConfig"]
+        : group == "assets" ? ["editAssets"]
+        : group == "workOrders" ? ["editApparatus", "editFleetWorkOrders"]
+        : group == "hoseTests" ? ["editApparatus", "editAssets"]
+        : group == "occupancies" ? ["editInspections", "conductInspections", "editPreplans", "createPreplans"]
+        : group == "inspections" ? inspectionWorkKeys()
+        : group == "preplans" ? preplanWorkKeys()
+        : group == "documents" ? ["editDocuments"]
+        : group == "neris" ? ["editNerisReports"]
+        : group == "signage" ? ["editDigitalDashboard", "manageDigitalDashboard"]
+        : [];
+    }
+    function isListManager(departmentId, listKey) {
+      return listGroup(listKey) == "" || memberCanAny(departmentId, listGroupKeys(listGroup(listKey)));
+    }
+    // Private personnel fields live in personnelPrivate/, never in the shared list.
+    function personnelPrivateKeys() {
+      return ["birthDate", "citizenship", "race", "ethnicity", "gender", "maritalStatus", "socialSecurityNumber",
+        "driversLicenseNumber"];
+    }
+    function noPrivatePersonnelFields(listKey) {
+      return listKey != "hlfd-rms-personnel"
+        || !request.resource.data.keys().hasAny(personnelPrivateKeys());
+    }
+    function isDecided(data) {
+      return data.get("status", "") in ["Approved", "Denied"];
+    }
+    // A new request is the member's own (or they aren't linked to a personnel record yet).
+    function newIsMine(departmentId) {
+      return myPersonnelId(departmentId) == ""
+        || request.resource.data.get("personnelId", "") == myPersonnelId(departmentId);
+    }
+    function storedIsMine(departmentId) {
+      return myPersonnelId(departmentId) != ""
+        && resource.data.get("personnelId", "") == myPersonnelId(departmentId);
+    }
+    // Requesters can't approve their own request.
+    function notSelfApproval(departmentId) {
+      return !storedIsMine(departmentId)
+        || !(request.resource.data.get("status", "") == "Approved" && resource.data.get("status", "") != "Approved");
+    }
+    // Members (not list managers) may add these items.
+    function memberItemCreate(departmentId, listKey) {
+      return (listKey == "hlfd-rms-leave-requests"
+          && memberCanAny(departmentId, ["submitLeaveRequests", "accessEmployeePortal"])
+          && newIsMine(departmentId) && !isDecided(request.resource.data))
+        || (listKey == "hlfd-rms-shift-trades"
+          && memberCanAny(departmentId, ["submitShiftTrades", "accessEmployeePortal"])
+          && newIsMine(departmentId) && !isDecided(request.resource.data))
+        || (listKey == "hlfd-rms-vacancy-pickups"
+          && memberCanAny(departmentId, ["submitVacancyPickups", "accessEmployeePortal"])
+          && newIsMine(departmentId) && !isDecided(request.resource.data))
+        || (listKey == "hlfd-rms-time-cards"
+          && myPersonnelId(departmentId) != ""
+          && request.resource.data.get("personnelId", "") == myPersonnelId(departmentId)
+          && request.resource.data.get("departmentHeadSignature", "") in [null, ""])
+        || listKey == "hlfd-rms-work-orders";
+    }
+    // Members (not list managers) may make these changes.
+    function memberItemUpdate(departmentId, listKey) {
+      return (listKey == "hlfd-rms-leave-requests"
+          && myPersonnelId(departmentId) != ""
+          && myPersonnelId(departmentId) in [resource.data.get("personnelId", ""),
+               resource.data.get("assignedOfficerId", ""), resource.data.get("assignedBattalionChiefId", "")]
+          && unchanged("personnelId") && notSelfApproval(departmentId))
+        || (listKey == "hlfd-rms-shift-trades"
+          && myPersonnelId(departmentId) != ""
+          && (myPersonnelId(departmentId) in [resource.data.get("personnelId", ""), resource.data.get("coveragePersonnelId", "")]
+              || resource.data.get("assignedBattalionChiefIds", []).hasAny([myPersonnelId(departmentId)]))
+          && unchanged("personnelId") && notSelfApproval(departmentId))
+        || (listKey == "hlfd-rms-call-shifts" && changedKeys().hasOnly(["responses", "updatedAt", "_order"]))
+        || (listKey == "hlfd-rms-time-cards"
+          && storedIsMine(departmentId) && unchanged("personnelId") && unchanged("departmentHeadSignature"))
+        || (listKey == "hlfd-rms-documents" && changedKeys().hasOnly(["acknowledgements", "updatedAt", "_order"]))
+        // A battalion chief's final trade approval notes it on the requester's record.
+        || (listKey == "hlfd-rms-personnel" && changedKeys().hasOnly(["activityLog", "updatedAt", "_order"]));
+    }
+    function memberItemDelete(departmentId, listKey) {
+      return listKey == "hlfd-rms-leave-requests" && storedIsMine(departmentId) && !isDecided(resource.data);
+    }
+
+    // The write moves status into one of these (or creates a record already there).
+    function movesToStatus(statuses) {
+      return request.resource.data.get("status", "") in statuses
+        && (resource == null || resource.data.get("status", "") != request.resource.data.get("status", ""));
+    }
+    // Fields a write changes (create = every field).
+    function changedKeys() {
+      return resource == null
+        ? request.resource.data.keys()
+        : request.resource.data.diff(resource.data).affectedKeys();
+    }
+    // The write leaves a field as it was (missing on both sides counts as unchanged).
+    function unchanged(field) {
+      return resource == null
+        ? !(field in request.resource.data)
+        : !request.resource.data.diff(resource.data).affectedKeys().hasAny([field]);
+    }
+
     function planLimit(departmentId, limitKey) {
       return exists(entitlementsPath(departmentId))
         ? entitlementsData(departmentId).get("limits", {}).get(limitKey, 0)
@@ -386,7 +591,8 @@ service cloud.firestore {
     function hasExplicitTenantRule(collection) {
       return collection in [
         "academyAuditLogs", "academyEvents", "academyIntegrations", "adoptedCodeProfiles",
-        "auditLogs", "codeExtractionIssues", "codeSavedSections", "codeSearchHistory",
+        "auditLogs", "codeExtractionIssues", "codeSavedSections", "codeSearchHistory", "counters",
+        "internalEmails", "memberGrants", "personnelPrivate", "preplanRestricted",
         "codeSections", "codeSets", "dropdowns", "fireProtectionSystems",
         "fleetAccidentEvents", "fleetAssetAliases", "fleetAssetInsurance", "fleetAssets",
         "fleetAssignments", "fleetAuditEvents", "fleetAutomationRuns", "fleetAutomations",
@@ -430,7 +636,8 @@ service cloud.firestore {
     match /departments/{departmentId} {
       match /public/{document} {
         allow read: if document == "alert-dashboard";
-        allow write: if canAccessDepartment(departmentId);
+        allow write: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["manageDigitalDashboard", "manageSystemSettings"]);
       }
       match /profile/{document} {
         // Members of a suspended department may still read the profile so the app
@@ -441,11 +648,12 @@ service cloud.firestore {
           && withinLimit(departmentId, "maxStations", request.resource.data.get("stationDetails", []).size(), 0)
           && withinLimit(departmentId, "maxStations", request.resource.data.get("stations", []).size(), 0);
         allow update: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["manageSystemSettings"])
           && withinLimit(departmentId, "maxStations",
                request.resource.data.get("stationDetails", []).size(), resource.data.get("stationDetails", []).size())
           && withinLimit(departmentId, "maxStations",
                request.resource.data.get("stations", []).size(), resource.data.get("stations", []).size());
-        allow delete: if canAccessDepartment(departmentId);
+        allow delete: if isPlatformCreator();
       }
       // Department settings: admins change them. A member may only seed a missing
       // settings/main on first load and save distribution groups (the app checks
@@ -506,23 +714,61 @@ service cloud.firestore {
       // cannot grow past the plan's maxPersonnel.
       match /lists/{listKey} {
         allow read: if canAccessDepartment(departmentId);
+        // A whole-list (items array) save changes everyone's records, so it needs
+        // the list's manage permission. Headers without items are fine for members.
         allow create: if canWriteModule(departmentId, listModule(listKey))
+          && (request.resource.data.get("items", []).size() == 0 || isListManager(departmentId, listKey))
           && (listKey != "hlfd-rms-personnel"
               || withinLimit(departmentId, "maxPersonnel", request.resource.data.get("items", []).size(), 0));
         allow update: if canWriteModule(departmentId, listModule(listKey))
           && !(resource.data.get("storage", "") == "items"
                && request.resource.data.get("items", []).size() > 0)
+          && (!changedKeys().hasAny(["items"]) || isListManager(departmentId, listKey))
           && (listKey != "hlfd-rms-personnel"
               || withinLimit(departmentId, "maxPersonnel",
                    request.resource.data.get("items", []).size(), resource.data.get("items", []).size()));
-        allow delete: if canWriteModule(departmentId, listModule(listKey));
+        allow delete: if canWriteModule(departmentId, listModule(listKey)) && isListManager(departmentId, listKey);
 
+        // One record per item. List managers change anything; other members only
+        // their own requests/time card, replies and acknowledgements (see memberItem*).
         match /items/{itemId} {
           allow read: if canAccessDepartment(departmentId);
           allow create: if canWriteModule(departmentId, listModule(listKey))
-            && (listKey != "hlfd-rms-personnel" || personnelRoom(departmentId));
-          allow update, delete: if canWriteModule(departmentId, listModule(listKey));
+            && (listKey != "hlfd-rms-personnel" || personnelRoom(departmentId))
+            && noPrivatePersonnelFields(listKey)
+            && (isListManager(departmentId, listKey) || memberItemCreate(departmentId, listKey));
+          allow update: if canWriteModule(departmentId, listModule(listKey))
+            && noPrivatePersonnelFields(listKey)
+            && (isListManager(departmentId, listKey)
+                || changedKeys().hasOnly(["_order"])
+                || memberItemUpdate(departmentId, listKey));
+          allow delete: if canWriteModule(departmentId, listModule(listKey))
+            && (isListManager(departmentId, listKey) || memberItemDelete(departmentId, listKey));
         }
+      }
+      // Private personnel fields (SSN, birth date, demographics): people who can
+      // see private info, and each person reads their own.
+      match /personnelPrivate/{personnelId} {
+        allow read: if memberCanAny(departmentId, ["editPersonnel", "manageUsers", "manageSystemSettings"])
+          || (canAccessDepartment(departmentId) && myPersonnelId(departmentId) == personnelId);
+        allow create, update, delete: if canWriteModule(departmentId, "personnel")
+          && memberCanAny(departmentId, ["editPersonnel", "manageUsers", "manageSystemSettings"]);
+      }
+      // Each member's permissions, written only by Cloud Functions.
+      match /memberGrants/{uid} {
+        allow read: if (isAuthenticated() && request.auth.uid == uid) || isDepartmentAdmin(departmentId);
+        allow write: if false;
+      }
+      // Record-number counters: only ever count up.
+      match /counters/{counterKey} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if canAccessDepartment(departmentId)
+          && request.resource.data.keys().hasOnly(["value", "updatedAt"])
+          && request.resource.data.value is int && request.resource.data.value > 0;
+        allow update: if canAccessDepartment(departmentId)
+          && request.resource.data.keys().hasOnly(["value", "updatedAt"])
+          && request.resource.data.value is int && request.resource.data.value > resource.data.value;
+        allow delete: if false;
       }
       // Memberships: created and changed by department admins (or platform creators) only.
       // Users can never grant themselves access or roles.
@@ -551,7 +797,27 @@ service cloud.firestore {
       }
       match /dropdowns/{dropdownId} {
         allow read: if canAccessDepartment(departmentId);
-        allow write: if canAccessDepartment(departmentId);
+        // Missing defaults may be created by anyone; changes need manageDropdowns.
+        allow create: if canAccessDepartment(departmentId);
+        allow update, delete: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["manageDropdowns", "manageSystemSettings"]);
+      }
+      // Messages: sent as yourself; others only mark them read; sender or
+      // message managers delete. (Reading is still department-wide: the inbox
+      // loads the whole collection and filters by recipient.)
+      match /internalEmails/{messageId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if canWriteModule(departmentId, "internalEmail")
+          && request.resource.data.get("fromUid", "") == request.auth.uid;
+        allow update: if canWriteModule(departmentId, "internalEmail")
+          && (
+            (resource.data.get("fromUid", "") == request.auth.uid && unchanged("fromUid"))
+            || (changedKeys().hasOnly(["readBy", "updatedAt"])
+                && request.resource.data.get("readBy", {}).diff(resource.data.get("readBy", {})).affectedKeys().hasOnly([request.auth.uid]))
+            || memberCanAny(departmentId, ["manageInternalEmail"])
+          );
+        allow delete: if canWriteModule(departmentId, "internalEmail")
+          && (resource.data.get("fromUid", "") == request.auth.uid || memberCanAny(departmentId, ["manageInternalEmail"]));
       }
       match /auditLogs/{logId} {
         allow read: if canAccessDepartment(departmentId);
@@ -560,53 +826,64 @@ service cloud.firestore {
       }
       match /inspectionSettings/{document} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
         allow delete: if isPlatformCreator();
       }
+      // Signing off an inspection that is awaiting approval needs approveInspections.
       match /inspections/{inspectionId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update: if canWriteModule(departmentId, "inspections");
-        allow delete: if canWriteModule(departmentId, "inspections");
+        allow create, update: if canManageModule(departmentId, "inspections", inspectionWorkKeys())
+          && !(resource != null && resource.data.get("status", "") == "awaiting_approval"
+               && request.resource.data.get("status", "") == "completed"
+               && !memberCanAny(departmentId, ["approveInspections", "manageInspectionConfig"]));
+        allow delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /occupancies/{occupancyId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update: if canWriteModule(departmentId, "occupancies");
-        allow delete: if canWriteModule(departmentId, "occupancies");
+        allow create, update: if canManageModule(departmentId, "occupancies", inspectionWorkKeys());
+        allow delete: if canManageModule(departmentId, "occupancies", inspectionWorkKeys());
       }
       match /inspectionAuditEvents/{eventId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create: if canWriteModule(departmentId, "inspections");
+        allow create: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
         allow update, delete: if false;
       }
       match /inspectionTypes/{typeId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /inspectionTemplates/{templateId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /inspectionTemplateVersions/{versionId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create: if canWriteModule(departmentId, "inspections");
+        allow create: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
         // Published versions are immutable snapshots.
         allow update, delete: if false;
       }
       match /codeSets/{codeSetId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", codeLibraryKeys());
       }
       match /codeSections/{sectionId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", codeLibraryKeys());
       }
       match /localAmendments/{amendmentId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", codeLibraryKeys());
       }
       match /adoptedCodeProfiles/{profileId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", codeLibraryKeys());
       }
       match /codeSavedSections/{savedId} {
         allow read: if canAccessDepartment(departmentId);
@@ -618,223 +895,256 @@ service cloud.firestore {
       }
       match /codeExtractionIssues/{issueId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", codeLibraryKeys());
       }
       match /violationCatalog/{catalogId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /violations/{violationId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
+      // Approving or publishing a preplan needs approvePreplans.
       match /preplans/{preplanId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create, update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
+          && (!movesToStatus(["approved", "published"]) || memberCanAny(departmentId, preplanApproveKeys()));
+        allow delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
       }
+      // Restricted preplan answers (gate codes, utility shutoffs, hazmat).
+      match /preplanRestricted/{revisionId} {
+        allow read: if canAccessDepartment(departmentId) && memberCanAny(departmentId, preplanRestrictedReadKeys());
+        allow create, update, delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
+      }
+      // Restricted answers (src/lib/inspections/preplanRestricted.js) are kept in
+      // preplanRestricted/, never in the revision every member reads.
       match /preplanRevisions/{revisionId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create, update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
+          && !request.resource.data.get("sectionAnswers", {}).keys().hasAny(["gatesCodes", "gas", "electric", "hazmat"]);
+        allow delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
       }
       match /preplanTemplates/{templateId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create: if canWriteModule(departmentId, "preplans");
+        allow update, delete: if canManageModule(departmentId, "preplans", preplanConfigKeys());
       }
       match /preplanTemplateVersions/{versionId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create: if canWriteModule(departmentId, "preplans");
+        allow create: if canManageModule(departmentId, "preplans", preplanWorkKeys());
         allow update, delete: if false;
       }
       match /preplanSymbolLibraries/{libraryId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create: if canWriteModule(departmentId, "preplans");
+        allow update, delete: if canManageModule(departmentId, "preplans", preplanConfigKeys());
       }
       match /preplanDiagrams/{diagramId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create, update, delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
       }
       match /preplanVerifications/{verificationId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create, update, delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
       }
       match /preplanDropdownLibraries/{libraryId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create: if canWriteModule(departmentId, "preplans");
+        allow update, delete: if canManageModule(departmentId, "preplans", preplanConfigKeys());
       }
       match /preplanDropdownOptions/{optionId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create: if canWriteModule(departmentId, "preplans");
+        allow update, delete: if canManageModule(departmentId, "preplans", preplanConfigKeys());
       }
       match /preplanBuildings/{buildingId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create, update, delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
       }
       match /preplanFiles/{fileId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create, update, delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
       }
       match /preplanQrTokens/{tokenId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "preplans");
+        allow create, update, delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
       }
       match /inspectionDocumentTemplates/{templateId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /inspectionNotices/{noticeId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionCertificates/{certificateId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionNoticeDeliveries/{deliveryId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionReinspections/{reinspectionId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionEnforcementOrders/{orderId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionCitations/{citationId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionAppeals/{appealId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionCorrectionSubmissions/{submissionId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /fireProtectionSystems/{systemId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /fpsTestReports/{reportId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /fpsImpairments/{impairmentId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /fpsDeficiencies/{deficiencyId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /fpsContractors/{contractorId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionFeeSchedules/{scheduleId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /inspectionFees/{feeId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionInvoices/{invoiceId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionPayments/{paymentId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionFeeAdjustments/{adjustmentId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionSavedReports/{reportId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionReportRuns/{runId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionScheduledReports/{scheduleId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionDevicePolicies/{document} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /inspectionAutomations/{automationId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /inspectionAutomationRuns/{runId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionWorkflows/{workflowId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /inspectionWebhooks/{webhookId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /inspectionCalendarEvents/{eventId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionNerisMappings/{mappingId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /inspectionIntegrationAdapters/{adapterId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /inspectionImportBatches/{batchId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /inspectionHardeningChecks/{checkId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "inspections");
+        allow create: if canWriteModule(departmentId, "inspections");
+        allow update, delete: if canManageModule(departmentId, "inspections", inspectionConfigKeys());
       }
       match /fleetSettings/{document} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
         allow delete: if isPlatformCreator();
       }
       match /fleetClasses/{classId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetAssets/{assetId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update: if canWriteModule(departmentId, "apparatus");
+        allow delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetAssetAliases/{aliasId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetAuditEvents/{eventId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create: if canWriteModule(departmentId, "apparatus");
+        allow create: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
         allow update, delete: if false;
       }
       match /fleetMigrationReports/{reportId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
         allow delete: if isPlatformCreator();
       }
       match /fleetChecklistTemplates/{templateId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetChecklistTemplateVersions/{versionId} {
         allow read: if canAccessDepartment(departmentId);
@@ -852,11 +1162,13 @@ service cloud.firestore {
       }
       match /fleetDefects/{defectId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetDefectCategories/{categoryId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetStatusEvents/{eventId} {
         allow read: if canAccessDepartment(departmentId);
@@ -865,219 +1177,236 @@ service cloud.firestore {
       }
       match /fleetReserveRequests/{requestId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetWorkOrders/{workOrderId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetShops/{shopId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetVendors/{vendorId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetPmPrograms/{programId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetPmSchedules/{scheduleId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetTestPrograms/{programId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetTests/{testId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetFuelSites/{siteId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetFuelTransactions/{transactionId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetFuelExceptionRules/{ruleId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetChargingSessions/{sessionId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetTelematicsAdapters/{adapterId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetTelematicsMappings/{mappingId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetTelematicsEvents/{eventId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetTires/{tireId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetBatteries/{batteryId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetFluidEvents/{eventId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetRecalls/{recallId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetWarranties/{warrantyId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetWarrantyClaims/{claimId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetAssignments/{assignmentId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetTransfers/{transferId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetReserveSwaps/{swapId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetCheckouts/{checkoutId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetPoolReservations/{reservationId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetLoadPlans/{planId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetDeconEvents/{eventId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetAccidentEvents/{eventId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetInsuranceClaims/{claimId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetTowProviders/{providerId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetRoadsideEvents/{eventId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetSafetyReviews/{reviewId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetProcurementRequests/{requestId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetSpecifications/{specId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetBuildProjects/{projectId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetGrants/{grantId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetAssetInsurance/{policyId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetCostEntries/{entryId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetDowntimeEvents/{eventId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetReplacementModels/{modelId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetReplacementCases/{caseId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetCapitalPlanItems/{itemId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetValuations/{valuationId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetDisposalRecords/{recordId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetSavedReports/{reportId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetReportRuns/{runId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetAutomations/{automationId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetAutomationRuns/{runId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update, delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetWorkflows/{workflowId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetIntegrationAdapters/{adapterId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetNerisMappings/{mappingId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetCadMappings/{mappingId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /fleetHardeningChecks/{checkId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create: if canWriteModule(departmentId, "apparatus");
+        allow update, delete: if canManageModule(departmentId, "apparatus", fleetConfigKeys());
       }
       match /integrations/{integrationId} {
         allow read, write: if false;
@@ -1104,20 +1433,25 @@ service cloud.firestore {
       match /notifications/{notificationId} {
         allow read: if canAccessDepartment(departmentId);
         allow create: if canAccessDepartment(departmentId);
-        allow update: if canAccessDepartment(departmentId);
+        // Marking read only.
+        allow update: if canAccessDepartment(departmentId)
+          && changedKeys().hasOnly(["status", "readAt", "read_at", "updatedAt"]);
         allow delete: if isDepartmentAdmin(departmentId);
       }
       match /waterCompanies/{companyId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "hydrants");
+        allow create: if canWriteModule(departmentId, "hydrants");
+        allow update, delete: if canManageModule(departmentId, "hydrants", hydrantAdminKeys());
       }
       match /waterCompanyContacts/{contactId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "hydrants");
+        allow create: if canWriteModule(departmentId, "hydrants");
+        allow update, delete: if canManageModule(departmentId, "hydrants", hydrantAdminKeys());
       }
       match /waterDistricts/{districtId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "hydrants");
+        allow create: if canWriteModule(departmentId, "hydrants");
+        allow update, delete: if canManageModule(departmentId, "hydrants", hydrantAdminKeys());
       }
       match /hydrantOwnershipReview/{reviewId} {
         allow read: if canAccessDepartment(departmentId);

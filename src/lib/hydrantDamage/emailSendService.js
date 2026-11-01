@@ -91,7 +91,8 @@ export async function sendHydrantDamageReport(departmentId, reportId, options = 
 
     if (!data.accepted) {
       await updateRecord(departmentId, HYDRANT_DAMAGE_EMAIL_ATTEMPTS_COLLECTION, attemptId, {
-        status: "failed",
+        // "logged" = server is in log-only mode; nothing was emailed.
+        status: data.providerStatus === "logged" ? "logged" : "failed",
         error: data.error || "Provider did not accept the message.",
         providerStatus: data.providerStatus || "",
         failedAt: nowIso(),
@@ -109,7 +110,9 @@ export async function sendHydrantDamageReport(departmentId, reportId, options = 
         providerMessageId: data.providerMessageId || "",
         reason: data.error || "Provider did not accept the message.",
       });
-      throw new Error(data.error || "Email provider did not accept the message.");
+      const notSent = new Error(data.error || "Email provider did not accept the message.");
+      notSent.alreadyRecorded = true;
+      throw notSent;
     }
 
     const next = normalizeDamageReport({
@@ -143,7 +146,7 @@ export async function sendHydrantDamageReport(departmentId, reportId, options = 
     return next;
   } catch (error) {
     const message = error?.message || "Email send failed.";
-    const alreadyRecorded = /provider did not accept/i.test(message);
+    const alreadyRecorded = Boolean(error?.alreadyRecorded);
     if (!alreadyRecorded) {
       await updateRecord(departmentId, HYDRANT_DAMAGE_EMAIL_ATTEMPTS_COLLECTION, attemptId, {
         status: "failed",

@@ -8,6 +8,8 @@ import { normalizePersonnelAccruals } from "./personnelAccruals.js";
 import { normalizeActivityLog } from "./personnelActivityLog.js";
 import { normalizePersonnelEmsCredentials } from "./personnelEmsCredentials.js";
 
+// Private details (birth date, SSN, demographics, driver's license number) are
+// not list fields: they live in personnelPrivate (see personnelPrivateFields.js).
 export const PERSONNEL_FIELD_DEFAULTS = {
   firstName: "",
   middleName: "",
@@ -49,7 +51,6 @@ export const PERSONNEL_FIELD_DEFAULTS = {
   forgePersonId: "",
   payrollId: "",
   ems: "",
-  driversLicenseNumber: "",
   driversLicenseState: "",
   driversLicenseClass: "",
   driversLicenseExpiration: "",
@@ -69,17 +70,10 @@ export const PERSONNEL_FIELD_DEFAULTS = {
   status: "",
   supervisor: "",
   iaffLocalNumber: "",
-  birthDate: "",
-  citizenship: "",
   hireDate: "",
   secondaryStartDate: "",
   startDateRanking: "",
   endOfServiceDate: "",
-  race: "",
-  ethnicity: "",
-  gender: "",
-  maritalStatus: "",
-  socialSecurityNumber: "",
   photoUrl: "",
   documents: [],
   certifications: [],
