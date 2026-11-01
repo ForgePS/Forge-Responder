@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CirclePlus, Save, Truck } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
+import { readinessForFleetStatus } from "../lib/fleet/fleetStatusOverlay.js";
 import FleetModuleLayout, {
   FleetEmptyState,
   FleetPermissionGate,
@@ -163,7 +164,12 @@ export default function FleetAssetsMasterPage({
     setError("");
     setMessage("");
     try {
-      const saved = await saveFleetAsset(departmentId, draft, actor);
+      // A status chosen here must also change readiness, or the Readiness Board keeps the old state.
+      const original = records.find((row) => row.id === draft.id);
+      const statusChanged = original && original.status !== draft.status;
+      const saved = await saveFleetAsset(departmentId, statusChanged
+        ? { ...draft, readinessState: readinessForFleetStatus(draft.status) || draft.readinessState, activeRestriction: draft.status === "restricted" ? draft.activeRestriction : "" }
+        : draft, actor);
       setRecords((current) => [saved, ...current.filter((row) => row.id !== saved.id)]);
       setSelectedId(saved.id);
       setMessage("Fleet asset saved.");

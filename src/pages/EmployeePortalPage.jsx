@@ -36,6 +36,10 @@ import {
   validateMaintenanceIssueForm,
 } from "../lib/maintenanceIssueWorkflow.js";
 import { createPortalDamageFormRecord, loadDamageFormSettings } from "../lib/damageFormService.js";
+import { createFleetWorkOrder } from "../lib/fleet/fleetWorkOrderService.js";
+import { createDefect } from "../lib/fleet/fleetDefectService.js";
+import { resolveFleetAsset } from "../lib/fleet/resolveFleetAsset.js";
+import { portalReportToFleetWorkOrderInput } from "../lib/fleet/workOrderLoopLogic.js";
 import { writeAuditLog } from "../lib/auditService.js";
 import { findPersonnelForLeaveRequest } from "../lib/leaveAccrualIntegration.js";
 import {
@@ -698,11 +702,50 @@ export default function EmployeePortalPage({
 
     setSubmittingMaintenance(true);
     try {
-      const record = buildMaintenanceWorkOrderRecord(
-        maintenanceForm,
-        submittedByName,
-        workOrders.length
-      );
+      // One id for the classic list row and the Fleet work order, so the Fleet sync never
+      // copies this report twice (and two members submitting at once never share an id).
+      const reportId = `WO-P${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+      const record = {
+        ...buildMaintenanceWorkOrderRecord(maintenanceForm, submittedByName, workOrders.length),
+        id: reportId,
+      };
+
+      // Fleet Work Orders is the one place work orders are handled. If this fails, the classic
+      // row below is still saved and Fleet copies it the next time Fleet Work Orders loads.
+      let fleetWorkOrder = null;
+      let fleetDefect = null;
+      const fleetActor = { actorUid: user?.uid || "", actorName: submittedByName };
+      try {
+        const { concern, ...fleetInput } = portalReportToFleetWorkOrderInput(maintenanceForm, record, submittedByName);
+        const asset = await resolveFleetAsset(departmentId, fleetInput.unit).catch(() => null);
+        const isFleetAsset = Boolean(asset?.id && String(asset.source || "").startsWith("fleet_"));
+        if (concern && isFleetAsset) {
+          fleetDefect = await createDefect(departmentId, {
+            fleetAssetId: asset.id,
+            fleetNumber: asset.fleetNumber,
+            unitDesignation: asset.unitDesignation,
+            source: "employee_portal",
+            description: fleetInput.complaint,
+            severity: concern === "out_of_service" ? "immediate_oos" : "critical",
+            categoryName: "Damage report",
+            status: "submitted",
+          }, fleetActor).catch((defectError) => {
+            console.warn("Damage report: defect not created", defectError);
+            return null;
+          });
+        }
+        fleetWorkOrder = await createFleetWorkOrder(departmentId, {
+          ...fleetInput,
+          id: reportId,
+          workOrderNumber: reportId,
+          fleetAssetId: isFleetAsset ? asset.id : "",
+          workOrderType: fleetDefect ? "defect" : fleetInput.workOrderType,
+          defectId: fleetDefect?.id || "",
+        }, fleetActor);
+      } catch (fleetError) {
+        console.error("Damage report: Fleet work order not created", fleetError);
+      }
+
       setWorkOrders((current) => [record, ...current]);
 
       const chiefs = resolveAllBattalionChiefs(personnel);
@@ -737,7 +780,12 @@ export default function EmployeePortalPage({
 
       await createPortalDamageFormRecord(departmentId, maintenanceForm, record, submittedByName);
 
-      setMessage(`Damage report submitted and sent to ${chiefLabel}.`);
+      const unitLabel = fleetWorkOrder?.unitDesignation || fleetWorkOrder?.fleetNumber || maintenanceForm.location;
+      setMessage(fleetWorkOrder
+        ? `Damage report submitted. Work order ${fleetWorkOrder.workOrderNumber} was opened for ${unitLabel}${
+          fleetDefect ? " and the unit was flagged with a safety defect" : ""
+        }, and ${chiefLabel} ${chiefs.length > 1 ? "were" : "was"} notified.`
+        : `Damage report sent to ${chiefLabel}. The fleet work order could not be opened right now; it will be added automatically the next time an officer opens Fleet Work Orders.`);
       setMaintenanceForm(defaultMaintenanceIssueForm());
     } catch (error) {
       console.error("Failed to submit maintenance issue", error);

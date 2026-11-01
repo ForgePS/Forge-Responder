@@ -196,7 +196,13 @@ const FleetCostReplacementPage = lazyPage(() => import("./pages/FleetCostReplace
 const FleetReportingPage = lazyPage(() => import("./pages/FleetReportingPage.jsx"));
 const FleetHardeningPage = lazyPage(() => import("./pages/FleetHardeningPage.jsx"));
 const FleetVendorPortalPage = lazyPage(() => import("./pages/FleetVendorPortalPage.jsx"));
-import { loadFleetSettings } from "./lib/fleet/index.js";
+import { applyFleetStatusDecision, listFleetAssets, listFleetWorkOrders, loadFleetSettings, saveFleetAsset, syncFleetAssetsFromApparatus } from "./lib/fleet/index.js";
+import {
+  applyFleetStatus,
+  changedUnitStatuses,
+  findFleetAssetForUnit,
+  fleetDecisionForClassicStatus,
+} from "./lib/fleet/fleetStatusOverlay.js";
 
 const navGroups = [
   { label: "", items: [["Dashboard", Home]] },
@@ -222,7 +228,6 @@ const navGroups = [
     ["Fleet Configuration Studio", Settings2],
     ["Apparatus", Truck],
     ["Assets", PackageSearch],
-    ["Maintenance", Wrench],
     ["Hose Testing", Gauge],
   ] },
   {
@@ -244,16 +249,6 @@ const PAGE_INDEX = buildPageIndex(
     .map(([name]) => name)
 );
 
-const kpis = [
-  ["Personnel On Duty", "42", "of 56 Assigned", "info", Users, "Scheduling"],
-  ["Staffing Deficit", "14", "25% Below Target", "critical", Users, "Scheduling"],
-  ["Certifications Expiring", "18", "Next 30 Days", "warning", FileCheck2, "Certifications"],
-  ["Training Compliance", "87%", "↑ 6% vs Last Month", "success", GraduationCap, "Training"],
-  ["Units Available", "12", "of 18 Total", "info", Truck, "Apparatus"],
-  ["Units Out of Service", "6", "33% of Fleet", "critical", Wrench, "Maintenance"],
-  ["Inspections Due", "27", "Next 30 Days", "warning", ClipboardCheck, "Inspections Dashboard"],
-  ["Open Tasks", "64", "Across All Areas", "info", FileCheck2, "Dashboard"]
-];
 
 const NAV_SECTIONS_STORAGE_KEY = "rms-nav-sections-collapsed";
 const NAV_NESTED_STORAGE_KEY = "rms-nav-nested-collapsed";
@@ -999,6 +994,70 @@ function AppShell() {
   const [certifications, setCertifications] = useTenantPersistentState(departmentId, LIST_KEYS.certifications, getTenantListFallback(departmentId, LIST_KEYS.certifications));
   const [training, setTraining] = useTenantPersistentState(departmentId, LIST_KEYS.training, getTenantListFallback(departmentId, LIST_KEYS.training));
   const [apparatus, setApparatus] = useTenantPersistentState(departmentId, LIST_KEYS.apparatus, getTenantListFallback(departmentId, LIST_KEYS.apparatus));
+  // Unit status lives on the fleet record; reload it whenever the page changes so a
+  // failed check on the Readiness Board shows up on the Dashboard and Scheduling.
+  const [fleetStatusAssets, setFleetStatusAssets] = useState([]);
+  const [fleetStatusVersion, setFleetStatusVersion] = useState(0);
+  const [fleetWorkOrdersForDashboard, setFleetWorkOrdersForDashboard] = useState(null);
+  useEffect(() => {
+    if (!departmentId || inPlatformScope) {
+      setFleetStatusAssets([]);
+      setFleetWorkOrdersForDashboard(null);
+      return undefined;
+    }
+    let cancelled = false;
+    listFleetAssets(departmentId)
+      .then((list) => { if (!cancelled) setFleetStatusAssets(Array.isArray(list) ? list : []); })
+      .catch(() => {});
+    // Work orders now live in Fleet; the dashboard counts those (shaped like the old list).
+    listFleetWorkOrders(departmentId)
+      .then((list) => {
+        if (cancelled) return;
+        setFleetWorkOrdersForDashboard((Array.isArray(list) ? list : []).map((order) => ({
+          id: order.workOrderNumber || order.id,
+          unit: order.unitDesignation || order.fleetNumber || "Unit",
+          status: ["completed", "closed", "cancelled", "canceled"].includes(order.status) ? "Complete" : "Open",
+        })));
+      })
+      .catch(() => { if (!cancelled) setFleetWorkOrdersForDashboard(null); });
+    return () => { cancelled = true; };
+  }, [departmentId, inPlatformScope, current, fleetStatusVersion]);
+  const apparatusLive = useMemo(() => applyFleetStatus(apparatus, fleetStatusAssets), [apparatus, fleetStatusAssets]);
+
+  // Status changed on the classic Apparatus page: record it on the fleet unit too.
+  async function syncClassicStatusesToFleet(changedUnits = []) {
+    const actor = { actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "User" };
+    for (const unit of changedUnits) {
+      const asset = findFleetAssetForUnit(fleetStatusAssets, unit);
+      const change = fleetDecisionForClassicStatus(unit.status);
+      if (!asset || !change) continue;
+      if (change.decision) {
+        await applyFleetStatusDecision(departmentId, {
+          fleetAssetId: asset.id,
+          decision: change.decision,
+          basis: "Changed on the Apparatus page",
+        }, actor);
+      } else {
+        await saveFleetAsset(departmentId, { ...asset, status: change.status, readinessState: change.readinessState }, actor);
+      }
+    }
+    setFleetStatusVersion((value) => value + 1);
+  }
+
+  function setApparatusFromClassicPage(update) {
+    const next = typeof update === "function" ? update(apparatusLive) : update;
+    setApparatus(next);
+    const changed = changedUnitStatuses(apparatusLive, next);
+    if (changed.length) {
+      syncClassicStatusesToFleet(changed).catch((error) => console.warn("Couldn't update fleet status", error));
+    }
+    // New units added here also become fleet units (checks, work orders, Readiness Board).
+    if (Array.isArray(next) && next.length > apparatusLive.length) {
+      syncFleetAssetsFromApparatus(departmentId, next, { actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "User" })
+        .then((added) => { if (added?.length) setFleetStatusVersion((value) => value + 1); })
+        .catch(() => {});
+    }
+  }
   const [workOrders, setWorkOrders] = useTenantPersistentState(departmentId, LIST_KEYS.workOrders, getTenantListFallback(departmentId, LIST_KEYS.workOrders));
   const [fleetCutover, setFleetCutover] = useState({
     redirectApparatusToFleetAssets: false,
@@ -1244,7 +1303,7 @@ function AppShell() {
       setPersonnel={setPersonnel}
       scheduleDays={scheduleDays}
       roster={roster}
-      apparatus={apparatus}
+      apparatus={apparatusLive}
       schedulingSettings={schedulingSettings}
       dailyLogs={dailyLogs}
       setDailyLogs={setDailyLogs}
@@ -1272,7 +1331,7 @@ function AppShell() {
       }}
     />
   ) : current === "Dashboard" ? (
-    <CommandDashboard onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={liveCertifications} apparatus={apparatus} workOrders={workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} dutyDayId={currentDutyDayId} />
+    <CommandDashboard onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={liveCertifications} apparatus={apparatusLive} workOrders={fleetWorkOrdersForDashboard || workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} dutyDayId={currentDutyDayId} />
   ) : current === "Personnel" ? (
     hasPermission(permissions, "viewPersonnel") ? (
       <PersonnelPage
@@ -1323,7 +1382,7 @@ function AppShell() {
         setRoster={setRoster}
         personnel={personnel}
         setPersonnel={setPersonnel}
-        apparatus={apparatus}
+        apparatus={apparatusLive}
         leaveRequests={leaveRequests}
         setLeaveRequests={setLeaveRequests}
         overtimeOffers={overtimeOffers}
@@ -1365,7 +1424,7 @@ function AppShell() {
         roster={roster}
         scheduleDays={scheduleDays}
         schedulingSettings={schedulingSettings}
-        apparatus={apparatus}
+        apparatus={apparatusLive}
         shiftRotation={shiftRotation}
         shiftTrades={shiftTrades}
         departmentTitle={profile?.displayTitle || profile?.name || "Fire and EMS"}
@@ -1380,7 +1439,7 @@ function AppShell() {
         records={dailyLogs}
         setRecords={setDailyLogs}
         personnel={personnel}
-        apparatus={apparatus}
+        apparatus={apparatusLive}
         roster={roster}
         leaveRequests={leaveRequests}
         shiftTrades={shiftTrades}
@@ -1402,8 +1461,8 @@ function AppShell() {
   ) : current === "Apparatus" ? (
     hasPermission(permissions, "viewApparatus") ? (
       <ApparatusPage
-        units={apparatus}
-        setUnits={fleetCutover.legacyApparatusWritesLocked ? () => {} : setApparatus}
+        units={apparatusLive}
+        setUnits={fleetCutover.legacyApparatusWritesLocked ? () => {} : setApparatusFromClassicPage}
         workOrders={workOrders}
         setWorkOrders={setWorkOrders}
         canEdit={
@@ -1551,7 +1610,7 @@ function AppShell() {
   ) : current === "Assets" ? (
     hasPermission(permissions, "viewAssets") ? <AssetsPageConnected query={query} records={assets} setRecords={setAssets} canEdit={canEditAssets(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Hose Testing" ? (
-    hasPermission(permissions, "viewApparatus") ? <HoseTestingPage query={query} records={hoseTests} setRecords={setHoseTests} apparatus={apparatus} canEdit={canEditApparatus(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "viewApparatus") ? <HoseTestingPage query={query} records={hoseTests} setRecords={setHoseTests} apparatus={apparatusLive} canEdit={canEditApparatus(permissions, isCreator)} /> : <AccessDeniedModule name={current} />
   ) : current === "Occupancies" ? (
     hasPermission(permissions, "viewInspections") ? (
       <OccupanciesMasterPage
@@ -1756,7 +1815,7 @@ function AppShell() {
         setRecords={setNerisFireReports}
         canEdit={canEditNerisReports(permissions, isCreator)}
         personnel={personnel}
-        apparatus={apparatus}
+        apparatus={apparatusLive}
         occupancies={occupancies}
         preplans={preplans}
         inspections={inspections}
@@ -1768,7 +1827,7 @@ function AppShell() {
       <NerisAnalyticsPage reports={nerisFireReports} />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Analytics" ? (
-    hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={liveCertifications} training={training} apparatus={apparatus} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />
+    hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={liveCertifications} training={training} apparatus={apparatusLive} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />
   ) : current === "Messages" ? (
     hasPermission(permissions, "viewInternalEmail") ? <InternalEmailBoardPage personnel={personnel} /> : <AccessDeniedModule name={current} />
   ) : current === "Digital Dashboard" ? (
@@ -1812,7 +1871,7 @@ function AppShell() {
     canAccessSystemAdmin(permissions, isCreator) ? (
       <AdminControlCenterPage
         personnel={personnel}
-        apparatus={apparatus}
+        apparatus={apparatusLive}
         onOpenPersonnelProfile={openPersonnelProfile}
         onOpenEmployeeProfile={showEmployeeToggle ? openEmployeeProfileForPerson : undefined}
       />

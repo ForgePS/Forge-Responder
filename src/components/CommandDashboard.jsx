@@ -119,8 +119,8 @@ export default function CommandDashboard({
     ["Staffing Deficit", metrics.staffingDeficit ?? "—", metrics.staffingDeficit === null ? "Roster not set up" : metrics.staffingDeficit ? `${metrics.staffingDeficit} short this shift` : "Fully staffed", metrics.staffingDeficit ? "critical" : "success", Users, "Scheduling"],
     ["Certifications Expiring", metrics.certsExpiring90, "Next 90 Days", "warning", FileCheck2, "Certifications"],
     ["Training Compliance", `${metrics.trainingCompliance}%`, "Department-wide", metrics.trainingCompliance >= 85 ? "success" : "warning", GraduationCap, "Training"],
-    ["Units Available", metrics.unitsAvailable, `of ${apparatus.length} Total`, "success", Truck, "Apparatus"],
-    ["Units Out of Service", metrics.unitsOos, "Fleet Status", metrics.unitsOos ? "critical" : "success", Wrench, "Maintenance"],
+    ["Units Available", metrics.unitsAvailable, `of ${apparatus.length} Total`, "success", Truck, "Readiness Board"],
+    ["Units Out of Service", metrics.unitsOos, "Fleet Status", metrics.unitsOos ? "critical" : "success", Wrench, "Readiness Board"],
     ["Inspections Due", metrics.inspectionsDue, "Prevention Queue", "warning", ClipboardCheck, "Inspections Dashboard"],
     ["Open Tasks", metrics.openTasks, "Across All Areas", "info", Activity, "Dashboard"]
   ];
@@ -138,9 +138,9 @@ export default function CommandDashboard({
       target: "Scheduling",
     })),
     ...metrics.openWorkOrders.slice(0, 2).map((order) => ({
-      title: "Maintenance request",
+      title: "Work order",
       detail: `${order.unit} · ${order.id}`,
-      target: "Maintenance",
+      target: "Fleet Work Orders",
     })),
     ...metrics.overdueInspections.slice(0, 2).map((item) => ({
       title: "Inspection follow-up",

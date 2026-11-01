@@ -69,6 +69,15 @@ export default function MaintenanceIssueForm({
         />
       </label>
 
+      <label className="maintenance-line-field maintenance-oos-check">
+        <input
+          type="checkbox"
+          checked={Boolean(value.unitOutOfService)}
+          onChange={(event) => update({ unitOutOfService: event.target.checked })}
+        />
+        <span>This unit can't safely respond (out of service until it's fixed)</span>
+      </label>
+
       <label className="maintenance-line-field">
         <span>Person Filling out the form:</span>
         <input

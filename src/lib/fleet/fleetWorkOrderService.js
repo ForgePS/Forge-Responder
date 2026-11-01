@@ -8,8 +8,10 @@ import { loadTenantListFromFirestore } from "../tenantListLoader.js";
 import { LIST_KEYS } from "../tenantListKeys.js";
 import { writeFleetAuditLog } from "./fleetAudit.js";
 import { getFleetAsset, listFleetAssets } from "./fleetAssetService.js";
-import { updateDefect } from "./fleetDefectService.js";
+import { closeDefect, getDefect, updateDefect } from "./fleetDefectService.js";
+import { applyFleetStatusDecision } from "./fleetStatusControlService.js";
 import { resolveFleetAsset } from "./resolveFleetAsset.js";
+import { isUnitDown, selectLegacyWorkOrdersToSync } from "./workOrderLoopLogic.js";
 import {
   DEFAULT_WORK_ORDER_PRIORITIES,
   DEFAULT_WORK_ORDER_STATUSES,
@@ -265,6 +267,63 @@ export async function ensureFleetWorkOrders(departmentId, legacyFallback = [], a
 }
 
 /**
+ * Copy classic Maintenance list orders that never reached Fleet (matched by Fleet id or
+ * legacyWorkOrderId). Never deletes or overwrites anything; safe to call on every load.
+ * @param {string} departmentId
+ * @param {object[]} [legacyItems] - used when the classic list cannot be read from Firestore
+ * @param {{ actorUid?: string, actorName?: string, assets?: object[] }} [audit]
+ * @returns {Promise<{ workOrders: object[], added: object[], failed: number }>}
+ */
+export async function syncLegacyWorkOrders(departmentId, legacyItems = [], audit = {}) {
+  if (!departmentId) return { workOrders: [], added: [], failed: 0 };
+  const existing = await listFleetWorkOrders(departmentId);
+
+  let items = [];
+  try {
+    const pack = await loadTenantListFromFirestore(departmentId, LIST_KEYS.workOrders);
+    items = Array.isArray(pack?.items) ? pack.items : [];
+  } catch {
+    items = [];
+  }
+  if (!items.length && Array.isArray(legacyItems)) items = legacyItems;
+
+  const missing = selectLegacyWorkOrdersToSync(items, existing);
+  if (!missing.length) return { workOrders: existing, added: [], failed: 0 };
+
+  const assets = Array.isArray(audit.assets) ? audit.assets : await listFleetAssets(departmentId);
+  const stamp = nowIso();
+  const added = [];
+  let failed = 0;
+  for (const item of missing) {
+    const record = legacyWorkOrderToFleet(item, departmentId, assets);
+    if (!record.id) continue;
+    record.createdAt = stamp;
+    record.updatedAt = stamp;
+    try {
+      await createRecord(departmentId, FLEET_WORK_ORDERS_COLLECTION, record.id, record);
+      added.push(record);
+    } catch (error) {
+      failed += 1;
+      console.warn("syncLegacyWorkOrders: could not copy", record.id, error);
+    }
+  }
+
+  if (added.length) {
+    await writeFleetAuditLog(departmentId, {
+      action: "migrate",
+      recordId: FLEET_WORK_ORDERS_COLLECTION,
+      summary: `Copied ${added.length} work order(s) from the classic Maintenance list`,
+      actorUid: audit.actorUid || "system",
+      actorName: audit.actorName || "System",
+    }).catch(() => null);
+  }
+
+  const workOrders = [...added, ...existing]
+    .sort((a, b) => String(b.updatedAt || b.openedAt).localeCompare(String(a.updatedAt || a.openedAt)));
+  return { workOrders, added, failed };
+}
+
+/**
  * @param {string} departmentId
  * @param {object} input
  * @param {{ actorUid?: string, actorName?: string }} [audit]
@@ -342,10 +401,86 @@ export async function updateFleetWorkOrder(departmentId, workOrderId, patch = {}
 }
 
 /**
+ * Close the loop when a work order is completed: close its defect, advance a PM schedule
+ * waiting on it, and (when asked) put the unit back in service.
+ * Each step is independent; a failure becomes a plain warning instead of undoing the completion.
+ * @param {string} departmentId
+ * @param {object} workOrder - the completed work order
+ * @param {{ actorUid?: string, actorName?: string, returnToService?: boolean }} [audit]
+ */
+async function runWorkOrderCompletionHooks(departmentId, workOrder, audit = {}) {
+  const label = workOrder.workOrderNumber || workOrder.id;
+  const outcome = {
+    workOrderNumber: label,
+    unitName: workOrder.unitDesignation || workOrder.fleetNumber || "",
+    defectClosed: false,
+    pmAdvanced: false,
+    pmProgramName: "",
+    returnedToService: false,
+    warnings: [],
+  };
+  const actor = { actorUid: audit.actorUid, actorName: audit.actorName };
+
+  if (workOrder.defectId) {
+    try {
+      const defect = await getDefect(departmentId, workOrder.defectId);
+      if (defect && defect.status !== "closed") {
+        const correction = String(workOrder.correction || "").trim();
+        await closeDefect(departmentId, workOrder.defectId, {
+          resolution: `Repaired under work order ${label}.${correction ? ` ${correction}` : ""}`,
+        }, actor);
+        outcome.defectClosed = true;
+      }
+    } catch (error) {
+      console.warn("Work order completion: defect not closed", error);
+      outcome.warnings.push("The linked defect could not be closed; close it from Defects.");
+    }
+  }
+
+  try {
+    // Dynamic import: fleetPmService imports this module.
+    const pm = await import("./fleetPmService.js");
+    const schedules = await pm.listPmSchedules(departmentId);
+    for (const schedule of schedules.filter((row) => row.openWorkOrderId === workOrder.id)) {
+      await pm.completePmSchedule(departmentId, schedule.id, {
+        completedAt: workOrder.completedAt || nowIso(),
+      }, actor);
+      outcome.pmAdvanced = true;
+      outcome.pmProgramName = schedule.programName || outcome.pmProgramName;
+    }
+  } catch (error) {
+    console.warn("Work order completion: PM schedule not advanced", error);
+    outcome.warnings.push("The preventive maintenance schedule could not be updated; update it from PM.");
+  }
+
+  if (audit.returnToService === true && workOrder.fleetAssetId) {
+    try {
+      const asset = await getFleetAsset(departmentId, workOrder.fleetAssetId);
+      if (asset && isUnitDown(asset)) {
+        await applyFleetStatusDecision(departmentId, {
+          decision: "return_to_service",
+          fleetAssetId: asset.id,
+          basis: `Work order ${label} completed`,
+          defectIds: workOrder.defectId ? [workOrder.defectId] : [],
+        }, actor);
+        outcome.returnedToService = true;
+        outcome.unitName = asset.unitDesignation || asset.fleetNumber || outcome.unitName;
+      }
+    } catch (error) {
+      console.warn("Work order completion: unit not returned to service", error);
+      outcome.warnings.push(`${outcome.unitName || "The unit"} could not be put back in service; change its status from Fleet.`);
+    }
+  }
+
+  return outcome;
+}
+
+/**
  * @param {string} departmentId
  * @param {string} workOrderId
  * @param {string} toStatus
- * @param {{ actorUid?: string, actorName?: string, notes?: string }} [audit]
+ * @param {{ actorUid?: string, actorName?: string, notes?: string, returnToService?: boolean }} [audit]
+ * @returns {Promise<object>} the work order; when newly completed, `completion` says what else happened
  */
 export async function transitionFleetWorkOrder(departmentId, workOrderId, toStatus, audit = {}) {
   const existing = await getFleetWorkOrder(departmentId, workOrderId);
@@ -374,7 +509,11 @@ export async function transitionFleetWorkOrder(departmentId, workOrderId, toStat
   }
   if (toStatus === "closed") patch.closedAt = stamp;
 
-  return updateFleetWorkOrder(departmentId, workOrderId, patch, audit);
+  const next = await updateFleetWorkOrder(departmentId, workOrderId, patch, audit);
+  if (toStatus === "completed" && existing.status !== "completed") {
+    next.completion = await runWorkOrderCompletionHooks(departmentId, next, audit);
+  }
+  return next;
 }
 
 /**
@@ -438,18 +577,28 @@ export async function addWorkOrderPart(departmentId, workOrderId, entry = {}, au
  * @param {string} departmentId
  * @param {string} workOrderId
  * @param {{ passed: boolean, notes?: string }} input
- * @param {{ actorUid?: string, actorName?: string }} [audit]
+ * @param {{ actorUid?: string, actorName?: string, returnToService?: boolean }} [audit]
  */
 export async function completeWorkOrderQc(departmentId, workOrderId, input = {}, audit = {}) {
+  const before = input.passed ? await getFleetWorkOrder(departmentId, workOrderId) : null;
+  const newlyCompleted = Boolean(before && before.status !== "completed");
   const patch = {
     qcPassed: Boolean(input.passed),
     qcNotes: input.notes || "",
     qcBy: audit.actorName || "User",
     qcAt: nowIso(),
   };
-  if (input.passed) patch.status = "completed";
-  else patch.status = "in_progress";
-  return updateFleetWorkOrder(departmentId, workOrderId, patch, audit);
+  if (input.passed) {
+    patch.status = "completed";
+    if (newlyCompleted && !before.completedAt) patch.completedAt = patch.qcAt;
+  } else {
+    patch.status = "in_progress";
+  }
+  const next = await updateFleetWorkOrder(departmentId, workOrderId, patch, audit);
+  if (newlyCompleted) {
+    next.completion = await runWorkOrderCompletionHooks(departmentId, next, audit);
+  }
+  return next;
 }
 
 /**
