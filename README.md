@@ -1,6 +1,6 @@
-# Horn Lake Fire/EMS Dashboard — Codex Upload Package
+# Fire/EMS Dashboard — Codex Upload Package
 
-This package contains Codex-ready specifications and prompts for building the desktop-first RMS dashboard theme and layout for the Horn Lake Fire/EMS Dashboard.
+This package contains Codex-ready specifications and prompts for building the desktop-first RMS dashboard theme and layout for Forge Public Safety.
 
 ## Files
 
@@ -29,6 +29,6 @@ Lower priority:
 - NERIS/NEMSIS compliance bridge
 
 Branding:
-- Product name: Horn Lake Fire/EMS Dashboard
-- Theme name: Horn Lake Command
-- Optional footer: Powered by Havoc Calls
+- Product name: Forge Responder
+- Division of Forge Public Safety
+
