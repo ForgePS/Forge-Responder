@@ -169,6 +169,11 @@ html[data-theme="dark"] .nr-page {
 .nr-dialog footer { display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: -22px; margin: 0 -22px -22px; padding: 14px 22px; background: var(--rms-bg-modal, #fff); border-top: 1px solid var(--nr-border); }
 .nr-muted { color: var(--nr-muted); margin: 0; }
 
+.nr-cad-start { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px dashed var(--nr-border); border-radius: 12px; background: var(--nr-accent-soft); }
+.nr-cad-start > div { display: grid; gap: 2px; min-width: 0; }
+.nr-cad-start small { color: var(--rms-text-muted, #64748b); font-size: 13px; }
+.nr-cad-start .nr-btn { flex-shrink: 0; background: var(--rms-bg-modal, #fff); }
+@media (max-width: 560px) { .nr-cad-start { flex-direction: column; align-items: stretch; } }
 .nr-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .nr-kind {
   display: grid; gap: 4px; justify-items: start; text-align: left; padding: 14px; border-radius: 14px;

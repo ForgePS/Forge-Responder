@@ -7,6 +7,29 @@ import {
   parseCadPayload,
 } from "../../lib/neris/cadImport.js";
 
+/** "2026-11-01T14:02" -> "Nov 1, 2026 14:02"; "2026-11-01" -> "Nov 1, 2026". */
+function displayValue(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}:\d{2}))?/.exec(String(value || ""));
+  if (!match) return String(value ?? "");
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const day = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return match[4] ? `${day} ${match[4]}` : day;
+}
+
+/** Plain rows for people: one "Units" row, no duplicate call number. */
+function displayRows(fields) {
+  const byKey = Object.fromEntries(fields.map((f) => [f.key, f]));
+  const unitIds = fields.filter((f) => /^unit-\d+-unitId$/.test(f.key)).map((f) => f.value);
+  const rows = [];
+  for (const field of fields) {
+    if (/^unit-\d+-unitId$/.test(field.key)) continue;
+    if (field.key === "cadCallNumber" && byKey.incidentNumber?.value === field.value) continue;
+    rows.push({ key: field.key, label: field.label, value: displayValue(field.value) });
+  }
+  if (unitIds.length) rows.push({ key: "units", label: "Units", value: unitIds.join(", ") });
+  return rows;
+}
+
 function ModalShell({ title, onClose, children }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -36,6 +59,7 @@ export default function NerisCadImportModal({
   onClose,
   report,
   onApply,
+  startsNewReport = false,
 }) {
   const fileInputRef = useRef(null);
   const [mode, setMode] = useState("paste");
@@ -196,27 +220,20 @@ export default function NerisCadImportModal({
 
       {previewFields.length ? (
         <div className="neris-cad-import-preview">
-          <h4>Fields to import</h4>
+          <h4>What will be filled in</h4>
           <table className="neris-table">
-            <thead>
-              <tr>
-                <th>Field</th>
-                <th>Value</th>
-                <th>Target</th>
-              </tr>
-            </thead>
             <tbody>
-              {previewFields.map((field) => (
+              {displayRows(previewFields).map((field) => (
                 <tr key={field.key}>
-                  <td>{field.label}</td>
+                  <th scope="row">{field.label}</th>
                   <td>{field.value}</td>
-                  <td><code>{field.target}</code></td>
                 </tr>
               ))}
             </tbody>
           </table>
           <p className="auth-help">
-            Imported fields will be marked as <span className="neris-auto-badge">CAD</span> and merged into the current report.
+            Imported fields are marked <span className="neris-auto-badge">CAD</span>
+            {startsNewReport ? " in the new report. You can edit anything afterward." : " and merged into this report."}
           </p>
         </div>
       ) : null}
@@ -229,7 +246,7 @@ export default function NerisCadImportModal({
           disabled={!pendingPayload || !previewFields.length}
           onClick={handleApply}
         >
-          <Check size={14} /> Apply to report
+          <Check size={14} /> {startsNewReport ? "Start report" : "Apply to report"}
         </button>
       </div>
     </ModalShell>

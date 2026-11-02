@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Biohazard, ChevronRight, CirclePlus, ClipboardList, FileText, Flame, HandHelping, HeartPulse, LifeBuoy, Search,
+  Biohazard, ChevronRight, CirclePlus, ClipboardList, Download, FileText, Flame, HandHelping, HeartPulse, LifeBuoy, Search,
   ShieldQuestion, Sparkles, Wifi, WifiOff, X,
 } from "lucide-react";
 import NerisReportEditor from "../components/neris/NerisReportEditor.jsx";
+import NerisCadImportModal from "../components/neris/NerisCadImportModal.jsx";
 import { ProgressRing } from "../components/neris/NerisControls.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -179,12 +180,24 @@ export default function NerisFireReportsPage({
     });
   }
 
-  async function startReport(details) {
+  // `imported` is a draft that already has CAD data applied (Start a report → Import from CAD).
+  async function startReport(details, imported = null) {
     if (creatingRef.current) return;
     creatingRef.current = true;
     try {
       const reportNumber = await nextReportNumber(departmentId, records);
-      const next = buildNewReport(reportNumber, details);
+      const fresh = buildNewReport(reportNumber, details);
+      const next = imported
+        ? {
+          ...imported,
+          id: fresh.id,
+          reportNumber,
+          status: "Draft",
+          createdAt: fresh.createdAt,
+          updatedAt: fresh.updatedAt,
+          modules: { ...(imported.modules || {}), core_mod_incident: { ...(imported.modules?.core_mod_incident || {}), incident_internal_id: reportNumber } },
+        }
+        : fresh;
       setRecords((current) => [next, ...current]);
       setSelectedId(next.id);
       setStarting(false);
@@ -338,16 +351,65 @@ export default function NerisFireReportsPage({
   );
 }
 
+// Best guess at the call kind from CAD's incident type text; the author can change it later.
+const CAD_KIND_PATTERNS = [
+  ["fire", /fire|smoke|burn|flame/i],
+  ["ems", /medical|ems|cardiac|breath|sick|injur|fall|overdose|unconscious|seizure|chest/i],
+  ["rescue", /mva|mvc|crash|collision|accident|extricat|rescue|entrap/i],
+  ["hazmat", /hazmat|gas|odor|leak|spill|\bco\b|carbon monoxide|wire|electric/i],
+  ["service", /lift assist|lockout|standby|service|assist|public/i],
+  ["noemerg", /false alarm|alarm activation|good intent|cancel/i],
+];
+
+function kindsFromCadType(text = "") {
+  const value = String(text || "");
+  if (!value) return [];
+  if (/false alarm|alarm activation|good intent|cancel/i.test(value)) return ["noemerg"];
+  return CAD_KIND_PATTERNS.filter(([, re]) => re.test(value)).map(([id]) => id);
+}
+
 function StartReportDialog({ onCancel, onStart }) {
   const [kinds, setKinds] = useState([]);
   const [incidentDate, setIncidentDate] = useState(todayIso());
   const [incidentAddress, setIncidentAddress] = useState("");
+  const [cadOpen, setCadOpen] = useState(false);
+
+  function currentDetails(extraKinds = []) {
+    const picked = new Set([...kinds, ...extraKinds]);
+    return {
+      disciplines: INCIDENT_KINDS.filter((k) => picked.has(k.id) && k.discipline).map((k) => k.discipline),
+      incidentDate,
+      incidentAddress: incidentAddress.trim(),
+    };
+  }
 
   useEffect(() => {
+    if (cadOpen) return undefined;
     const onKey = (e) => { if (e.key === "Escape") onCancel(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
+  }, [onCancel, cadOpen]);
+
+  if (cadOpen) {
+    const draft = buildNewReport("", currentDetails());
+    return (
+      <NerisCadImportModal
+        open
+        startsNewReport
+        report={draft}
+        onClose={() => setCadOpen(false)}
+        onApply={(next) => {
+          const guessed = kindsFromCadType(next.incidentTypeSummary);
+          const merged = currentDetails(kinds.length ? [] : guessed);
+          onStart(merged, {
+            ...next,
+            disciplines: merged.disciplines,
+            workspace: { ...(next.workspace || {}), disciplines: merged.disciplines },
+          });
+        }}
+      />
+    );
+  }
 
   function toggle(id) {
     setKinds((current) => (current.includes(id) ? current.filter((k) => k !== id) : [...current, id]));
@@ -360,7 +422,16 @@ function StartReportDialog({ onCancel, onStart }) {
           <h2 id="nr-start-title">Start a report</h2>
           <button type="button" className="nr-icon-btn" aria-label="Close" onClick={onCancel}><X size={18} /></button>
         </header>
-        <p className="nr-muted">What kind of call was it? Pick all that apply — you can change this later.</p>
+        <div className="nr-cad-start">
+          <div>
+            <strong>Have the CAD record?</strong>
+            <small>Import it to fill in the call number, times, address and units.</small>
+          </div>
+          <button type="button" className="nr-btn nr-btn-soft" onClick={() => setCadOpen(true)}>
+            <Download size={15} /> Import from CAD
+          </button>
+        </div>
+        <p className="nr-muted">Or start by hand: what kind of call was it? Pick all that apply — you can change this later.</p>
         <div className="nr-kinds">
           {INCIDENT_KINDS.map((kind) => {
             const Icon = KIND_ICONS[kind.id];
@@ -389,11 +460,7 @@ function StartReportDialog({ onCancel, onStart }) {
           <button
             type="button"
             className="nr-btn nr-btn-primary"
-            onClick={() => onStart({
-              disciplines: INCIDENT_KINDS.filter((k) => kinds.includes(k.id) && k.discipline).map((k) => k.discipline),
-              incidentDate,
-              incidentAddress: incidentAddress.trim(),
-            })}
+            onClick={() => onStart(currentDetails())}
           >
             Start report <ChevronRight size={16} />
           </button>

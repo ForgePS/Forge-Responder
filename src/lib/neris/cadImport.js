@@ -28,11 +28,11 @@ const CAD_FIELD_ALIASES = {
   incidentNumber: [
     "incidentnumber", "incident_number", "incidentno", "incident_no", "incidentid", "incident_id",
     "callnumber", "call_number", "cadcallnumber", "cad_call_number", "dispatchid", "dispatch_id",
-    "eventnumber", "event_number", "masterincidentnumber",
+    "eventnumber", "event_number", "masterincidentnumber", "call", "call_no",
   ],
   cadCallNumber: [
     "cadcallnumber", "cad_call_number", "callid", "call_id", "callno", "call_no", "cadid", "cad_id",
-    "incidentnumber", "incident_number",
+    "incidentnumber", "incident_number", "call",
   ],
   receivedTime: [
     "receivedtime", "received_time", "callreceived", "call_received", "callreceivedtime", "call_received_time",
@@ -58,6 +58,9 @@ const CAD_FIELD_ALIASES = {
     "initialcomments", "initial_comments", "comments", "comment", "narrative", "remarks", "notes",
     "problem", "nature", "calltype", "call_type", "incidenttype", "incident_type", "description",
     "dispatchnotes", "dispatch_notes",
+  ],
+  incidentDate: [
+    "date", "incidentdate", "incident_date", "calldate", "call_date", "dispatchdate", "dispatch_date", "eventdate", "event_date",
   ],
   address: [
     "address", "incidentaddress", "incident_address", "location", "fulladdress", "full_address",
@@ -439,8 +442,18 @@ function mapRawToCadPayload(raw) {
 
   const incidentAddress = pickAlias(source, CAD_FIELD_ALIASES.address);
   const incidentTypeSummary = pickAlias(source, CAD_FIELD_ALIASES.incidentType);
-  const dispatchTime = cad.dispatchTime;
-  const incidentDate = dispatchTime ? dispatchTime.slice(0, 10) : undefined;
+  // The date comes from an explicit date field, else from a full date-time; a bare
+  // time like "14:02" is never a date. Bare times are joined to that date.
+  const explicitDate = isoDateOnly(pickAlias(source, CAD_FIELD_ALIASES.incidentDate));
+  const timeKeys = ["receivedTime", "dispatchTime", "enrouteTime", "arrivalTime", "clearTime"];
+  const datedTime = timeKeys.map((key) => cad[key]).find((value) => /^\d{4}-\d{2}-\d{2}/.test(value || ""));
+  const incidentDate = explicitDate || (datedTime ? datedTime.slice(0, 10) : undefined);
+  if (incidentDate) {
+    for (const key of timeKeys) {
+      const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(String(cad[key] || "").trim());
+      if (match) cad[key] = `${incidentDate}T${match[1].padStart(2, "0")}:${match[2]}`;
+    }
+  }
 
   let units = [];
   const rawUnits = source.units || source.resources || source.apparatus || source.assignedunits;
@@ -510,9 +523,22 @@ function pickAlias(source, aliases) {
 }
 
 /** @param {string} value */
+/** "2026-11-01", "11/01/2026" or "Nov 1, 2026" -> "2026-11-01"; otherwise "". */
+function isoDateOnly(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime()) || !/\d{4}/.test(text)) return "";
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+}
+
 function normalizeDateTime(value) {
   if (!value) return "";
-  const trimmed = value.trim();
+  const trimmed = String(value).trim();
+  // A bare time stays as written; it is joined to the incident date later.
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) return trimmed;
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed)) return trimmed.slice(0, 16);
   const parsed = new Date(trimmed);
   if (!Number.isNaN(parsed.getTime())) {
@@ -524,7 +550,7 @@ function normalizeDateTime(value) {
 
 /** @param {string} key */
 function normalizeKey(key) {
-  return String(key).trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return String(key).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
 /** @param {string} key */
