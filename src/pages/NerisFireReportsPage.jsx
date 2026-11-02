@@ -11,6 +11,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { NERIS_FORM_MODULES, summarizeIncidentType } from "../lib/nerisSchema.js";
 import { NERIS_REPORT_STATUSES } from "../lib/neris/workflow.js";
 import { autoPopulateReport } from "../lib/neris/autoPopulation.js";
+import { mergeBuildingDetails } from "../lib/neris/buildingDetails.js";
+import { loadBuildingDetails } from "../lib/neris/buildingDetailsLoader.js";
 import { isNerisFeatureEnabled } from "../lib/neris/featureFlags.js";
 import { queueOfflineReport, syncOfflineQueue } from "../lib/neris/offlineSync.js";
 import {
@@ -201,18 +203,53 @@ export default function NerisFireReportsPage({
       setRecords((current) => [next, ...current]);
       setSelectedId(next.id);
       setStarting(false);
+      // Fill the building details in the background; the report opens right away.
+      fillBuildingDetails(next).then((filled) => {
+        if (filled.length) setMessage(`Filled in ${filled.length} building detail${filled.length === 1 ? "" : "s"} from the preplan and inspection records. Check them on the Scene step.`);
+      });
     } finally {
       creatingRef.current = false;
     }
   }
 
-  function autoFill() {
+  /**
+   * Construction, sprinklers, alarm, Knox Box, hazards, water supply and last inspection
+   * from the building's preplan, fire protection systems, occupancy and inspections.
+   * Only blank or "Unknown" fields are filled. Returns the names of the fields it filled.
+   */
+  async function fillBuildingDetails(report) {
+    const address = String(report?.incidentAddress || "").trim();
+    if (!address) return [];
+    const { occupancy, details, sources: from } = await loadBuildingDetails(departmentId, address, { occupancies, preplans })
+      .catch(() => ({ occupancy: null, details: {}, sources: {} }));
+    if (!occupancy) return [];
+    const withBuilding = {
+      occupancyId: occupancy.id,
+      occupancyName: occupancy.name,
+      propertyUse: occupancy.occupancyType || occupancy.type,
+      ...details,
+    };
+    const { filled } = mergeBuildingDetails(report.workspace?.location, withBuilding);
+    if (!filled.length) return [];
+    setRecords((current) => current.map((r) => {
+      if (r.id !== report.id) return r;
+      const merged = mergeBuildingDetails(r.workspace?.location, withBuilding);
+      const autoSources = { ...(r.autoPopulateSources || {}), "workspace.location": r.autoPopulateSources?.["workspace.location"] || "occupancy" };
+      for (const key of merged.filled) autoSources[`workspace.location.${key}`] = from[key] || "occupancy";
+      return { ...r, workspace: { ...(r.workspace || {}), location: merged.location }, autoPopulateSources: autoSources, updatedAt: new Date().toISOString() };
+    }));
+    return filled.filter((key) => !["occupancyId", "occupancyName", "propertyUse"].includes(key));
+  }
+
+  async function autoFill() {
     if (!selected) return;
     const filled = autoPopulateReport(selected, sources);
     updateSelected({ workspace: filled.workspace, autoPopulateSources: filled.autoPopulateSources });
     const found = [];
     if (filled.workspace.location?.occupancyName && !selected.workspace?.location?.occupancyName) found.push("property details");
     if ((filled.workspace.personnel || []).length && !(selected.workspace?.personnel || []).length) found.push("crew from the schedule");
+    const building = await fillBuildingDetails({ ...selected, workspace: filled.workspace });
+    if (building.length) found.push(`${building.length} building detail${building.length === 1 ? "" : "s"} from the preplan and inspections`);
     setMessage(found.length ? `Filled in ${found.join(" and ")}. Check them before you submit.` : "Nothing new to fill in from FORGE records for this address and date.");
   }
 
