@@ -901,3 +901,46 @@ html[data-theme="dark"] .daily-roster-time-part,
   width: 100%;
   height: 100%;
 }
+
+.employee-trade-not-on-shift {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--rms-border);
+  border-radius: 10px;
+  background: var(--rms-bg-surface-2, #f8fafc);
+}
+
+.employee-trade-not-on-shift strong {
+  color: var(--rms-text-strong);
+  font-size: 14px;
+}
+
+.employee-trade-not-on-shift span {
+  color: var(--rms-text-muted);
+  font-size: 13px;
+}
+
+.employee-trade-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 8px;
+}
+
+.employee-trade-preview > span {
+  color: var(--rms-text-body);
+  font-size: 13px;
+}
+
+.employee-trade-preview select {
+  min-width: 260px;
+  padding: 7px 10px;
+  border: 1px solid var(--rms-border);
+  border-radius: 6px;
+  background: var(--rms-bg-input, #fff);
+  color: var(--rms-text-body);
+  font: inherit;
+  font-size: 13px;
+}
