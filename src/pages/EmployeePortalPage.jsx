@@ -847,7 +847,7 @@ export default function EmployeePortalPage({
           <section className="dashboard-grid">
             <div className="dashboard-column">
               <Panel title="Certification Alerts" icon={FileCheck2}>
-                <div className="operational-notes">
+                <div className="operational-notes employee-cert-list">
                   {myCerts.map((item) => <p key={item.id}><time>{item.expires}</time><b>{item.type}</b><span>{item.status}</span></p>)}
                   {!myCerts.length && <p><b>All clear</b><span>No certification alerts</span></p>}
                 </div>

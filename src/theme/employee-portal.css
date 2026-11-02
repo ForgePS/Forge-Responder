@@ -230,9 +230,10 @@
   color: var(--rms-text-muted);
 }
 
-.employee-leave-history time,
-.employee-trade-history time {
-  min-width: 88px;
+.operational-notes.employee-cert-list p,
+.operational-notes.employee-leave-history p,
+.operational-notes.employee-trade-history p {
+  grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
 }
 
 .operational-notes.employee-doc-ack-list p {
