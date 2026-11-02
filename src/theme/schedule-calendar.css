@@ -225,7 +225,6 @@
   gap: 6px;
   padding: 10px 10px 8px;
   border: 0;
-  border-top: 3px solid var(--day-shift-color, transparent);
   background: var(--rms-bg-surface, #fff);
   color: var(--rms-text-strong, #0f172a);
   text-align: left;
@@ -252,7 +251,6 @@
 
 .schedule-calendar-day.is-hidden-day {
   background: var(--rms-bg-surface-2, #f8fafc);
-  border-top-color: transparent;
   border: 0;
   box-shadow: none;
   pointer-events: none;
@@ -504,4 +502,40 @@ html[data-theme="dark"] .schedule-calendar-day.is-selected,
 html[data-theme="dark"] .schedule-calendar-shift-badge,
 :root:not([data-theme="light"]) .schedule-calendar-shift-badge {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+/* Soft shift pills: a tint of the shift color with a colored dot, instead of a
+   solid block on every day. Works for any configured shift color. */
+.schedule-calendar-shift-badge {
+  gap: 5px;
+  padding: 2px 8px 2px 7px;
+  background: color-mix(in srgb, var(--badge-color, #64748b) 12%, transparent);
+  color: color-mix(in srgb, var(--badge-color, #64748b) 70%, #0f172a);
+  font-weight: 600;
+}
+
+.schedule-calendar-shift-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--badge-color, #64748b);
+  flex-shrink: 0;
+}
+
+html[data-theme="dark"] .schedule-calendar-shift-badge,
+:root:not([data-theme="light"]) .schedule-calendar-shift-badge {
+  background: color-mix(in srgb, color-mix(in srgb, var(--badge-color, #64748b) 55%, #94a3b8) 26%, transparent);
+  color: color-mix(in srgb, var(--badge-color, #94a3b8) 45%, #f1f5f9);
+  box-shadow: none;
+}
+
+/* Black (A Shift) needs a visible dot on dark backgrounds. */
+html[data-theme="dark"] .schedule-calendar-shift-badge::before,
+:root:not([data-theme="light"]) .schedule-calendar-shift-badge::before {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.schedule-calendar-grid {
+  background: color-mix(in srgb, var(--rms-border, #e2e8f0) 70%, transparent);
 }
