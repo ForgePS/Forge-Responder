@@ -1324,6 +1324,7 @@ function AppShell() {
       timeCards={timeCards}
       setTimeCards={setTimeCards}
       previewPerson={employeePreviewPerson}
+      onPreviewPerson={showEmployeeToggle ? (personnelId) => setEmployeePreviewPersonId(personnelId) : undefined}
       onClearPreviewPerson={() => {
         setEmployeePreviewPersonId("");
         persistAppViewPref("admin");

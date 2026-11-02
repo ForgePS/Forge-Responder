@@ -59,6 +59,7 @@ import { listMyAcademyTraining } from "../lib/academyIntegrations.js";
 import {
   advanceShiftTradeApproval,
   buildLeaveApprovalMeta,
+  isRotationShift,
   buildShiftTradeApprovalHint,
   buildShiftTradeApprovalMeta,
   buildShiftTradeDateWindow,
@@ -209,6 +210,7 @@ export default function EmployeePortalPage({
   setTimeCards,
   previewPerson = null,
   onClearPreviewPerson,
+  onPreviewPerson,
 }) {
   const { departmentId } = useTenant();
   const { patchMembership } = useAuth();
@@ -435,6 +437,15 @@ export default function EmployeePortalPage({
   const myCertAlerts = myCerts.filter(isCertificationAlert);
   const certAlerts = myCertAlerts.length;
   const onRotation = Boolean(scheduleContext.onRotation);
+  // Admins who aren't on a shift can preview the schedule tabs as a shift member.
+  const shiftMembersForPreview = useMemo(
+    () => (hasPermission(permissions, "accessAdminRms")
+      ? personnel
+        .filter((person) => person && isRotationShift(person.shift, rotation) && !/inactive|terminated/i.test(String(person.status || "")))
+        .sort((a, b) => String(a.shift).localeCompare(String(b.shift)) || String(a.name).localeCompare(String(b.name)))
+      : []),
+    [permissions, personnel, rotation]
+  );
 
   const canSubmitLeave = hasPermission(permissions, "submitLeaveRequests") || hasPermission(permissions, "accessAdminRms");
   const canSubmitTrades = hasPermission(permissions, "submitShiftTrades") || hasPermission(permissions, "accessAdminRms");
@@ -1090,6 +1101,20 @@ export default function EmployeePortalPage({
                       {`You're on ${myPerson?.shift || membership?.assignedShift || "day staff"}, so you don't have rotation shifts to trade. `}
                       {pendingTradeActions.length ? "Trades waiting for your approval are listed below." : "Trades that need your approval will show here."}
                     </span>
+                    {onPreviewPerson && shiftMembersForPreview.length ? (
+                      <label className="employee-trade-preview">
+                        <span>To check the setup, see this tab as a shift member:</span>
+                        <select
+                          value=""
+                          onChange={(event) => { if (event.target.value) onPreviewPerson(event.target.value); }}
+                        >
+                          <option value="">Preview as…</option>
+                          {shiftMembersForPreview.map((person) => (
+                            <option key={person.id} value={person.id}>{person.name} · {person.shift}{person.rank ? ` · ${person.rank}` : ""}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                   </div>
                 ) : canSubmitTrades ? (
                   <>
