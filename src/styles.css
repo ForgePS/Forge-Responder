@@ -2484,7 +2484,7 @@ html[data-theme="dark"] .shift-legend-chip {
   padding: 8px 10px;
   border: 1px solid var(--rms-border);
   border-radius: 6px;
-  background: rgba(10, 29, 46, 0.72);
+  background: var(--rms-bg-input);
   color: var(--rms-text-body);
 }
 
@@ -2503,7 +2503,7 @@ html[data-theme="dark"] .shift-legend-chip {
   padding: 10px 12px;
   border: 1px solid var(--rms-border);
   border-radius: 8px;
-  background: rgba(10, 29, 46, 0.45);
+  background: var(--rms-bg-surface);
 }
 
 .neris-field-settings-row strong {
@@ -2520,7 +2520,7 @@ html[data-theme="dark"] .shift-legend-chip {
 }
 
 .neris-field-settings-head {
-  background: rgba(10, 29, 46, 0.85);
+  background: var(--rms-bg-panel-header);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -2566,7 +2566,7 @@ html[data-theme="dark"] .shift-legend-chip {
   border: 1px solid var(--rms-border);
   border-top: none;
   border-radius: 0 0 8px 8px;
-  background: rgba(10, 29, 46, 0.3);
+  background: var(--rms-bg-surface-3);
 }
 
 .neris-field-settings-field-block .neris-field-settings-row {
@@ -2621,7 +2621,7 @@ html[data-theme="dark"] .shift-legend-chip {
   padding: 8px 10px;
   border: 1px solid var(--rms-border-subtle);
   border-radius: 6px;
-  background: rgba(10, 29, 46, 0.55);
+  background: var(--rms-bg-surface);
 }
 
 .neris-dropdown-option-label {
@@ -2654,7 +2654,7 @@ html[data-theme="dark"] .shift-legend-chip {
   padding: 8px 10px;
   border: 1px solid var(--rms-border);
   border-radius: 6px;
-  background: rgba(10, 29, 46, 0.72);
+  background: var(--rms-bg-input);
   color: var(--rms-text-body);
 }
 
@@ -2778,7 +2778,7 @@ html[data-theme="dark"] .shift-legend-chip {
   gap: 8px;
   justify-items: center;
   color: var(--rms-text-muted, #64748b);
-  background: rgba(15, 23, 42, 0.18);
+  background: var(--rms-bg-surface-3);
 }
 
 .inspections-denied-state,
@@ -2875,7 +2875,7 @@ html[data-theme="dark"] .shift-legend-chip {
   border: 1px solid var(--rms-border);
   border-radius: 6px;
   padding: 6px 10px;
-  background: rgba(10, 29, 46, 0.55);
+  background: var(--rms-bg-input);
   color: var(--rms-text-body);
 }
 
@@ -2973,7 +2973,7 @@ html[data-theme="dark"] .shift-legend-chip {
   gap: 2px;
   padding: 8px 10px;
   border-left: 3px solid var(--rms-accent, #2563eb);
-  background: rgba(15, 23, 42, 0.22);
+  background: var(--rms-bg-surface-3);
   border-radius: 0 6px 6px 0;
 }
 
@@ -3025,7 +3025,7 @@ html[data-theme="dark"] .shift-legend-chip {
   border: 1px solid var(--rms-border);
   border-radius: 6px;
   padding: 6px 10px;
-  background: rgba(10, 29, 46, 0.55);
+  background: var(--rms-bg-input);
   color: var(--rms-text-body);
   font-weight: 500;
 }
@@ -3036,7 +3036,7 @@ html[data-theme="dark"] .shift-legend-chip {
   padding: 12px;
   display: grid;
   gap: 10px;
-  background: rgba(15, 23, 42, 0.2);
+  background: var(--rms-bg-surface-3);
 }
 
 .template-fields {
@@ -3498,7 +3498,7 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
   padding: 12px;
   display: grid;
   gap: 8px;
-  background: rgba(15, 23, 42, 0.25);
+  background: var(--rms-bg-surface);
 }
 
 .readiness-unit-card header {
@@ -3533,7 +3533,7 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
 .fleet-wo-column {
   border: 1px solid var(--rms-border);
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.22);
+  background: var(--rms-bg-surface-3);
   min-height: 220px;
   display: flex;
   flex-direction: column;
@@ -3561,7 +3561,7 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
   border: 1px solid var(--rms-border);
   border-radius: 6px;
   padding: 8px 10px;
-  background: rgba(10, 29, 46, 0.55);
+  background: var(--rms-bg-surface);
   color: inherit;
   display: grid;
   gap: 4px;

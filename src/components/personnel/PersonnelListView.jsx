@@ -128,7 +128,7 @@ export default function PersonnelListView({
 
   function handleBulkDelete() {
     if (!selectedIds.length || !onDeletePerson) return;
-    if (!window.confirm(`Delete ${selectedIds.length} personnel record(s)?`)) return;
+    if (!window.confirm(`Delete ${selectedIds.length} personnel record${selectedIds.length === 1 ? "" : "s"}?`)) return;
     selectedIds.forEach((id) => onDeletePerson(id));
     setSelectedIds([]);
   }

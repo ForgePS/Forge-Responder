@@ -46,7 +46,7 @@ export default function AccessDeniedPage({ userId = "" }) {
           setPlatformCreatorRecoverable(true);
         }
       } catch {
-        // Ignore lookup failures; Change tenant / Sign out remain available.
+        // Ignore lookup failures; Change department / Sign out remain available.
       }
     }
     checkPlatformCreator();
@@ -62,7 +62,7 @@ export default function AccessDeniedPage({ userId = "" }) {
       setRecoveryMessage("Admin access restored. Loading your workspace...");
       return;
     }
-    setRecoveryMessage("Could not restore access automatically. Use Change tenant, or contact your platform owner.");
+    setRecoveryMessage("We couldn't restore access automatically. Use Change Department, or contact FORGE Public Safety.");
   }
 
   async function handleChangeTenant() {
@@ -121,9 +121,9 @@ export default function AccessDeniedPage({ userId = "" }) {
           {inactive
             ? "If you think this is a mistake, ask your department administrator to contact FORGE Public Safety."
             : creatorConsoleEntry
-            ? "Click Restore admin access below, or add your Account ID to platformCreators in Firebase Console."
+            ? "Click Restore Admin Access below, or contact FORGE support."
             : canChangeTenant
-              ? "If you selected the wrong tenant, use Change tenant below. Otherwise ask your department administrator to send you an invite link."
+              ? "If you picked the wrong department, use Change Department below. Otherwise ask your department administrator to send you an invite link."
               : "Ask your department administrator to send you an invite link, then open it and sign in again."}
         </p>
         {creatorConsoleEntry && (
@@ -149,7 +149,7 @@ export default function AccessDeniedPage({ userId = "" }) {
             onClick={handleRecoverAccess}
             disabled={recoveryLoading || changingTenant}
           >
-            {recoveryLoading ? "Restoring access..." : "Restore admin access"}
+            {recoveryLoading ? "Restoring access…" : "Restore Admin Access"}
           </button>
         )}
 
@@ -160,7 +160,7 @@ export default function AccessDeniedPage({ userId = "" }) {
             onClick={handleChangeTenant}
             disabled={changingTenant || recoveryLoading}
           >
-            {changingTenant ? "Switching tenant..." : "Change tenant"}
+            {changingTenant ? "Switching department…" : "Change Department"}
           </button>
         )}
 
@@ -172,7 +172,7 @@ export default function AccessDeniedPage({ userId = "" }) {
           onClick={signOut}
           disabled={changingTenant}
         >
-          Sign out
+          Sign Out
         </button>
       </section>
     </div>

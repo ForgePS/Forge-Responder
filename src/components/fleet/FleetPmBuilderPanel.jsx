@@ -272,7 +272,7 @@ export default function FleetPmBuilderPanel({
           <header>
             <div><CalendarClock size={15} /><strong>Maintenance schedules</strong></div>
             <button className="text-button" type="button" disabled={saving} onClick={startNew}>
-              <CirclePlus size={14} /> Add schedule
+              <CirclePlus size={14} /> Add Schedule
             </button>
           </header>
           <div className="panel-body">
@@ -498,7 +498,7 @@ export default function FleetPmBuilderPanel({
               {!isNew ? (
                 <div className="pm-remove-row">
                   <button className="secondary-button danger-button" type="button" disabled={saving} onClick={handleRemove}>
-                    <Trash2 size={14} /> Remove schedule
+                    <Trash2 size={14} /> Remove Schedule
                   </button>
                   <small className="pm-help">
                     {unitCounts[draft.id]

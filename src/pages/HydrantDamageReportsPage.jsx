@@ -50,6 +50,7 @@ import { loadTenantHydrantRecords, loadStaticHydrants, persistHydrantUpdate } fr
 import { isOutOfServiceHydrant } from "../lib/hydrantCompletionStats.js";
 import { applyHydrantStatusChange } from "../lib/hydrantStatusSync.js";
 import { hydrantMatchesDamageReport, shouldOfferReturnToService } from "../lib/hydrantDamage/returnToService.js";
+import { friendlyError } from "../lib/friendlyError.js";
 
 function queueIdFromNav(navName = "") {
   const views = getDamageQueueViews();
@@ -138,7 +139,7 @@ export default function HydrantDamageReportsPage({
       setSelectedId((current) => current || nextReports[0]?.id || "");
     } catch (loadError) {
       console.error(loadError);
-      setError(loadError?.message || "Unable to load damage reports.");
+      setError(friendlyError(loadError, "Couldn't load damage reports."));
     } finally {
       setLoading(false);
     }
@@ -217,7 +218,7 @@ export default function HydrantDamageReportsPage({
         setSelectedId(created.id);
         setMessage(`Draft ${created.reportNumber} created for ${created.hydrantLabel}.`);
       } catch (createError) {
-        setError(createError?.message || "Unable to create damage report.");
+        setError(friendlyError(createError, "Couldn't create damage report."));
       } finally {
         setSaving(false);
       }
@@ -255,7 +256,7 @@ export default function HydrantDamageReportsPage({
       setSelectedId(created.id);
       setMessage(`Draft ${created.reportNumber} created.`);
     } catch (createError) {
-      setError(createError?.message || "Unable to create report.");
+      setError(friendlyError(createError, "Couldn't create report."));
     } finally {
       setSaving(false);
     }
@@ -277,7 +278,7 @@ export default function HydrantDamageReportsPage({
       setSelectedId(created.id);
       setMessage(`Draft ${created.reportNumber} created for OOS hydrant ${created.hydrantLabel}.`);
     } catch (createError) {
-      setError(createError?.message || "Unable to create damage report for hydrant.");
+      setError(friendlyError(createError, "Couldn't create damage report for hydrant."));
     } finally {
       setSaving(false);
     }
@@ -325,7 +326,7 @@ export default function HydrantDamageReportsPage({
       setReports((current) => [saved, ...current.filter((row) => row.id !== saved.id)]);
       setMessage("Hydrant assigned.");
     } catch (assignError) {
-      setError(assignError?.message || "Unable to assign hydrant.");
+      setError(friendlyError(assignError, "Couldn't assign hydrant."));
     } finally {
       setSaving(false);
     }
@@ -357,7 +358,7 @@ export default function HydrantDamageReportsPage({
         setDraft((current) => ({ ...current, localId: savedOffline.localId, offlineQueued: true }));
         setMessage("Network unavailable — draft queued offline.");
       } else {
-        setError(saveError?.message || "Unable to save report.");
+        setError(friendlyError(saveError, "Couldn't save report."));
       }
     } finally {
       setSaving(false);
@@ -375,7 +376,7 @@ export default function HydrantDamageReportsPage({
       setReports((current) => [saved, ...current.filter((row) => row.id !== saved.id)]);
       setMessage("Marked Ready to Send. Use Send on step 8 to deliver via server email.");
     } catch (readyError) {
-      setError(readyError?.message || "Unable to mark ready.");
+      setError(friendlyError(readyError, "Couldn't mark ready."));
     } finally {
       setSaving(false);
     }
@@ -402,7 +403,7 @@ export default function HydrantDamageReportsPage({
     } catch (sendError) {
       // reload() clears the error banner, so refresh first and show the reason after.
       await reload();
-      setError(`Not sent: ${sendError?.message || "the email could not be sent."}`);
+      setError(`Email not sent. ${friendlyError(sendError, "Please try again.")}`);
     } finally {
       setSaving(false);
     }
@@ -428,7 +429,7 @@ export default function HydrantDamageReportsPage({
         utilityNotes: "",
       });
     } catch (ackError) {
-      setError(ackError?.message || "Unable to record acknowledgment.");
+      setError(friendlyError(ackError, "Couldn't record acknowledgment."));
     } finally {
       setSaving(false);
     }
@@ -449,7 +450,7 @@ export default function HydrantDamageReportsPage({
       setReports((current) => [saved, ...current.filter((row) => row.id !== saved.id)]);
       setMessage(status === "completed" ? "Repair completed — queued for FD verification." : "Repair update recorded.");
     } catch (updateError) {
-      setError(updateError?.message || "Unable to record repair update.");
+      setError(friendlyError(updateError, "Couldn't record repair update."));
     } finally {
       setSaving(false);
     }
@@ -470,7 +471,7 @@ export default function HydrantDamageReportsPage({
       setEscalateNotes("");
       setMessage("Escalation recorded (internal alert + history). Reminder email can be sent separately.");
     } catch (escalateError) {
-      setError(escalateError?.message || "Unable to escalate.");
+      setError(friendlyError(escalateError, "Couldn't escalate."));
     } finally {
       setSaving(false);
     }
@@ -489,7 +490,7 @@ export default function HydrantDamageReportsPage({
       setReports((current) => [saved, ...current.filter((row) => row.id !== saved.id)]);
       setMessage(saved.slaPaused ? "SLA paused." : "SLA resumed.");
     } catch (pauseError) {
-      setError(pauseError?.message || "Unable to update SLA pause.");
+      setError(friendlyError(pauseError, "Couldn't update SLA pause."));
     } finally {
       setSaving(false);
     }
@@ -505,7 +506,7 @@ export default function HydrantDamageReportsPage({
       setReports((current) => [saved, ...current.filter((row) => row.id !== saved.id)]);
       setMessage("Queued for fire-department verification.");
     } catch (readyError) {
-      setError(readyError?.message || "Unable to queue verification.");
+      setError(friendlyError(readyError, "Couldn't queue verification."));
     } finally {
       setSaving(false);
     }
@@ -540,7 +541,7 @@ export default function HydrantDamageReportsPage({
             summary += ` Hydrant ${label} is back in service.`;
           } catch (hydrantError) {
             console.error(hydrantError);
-            setError(`Report closed, but hydrant ${label} could not be put back in service (${hydrantError?.message || "save failed"}). Update it in Hydrants.`);
+            setError(`Report closed, but hydrant ${label} couldn't be put back in service. Update it in Hydrants.`);
           }
         } else {
           summary += ` Hydrant ${label} is still Out of Service.`;
@@ -548,7 +549,7 @@ export default function HydrantDamageReportsPage({
       }
       setMessage(summary);
     } catch (verifyError) {
-      setError(verifyError?.message || "Unable to submit verification.");
+      setError(friendlyError(verifyError, "Couldn't submit verification."));
     } finally {
       setSaving(false);
     }
@@ -566,7 +567,7 @@ export default function HydrantDamageReportsPage({
       setReports((current) => [saved, ...current.filter((row) => row.id !== saved.id)]);
       setMessage("Report reopened.");
     } catch (reopenError) {
-      setError(reopenError?.message || "Unable to reopen report.");
+      setError(friendlyError(reopenError, "Couldn't reopen report."));
     } finally {
       setSaving(false);
     }

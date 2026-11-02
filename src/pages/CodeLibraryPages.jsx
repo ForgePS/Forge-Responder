@@ -40,7 +40,6 @@ import { createViolation } from "../lib/inspections/violationService.js";
 import {
   canCiteCodeSections,
   canManageAdoptedCodes,
-  canManageCodeLibrary,
   canViewCodeLibrary,
 } from "../lib/inspections/inspectionPermissions.js";
 
@@ -335,7 +334,7 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
   if (!access?.moduleEnabled && !isCreator) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-700">
-        Code Library is disabled for this department. Ask a Creator to enable it under Code Administration.
+        Code Library isn't turned on for this department yet. Contact FORGE support to enable it.
       </div>
     );
   }
@@ -435,7 +434,7 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
                   ? "Unable to load hierarchy. See error above."
                   : loading
                     ? "Loading sections…"
-                    : "No nodes yet. Publish the IFC import or preview seed under Code Administration."}
+                    : "No code sections are loaded yet. Contact FORGE support to load your adopted code books."}
               </p>
             ) : null}
           </div>
@@ -763,10 +762,10 @@ export function AdoptedCodesPage() {
 }
 
 export function CodeAdministrationPage({ onNavigate }) {
-  const { permissions, isCreator } = useAuth();
+  const { isCreator } = useAuth();
   const departmentId = useDepartmentId();
   const actor = useActor();
-  const allowed = canManageCodeLibrary(permissions, isCreator);
+  const allowed = Boolean(isCreator); // FORGE staff only
 
   const [access, setAccess] = useState(null);
   const [publications, setPublications] = useState([]);
@@ -841,7 +840,7 @@ export function CodeAdministrationPage({ onNavigate }) {
         },
         actorUid: actor.actorUid,
       });
-      setMessage(`Published preview seed (${result.written} nodes). Run scripts/ifc for full DOCX import.`);
+      setMessage(`Published the sample code book (${result.written} sections).`);
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Publish failed.");
@@ -856,8 +855,7 @@ export function CodeAdministrationPage({ onNavigate }) {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-slate-900">Code Administration</h1>
       <p className="text-sm text-slate-600">
-        Creator controls which code libraries are available to this department. See{" "}
-        <code className="rounded bg-slate-100 px-1">docs/inspections/code-library-runbook.md</code>.
+        Choose which code books this department can search and cite during inspections.
       </p>
       {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
@@ -879,7 +877,7 @@ export function CodeAdministrationPage({ onNavigate }) {
             Enable 2024 IFC
           </button>
           <button type="button" disabled={busy} onClick={handlePublishSeed} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold">
-            <BookOpen className="h-3.5 w-3.5" /> Publish preview seed
+            <BookOpen className="h-3.5 w-3.5" /> Publish sample code book
           </button>
           <button type="button" onClick={() => onNavigate?.("Browse Codes")} className="rounded-lg border px-3 py-2 text-xs font-semibold">
             Open browser
@@ -918,7 +916,7 @@ export function CodeAdministrationPage({ onNavigate }) {
           ))}
           {!batches.length ? (
             <p className="text-xs text-slate-500">
-              No import batches. Use <code>node scripts/ifc/parseIfcDocx.mjs</code> then publish.
+              No code book imports yet.
             </p>
           ) : null}
         </div>

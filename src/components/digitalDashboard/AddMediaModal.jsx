@@ -868,7 +868,7 @@ export default function AddMediaModal({
               onClick={handleSave}
               disabled={uploading || !form.title?.trim() || (isGallerySource && !form.url?.trim())}
             >
-              {uploading ? "Uploading…" : isEdit ? "Save media" : "Add media"}
+              {uploading ? "Uploading…" : isEdit ? "Save Media" : "Add Media"}
             </button>
           </div>
         </footer>

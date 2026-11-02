@@ -128,8 +128,7 @@ export default function NerisCadImportModal({
   return (
     <ModalShell title="Import from CAD" onClose={handleClose}>
       <p className="auth-help">
-        Paste a CAD/dispatch payload or upload an export file (.json, .csv, .xml).
-        No department CAD connector is required — manual import is supported.
+        Paste call details from your CAD system or upload a CAD export file.
       </p>
 
       <div className="neris-cad-import-tabs">
@@ -138,7 +137,7 @@ export default function NerisCadImportModal({
           className={mode === "paste" ? "active" : ""}
           onClick={() => setMode("paste")}
         >
-          <ClipboardPaste size={14} /> Paste payload
+          <ClipboardPaste size={14} /> Paste call details
         </button>
         <button
           type="button"
@@ -152,12 +151,12 @@ export default function NerisCadImportModal({
       {mode === "paste" ? (
         <div className="neris-cad-import-pane">
           <label className="neris-field neris-field-wide">
-            <span>CAD / dispatch data (JSON or key: value text)</span>
+            <span>Call details from CAD</span>
             <textarea
               rows={8}
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
-              placeholder={'{\n  "call_number": "CAD-2026-1042",\n  "dispatch_time": "2026-06-10T14:05",\n  "address": "3101 Main St",\n  "incident_type": "STRUCTURE_FIRE",\n  "units": [{"unit": "Engine 1", "dispatch_time": "2026-06-10T14:05"}]\n}'}
+              placeholder={"Call #: 2026-1042\nAddress: 3101 Main St\nType: Structure fire"}
             />
           </label>
           <button

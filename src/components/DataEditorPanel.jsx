@@ -156,11 +156,11 @@ export default function DataEditorPanel({ onMessage, onDirtyChange }) {
     <section className="data-editor-panel">
       <div className="data-editor-toolbar">
         <label>
-          <span>Module dataset</span>
+          <span>List</span>
           <select
             value={datasetKey}
             onChange={(event) => {
-              if (isDirty && !window.confirm("You have unsaved changes in this dataset. Switch without saving?")) return;
+              if (isDirty && !window.confirm("You have unsaved changes in this list. Switch without saving?")) return;
               setDatasetKey(event.target.value);
             }}
           >
@@ -175,7 +175,7 @@ export default function DataEditorPanel({ onMessage, onDirtyChange }) {
           <div className="data-editor-actions">
             <button className="secondary-button" type="button" onClick={addRow}><CirclePlus size={14} /> Add row</button>
             <button className="primary-button" type="button" onClick={saveDataset} disabled={saving || loading || loadFailed}>
-              <Check size={14} /> {saving ? "Saving..." : "Save dataset"}
+              <Check size={14} /> {saving ? "Saving…" : "Save List"}
             </button>
           </div>
         )}

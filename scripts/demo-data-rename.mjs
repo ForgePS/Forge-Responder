@@ -20,6 +20,10 @@ const DEMO = "forge-demo";
 const REPLACEMENTS = [
   ["3101 Goodman Rd W, Horn Lake, MS 38637", "3101 Main St, Riverside, MS 38600"],
   ["120 Commerce Dr, Horn Lake, MS 38637", "120 Commerce Dr, Riverside, MS 38600"],
+  ["Amazon Distribution Center", "Riverside Distribution Center"],
+  ["Amazon Distribution", "Riverside Distribution Center"],
+  ["Logan's Roadhouse", "Main Street Diner"],
+  ["Comfort Inn", "Riverside Inn"],
   ["Horn Lake High School", "Riverside High School"],
   ["Horn Lake City Hall", "Riverside City Hall"],
   ["4710 Horn Lake Rd", "4710 Riverside Rd"],

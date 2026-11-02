@@ -22,6 +22,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { limitCheck, limitMessage } from "../lib/moduleAccess.js";
 import { usePersonnelPrivate } from "../hooks/usePersonnelPrivate.js";
 import { savePersonnelPrivate } from "../lib/personnelPrivateService.js";
+import { friendlyError } from "../lib/friendlyError.js";
 import {
   hasPrivateValue,
   mergePersonnelPrivate,
@@ -203,7 +204,7 @@ export default function PersonnelPage({
         forgePersonId
           ? "Profile saved (Forge person ID linked)"
           : hubLinkError
-            ? `Profile saved. Forge person ID link is pending (Integration Hub: ${hubLinkError}).`
+            ? "Profile saved. The FORGE person ID will link automatically once the connection is available."
             : "Profile saved"
       );
     } catch (error) {
@@ -214,7 +215,7 @@ export default function PersonnelPage({
         );
         return;
       }
-      setSavedMessage(error instanceof Error ? error.message : "Save failed — please try again");
+      setSavedMessage(friendlyError(error, "Couldn't save the profile. Please try again."));
     }
   }
 
@@ -340,7 +341,7 @@ export default function PersonnelPage({
     if (!outcome.updatedCount) return;
 
     setRecords(outcome.records);
-    setSavedMessage(`Updated ${outcome.updatedCount} personnel record(s).`);
+    setSavedMessage(`Updated ${outcome.updatedCount} personnel record${outcome.updatedCount === 1 ? "" : "s"}.`);
     if (departmentId) {
       await writeAuditLog(departmentId, {
         action: "update",
@@ -359,7 +360,7 @@ export default function PersonnelPage({
         records = await attachForgePersonIds(departmentId, records);
       }
       setRecords(records);
-      setSavedMessage(`Imported ${outcome.created} new and updated ${outcome.updated} personnel record(s).`);
+      setSavedMessage(`Personnel import complete: ${outcome.created} added, ${outcome.updated} updated.`);
       if (departmentId) {
         await writeAuditLog(departmentId, {
           action: "import",
@@ -375,7 +376,7 @@ export default function PersonnelPage({
         );
         return;
       }
-      setSavedMessage(error instanceof Error ? error.message : "Import failed during identity resolve.");
+      setSavedMessage(friendlyError(error, "Import failed. Check the file and try again."));
     }
   }
 

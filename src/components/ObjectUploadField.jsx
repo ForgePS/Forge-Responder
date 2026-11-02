@@ -81,7 +81,7 @@ export default function ObjectUploadField({
       console.error("Object upload failed", err);
       const code = err?.code || "";
       if (code === "storage/unauthorized" || code === "storage/permission-denied") {
-        setError("Upload blocked by Storage permissions. Storage rules may need deploying.");
+        setError("You don't have permission to upload files here. Ask your administrator.");
       } else if (code === "storage/retry-limit-exceeded" || code === "storage/network-request-failed") {
         setError("Network error during upload — check connection and try again.");
       } else if (code === "storage/canceled") {

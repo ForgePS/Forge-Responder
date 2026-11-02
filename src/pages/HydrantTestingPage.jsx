@@ -783,7 +783,9 @@ function CrewSessionPanel({ crew, draftCrew, setDraftCrew, setCrewSession, clear
   );
 }
 
-const hydrantMapViewStore = { center: null, zoom: null };
+// boundsKey: the hydrant area the map was last fitted to. userMoved: the
+// person panned or zoomed, so later data loads don't yank the view away.
+const hydrantMapViewStore = { center: null, zoom: null, boundsKey: "", userMoved: false };
 
 function rememberHydrantMapView(map) {
   if (!map) return;
@@ -812,12 +814,17 @@ function HydrantMap({ hydrants, selected, onSelect, mapBounds = cityBoundsDefaul
     }).addTo(map);
     const savedCenter = hydrantMapViewStore.center;
     const savedZoom = hydrantMapViewStore.zoom;
-    if (Array.isArray(savedCenter) && Number.isFinite(savedCenter[0]) && Number.isFinite(savedCenter[1]) && Number.isFinite(savedZoom)) {
+    const boundsKey = JSON.stringify(mapBounds);
+    const keepSaved = hydrantMapViewStore.userMoved || hydrantMapViewStore.boundsKey === boundsKey;
+    if (keepSaved && Array.isArray(savedCenter) && Number.isFinite(savedCenter[0]) && Number.isFinite(savedCenter[1]) && Number.isFinite(savedZoom)) {
       map.setView(savedCenter, savedZoom, { animate: false });
     } else {
       map.fitBounds(mapBounds, { padding: [24, 24] });
+      hydrantMapViewStore.boundsKey = boundsKey;
       rememberHydrantMapView(map);
     }
+    map.on("dragstart", () => { hydrantMapViewStore.userMoved = true; });
+    elRef.current.addEventListener("wheel", () => { hydrantMapViewStore.userMoved = true; }, { passive: true });
     map.on("moveend", () => rememberHydrantMapView(map));
     map.on("zoomend", () => rememberHydrantMapView(map));
     mapRef.current = map;
@@ -900,6 +907,16 @@ function HydrantMap({ hydrants, selected, onSelect, mapBounds = cityBoundsDefaul
       map.setView(ll, 15);
     });
   }
+
+  // Hydrants usually arrive after the map is drawn: fit to them once they do.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || hydrantMapViewStore.userMoved) return;
+    const boundsKey = JSON.stringify(mapBounds);
+    if (hydrantMapViewStore.boundsKey === boundsKey) return;
+    hydrantMapViewStore.boundsKey = boundsKey;
+    map.fitBounds(mapBounds, { padding: [24, 24] });
+  }, [mapBounds]);
 
   function zoomCity() {
     mapRef.current?.fitBounds(mapBounds, { padding: [24, 24] });
@@ -1151,7 +1168,8 @@ function HydrantCard({ selected }) {
 
 function HydrantOverlay({ children }) {
   if (typeof document === "undefined") return children;
-  return createPortal(children, document.body);
+  // hydrant-portal-scope keeps hydrant-testing.css styles on dialogs rendered into <body>.
+  return createPortal(<div className="hydrant-portal-scope hydrant-module-root hydrant-rms-theme">{children}</div>, document.body);
 }
 
 function HydrantEditorModal({ hydrant, crew, onClose, onSaved }) {
@@ -2344,12 +2362,12 @@ function SyncImportPage({ departmentId, departmentName, hydrantCount, onImported
       <div className="module-card">
         <div className="module-card-header">
           <strong>Sync Configuration</strong>
-          <span>These fields are placeholders until your agency confirms the Elite connection method.</span>
+          <span>Fill these in once ImageTrend confirms your connection details.</span>
         </div>
         <div className="form-grid">
           <Field label="Elite Endpoint / Import URL"><input placeholder="Provided by ImageTrend or agency admin" /></Field>
           <Field label="Agency / Department ID"><input placeholder={`${resolveDepartmentDisplayName(hydrantProfile)} identifier`} /></Field>
-          <Field label="Export Format"><select defaultValue="Daily Activity CSV"><option>Daily Activity CSV</option><option>Elite API JSON</option><option>Custom Import Template</option></select></Field>
+          <Field label="Export Format"><select defaultValue="Daily Activity CSV"><option>Daily Activity CSV</option><option value="Elite API JSON">ImageTrend Elite format</option><option>Custom Import Template</option></select></Field>
           <Field label="Sync Mode"><select defaultValue="Manual Review"><option>Manual Review</option><option>Auto Send Daily</option><option>Export Only</option></select></Field>
         </div>
         <div className="report-actions">
@@ -2544,7 +2562,7 @@ function EmsProtocolsPage() {
           <button className="secondary" onClick={() => setView("menu")}><ChevronRight size={16} /> EMS Menu</button>
           <label className="code-search">
             <Search size={16} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search 79 EMS treatment guidelines" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search EMS treatment guidelines" />
           </label>
           <span className="module-chip">{filteredProtocols.length} protocols</span>
         </div>
@@ -3379,7 +3397,7 @@ function InvestigationsPage() {
             <strong>Quick Actions</strong>
             <div className="inspection-division-card investigation-info-card">
               <ClipboardList size={24} />
-              <span><b>Investigation Report</b><em>Placeholder for the department investigation form or case system.</em></span>
+              <span><b>Investigation Report</b><em>Link your department's investigation form or case system.</em></span>
             </div>
             <div className="inspection-division-card investigation-info-card">
               <Mail size={24} />
@@ -3583,7 +3601,7 @@ function FireCodesPage() {
   }
 
   function sourceLabel(code) {
-    if (code.sourceUrl || code.fileUrl || code.downloadUrl) return "Firebase source";
+    if (code.sourceUrl || code.fileUrl || code.downloadUrl) return "Department upload";
     if (code.sourceKind === "Word document") return code.sourceFile || "2024 IFC Word source";
     if (code.sourceKind === "PDF source" && code.sourceFile) return code.sourceFile;
     const pdfPath = fireCodePdfUrls[code.chapter];

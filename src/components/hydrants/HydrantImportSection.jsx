@@ -75,7 +75,7 @@ export default function HydrantImportSection({
       setMessageTone("success");
       setMessage(
         importMode === "replace"
-          ? `Replaced tenant hydrant inventory with ${result.imported} records for ${departmentName}.`
+          ? `Replaced your department's hydrant list with ${result.imported} records for ${departmentName}.`
           : `Imported ${result.imported} hydrant records for ${departmentName}.`
       );
       setParsedHydrants([]);
@@ -125,7 +125,7 @@ export default function HydrantImportSection({
           }}
         >
           <FileUp size={28} />
-          <strong>Drop CSV or JSON here</strong>
+          <strong>Drop your hydrant spreadsheet (CSV) here</strong>
           <span>Use the standard hydrant field structure. Leave a column blank to keep the existing value on merge imports.</span>
           <button type="button" className="secondary" onClick={() => inputRef.current?.click()} disabled={importing}>
             <UploadCloud size={16} /> Choose File
@@ -143,8 +143,8 @@ export default function HydrantImportSection({
         <div className="form-grid hydrant-import-options">
           <Field label="Import Mode">
             <select value={importMode} onChange={(event) => setImportMode(event.target.value)} disabled={importing}>
-              <option value="merge">Merge with existing tenant records</option>
-              <option value="replace">Replace tenant hydrant inventory</option>
+              <option value="merge">Merge with existing hydrant records</option>
+              <option value="replace">Replace your department's hydrant list</option>
             </select>
           </Field>
         </div>

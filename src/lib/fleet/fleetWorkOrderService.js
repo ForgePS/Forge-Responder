@@ -98,7 +98,7 @@ export function normalizeFleetWorkOrder(raw = {}, departmentId = "") {
     technician: data.technician || "",
     vendorId: data.vendorId || "",
     vendorName: data.vendorName || data.vendor || "",
-    openedAt: data.openedAt || data.opened || "",
+    openedAt: (data.openedAt || data.opened) ? legacyOpenedAt(data.openedAt || data.opened) : "",
     scheduledAt: data.scheduledAt || "",
     startedAt: data.startedAt || "",
     targetCompletionAt: data.targetCompletionAt || "",
@@ -180,7 +180,7 @@ export function legacyWorkOrderToFleet(item = {}, departmentId = "", assets = []
     category: item.category || "",
     vendorName: item.vendor || "",
     estimatedCost: item.cost === "Pending" ? 0 : Number(String(item.cost || "").replace(/[^0-9.]/g, "")) || 0,
-    openedAt: item.opened || nowIso(),
+    openedAt: legacyOpenedAt(item.opened),
     migratedFromList: true,
   }, departmentId);
 }
@@ -636,4 +636,18 @@ export function getWorkOrderTypeOptions() {
 
 export function getAllowedWorkOrderTransitions(fromStatus) {
   return WORK_ORDER_TRANSITIONS[fromStatus] || [];
+}
+
+/**
+ * Classic list dates can lack a year ("Oct 15"), which Date reads as 2001.
+ * Assume the most recent such date that is not in the future.
+ */
+export function legacyOpenedAt(value, now = new Date()) {
+  const text = String(value || "").trim();
+  if (!text) return nowIso();
+  if (/\b\d{4}\b/.test(text)) return text;
+  const parsed = new Date(`${text}, ${now.getFullYear()}`);
+  if (Number.isNaN(parsed.getTime())) return text;
+  if (parsed > now) parsed.setFullYear(parsed.getFullYear() - 1);
+  return parsed.toISOString();
 }

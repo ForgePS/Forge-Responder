@@ -36,11 +36,11 @@ export default function DemoEntryPage() {
     } catch (launchError) {
       const code = launchError?.code || "";
       if (code === "auth/invalid-credential" || code === "auth/user-not-found") {
-        setError("Demo account is not set up yet. Create Firebase Auth user demo@forge.demo (password ForgeDemo2026!) then run npm run seed:demo.");
+        setError("The demo isn't available right now. Please try again shortly or contact FORGE Public Safety.");
       } else if (code === "permission-denied") {
-        setError("Demo sandbox permissions are updating. Wait one minute, hard refresh, and try Launch Demo RMS again.");
+        setError("The demo is getting ready. Wait a minute, then refresh the page and try again.");
       } else {
-        setError(launchError?.message || "Unable to launch demo.");
+        setError("We couldn't open the demo. Please try again.");
       }
     } finally {
       setSubmitting(false);
@@ -79,7 +79,7 @@ export default function DemoEntryPage() {
         {error && <div className="auth-error">{error}</div>}
 
         <button className="primary-button demo-entry-launch" type="button" onClick={launchDemo} disabled={submitting}>
-          <PlayCircle size={16} /> {submitting ? "Launching..." : "Launch Demo RMS"}
+          <PlayCircle size={16} /> {submitting ? "Launching…" : "Launch Demo RMS"}
         </button>
 
         <p className="auth-help demo-entry-credentials">

@@ -115,7 +115,7 @@ export default function NerisFireReportsPage({
         setRecords(merged);
         setMessage(`Synced ${synced} report${synced !== 1 ? "s" : ""} saved while offline.`);
       }
-      if (conflicts.length) setMessage(`${conflicts.length} report(s) changed in two places while offline. Check them before submitting.`);
+      if (conflicts.length) setMessage(`${conflicts.length} ${conflicts.length === 1 ? "report was" : "reports were"} changed in two places while offline. Check ${conflicts.length === 1 ? "it" : "them"} before submitting.`);
     }
     function handleOffline() { setOnline(false); }
     window.addEventListener("online", handleOnline);

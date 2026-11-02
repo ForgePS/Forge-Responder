@@ -410,7 +410,7 @@ export default function DigitalDashboardPanel({
                   onClick={() => setModal({ type: "display", form: defaultDisplayForm() })}
                 >
                   <CirclePlus size={16} />
-                  Add display
+                  Add Display
                 </button>
               ) : null}
             </div>
@@ -457,7 +457,7 @@ export default function DigitalDashboardPanel({
               <EmptyState
                 title="No displays registered"
                 detail="Add wall-mounted players, lobby screens, or training room projectors. Each one gets a link to the live alert dashboard."
-                actionLabel={canEdit ? "Add display" : undefined}
+                actionLabel={canEdit ? "Add Display" : undefined}
                 onAction={canEdit ? () => setModal({ type: "display", form: defaultDisplayForm() }) : undefined}
               />
             )}
@@ -570,7 +570,7 @@ export default function DigitalDashboardPanel({
             <EmptyState
               title={displays.length ? "No devices match your filters" : "No devices yet"}
               detail="Register players and assign playlists to push content to screens."
-              actionLabel={canEdit && !displays.length ? "Add device" : undefined}
+              actionLabel={canEdit && !displays.length ? "Add Device" : undefined}
               onAction={canEdit && !displays.length ? () => setModal({ type: "display", form: defaultDisplayForm() }) : undefined}
             />
           )}
@@ -654,7 +654,7 @@ export default function DigitalDashboardPanel({
             <EmptyState
               title={media.length ? "No media matches your filters" : "Media library is empty"}
               detail="Create announcements, images, video loops, or web widgets for your playlists."
-              actionLabel={canEdit && !media.length ? "Add media" : undefined}
+              actionLabel={canEdit && !media.length ? "Add Media" : undefined}
               onAction={canEdit && !media.length ? () => setModal({ type: "media", form: defaultMediaForm() }) : undefined}
             />
           )}
@@ -735,7 +735,7 @@ export default function DigitalDashboardPanel({
             <EmptyState
               title={playlists.length ? "No playlists match your search" : "No playlists yet"}
               detail="Group media into loops. They're saved for when screens can play signage."
-              actionLabel={canEdit && !playlists.length ? "Add playlist" : undefined}
+              actionLabel={canEdit && !playlists.length ? "Add Playlist" : undefined}
               onAction={canEdit && !playlists.length ? () => setModal({ type: "playlist", form: defaultPlaylistForm() }) : undefined}
             />
           )}
@@ -836,7 +836,7 @@ export default function DigitalDashboardPanel({
             <EmptyState
               title={schedules.length ? "No schedules match your filters" : "No schedules configured"}
               detail="Schedules are saved for when screens can play signage — nothing is published to screens yet."
-              actionLabel={canEdit && !schedules.length ? "Create schedule" : undefined}
+              actionLabel={canEdit && !schedules.length ? "Create Schedule" : undefined}
               onAction={canEdit && !schedules.length ? () => setModal({ type: "schedule", form: defaultScheduleForm() }) : undefined}
             />
           )}
@@ -886,7 +886,7 @@ export default function DigitalDashboardPanel({
               saveDisplay(modal.form);
             }}
           >
-            <header><h3>{modal.form.id ? "Edit display" : "Add display"}</h3></header>
+            <header><h3>{modal.form.id ? "Edit Display" : "Add Display"}</h3></header>
             <label>Name<input value={modal.form.name} onChange={(event) => setModal({ ...modal, form: { ...modal.form, name: event.target.value } })} required /></label>
             <label>Location<input value={modal.form.location} onChange={(event) => setModal({ ...modal, form: { ...modal.form, location: event.target.value } })} /></label>
             <label>
@@ -945,7 +945,7 @@ export default function DigitalDashboardPanel({
             <label>Notes<textarea rows={3} value={modal.form.notes} onChange={(event) => setModal({ ...modal, form: { ...modal.form, notes: event.target.value } })} /></label>
             <footer className="dd-modal-actions">
               <button type="button" className="dd-action-button" onClick={closeModal}>Cancel</button>
-              <button type="button" className="dd-action-button primary" onClick={() => saveDisplay(modal.form)}>Save display</button>
+              <button type="button" className="dd-action-button primary" onClick={() => saveDisplay(modal.form)}>Save Display</button>
             </footer>
           </form>
         </div>
@@ -974,7 +974,7 @@ export default function DigitalDashboardPanel({
               savePlaylist(modal.form);
             }}
           >
-            <header><h3>{modal.form.id ? "Edit playlist" : "Add playlist"}</h3></header>
+            <header><h3>{modal.form.id ? "Edit Playlist" : "Add Playlist"}</h3></header>
             <label>Name<input value={modal.form.name} onChange={(event) => setModal({ ...modal, form: { ...modal.form, name: event.target.value } })} required /></label>
             <label>Description<textarea rows={2} value={modal.form.description} onChange={(event) => setModal({ ...modal, form: { ...modal.form, description: event.target.value } })} /></label>
             <div className="dd-form-row">
@@ -1007,7 +1007,7 @@ export default function DigitalDashboardPanel({
             </fieldset>
             <footer className="dd-modal-actions">
               <button type="button" className="dd-action-button" onClick={closeModal}>Cancel</button>
-              <button type="button" className="dd-action-button primary" onClick={() => savePlaylist(modal.form)}>Save playlist</button>
+              <button type="button" className="dd-action-button primary" onClick={() => savePlaylist(modal.form)}>Save Playlist</button>
             </footer>
           </form>
         </div>
@@ -1023,7 +1023,7 @@ export default function DigitalDashboardPanel({
               saveSchedule(modal.form);
             }}
           >
-            <header><h3>{modal.form.id ? "Edit schedule" : "Add schedule"}</h3></header>
+            <header><h3>{modal.form.id ? "Edit Schedule" : "Add Schedule"}</h3></header>
             <label>Name<input value={modal.form.name} onChange={(event) => setModal({ ...modal, form: { ...modal.form, name: event.target.value } })} required /></label>
             <label>
               Playlist
@@ -1070,7 +1070,7 @@ export default function DigitalDashboardPanel({
             </label>
             <footer className="dd-modal-actions">
               <button type="button" className="dd-action-button" onClick={closeModal}>Cancel</button>
-              <button type="button" className="dd-action-button primary" onClick={() => saveSchedule(modal.form)}>Save schedule</button>
+              <button type="button" className="dd-action-button primary" onClick={() => saveSchedule(modal.form)}>Save Schedule</button>
             </footer>
           </form>
         </div>

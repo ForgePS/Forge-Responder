@@ -49,12 +49,23 @@ import {
   scheduleReinspection,
   startInspection,
 } from "../lib/inspections/index.js";
+import { friendlyError } from "../lib/friendlyError.js";
+
+// Stored lowercase ("normal"); shown capitalized.
+function formatPriority(value) {
+  const text = String(value || "").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "—";
+}
 
 function formatDue(value) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString();
+  // Due dates are days: show the time only when one was actually set.
+  const midnight = date.getHours() === 0 && date.getMinutes() === 0;
+  return midnight
+    ? date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : date.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function Field({ label, children }) {
@@ -282,7 +293,7 @@ function InspectionWorkspace({
       setCitationMessage(`Violation issued citing ${pendingCitation.sectionNumber}.`);
       onViolationChanged?.();
     } catch (citeError) {
-      setCitationMessage(`Couldn't issue the violation: ${citeError?.message || "unknown error"}`);
+      setCitationMessage(`Couldn't issue the violation. ${friendlyError(citeError, "Please try again.")}`);
     } finally {
       setCitationBusy(false);
     }
@@ -314,7 +325,7 @@ function InspectionWorkspace({
       <div className="panel-body config-studio-body">
         <div className="occupancy-form-grid">
           <div><span className="occupancy-muted">Type</span><strong>{record.inspectionTypeSnapshot?.label || record.inspectionTypeId || "—"}</strong></div>
-          <div><span className="occupancy-muted">Priority</span><strong>{record.priority || "—"}</strong></div>
+          <div><span className="occupancy-muted">Priority</span><strong>{formatPriority(record.priority)}</strong></div>
           <div><span className="occupancy-muted">Scheduled</span><strong>{formatDue(record.scheduledStart)}</strong></div>
           <div><span className="occupancy-muted">Due</span><strong>{formatDue(record.dueAt)}</strong></div>
         </div>
@@ -628,7 +639,7 @@ function InspectionsShellPage({
       }
     } catch (loadError) {
       console.error("Failed to load inspections shell", loadError);
-      setError(loadError?.message || "Unable to load inspections data.");
+      setError(friendlyError(loadError, "Couldn't load inspections data."));
       setRecords([]);
     } finally {
       setLoading(false);
@@ -694,7 +705,7 @@ function InspectionsShellPage({
       setMessage(`Created ${created.inspectionNumber}`);
       if (mode === "dashboard") onNavigate?.("Work Queue");
     } catch (createError) {
-      setError(createError?.message || "Unable to create inspection.");
+      setError(friendlyError(createError, "Couldn't create inspection."));
     } finally {
       setSaving(false);
     }
@@ -710,7 +721,7 @@ function InspectionsShellPage({
       upsertRecord(next);
       setMessage(successMessage);
     } catch (actionError) {
-      setError(actionError?.message || "Action failed.");
+      setError(friendlyError(actionError, "That didn't work. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -878,7 +889,7 @@ function InspectionsShellPage({
                     : "Draft saved"
                 );
               } catch (actionError) {
-                setError(actionError?.message || "Unable to save draft.");
+                setError(friendlyError(actionError, "Couldn't save draft."));
               } finally {
                 setSaving(false);
               }
@@ -1008,7 +1019,7 @@ function InspectionRecordsTable({ records = [], onOpen }) {
               <td>{record.occupancyName || record.address || "—"}</td>
               <td><InspectionStatusBadge status={record.status} /></td>
               <td>{formatDue(record.dueAt || record.scheduledStart)}</td>
-              <td>{record.priority || "—"}</td>
+              <td>{formatPriority(record.priority)}</td>
               <td>{Number(record.openViolationCount) || 0}</td>
               <td>
                 <button className="text-button" type="button" onClick={() => onOpen?.(record.id)}>

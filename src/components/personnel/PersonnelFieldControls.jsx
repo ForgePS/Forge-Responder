@@ -38,7 +38,7 @@ export function ProfileField({ label, value, editing, onChange, dropdownId, requ
     <FlowFieldShell flow={flow} className={className} label={label} required={required}>
       {editing
         ? dropdownId
-          ? <ManagedSelect dropdownId={dropdownId} value={value} onChange={onChange} />
+          ? <ManagedSelect dropdownId={dropdownId} value={value} onChange={onChange} label={typeof label === "string" ? label : ""} />
           : (
             <input
               type={type}

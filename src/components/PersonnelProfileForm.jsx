@@ -147,7 +147,7 @@ function PersonalDetailsSection({
         <FormRow columns={5}>
           <ProfileField flow label="Badge Number" value={draft.badgeNumber || ""} editing={canEdit} onChange={(value) => updateDraftField("badgeNumber", value)} />
           <ProfileField flow label="Agency Personnel ID" value={draft.agencyPersonnelId || ""} editing={canEdit} onChange={(value) => updateDraftField("agencyPersonnelId", value)} />
-          <ProfileField flow label="API ID" value={draft.apiId || ""} editing={canEdit} onChange={(value) => updateDraftField("apiId", value)} />
+          <ProfileField flow label="External system ID" value={draft.apiId || ""} editing={canEdit} onChange={(value) => updateDraftField("apiId", value)} />
           <ProfileField flow label="Firefighter ID" value={draft.firefighterId || ""} editing={canEdit} onChange={(value) => updateDraftField("firefighterId", value)} />
           <ProfileField flow label="FEMA ID" value={draft.femaId || ""} editing={canEdit} onChange={(value) => updateDraftField("femaId", value)} />
           <ProfileField
@@ -496,7 +496,7 @@ export default function PersonnelProfileForm({
               <div style={{ marginTop: 12 }}>
                 <ObjectUploadField
                   label="Upload personnel attachment"
-                  hint="PDF, Word, or image — saved to Firebase Storage"
+                  hint="PDF, Word, or image — stored securely"
                   buttonLabel="Choose file"
                   disabled={!departmentId || !draft?.id}
                   buildPath={(file) => buildPersonnelDocumentPath(departmentId, draft.id, file.name)}

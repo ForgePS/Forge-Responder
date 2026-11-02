@@ -28,6 +28,7 @@ import {
   updateReserveRequest,
 } from "../lib/fleet/index.js";
 import { activeOptionsWithSelected, firstActiveId } from "../lib/fleet/repairsConfig.js";
+import { friendlyError } from "../lib/friendlyError.js";
 
 function Field({ label, children }) {
   return (
@@ -99,7 +100,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
       }));
     } catch (loadError) {
       console.error(loadError);
-      setError(loadError?.message || "Unable to load defects.");
+      setError(friendlyError(loadError, "Couldn't load defects."));
     } finally {
       setLoading(false);
     }
@@ -151,7 +152,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
       setCreateDraft((c) => ({ ...c, description: "" }));
       setMessage("Defect submitted.");
     } catch (createError) {
-      setError(createError?.message || "Unable to create defect.");
+      setError(friendlyError(createError, "Couldn't create defect."));
     } finally {
       setSaving(false);
     }
@@ -178,7 +179,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
       upsert(next);
       setMessage(`Status decision applied: ${decision}`);
     } catch (statusError) {
-      setError(statusError?.message || "Unable to apply status decision.");
+      setError(friendlyError(statusError, "Couldn't apply status decision."));
     } finally {
       setSaving(false);
     }
@@ -204,7 +205,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
       upsert(next);
       setMessage("Reserve request created.");
     } catch (reserveError) {
-      setError(reserveError?.message || "Unable to request reserve.");
+      setError(friendlyError(reserveError, "Couldn't request reserve."));
     } finally {
       setSaving(false);
     }
@@ -219,7 +220,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
         onNavigate={onNavigate}
         actions={canEdit ? (
           <button className="primary-button" type="button" onClick={() => setShowCreate(true)}>
-            <CirclePlus size={14} /> Report defect
+            <CirclePlus size={14} /> Report Defect
           </button>
         ) : null}
       >
@@ -317,13 +318,13 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
                                 setMessage(`Work order ${wo.workOrderNumber} created.`);
                                 onNavigate?.("Fleet Work Orders");
                               } catch (woError) {
-                                setError(woError?.message || "Unable to create work order.");
+                                setError(friendlyError(woError, "Couldn't create work order."));
                               } finally {
                                 setSaving(false);
                               }
                             }}
                           >
-                            <Wrench size={14} /> Create work order
+                            <Wrench size={14} /> Create Work Order
                           </button>
                         </div>
                       ) : null}
@@ -335,7 +336,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
                             type="button"
                             onClick={() => onNavigate?.("Fleet Work Orders")}
                           >
-                            Open board
+                            Open Board
                           </button>
                         </p>
                       ) : null}
@@ -356,13 +357,13 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
                               setEvidenceNotes("");
                               setMessage("Evidence added.");
                             } catch (evError) {
-                              setError(evError?.message || "Unable to add evidence.");
+                              setError(friendlyError(evError, "Couldn't add evidence."));
                             } finally {
                               setSaving(false);
                             }
                           }}
                         >
-                          Add evidence
+                          Add Evidence
                         </button>
                       </div>
 
@@ -373,16 +374,16 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
                           </Field>
                           <div className="occupancy-detail-actions">
                             <button className="secondary-button" type="button" disabled={saving} onClick={() => handleStatus("restrict")}>
-                              Restrict unit
+                              Restrict Unit
                             </button>
                             <button className="secondary-button" type="button" disabled={saving} onClick={() => handleStatus("out_of_service")}>
-                              Mark OOS
+                              Mark Out of Service
                             </button>
                             <button className="secondary-button" type="button" disabled={saving} onClick={() => handleStatus("return_to_service")}>
-                              Return to service
+                              Return to Service
                             </button>
                             <button className="secondary-button" type="button" disabled={saving} onClick={handleReserve}>
-                              Request reserve
+                              Request Reserve
                             </button>
                           </div>
                         </>
@@ -403,13 +404,13 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
                               upsert(next);
                               setMessage("Defect closed.");
                             } catch (closeError) {
-                              setError(closeError?.message || "Unable to close.");
+                              setError(friendlyError(closeError, "Couldn't close."));
                             } finally {
                               setSaving(false);
                             }
                           }}
                         >
-                          <Save size={14} /> Close defect
+                          <Save size={14} /> Close Defect
                         </button>
                       </div>
                     </>
@@ -427,7 +428,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
                           upsert(next);
                           setMessage("Defect reopened.");
                         } catch (reopenError) {
-                          setError(reopenError?.message || "Unable to reopen.");
+                          setError(friendlyError(reopenError, "Couldn't reopen."));
                         } finally {
                           setSaving(false);
                         }

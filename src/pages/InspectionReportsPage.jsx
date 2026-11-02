@@ -11,6 +11,7 @@ import { useTenant } from "../context/TenantContext.jsx";
 import InspectionEmptyState from "../components/inspections/InspectionEmptyState.jsx";
 import InspectionPermissionGate from "../components/inspections/InspectionPermissionGate.jsx";
 import InspectionStatusBadge from "../components/inspections/InspectionStatusBadge.jsx";
+import { labelFromKey } from "../lib/labelFromKey.js";
 import InspectionsModuleLayout, {
   PREVENTION_TOOL_TABS,
 } from "../components/inspections/InspectionsModuleLayout.jsx";
@@ -202,7 +203,7 @@ export default function InspectionReportsPage({ onNavigate, query = "" }) {
     <InspectionPermissionGate allowed={allowed} title="Inspection Reports">
       <InspectionsModuleLayout
         title="Inspection Reports"
-        description="Prevention KPIs, charts, standard catalog, custom builder, and scheduled delivery stubs."
+        description="Prevention KPIs, charts, standard catalog, custom builder, and scheduled delivery."
         activeNavName="Inspection Reports"
         onNavigate={onNavigate}
         tabs={PREVENTION_TOOL_TABS}
@@ -522,27 +523,27 @@ export default function InspectionReportsPage({ onNavigate, query = "" }) {
                   onClick={() => downloadRowsAsCsv(`${reportResult.reportId || "report"}.csv`, reportResult.rows)}
                   disabled={!reportResult.rows.length}
                 >
-                  <Download size={14} /> CSV
+                  <Download size={14} /> Spreadsheet (CSV)
                 </button>
                 <button
                   className="secondary-button"
                   type="button"
                   onClick={() => downloadJson(`${reportResult.reportId || "report"}.json`, reportResult)}
                 >
-                  <Download size={14} /> JSON
+                  <Download size={14} /> Data file (JSON)
                 </button>
               </div>
             </header>
             <div className="panel-body">
               {!reportResult.rows.length ? (
-                <p className="occupancy-muted">Report returned no rows.</p>
+                <p className="occupancy-muted">This report has no results.</p>
               ) : (
                 <div className="table-wrap">
                   <table className="inspections-table">
                     <thead>
                       <tr>
                         {(reportResult.columns || Object.keys(reportResult.rows[0] || {})).map((col) => (
-                          <th key={col}>{col}</th>
+                          <th key={col}>{labelFromKey(col)}</th>
                         ))}
                       </tr>
                     </thead>

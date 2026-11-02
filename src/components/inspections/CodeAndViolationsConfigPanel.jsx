@@ -292,7 +292,7 @@ export default function CodeAndViolationsConfigPanel({
                     <Field label="Inspector summary" wide>
                       <textarea rows={2} value={sectionDraft.shortInspectorSummary || ""} onChange={(e) => setSectionDraft((c) => ({ ...c, shortInspectorSummary: e.target.value }))} />
                     </Field>
-                    <Field label="Tenant description" wide>
+                    <Field label="Description for occupant / property owner" wide>
                       <textarea rows={3} value={sectionDraft.tenantDescription || ""} onChange={(e) => setSectionDraft((c) => ({ ...c, tenantDescription: e.target.value }))} />
                     </Field>
                     <Field label="Default corrective action" wide>

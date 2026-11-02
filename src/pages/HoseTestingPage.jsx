@@ -126,7 +126,7 @@ export default function HoseTestingPage({ records = [], setRecords, query = "", 
       </Panel>
 
       {adding ? (
-        <Modal title="Add hose section" onClose={() => setAdding(false)}>
+        <Modal title="Add Hose Section" onClose={() => setAdding(false)}>
           <div className="workflow-form">
             {error ? <p className="form-error" role="alert">{error}</p> : null}
             <label><span>Apparatus</span>

@@ -131,7 +131,7 @@ export async function runFleetHardeningChecks(departmentId, options = {}) {
         status = lastMigration ? "pass" : "warn";
         detail = lastMigration
           ? `Last migration ${lastMigration.id || lastMigration.createdAt || "recorded"}`
-          : "No migration report found — run Migration Center if classic apparatus exists";
+          : "No import report found — use Import & Backup in Fleet Configuration Studio to bring in an existing apparatus list";
         break;
       case "aliases_preserve_links":
         status = "pass";

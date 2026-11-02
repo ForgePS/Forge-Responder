@@ -4,6 +4,7 @@ import { Field, TextArea } from "./NerisControls.jsx";
 import { requestAiNarrative } from "../../lib/neris/aiNarrativeClient.js";
 import { generateDraftNarrative } from "../../lib/neris/narrative.js";
 import { narrativeText } from "../../lib/neris/reportModel.js";
+import { friendlyError } from "../../lib/friendlyError.js";
 
 const STYLES = [
   { id: "concise", label: "Concise" },
@@ -60,7 +61,7 @@ export default function NerisAiNarrative({ report, departmentId, editable, onlin
         missing: result.missing || [],
       });
     } catch (err) {
-      setError(err?.message || "Couldn't draft the narrative.");
+      setError(friendlyError(err, "Couldn't draft the narrative."));
     } finally {
       setBusy(false);
     }

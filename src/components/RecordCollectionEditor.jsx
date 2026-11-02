@@ -222,7 +222,7 @@ export default function RecordCollectionEditor({
     <section className="data-editor-panel">
       <div className="data-editor-toolbar">
         <label>
-          <span>Record collection</span>
+          <span>List to edit</span>
           <select
             value={collectionName}
             onChange={(event) => {

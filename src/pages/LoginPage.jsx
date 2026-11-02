@@ -62,23 +62,24 @@ function useInvitePreview(setMode) {
 function authErrorMessage(error) {
   const code = error?.code || "";
   if (code === "auth/configuration-not-found") {
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "rms-dashboard-7562e";
-    return `Email/Password sign-in is not enabled yet. Open Firebase Console → ${projectId} → Authentication → Sign-in method → enable Email/Password → Save, then try again.`;
+    return "Email sign-in isn't turned on for this site yet. Contact FORGE support.";
   }
   if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
-    return "Invalid email or password.";
+    return "That email and password don't match. Try again or reset your password.";
   }
   if (code === "auth/email-already-in-use") return "An account with this email already exists.";
   if (code === "auth/weak-password") return "Password must be at least 6 characters.";
   if (code === "auth/invalid-email") return "Enter a valid email address.";
-  return error?.message || "Authentication failed.";
+  if (code === "auth/too-many-requests") return "Too many attempts. Wait a few minutes and try again.";
+  if (code === "auth/network-request-failed") return "Can't reach FORGE. Check your connection and try again.";
+  return "We couldn't sign you in. Please try again.";
 }
 
 function validateTenantId(value) {
   const tenantId = normalizeGatewayDepartmentId(value);
-  if (!tenantId) return { ok: false, message: "Enter your tenant ID." };
+  if (!tenantId) return { ok: false, message: "Enter your department ID." };
   if (isInvalidGatewaySlug(tenantId) || RESERVED_GATEWAY_PATHS.has(tenantId)) {
-    return { ok: false, message: "Enter a valid tenant ID." };
+    return { ok: false, message: "We couldn't find that department ID. Check it and try again." };
   }
   return { ok: true, tenantId };
 }
@@ -241,7 +242,7 @@ export default function LoginPage() {
               <span className="auth-tenant-id">{activeTenantId}</span>
               {canChangeTenant && (
                 <button className="text-button auth-change-tenant" type="button" onClick={handleChangeTenant}>
-                  Change tenant
+                  Change Department
                 </button>
               )}
             </div>
@@ -253,16 +254,16 @@ export default function LoginPage() {
           <div>
             <h1>
               {creatorConsoleEntry
-                ? "Creator Console sign in"
+                ? "Creator Console Sign In"
                 : !tenantLocked
-                  ? "Select your tenant"
-                  : (mode === "signin" ? "Sign in" : "Create account")}
+                  ? "Find Your Department"
+                  : (mode === "signin" ? "Sign In" : "Create Account")}
             </h1>
             <p className="auth-portal-label">
               {creatorConsoleEntry
                 ? "FORGE RMS · Platform creator access required"
                 : !tenantLocked
-                  ? "Enter your department tenant ID to continue"
+                  ? "Enter your department's FORGE ID to continue"
                   : `FORGE RMS · ${gatewayDepartmentId ? buildDepartmentGatewayUrl(gatewayDepartmentId).replace(/^https?:\/\//, "") : FORGE_RMS_APP_HOST}`}
             </p>
           </div>
@@ -284,7 +285,7 @@ export default function LoginPage() {
         {!creatorConsoleEntry && !tenantLocked ? (
           <form className="auth-form" onSubmit={handleConfirmTenant}>
             <label>
-              <span>Tenant ID</span>
+              <span>Department ID</span>
               <input
                 value={tenantDraft}
                 onChange={(event) => setTenantDraft(event.target.value)}
@@ -318,10 +319,10 @@ export default function LoginPage() {
             </label>
             {error && <div className="auth-error">{error}</div>}
             <button className="primary-button auth-submit" type="submit" disabled={submitting || code.length !== 6}>
-              {submitting ? "Please wait..." : "Verify"}
+              {submitting ? "Please wait…" : "Verify Code"}
             </button>
             <button className="text-button" type="button" onClick={() => { setCodeResolver(null); setError(""); }}>
-              Use a different account
+              Use a Different Account
             </button>
           </form>
         ) : (
@@ -354,7 +355,7 @@ export default function LoginPage() {
             {resetNotice && <div className="success-banner" role="status">{resetNotice}</div>}
             {error && <div className="auth-error">{error}</div>}
             <button className="primary-button auth-submit" type="submit" disabled={submitting}>
-              {submitting ? "Please wait..." : mode === "signin" ? "Sign In" : "Create Account"}
+              {submitting ? "Please wait…" : mode === "signin" ? "Sign In" : "Create Account"}
             </button>
           </form>
         )}

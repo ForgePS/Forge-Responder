@@ -60,7 +60,7 @@ const STAFF_TABS = [
   ["cost", "Cost & replacement lists"],
   ["reporting", "Reporting lists"],
   ["hardening", "Hardening"],
-  ["migration", "Migration Center"],
+  ["migration", "Import & Backup"],
 ];
 
 export default function FleetConfigStudioPage({
@@ -209,7 +209,7 @@ export default function FleetConfigStudioPage({
                 </button>
               ))}
               <button className="inspections-subnav-item" type="button" disabled={saving} onClick={handleExport}>
-                <Download size={14} /> Backup classic lists
+                <Download size={14} /> Back up fleet lists
               </button>
             </nav>
 

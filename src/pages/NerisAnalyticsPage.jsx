@@ -11,6 +11,7 @@ import {
 } from "../lib/neris/analytics.js";
 import { isNerisFeatureEnabled } from "../lib/neris/featureFlags.js";
 import { useTenant } from "../context/TenantContext.jsx";
+import { labelFromKey } from "../lib/labelFromKey.js";
 import "../styles/neris-analytics.css";
 
 const NOT_ENOUGH = "Not enough data";
@@ -273,7 +274,7 @@ export default function NerisAnalyticsPage({ reports = [] }) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    {(adHoc.columns || []).map((col) => <th key={col}>{AD_HOC_LABELS[col] || col}</th>)}
+                    {(adHoc.columns || []).map((col) => <th key={col}>{AD_HOC_LABELS[col] || labelFromKey(col)}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -282,6 +283,9 @@ export default function NerisAnalyticsPage({ reports = [] }) {
                       {(adHoc.columns || []).map((col) => <td key={col}>{String(row[col] ?? "")}</td>)}
                     </tr>
                   ))}
+                  {!(adHoc.rows || []).length ? (
+                    <tr><td colSpan={Math.max((adHoc.columns || []).length, 1)}>No reports match these filters.</td></tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>

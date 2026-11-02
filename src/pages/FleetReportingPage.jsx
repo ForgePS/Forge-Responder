@@ -197,9 +197,9 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
             {[
               ["Active fleet", board.kpis.totalAssets, ""],
               ["In service", board.kpis.inService, ""],
-              ["OOS", board.kpis.oos, board.kpis.oos ? "critical" : ""],
+              ["Out of service", board.kpis.oos, board.kpis.oos ? "critical" : ""],
               ["Open defects", board.kpis.openDefects, board.kpis.criticalDefects ? "warn" : ""],
-              ["Open WOs", board.kpis.openWorkOrders, ""],
+              ["Open work orders", board.kpis.openWorkOrders, ""],
               ["Availability", `${board.kpis.availability}%`, ""],
               ["YTD cost", money(board.kpis.annualCost), ""],
               ["Urgent replace", board.kpis.urgentReplacements, board.kpis.urgentReplacements ? "critical" : ""],
@@ -314,8 +314,8 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                 <div><strong>{reportResult?.label || "Results"}</strong></div>
                 {reportResult ? (
                   <div className="inspections-header-actions">
-                    <button type="button" onClick={() => exportResult(reportResult, "csv")}><Download size={14} /> CSV</button>
-                    <button type="button" onClick={() => exportResult(reportResult, "json")}><Download size={14} /> JSON</button>
+                    <button type="button" onClick={() => exportResult(reportResult, "csv")}><Download size={14} /> Spreadsheet (CSV)</button>
+                    <button type="button" onClick={() => exportResult(reportResult, "json")}><Download size={14} /> Data file (JSON)</button>
                   </div>
                 ) : null}
               </header>
@@ -334,7 +334,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                     ))}
                   </div>
                 ) : (
-                  <FleetEmptyState title="Run a report" description="Select a standard report to preview rows, then export CSV or JSON." icon={FileBarChart2} />
+                  <FleetEmptyState title="Run a report" description="Select a standard report to preview rows, then export it as a spreadsheet or data file." icon={FileBarChart2} />
                 )}
               </div>
             </section>
@@ -433,8 +433,8 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
             {reportResult?.rows && tab === "custom" ? (
               <div className="panel-body">
                 <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                  <button type="button" onClick={() => exportResult(reportResult, "csv")}><Download size={14} /> CSV</button>
-                  <button type="button" onClick={() => exportResult(reportResult, "json")}><Download size={14} /> JSON</button>
+                  <button type="button" onClick={() => exportResult(reportResult, "csv")}><Download size={14} /> Spreadsheet (CSV)</button>
+                  <button type="button" onClick={() => exportResult(reportResult, "json")}><Download size={14} /> Data file (JSON)</button>
                 </div>
                 <p className="muted">{reportResult.rowCount} rows</p>
               </div>
@@ -564,7 +564,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                 </section>
               </section>
             ) : (
-              <FleetEmptyState title="No automations" description="Seeded starters cover critical defects, PM overdue, and replacement thresholds." icon={Zap} />
+              <FleetEmptyState title="No automations" description="Add an automation to get alerts for critical defects, overdue maintenance and replacement thresholds." icon={Zap} />
             )}
           </>
         ) : null}

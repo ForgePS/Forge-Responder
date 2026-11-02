@@ -27,6 +27,7 @@ import {
   normalizeOccupancyRecord,
   saveOccupancyRecord,
 } from "../lib/inspections/index.js";
+import { friendlyError } from "../lib/friendlyError.js";
 
 const EMPTY_DRAFT = {
   name: "",
@@ -109,7 +110,7 @@ export default function OccupanciesMasterPage({
       } catch (loadError) {
         if (cancelled) return;
         console.error("Failed to load occupancies", loadError);
-        setError(loadError?.message || "Unable to load occupancies.");
+        setError(friendlyError(loadError, "Couldn't load occupancies."));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -219,7 +220,7 @@ export default function OccupanciesMasterPage({
       setSelectedId(created.id);
       setMessage("Occupancy created.");
     } catch (saveError) {
-      setError(saveError?.message || "Unable to create occupancy.");
+      setError(friendlyError(saveError, "Couldn't create occupancy."));
     } finally {
       setSaving(false);
     }
@@ -240,7 +241,7 @@ export default function OccupanciesMasterPage({
       setDraft(saved);
       setMessage("Occupancy saved.");
     } catch (saveError) {
-      setError(saveError?.message || "Unable to save occupancy.");
+      setError(friendlyError(saveError, "Couldn't save occupancy."));
     } finally {
       setSaving(false);
     }
@@ -260,7 +261,7 @@ export default function OccupanciesMasterPage({
       setSelectedId(next[0]?.id || "");
       setMessage("Occupancy deleted.");
     } catch (deleteError) {
-      setError(deleteError?.message || "Unable to delete occupancy.");
+      setError(friendlyError(deleteError, "Couldn't delete occupancy."));
     } finally {
       setSaving(false);
     }
@@ -321,7 +322,7 @@ export default function OccupanciesMasterPage({
         {!loading && !error && !records.length ? (
           <InspectionEmptyState
             title="No occupancy records"
-            description="Add an occupancy or migrate from the classic list. Migration runs automatically when the master collection is empty."
+            description="Add your first occupancy to start tracking inspections and preplans."
             icon={Archive}
           />
         ) : null}
