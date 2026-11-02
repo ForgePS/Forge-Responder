@@ -748,3 +748,9 @@ html[data-theme="dark"] .daily-roster-time-part,
   overflow-y: visible;
   padding: 12px 14px 16px;
 }
+
+/* Empty-state rows have no date; let the message use the full width. */
+.operational-notes p.operational-notes-empty {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "title" "detail";
+}

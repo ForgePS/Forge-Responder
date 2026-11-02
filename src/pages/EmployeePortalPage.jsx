@@ -86,6 +86,24 @@ import { useTenant } from "../context/TenantContext.jsx";
 import { uniqueRecordId } from "../lib/recordIds.js";
 import { acknowledgementKeys, pendingForPerson, withAcknowledgement } from "../lib/documentAcknowledgement.js";
 import { loadDepartmentMembership } from "../lib/departmentMembership.js";
+
+const CERT_ALERT_DAYS = 90;
+
+/** Expired, due, or expiring within 90 days. */
+function isCertificationAlert(item) {
+  if (/due|expired|overdue/i.test(item?.status || "")) return true;
+  const expires = new Date(item?.expires || "");
+  if (Number.isNaN(expires.getTime())) return false;
+  return expires.getTime() - Date.now() <= CERT_ALERT_DAYS * 86400000;
+}
+
+/** "2026-01-01" -> "Jan 1, 2026"; other values pass through. */
+function formatShortDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ""));
+  if (!match) return value || "";
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 import CallShiftOffers from "../components/employee/CallShiftOffers.jsx";
 import EmployeeApparatusCheck from "../components/employee/EmployeeApparatusCheck.jsx";
 
@@ -399,7 +417,9 @@ export default function EmployeePortalPage({
 
   const trainingDue = myTraining.filter((item) => item.status !== "Complete").length;
   const pendingTrades = myTrades.filter((item) => /pending|awaiting/i.test(item.status || "")).length;
-  const certAlerts = myCerts.filter((item) => /due|expired|overdue/i.test(item.status || "")).length;
+  const myCertAlerts = myCerts.filter(isCertificationAlert);
+  const certAlerts = myCertAlerts.length;
+  const onRotation = Boolean(scheduleContext.onRotation);
 
   const canSubmitLeave = hasPermission(permissions, "submitLeaveRequests") || hasPermission(permissions, "accessAdminRms");
   const canSubmitTrades = hasPermission(permissions, "submitShiftTrades") || hasPermission(permissions, "accessAdminRms");
@@ -840,7 +860,7 @@ export default function EmployeePortalPage({
       {current === "My Dashboard" && (
         <>
           <section className="training-summary">
-            {[["Next Shift", myShift ? `${myShift.date} · ${myShift.shift}` : "—", "info"], ["Certification Alerts", certAlerts, certAlerts ? "warning" : "success"], ["Training Due", trainingDue, trainingDue ? "warning" : "success"], ["Documents", myDocs.length, myDocs.length ? "warning" : "success"], ["Pending Trades", pendingTrades, pendingTrades ? "warning" : "info"]].map(([label, value, tone]) => (
+            {[["Next Shift", myShift ? `${myShift.date} · ${myShift.shift}` : (!onRotation && (myPerson?.shift || membership?.assignedShift) ? "Day staff" : "—"), "info"], ["Certification Alerts", certAlerts, certAlerts ? "warning" : "success"], ["Training Due", trainingDue, trainingDue ? "warning" : "success"], ["Documents", myDocs.length, myDocs.length ? "warning" : "success"], ["Pending Trades", pendingTrades, pendingTrades ? "warning" : "info"]].map(([label, value, tone]) => (
               <div key={label} className={`fleet-stat stat-${tone}`}><strong>{value}</strong><span>{label}</span></div>
             ))}
           </section>
@@ -848,8 +868,13 @@ export default function EmployeePortalPage({
             <div className="dashboard-column">
               <Panel title="Certification Alerts" icon={FileCheck2}>
                 <div className="operational-notes employee-cert-list">
-                  {myCerts.map((item) => <p key={item.id}><time>{item.expires}</time><b>{item.type}</b><span>{item.status}</span></p>)}
-                  {!myCerts.length && <p><b>All clear</b><span>No certification alerts</span></p>}
+                  {myCertAlerts.map((item) => <p key={item.id}><time>{item.expires}</time><b>{item.type}</b><span>{item.status}</span></p>)}
+                  {!myCertAlerts.length && (
+                    <p className="operational-notes-empty">
+                      <b>All clear</b>
+                      <span>{myCerts.length ? `${myCerts.length} certification${myCerts.length === 1 ? "" : "s"} current; none expire in the next 90 days` : "No certifications on file"}</span>
+                    </p>
+                  )}
                 </div>
               </Panel>
             </div>
@@ -866,15 +891,15 @@ export default function EmployeePortalPage({
                   {myTrades.filter((item) => /pending|awaiting/i.test(item.status || "")).map((item) => (
                     <p key={item.id}><time>{item.submitted}</time><b>Shift trade</b><span>{shiftTradeStatusDetail(item)}</span></p>
                   ))}
-                  {!myPendingLeave.length && !pendingTrades && <p><b>No pending requests</b><span>Leave and trades will appear here</span></p>}
+                  {!myPendingLeave.length && !pendingTrades && <p className="operational-notes-empty"><b>No pending requests</b><span>Leave and trades will appear here</span></p>}
                 </div>
               </Panel>
             </div>
             <div className="dashboard-column">
               <Panel title="Documents to Acknowledge" icon={FileText}>
                 <div className="operational-notes employee-doc-ack-list">
-                  {myDocs.map((item) => <p key={item.id}><time>{item.effectiveDate}</time><b>{item.title}</b><span>{item.category}</span></p>)}
-                  {!myDocs.length && <p><b>All caught up</b><span>No pending acknowledgements</span></p>}
+                  {myDocs.map((item) => <p key={item.id}><time>{formatShortDate(item.effectiveDate)}</time><b>{item.title}</b><span>{item.category}</span></p>)}
+                  {!myDocs.length && <p className="operational-notes-empty"><b>All caught up</b><span>No pending acknowledgements</span></p>}
                 </div>
               </Panel>
             </div>
@@ -946,7 +971,7 @@ export default function EmployeePortalPage({
             summaryPanel={(
               <>
                 <div className="cert-detail-grid employee-schedule-summary">
-                  <div><span>Status</span><strong>{scheduleContext.isWorkDayToday ? "On duty today" : scheduleContext.offUntilLabel || "—"}</strong></div>
+                  <div><span>Status</span><strong>{scheduleContext.isWorkDayToday ? "On duty today" : scheduleContext.offUntilLabel || (onRotation ? "—" : "Day staff")}</strong></div>
                   <div><span>Your Shift</span><strong>{myPerson?.shift || membership?.assignedShift || "—"}</strong></div>
                 </div>
                 {vacancyDays.length > 0 && (

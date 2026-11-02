@@ -197,7 +197,10 @@ function resolveLegacyEmployeeShiftDay(scheduleDays = [], shift = "", todayId = 
     return sameDay;
   }
 
-  return days.find((day) => normalizeText(day.shift) === normalizeText(shift)) || days[0] || null;
+  // Only a matching, upcoming day; never fall back to an unrelated or past one.
+  return days
+    .filter((day) => normalizeText(day.shift) === normalizeText(shift) && (!todayId || !day.id || day.id >= todayId))
+    .sort((a, b) => String(a.id || "").localeCompare(String(b.id || "")))[0] || null;
 }
 
 export function resolveEmployeeScheduleContext(
@@ -212,9 +215,9 @@ export function resolveEmployeeScheduleContext(
   const todayId = formatDayId(today);
 
   if (!shift) {
-    const fallback = scheduleDays[0] || null;
     return {
-      nextWorkDay: fallback,
+      onRotation: false,
+      nextWorkDay: null,
       isWorkDayToday: false,
       offUntilLabel: "",
     };
@@ -227,6 +230,7 @@ export function resolveEmployeeScheduleContext(
   if (!isRotationShift) {
     const nextWorkDay = resolveLegacyEmployeeShiftDay(scheduleDays, shift, todayId);
     return {
+      onRotation: false,
       nextWorkDay,
       isWorkDayToday: nextWorkDay?.id === todayId,
       offUntilLabel: "",
@@ -246,6 +250,7 @@ export function resolveEmployeeScheduleContext(
     : "";
 
   return {
+    onRotation: true,
     nextWorkDay,
     isWorkDayToday,
     offUntilLabel,
