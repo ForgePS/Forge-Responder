@@ -167,16 +167,35 @@ export function resolveDeputyChief(personnel = []) {
   return personnel.find((p) => isActive(p) && isDeputyChiefRank(p)) || null;
 }
 
-/** Approved leave of 3 or more shifts that covers today or the first requested day. */
-export function isOnExtendedLeave(person, leaveRequests = [], { dayIds = [], today = new Date() } = {}) {
+/**
+ * A Battalion Chief is "on extended leave" for a request when they are absent from the
+ * day it is put in until after the requested dates: every shift they would work from
+ * today through the last requested day is covered by their approved leave. Days they
+ * aren't scheduled to work don't count either way.
+ */
+export function isOnExtendedLeave(person, leaveRequests = [], { dayIds = [], today = new Date(), rotation = defaultShiftRotation } = {}) {
   if (!person?.id) return false;
-  const checkDays = [formatDayId(today), ...[...dayIds].sort().slice(0, 1)];
-  return leaveRequests.some((request) => {
-    if (request.personnelId !== person.id || !/^approved$/i.test(String(request.status || ""))) return false;
-    const days = [...(request.selectedDates || [])].sort();
-    if (days.length < 3) return false;
-    return checkDays.some((day) => day >= days[0] && day <= days[days.length - 1]);
-  });
+  const requested = [...dayIds].filter(Boolean).sort();
+  if (!requested.length) return false;
+
+  const onLeave = new Set();
+  for (const request of leaveRequests) {
+    if (request.personnelId !== person.id || !/^approved$/i.test(String(request.status || ""))) continue;
+    for (const day of request.selectedDates || []) onLeave.add(day);
+  }
+  if (!onLeave.size) return false;
+
+  const start = parseDayId(formatDayId(today));
+  const end = parseDayId(requested[requested.length - 1]);
+  let workDays = 0;
+  for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
+    const id = formatDayId(day);
+    const works = isRotationShift(person.shift, rotation) ? isEmployeeShiftWorkDay(id, person.shift, rotation) : day.getDay() >= 1 && day.getDay() <= 5;
+    if (!works) continue;
+    workDays += 1;
+    if (!onLeave.has(id)) return false;
+  }
+  return workDays > 0;
 }
 
 function chiefApproval(approver, alternate, extra = {}) {
@@ -233,7 +252,7 @@ export function buildLeaveApprovalMeta(person = {}, personnel = [], leaveType = 
   const officer = findPersonnelByName(personnel, officerName);
   const battalionChief = resolveShiftBattalionChief(personnel, person.shift);
   // A Battalion Chief on extended leave can't approve: the Deputy Chief or Fire Chief covers.
-  if (battalionChief && isOnExtendedLeave(battalionChief, leaveRequests, { dayIds, today })) {
+  if (battalionChief && isOnExtendedLeave(battalionChief, leaveRequests, { dayIds, today, rotation })) {
     return chiefApproval(deputy, fireChief, { coveringFor: battalionChief.name, coveringForId: battalionChief.id });
   }
   // The officer step needs a real member to approve it; a supervisor who isn't in

@@ -51,14 +51,31 @@ test("shift members go to their officer, then their own shift's Battalion Chief"
   assert.equal(sick.assignedBattalionChiefId, "BC-C");
 });
 
-test("when the shift's Battalion Chief is on extended leave, the Deputy or Fire Chief covers", () => {
+// C Shift works Nov 3, 6, 9, 12… ("today" is Mon Nov 2).
+test("the Deputy or Fire Chief covers when the Battalion Chief is away from now until after the requested dates", () => {
   const leaveRequests = [
-    { personnelId: "BC-C", status: "Approved", selectedDates: ["2026-10-31", "2026-11-03", "2026-11-06"] },
+    { personnelId: "BC-C", status: "Approved", selectedDates: ["2026-11-03", "2026-11-06", "2026-11-09"] },
   ];
-  const meta = buildLeaveApprovalMeta(byId["FF-C"], personnel, "Vacation", { today, leaveRequests });
+  const meta = buildLeaveApprovalMeta(byId["FF-C"], personnel, "Vacation", { today, leaveRequests, dayIds: ["2026-11-09"] });
   assert.equal(meta.approvalStage, "chief");
   assert.equal(meta.coveringFor, "Battalion Y. Showcase");
   assert.equal(meta.assignedApprover, "Deputy B. Example or Chief A. Sample");
+});
+
+test("the Battalion Chief keeps the request if they're back by the requested dates", () => {
+  const leaveRequests = [
+    { personnelId: "BC-C", status: "Approved", selectedDates: ["2026-11-03", "2026-11-06", "2026-11-09"] },
+  ];
+  const meta = buildLeaveApprovalMeta(byId["FF-C"], personnel, "Vacation", { today, leaveRequests, dayIds: ["2026-11-12"] });
+  assert.equal(meta.assignedBattalionChiefId, "BC-C");
+});
+
+test("the Battalion Chief keeps the request if they work a shift before going on leave", () => {
+  const leaveRequests = [
+    { personnelId: "BC-C", status: "Approved", selectedDates: ["2026-11-06", "2026-11-09"] },
+  ];
+  const meta = buildLeaveApprovalMeta(byId["FF-C"], personnel, "Vacation", { today, leaveRequests, dayIds: ["2026-11-09"] });
+  assert.equal(meta.assignedBattalionChiefId, "BC-C");
   // A single day off isn't extended leave.
   const short = [{ personnelId: "BC-C", status: "Approved", selectedDates: ["2026-11-02"] }];
   assert.equal(buildLeaveApprovalMeta(byId["FF-C"], personnel, "Sick", { today, leaveRequests: short }).assignedBattalionChiefId, "BC-C");
