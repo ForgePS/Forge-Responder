@@ -7,6 +7,7 @@ import {
 import { defaultShiftRotation } from "./defaultShiftRotation.js";
 import { initialDocuments } from "./sprintModuleSeeds.js";
 import { formatDayId, shiftForDate } from "../lib/shiftCalendar.js";
+import { buildDemoNerisReports } from "./demoNerisReports.js";
 
 /*
  * Sample data for the public demo department (forge-demo, "Riverside Fire & EMS").
@@ -551,6 +552,7 @@ export const DEMO_FORCE_RESEED_KEYS = [
   "hlfd-rms-occupancies",
   "hlfd-rms-inspections",
   "hlfd-rms-preplans",
+  "hlfd-rms-neris-fire-reports",
 ];
 
 export const DEMO_LIST_SEEDS = {
@@ -575,7 +577,7 @@ export const DEMO_LIST_SEEDS = {
   "hlfd-rms-dd-media": defaultDigitalDashboardMedia,
   "hlfd-rms-dd-playlists": defaultDigitalDashboardPlaylists,
   "hlfd-rms-dd-schedules": defaultDigitalDashboardSchedules,
-  "hlfd-rms-neris-fire-reports": [],
+  "hlfd-rms-neris-fire-reports": buildDemoNerisReports(),
 };
 
 export const DEMO_LIST_KEYS = Object.keys(DEMO_LIST_SEEDS);
@@ -584,4 +586,4 @@ export const DEMO_LIST_KEYS = Object.keys(DEMO_LIST_SEEDS);
  * Bump whenever the demo seed data above changes: demo sign-ins reseed the
  * sandbox when this differs from the version last written (see demoService.js).
  */
-export const DEMO_SEED_VERSION = 4;
+export const DEMO_SEED_VERSION = 5;
