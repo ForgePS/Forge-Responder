@@ -26,7 +26,7 @@ const API_FIELDS = [
     id: "geocodingApiKey",
     label: "Geocoding API key",
     hint: "Server-side address lookup for dispatch alerts, hydrants, and location widgets.",
-    docs: "Enable Geocoding API and restrict by IP (Firebase Functions).",
+    docs: "Enable Geocoding API and restrict to FORGE's servers (see setup guide).",
   },
   {
     id: "placesApiKey",

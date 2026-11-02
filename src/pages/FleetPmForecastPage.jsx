@@ -108,7 +108,7 @@ export default function FleetPmForecastPage({ onNavigate, legacyApparatus = [] }
                 try {
                   const created = await applyPmProgramsToFleet(departmentId, {}, actor);
                   setMessage(created.length
-                    ? `Applied programs — ${created.length} new schedule(s).`
+                    ? `Applied programs — ${created.length} new schedule${created.length === 1 ? "" : "s"}.`
                     : "Programs already applied to eligible assets.");
                   await reload();
                 } catch (applyError) {
@@ -131,7 +131,7 @@ export default function FleetPmForecastPage({ onNavigate, legacyApparatus = [] }
                   const results = await generateDuePmWorkOrders(departmentId, actor);
                   const fresh = results.filter((row) => !row.deduped).length;
                   const dupes = results.filter((row) => row.deduped).length;
-                  setMessage(`Created ${fresh} work order(s)${dupes ? ` · ${dupes} already open` : ""}.`);
+                  setMessage(`Created ${fresh} work order${fresh === 1 ? "" : "s"}${dupes ? ` · ${dupes} already open` : ""}.`);
                   await reload();
                 } catch (genError) {
                   setError(genError?.message || "Unable to generate work orders.");

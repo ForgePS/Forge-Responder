@@ -1,6 +1,6 @@
 import { useDropdowns } from "../context/DropdownContext.jsx";
 
-export default function ManagedSelect({ dropdownId, value, onChange, disabled = false, className = "managed-select" }) {
+export default function ManagedSelect({ dropdownId, value, onChange, disabled = false, className = "managed-select", label = "" }) {
   const { getOptions } = useDropdowns();
   const options = getOptions(dropdownId, value);
   const safeValue = value ?? "";
@@ -12,7 +12,7 @@ export default function ManagedSelect({ dropdownId, value, onChange, disabled = 
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
     >
-      {!safeValue && <option value="">Select...</option>}
+      {!safeValue && <option value="">{label ? `Choose ${String(label).toLowerCase()}…` : "Select…"}</option>}
       {safeValue && !options.includes(safeValue) && <option value={safeValue}>{safeValue}</option>}
       {options.map((option) => <option key={option} value={option}>{option}</option>)}
     </select>

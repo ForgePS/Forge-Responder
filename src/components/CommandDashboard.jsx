@@ -24,13 +24,18 @@ function Panel({ title, icon: Icon, action, children, className = "" }) {
   );
 }
 
-function MiniTable({ columns, rows }) {
+function MiniTable({ columns, rows, emptyMessage }) {
   const safeRows = normalizeTableRows(rows);
   return (
     <div className="mini-table">
       <div className="mini-row mini-head" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
         {columns.map((column) => <span key={column}>{column}</span>)}
       </div>
+      {!safeRows.length && (
+        <div className="mini-row mini-empty" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
+          <span className="occupancy-muted">{emptyMessage || "Nothing to show yet."}</span>
+        </div>
+      )}
       {safeRows.map((row, rowIndex) => (
         <div className="mini-row" key={`${row.join("-")}-${rowIndex}`} style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
           {row.map((cell, index) => <span key={`${cell}-${index}`}>{cell}</span>)}
@@ -184,10 +189,11 @@ export default function CommandDashboard({
             <MiniTable
               columns={["Date", "Shift", "Staffed", "Minimum", "Status"]}
               rows={staffingRows}
+              emptyMessage="No shifts scheduled yet."
             />
           </Panel>
           <Panel title="Fleet Readiness" icon={Truck} className="panel-light-black-text">
-            <MiniTable columns={["Unit", "Status"]} rows={metrics.fleetReadiness} />
+            <MiniTable columns={["Unit", "Status"]} rows={metrics.fleetReadiness} emptyMessage="No apparatus added yet." />
           </Panel>
           <Panel
             title="Hydrant Testing Progress"
@@ -231,10 +237,10 @@ export default function CommandDashboard({
         <div className="dashboard-column">
           <h2>Alerts & Trends</h2>
           <Panel title="Certification Expirations" icon={FileCheck2} className="panel-light-black-text">
-            <MiniTable columns={["Personnel", "Certification", "Days"]} rows={metrics.expiringCerts.slice(0, 4).map((c) => [c.person, c.type, c.days])} />
+            <MiniTable columns={["Personnel", "Certification", "Days"]} rows={metrics.expiringCerts.slice(0, 4).map((c) => [c.person, c.type, c.days])} emptyMessage="No certifications expiring soon." />
           </Panel>
           <Panel title="Inspection Backlog" icon={ClipboardCheck} className="panel-light-black-text">
-            <MiniTable columns={["Occupancy", "Due", "Status"]} rows={inspections.filter((i) => i.status !== "Complete").slice(0, 4).map((i) => [i.occupancy, i.due, i.status])} />
+            <MiniTable columns={["Occupancy", "Due", "Status"]} rows={inspections.filter((i) => i.status !== "Complete").slice(0, 4).map((i) => [i.occupancy, i.due, i.status])} emptyMessage="No inspections due." />
           </Panel>
           <Panel title="30-Day Trends" icon={BarChart3}>
             <div className="trend-cards">

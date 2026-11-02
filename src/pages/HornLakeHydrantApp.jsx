@@ -44,7 +44,8 @@ export default function HornLakeHydrantApp() {
     <AuthProvider>
       <TenantProvider>
         <ThemeProvider>
-          <HornLakeHydrantShell />
+          {/* hydrant-standalone: lets hydrant-testing.css style the full page only here */}
+          <div className="hydrant-standalone" style={{ display: "contents" }}><HornLakeHydrantShell /></div>
         </ThemeProvider>
       </TenantProvider>
     </AuthProvider>

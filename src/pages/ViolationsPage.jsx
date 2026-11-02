@@ -19,6 +19,7 @@ import {
   generateNoticeFromViolation,
   listViolations,
 } from "../lib/inspections/index.js";
+import { friendlyError } from "../lib/friendlyError.js";
 
 function Field({ label, children }) {
   return (
@@ -85,7 +86,7 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
       setCreateCatalogId(nextCatalog[0]?.id || "");
     } catch (loadError) {
       console.error(loadError);
-      setError(loadError?.message || "Unable to load violations.");
+      setError(friendlyError(loadError, "Couldn't load violations."));
     } finally {
       setLoading(false);
     }
@@ -135,7 +136,7 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
       onChanged?.(created);
       if (!inspectionId) await reload();
     } catch (createError) {
-      setError(createError?.message || "Unable to create violation.");
+      setError(friendlyError(createError, "Couldn't create violation."));
     } finally {
       setSaving(false);
     }
@@ -155,7 +156,7 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
       setExtensionReason("");
       onChanged?.(next);
     } catch (extendError) {
-      setError(extendError?.message || "Unable to extend deadline.");
+      setError(friendlyError(extendError, "Couldn't extend deadline."));
     } finally {
       setSaving(false);
     }
@@ -177,7 +178,7 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
       setMessage(asCorrection ? "Correction evidence recorded." : "Evidence added.");
       onChanged?.(next);
     } catch (evidenceError) {
-      setError(evidenceError?.message || "Unable to add evidence.");
+      setError(friendlyError(evidenceError, "Couldn't add evidence."));
     } finally {
       setSaving(false);
     }
@@ -196,7 +197,7 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
       setMessage(status === "dismissed" ? "Violation dismissed." : "Violation closed.");
       onChanged?.(next);
     } catch (closeError) {
-      setError(closeError?.message || "Unable to close violation.");
+      setError(friendlyError(closeError, "Couldn't close violation."));
     } finally {
       setSaving(false);
     }
@@ -216,7 +217,7 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
       onNavigate?.("Notices & Certificates");
       onChanged?.(selected);
     } catch (noticeError) {
-      setError(noticeError?.message || "Unable to generate notice.");
+      setError(friendlyError(noticeError, "Couldn't generate notice."));
     } finally {
       setSaving(false);
     }
@@ -231,7 +232,7 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
       setMessage("Violation escalated.");
       onChanged?.(next);
     } catch (escalateError) {
-      setError(escalateError?.message || "Unable to escalate.");
+      setError(friendlyError(escalateError, "Couldn't escalate."));
     } finally {
       setSaving(false);
     }

@@ -384,7 +384,7 @@ export default function InspectionConfigStudioPage() {
             <span className="module-icon"><Settings2 size={22} /></span>
             <div>
               <h1>Inspections Configuration Studio</h1>
-              <p>Edit inspection types, statuses, numbering, and versioned form templates without a code deploy.</p>
+              <p>Edit inspection types, statuses, numbering, and versioned form templates — no IT help needed.</p>
             </div>
           </div>
           <button className="secondary-button" type="button" onClick={reload} disabled={loading || saving}>
@@ -535,7 +535,7 @@ export default function InspectionConfigStudioPage() {
                       <InspectionStatusBadge status={item.lifecycleStatus} />
                     </button>
                   ))}
-                  {!types.length ? <InspectionEmptyState title="No inspection types" description="Starter types will seed automatically on first open." /> : null}
+                  {!types.length ? <InspectionEmptyState title="No inspection types" description="Starter inspection types are added automatically. Refresh if they don't appear." /> : null}
                 </div>
               </div>
             </section>

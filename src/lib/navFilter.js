@@ -26,14 +26,16 @@ export const CODE_LIBRARY_NAV_NAMES = new Set([
  */
 export function filterNavByCodeLibraryAccess(navGroups = [], access = null, options = {}) {
   const moduleOn = Boolean(access?.moduleEnabled);
-  if (moduleOn) return navGroups;
+  // Code Administration loads code books for every department: FORGE staff only.
   const keepAdmin = Boolean(options.isCreator || options.isPlatformCreator);
+  if (moduleOn && keepAdmin) return navGroups;
 
   return navGroups
     .map((group) => {
       const leafVisible = (name) => {
         if (!CODE_LIBRARY_NAV_NAMES.has(name)) return true;
-        return keepAdmin && name === "Code Administration";
+        if (name === "Code Administration") return keepAdmin;
+        return moduleOn;
       };
       if (groupHasNavTree(group)) {
         const tree = filterNavTree(group.tree, (leaf) => leafVisible(leaf.name));

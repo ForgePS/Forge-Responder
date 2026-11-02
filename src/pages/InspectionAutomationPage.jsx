@@ -188,7 +188,7 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
     <InspectionPermissionGate allowed={allowed} title="Automation & Integrations">
       <InspectionsModuleLayout
         title="Automation & Integrations"
-        description="Automation rules, workflow templates, webhooks, calendar entries, NERIS relationship mappings, and adapters. These are set up here but not connected yet: nothing is sent automatically."
+        description="Set up automatic follow-ups, calendar entries and connections to other systems. Outbound connections are configured by FORGE support."
         activeNavName="Automation & Integrations"
         onNavigate={onNavigate}
         tabs={PREVENTION_TOOL_TABS}
@@ -399,7 +399,7 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
                   {nerisTypes.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
                 </select>
               </Field>
-              <Field label="Forge record ID">
+              <Field label="FORGE record number">
                 <input value={nerisDraft.forgeRecordId} onChange={(e) => setNerisDraft((c) => ({ ...c, forgeRecordId: e.target.value }))} />
               </Field>
               <Field label="Forge label" wide>
@@ -573,7 +573,7 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
             <div className="panel-body">
               <p className="occupancy-muted">Webhooks aren't sent yet, and testing a webhook isn't available yet.</p>
               {!(board?.webhooks || []).length ? (
-                <InspectionEmptyState title="No webhooks" description="Register endpoints for inspection lifecycle events." />
+                <InspectionEmptyState title="No webhooks" description="Connect another system to be notified when inspections change." />
               ) : (
                 <div className="personnel-list">
                   {(board.webhooks || []).map((row) => (
@@ -683,7 +683,7 @@ export default function InspectionAutomationPage({ onNavigate, query = "" }) {
             <div className="panel-body">
               <p className="occupancy-muted">Adapters are saved settings only. They aren't connected and can't be tested yet.</p>
               {!(board?.adapters || []).length ? (
-                <InspectionEmptyState title="No adapters" description="Register webhook, NERIS, calendar, CAD, GIS, or accounting adapters." />
+                <InspectionEmptyState title="No adapters" description="Connect another system to be notified when inspections change." />
               ) : (
                 <div className="personnel-list">
                   {(board.adapters || []).map((row) => (

@@ -426,7 +426,7 @@ export default function FleetFuelEnergyPage({ onNavigate, legacyApparatus = [] }
                         driverName: fuelDraft.driverName || actor.actorName,
                       }, actor);
                       setShowFuel(false);
-                      setMessage(`Fuel logged${created.exceptions.length ? ` with ${created.exceptions.length} exception(s)` : ""}.`);
+                      setMessage(`Fuel logged${created.exceptions.length ? ` with ${created.exceptions.length} exception${created.exceptions.length === 1 ? "" : "s"}` : ""}.`);
                       await reload();
                     } catch (createError) {
                       setError(createError?.message || "Unable to log fuel.");

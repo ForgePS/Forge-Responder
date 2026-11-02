@@ -16,6 +16,7 @@ import {
   unlinkAcademyPerson,
 } from "../../lib/academyIntegrations.js";
 import "../../theme/academy-integrations.css";
+import { friendlyError } from "../../lib/friendlyError.js";
 
 /**
  * Personnel Academy tab — multi-academy shells grouped by connection.
@@ -61,7 +62,7 @@ export default function PersonnelAcademyPanel({ person = null }) {
         setCache([]);
       }
     } catch (err) {
-      setError(err.message || "Could not load academy data.");
+      setError(friendlyError(err, "Couldn't load academy data."));
     } finally {
       setLoading(false);
     }
@@ -115,7 +116,7 @@ export default function PersonnelAcademyPanel({ person = null }) {
       setNotice("Academy link created.");
       await refresh();
     } catch (err) {
-      setError(err.message || "Link failed.");
+      setError(friendlyError(err, "Couldn't link this person. Please try again."));
     } finally {
       setBusy("");
     }
@@ -129,7 +130,7 @@ export default function PersonnelAcademyPanel({ person = null }) {
       setNotice("Academy link removed.");
       await refresh();
     } catch (err) {
-      setError(err.message || "Unlink failed.");
+      setError(friendlyError(err, "Couldn't unlink this person. Please try again."));
     } finally {
       setBusy("");
     }
@@ -156,7 +157,7 @@ export default function PersonnelAcademyPanel({ person = null }) {
         },
       }));
     } catch (err) {
-      setError(err.message || "Could not load academy details.");
+      setError(friendlyError(err, "Couldn't load academy details."));
     } finally {
       setBusy("");
     }
@@ -170,7 +171,7 @@ export default function PersonnelAcademyPanel({ person = null }) {
       setNotice("Sync requested.");
       await loadAcademyDetails(connection, links.find((l) => l.connectionId === connection.connectionId));
     } catch (err) {
-      setError(err.message || "Sync failed.");
+      setError(friendlyError(err, "Couldn't sync academy records. Please try again."));
     } finally {
       setBusy("");
     }

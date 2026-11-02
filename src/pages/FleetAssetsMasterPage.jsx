@@ -118,7 +118,7 @@ export default function FleetAssetsMasterPage({
       // Force import path only when empty; ensureFleetAssets already does this on load.
       const existing = records.length;
       if (existing) {
-        setMessage("Fleet assets already exist. Import runs only when the collection is empty.");
+        setMessage("Your fleet list already has vehicles, so there's nothing to import.");
         return;
       }
       const migrated = await migrateFleetAssetsFromApparatusIfEmpty(
@@ -129,7 +129,7 @@ export default function FleetAssetsMasterPage({
       setRecords(migrated);
       setSelectedId(migrated[0]?.id || "");
       setMessage(migrated.length
-        ? `Imported ${migrated.length} asset(s) from Apparatus list.`
+        ? `Imported ${migrated.length} vehicle${migrated.length === 1 ? "" : "s"} from your apparatus list.`
         : "No apparatus records found to import.");
     } catch (importError) {
       setError(importError?.message || "Unable to import apparatus.");

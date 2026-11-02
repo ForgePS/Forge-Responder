@@ -13,6 +13,7 @@ import {
   canViewFleetReadiness,
   ensureFleetAssets,
 } from "../lib/fleet/index.js";
+import { friendlyError } from "../lib/friendlyError.js";
 
 export default function FleetReadinessBoardPage({ onNavigate, legacyApparatus = [] }) {
   const { departmentId } = useTenant();
@@ -46,7 +47,7 @@ export default function FleetReadinessBoardPage({ onNavigate, legacyApparatus = 
       setBoard(next);
     } catch (loadError) {
       console.error(loadError);
-      setError(loadError?.message || "Unable to load readiness board.");
+      setError(friendlyError(loadError, "Couldn't load readiness board."));
     } finally {
       setLoading(false);
     }

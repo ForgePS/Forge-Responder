@@ -36,6 +36,7 @@ import {
   workOrderStatusLabel,
   workOrderTypeLabel,
 } from "../lib/fleet/workOrderLoopLogic.js";
+import { friendlyError } from "../lib/friendlyError.js";
 
 function Field({ label, children }) {
   return (
@@ -139,7 +140,7 @@ export default function FleetWorkOrdersPage({
       }));
     } catch (loadError) {
       console.error(loadError);
-      setError(loadError?.message || "Unable to load work orders.");
+      setError(friendlyError(loadError, "Couldn't load work orders."));
     } finally {
       setLoading(false);
     }
@@ -206,7 +207,7 @@ export default function FleetWorkOrdersPage({
         ? buildCompletionMessage({ ...completion, unitName: completion.unitName || unitName, warnings })
         : `Work order ${next.workOrderNumber} completed.`);
     } catch (completeError) {
-      setError(completeError?.message || "Unable to complete the work order.");
+      setError(friendlyError(completeError, "Couldn't complete the work order."));
     } finally {
       setSaving(false);
     }
@@ -237,7 +238,7 @@ export default function FleetWorkOrdersPage({
       setCreateDraft({ ...emptyCreate, fleetAssetId: assets[0]?.id || "", shopId: firstActiveId(shops) });
       setMessage(`Work order ${created.workOrderNumber} created.`);
     } catch (createError) {
-      setError(createError?.message || "Unable to create work order.");
+      setError(friendlyError(createError, "Couldn't create work order."));
     } finally {
       setSaving(false);
     }
@@ -252,7 +253,7 @@ export default function FleetWorkOrdersPage({
         onNavigate={onNavigate}
         actions={canEdit ? (
           <button className="primary-button" type="button" onClick={() => setShowCreate(true)}>
-            <CirclePlus size={14} /> New work order
+            <CirclePlus size={14} /> New Work Order
           </button>
         ) : null}
       >
@@ -358,7 +359,7 @@ export default function FleetWorkOrdersPage({
                                 upsert(next);
                                 setMessage(`Work order ${next.workOrderNumber} moved to ${workOrderStatusLabel(status)}.`);
                               } catch (transitionError) {
-                                setError(transitionError?.message || "Unable to change the status.");
+                                setError(friendlyError(transitionError, "Couldn't change the status."));
                               } finally {
                                 setSaving(false);
                               }
@@ -421,13 +422,13 @@ export default function FleetWorkOrdersPage({
                                 upsert(next);
                                 setTaskText("");
                               } catch (taskError) {
-                                setError(taskError?.message || "Unable to add task.");
+                                setError(friendlyError(taskError, "Couldn't add task."));
                               } finally {
                                 setSaving(false);
                               }
                             }}
                           >
-                            Add task
+                            Add Task
                           </button>
                         </div>
                       </section>
@@ -469,13 +470,13 @@ export default function FleetWorkOrdersPage({
                               upsert(next);
                               setLaborDraft({ hours: "1", rate: "0", notes: "" });
                             } catch (laborError) {
-                              setError(laborError?.message || "Unable to add labor.");
+                              setError(friendlyError(laborError, "Couldn't add labor."));
                             } finally {
                               setSaving(false);
                             }
                           }}
                         >
-                          Log labor
+                          Log Labor
                         </button>
                       </section>
 
@@ -516,13 +517,13 @@ export default function FleetWorkOrdersPage({
                               upsert(next);
                               setPartDraft({ name: "", quantity: "1", unitCost: "0" });
                             } catch (partError) {
-                              setError(partError?.message || "Unable to add part.");
+                              setError(friendlyError(partError, "Couldn't add part."));
                             } finally {
                               setSaving(false);
                             }
                           }}
                         >
-                          Add part
+                          Add Part
                         </button>
                       </section>
 
@@ -553,7 +554,7 @@ export default function FleetWorkOrdersPage({
                                   upsert(next);
                                   setMessage("QC passed.");
                                 } catch (qcError) {
-                                  setError(qcError?.message || "Unable to complete QC.");
+                                  setError(friendlyError(qcError, "Couldn't complete QC."));
                                 } finally {
                                   setSaving(false);
                                 }
@@ -575,7 +576,7 @@ export default function FleetWorkOrdersPage({
                                   upsert(next);
                                   setMessage("QC failed — returned to in progress.");
                                 } catch (qcError) {
-                                  setError(qcError?.message || "Unable to fail QC.");
+                                  setError(friendlyError(qcError, "Couldn't fail QC."));
                                 } finally {
                                   setSaving(false);
                                 }

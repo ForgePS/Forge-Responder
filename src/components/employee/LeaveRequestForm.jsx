@@ -94,7 +94,7 @@ export default function LeaveRequestForm({
             value={leaveTypeOptions.includes(value.type) ? value.type : leaveTypeOptions[0] || ""}
             onChange={(event) => update({ type: event.target.value })}
           >
-            {!value.type && <option value="">Select...</option>}
+            {!value.type && <option value="">Choose leave type</option>}
             {leaveTypeOptions.map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}

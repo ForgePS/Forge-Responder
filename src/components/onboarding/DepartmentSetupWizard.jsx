@@ -18,6 +18,7 @@ import DepartmentInvitesPanel from "../DepartmentInvitesPanel.jsx";
 import { useTenant } from "../../context/TenantContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { limitCheck, limitMessage } from "../../lib/moduleAccess.js";
+import { friendlyError } from "../../lib/friendlyError.js";
 
 const STEPS = [
   { id: "department", label: "Department", icon: Building2 },
@@ -161,7 +162,7 @@ export default function DepartmentSetupWizard({
       setStepIndex(nextIndex);
     } catch (saveError) {
       console.error("Setup wizard save failed", saveError);
-      setError(saveError?.message || "Could not save. Check your connection and try again.");
+      setError(friendlyError(saveError, "Couldn't save. Check your connection and try again."));
     } finally {
       setSaving(false);
     }
@@ -186,7 +187,7 @@ export default function DepartmentSetupWizard({
       await refreshDepartment?.();
       onClose?.({ completed: true });
     } catch (finishError) {
-      setError(finishError?.message || "Could not finish setup.");
+      setError(friendlyError(finishError, "Couldn't finish setup."));
     } finally {
       setSaving(false);
     }
@@ -215,7 +216,7 @@ export default function DepartmentSetupWizard({
     } catch (importError) {
       setError(importError instanceof IdentityReviewRequiredError
         ? "Import paused: some people need an identity review before they can be added."
-        : importError?.message || "Import failed.");
+        : friendlyError(importError, "Import failed. Check the file and try again."));
     }
   }
 

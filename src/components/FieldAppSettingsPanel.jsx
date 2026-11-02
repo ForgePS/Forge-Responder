@@ -45,6 +45,7 @@ import {
   saveFieldAppConfig,
 } from "../field/fieldAdminService.js";
 import "./FieldAppSettingsPanel.css";
+import { friendlyError } from "../lib/friendlyError.js";
 
 const TABS = [
   { id: "general", label: "General" },
@@ -201,7 +202,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
       setUpdates(nextUpdates);
       setDirty(false);
     } catch (error) {
-      setLoadError(error?.message || "Couldn't load FORGE Field settings.");
+      setLoadError(friendlyError(error, "Couldn't load FORGE Field settings."));
     }
   }
 
@@ -222,7 +223,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
       setDirty(false);
       onMessage?.("FORGE Field settings saved — phones pick them up on their next update");
     } catch (error) {
-      onMessage?.(error?.code === "permission-denied" ? "Only department administrators can change FORGE Field settings." : `Save failed: ${error?.message || error}`);
+      onMessage?.(error?.code === "permission-denied" ? "Only department administrators can change FORGE Field settings." : friendlyError(error, "Couldn't save FORGE Field settings. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -236,7 +237,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
       setLists(await listCheckoffLists(departmentId));
       onMessage?.("Check-off list saved");
     } catch (error) {
-      onMessage?.(error?.code === "permission-denied" ? "Only department administrators can change check-off lists." : `Save failed: ${error?.message || error}`);
+      onMessage?.(error?.code === "permission-denied" ? "Only department administrators can change check-off lists." : friendlyError(error, "Couldn't save the check-off list. Please try again."));
     } finally {
       setSaving(false);
     }

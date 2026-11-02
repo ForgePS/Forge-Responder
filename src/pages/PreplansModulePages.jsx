@@ -53,6 +53,7 @@ import {
   updatePreplanRevision,
   VERIFICATION_CHECKLIST_ITEMS,
 } from "../lib/inspections/index.js";
+import { friendlyError } from "../lib/friendlyError.js";
 
 const PREPLAN_TABS = [
   { id: "workQueue", label: "Preplan Work Queue", navName: "Preplan Work Queue" },
@@ -596,7 +597,7 @@ function PreplanDetailWorkspace({
         )) : (
           <InspectionEmptyState
             title="No template sections"
-            description="Seed preplan templates in Configuration Studio."
+            description="Add preplan templates in Configuration Studio to get started."
           />
         )}
 
@@ -744,7 +745,7 @@ function PreplansShell({
       if (!quiet && (openPreplanId || bootstrapPreplanId)) setActiveId(openPreplanId || bootstrapPreplanId);
     } catch (loadError) {
       console.error(loadError);
-      setError(loadError?.message || "Unable to load preplans.");
+      setError(friendlyError(loadError, "Couldn't load preplans."));
     } finally {
       setLoading(false);
     }
@@ -832,7 +833,7 @@ function PreplansShell({
       setMessage(`Created ${result.preplan.preplanNumber}`);
       onNavigate?.("Preplan Work Queue");
     } catch (createError) {
-      setError(createError?.message || "Unable to create preplan.");
+      setError(friendlyError(createError, "Couldn't create preplan."));
     } finally {
       setSaving(false);
     }
@@ -852,7 +853,7 @@ function PreplansShell({
       await reload({ quiet: true });
       return true;
     } catch (actionError) {
-      setError(actionError?.message || "Action failed.");
+      setError(friendlyError(actionError, "That didn't work. Please try again."));
       return false;
     } finally {
       setSaving(false);
@@ -902,14 +903,14 @@ function PreplansShell({
             <section className="panel">
               <header>
                 <div><ShieldCheck size={15} /><strong>{
-                  mode === "work" ? "Work queue"
-                    : mode === "draft" ? "Draft preplans"
-                      : mode === "review" ? "Awaiting review"
-                        : mode === "approved" ? "Approved preplans"
-                          : mode === "mine" ? "My preplans"
+                  mode === "work" ? "Work Queue"
+                    : mode === "draft" ? "Draft Preplans"
+                      : mode === "review" ? "Awaiting Review"
+                        : mode === "approved" ? "Approved Preplans"
+                          : mode === "mine" ? "My Preplans"
                             : mode === "dashboard" ? "Dashboard"
                               : mode === "reports" ? "Reports"
-                                : "All preplans"
+                                : "All Preplans"
                 }</strong></div>
               </header>
               <div className="panel-body">

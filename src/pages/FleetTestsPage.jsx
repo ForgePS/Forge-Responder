@@ -114,7 +114,7 @@ export default function FleetTestsPage({
     <FleetPermissionGate allowed={allowed}>
       <FleetModuleLayout
         title="Fleet Tests"
-        description="Testing programs, certificates, and compliance — including migrated hose tests."
+        description="Testing programs, certificates, and compliance — including hose testing."
         activeNavName="Fleet Tests"
         onNavigate={onNavigate}
         actions={canEdit ? (
@@ -148,7 +148,7 @@ export default function FleetTestsPage({
         {!loading && !rows.length ? (
           <FleetEmptyState
             title="No test records"
-            description="Record a test or migrate classic Hose Testing records (auto-imports when empty)."
+            description="No tests recorded yet. Record a test to get started."
             icon={Gauge}
           />
         ) : null}

@@ -115,8 +115,8 @@ export default function PreplanOperationalPage({
 
         {notBuilt ? (
           <InspectionEmptyState
-            title="Not available yet"
-            description="This preplan view is not built yet. Use All Preplans or Target Hazards to find a preplan."
+            title="Not turned on"
+            description="This view isn't turned on for your department. Use All Preplans or Target Hazards."
           />
         ) : null}
 
@@ -125,7 +125,7 @@ export default function PreplanOperationalPage({
             <header>
               <div>
                 {variant === "targetHazards" ? <ShieldAlert size={15} /> : <MapPin size={15} />}
-                <strong>{filtered.length} preplan(s)</strong>
+                <strong>{filtered.length} preplan{filtered.length === 1 ? "" : "s"}</strong>
               </div>
             </header>
             <div className="panel-body">

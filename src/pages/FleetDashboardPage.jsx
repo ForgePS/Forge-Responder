@@ -13,6 +13,7 @@ import {
   ensureFleetAssets,
   loadFleetSettings,
 } from "../lib/fleet/index.js";
+import { friendlyError } from "../lib/friendlyError.js";
 
 export default function FleetDashboardPage({ onNavigate, legacyApparatus = [] }) {
   const { departmentId } = useTenant();
@@ -47,7 +48,7 @@ export default function FleetDashboardPage({ onNavigate, legacyApparatus = [] })
       setRecords(assets);
     } catch (loadError) {
       console.error(loadError);
-      setError(loadError?.message || "Unable to load fleet dashboard.");
+      setError(friendlyError(loadError, "Couldn't load fleet dashboard."));
     } finally {
       setLoading(false);
     }
@@ -68,7 +69,7 @@ export default function FleetDashboardPage({ onNavigate, legacyApparatus = [] })
       await downloadClassicFleetExport(departmentId);
       setMessage("Classic fleet lists exported.");
     } catch (exportError) {
-      setError(exportError?.message || "Unable to export fleet lists.");
+      setError(friendlyError(exportError, "Couldn't export fleet lists."));
     } finally {
       setExporting(false);
     }
@@ -83,7 +84,7 @@ export default function FleetDashboardPage({ onNavigate, legacyApparatus = [] })
         onNavigate={onNavigate}
         actions={(
           <button className="secondary-button" type="button" disabled={exporting} onClick={handleExport}>
-            <Download size={14} /> Export classic lists
+            <Download size={14} /> Export fleet lists
           </button>
         )}
       >
@@ -116,7 +117,7 @@ export default function FleetDashboardPage({ onNavigate, legacyApparatus = [] })
             {metrics.total === 0 ? (
               <FleetEmptyState
                 title="No fleet assets yet"
-                description="Open All Fleet Assets to import from the classic Apparatus list, or add assets manually."
+                description="Open All Fleet Assets to import your apparatus list, or add assets manually."
                 icon={Truck}
               />
             ) : (
@@ -133,8 +134,7 @@ export default function FleetDashboardPage({ onNavigate, legacyApparatus = [] })
                 </header>
                 <div className="panel-body">
                   <p className="occupancy-muted">
-                    Showing {metrics.total} asset{metrics.total === 1 ? "" : "s"} in the Fleet master collection.
-                    The classic Apparatus, Maintenance and Assets pages stay available until your department switches over to Fleet.
+                    Showing {metrics.total} asset{metrics.total === 1 ? "" : "s"} in your fleet.
                   </p>
                 </div>
               </section>

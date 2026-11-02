@@ -1,0 +1,144 @@
+/*
+ * Demo-readiness fixes, loaded last. Most of styles.css was written for the
+ * old navy theme; these rules move the leftovers onto theme tokens so they
+ * read correctly in both light and dark mode.
+ */
+
+/* Tokens some stylesheets use but tokens.css never defined. */
+:root,
+html[data-theme="light"] {
+  --rms-bg-surface-1: var(--rms-bg-surface);
+  --rms-surface: var(--rms-bg-surface);
+  --rms-bg-subtle: var(--rms-bg-surface-3);
+  --rms-text-primary: var(--rms-text-strong);
+  --rms-text-secondary: var(--rms-text-muted);
+}
+html[data-theme="dark"] {
+  --rms-bg-surface-1: var(--rms-bg-surface);
+  --rms-surface: var(--rms-bg-surface);
+  --rms-bg-subtle: var(--rms-bg-surface-3);
+  --rms-text-primary: var(--rms-text-strong);
+  --rms-text-secondary: var(--rms-text-muted);
+}
+
+/* ---------- Navy-era colours that are unreadable in light mode ---------- */
+.notification-item { color: var(--rms-text-strong); border-bottom-color: var(--rms-border-subtle); }
+.secondary-button.danger-button { color: var(--rms-critical); border-color: color-mix(in srgb, var(--rms-critical) 45%, transparent); }
+.internal-email-body { color: var(--rms-text-body); }
+.email-recipient-chip { color: var(--rms-text-strong); }
+.email-recipient-chip:hover { background: var(--rms-bg-hover-2); }
+.apparatus-member-avatar { color: var(--rms-text-strong); }
+.week-roster-panel,
+.admin-matrix-table,
+.admin-audit-table { background: var(--rms-bg-surface); }
+.admin-integration-card { background: var(--rms-bg-surface); border-color: var(--rms-border); color: var(--rms-text-body); }
+.occupancy-search input,
+.occupancy-field input,
+.occupancy-field select,
+.occupancy-field textarea { color: var(--rms-text-strong); }
+
+/* Demo banner: white text on the teal bar (the amber text was ~2:1 contrast). */
+.demo-mode-banner { border-bottom-color: transparent; }
+.demo-mode-banner strong,
+.demo-mode-banner span { color: #fff; }
+
+/* ---------- Desktop overflow (1280–1440px) ---------- */
+/* Grid pages with an implicit auto column grow to their widest child;
+   pin the column so wide tables scroll inside their panel instead. */
+.module-page,
+.inspections-module,
+.inspections-module-body { grid-template-columns: minmax(0, 1fr); }
+.module-page > *,
+.inspections-module-body > * { min-width: 0; }
+.personnel-firstdue-list { display: grid; gap: 12px; min-width: 0; }
+.personnel-table-toolbar { flex-wrap: wrap; }
+
+/* Assets: 8 cells per row (the 9th track was always empty). */
+.asset-table { min-width: 940px; }
+.asset-row {
+  grid-template-columns: minmax(170px, 1.4fr) minmax(90px, .8fr) minmax(90px, .8fr) minmax(100px, .9fr)
+    minmax(100px, .9fr) minmax(90px, .8fr) minmax(96px, .7fr) 76px;
+}
+
+/* Work order board: columns scroll inside the board, cards wrap long text. */
+.fleet-wo-board { grid-auto-columns: minmax(180px, 1fr); max-width: 100%; overscroll-behavior-x: contain; }
+.fleet-wo-column { min-width: 0; }
+.fleet-wo-column-body { min-width: 0; max-height: 60vh; overflow-y: auto; }
+.fleet-wo-card { min-width: 0; overflow-wrap: anywhere; }
+
+/* Wide tables: smaller minimums so a laptop screen rarely needs a scrollbar. */
+.cert-table { min-width: 900px; }
+.work-order-table { min-width: 900px; }
+.admin-page .data-editor-table { min-width: 860px; }
+.schedule-calendar-grid { grid-template-columns: repeat(7, minmax(110px, 1fr)); width: 100%; min-width: 800px; }
+
+/* ---------- Phone width ---------- */
+@media (max-width: 700px) {
+  .app-shell > .top-bar { min-height: 0; }
+  .demo-mode-banner { flex-wrap: wrap; padding: 8px 10px; gap: 8px; }
+  .demo-mode-banner > div { flex: 1 1 100%; }
+  .demo-mode-banner .secondary-button { margin-left: auto; }
+  .global-search input::placeholder { color: var(--rms-text-subtle); }
+}
+.department-switcher { overflow: hidden; }
+.department-switcher select { min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+
+/* ---------- Dark mode gaps ---------- */
+html[data-theme="dark"] .time-card-day-time,
+html[data-theme="dark"] .time-card-day.is-leave .time-card-day-hours.is-regular-work { color: #e2e8f0; }
+html[data-theme="dark"] .time-card-nav-btn { background: #1e293b; border-color: #475569; color: #e2e8f0; }
+html[data-theme="dark"] .time-card-week + .time-card-week { border-top-color: #64748b; }
+.schedule-calendar-cap-badge,
+.schedule-calendar-staffing-block { color: var(--rms-text-body); }
+
+/* Daily roster (Scheduling) */
+html[data-theme="dark"] .daily-roster-station,
+html[data-theme="dark"] .daily-roster-unit,
+html[data-theme="dark"] .daily-roster-member-row,
+html[data-theme="dark"] .daily-roster-overtime-add-btn,
+html[data-theme="dark"] .daily-roster-overtime-add-select {
+  background: var(--rms-bg-surface);
+  border-color: var(--rms-border);
+  color: var(--rms-text-body);
+}
+html[data-theme="dark"] .daily-roster-station-body,
+html[data-theme="dark"] .daily-roster-unit-head,
+html[data-theme="dark"] .daily-roster-member-head {
+  background: var(--rms-bg-surface-2);
+  border-color: var(--rms-border);
+  color: var(--rms-text-strong);
+}
+html[data-theme="dark"] .daily-roster-member-row.is-partial-open { background: rgba(245, 158, 11, 0.14); }
+
+/* Digital dashboard media library and Add Media dialog */
+html[data-theme="dark"] .dd-add-media-modal,
+html[data-theme="dark"] .dd-library-search,
+html[data-theme="dark"] .dd-library-filter,
+html[data-theme="dark"] .dd-add-media-app-search,
+html[data-theme="dark"] .dd-add-media-types,
+html[data-theme="dark"] .dd-add-media-source-tabs button,
+html[data-theme="dark"] .dd-upload-zone,
+html[data-theme="dark"] .dd-import-option,
+html[data-theme="dark"] .dd-import-panel,
+html[data-theme="dark"] .dd-gallery-tabs,
+html[data-theme="dark"] .dd-source-tabs,
+html[data-theme="dark"] .dd-source-field-full input,
+html[data-theme="dark"] .dd-gallery-mode-toggle,
+html[data-theme="dark"] .dd-gallery-advanced,
+html[data-theme="dark"] .dd-add-media-sidebar,
+html[data-theme="dark"] .dd-duration-input,
+html[data-theme="dark"] .dd-add-media-footer,
+html[data-theme="dark"] .dd-mvix-guide,
+html[data-theme="dark"] .dd-display-url-field,
+html[data-theme="dark"] .dd-modal input {
+  background: var(--rms-bg-surface);
+  border-color: var(--rms-border);
+  color: var(--rms-text-body);
+}
+html[data-theme="dark"] .dd-library-table tbody tr:hover { background: var(--rms-bg-hover); }
+
+/* Dashboard stat labels wrap instead of cutting off ("Personnel On…"). */
+.kpi-card > span:first-of-type { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .kpi-card > span:first-of-type { font-size: 13px; line-height: 1.25; }
+}

@@ -20,9 +20,9 @@ export function Panel({ title, icon: Icon, action, children, className = "" }) {
   return <section className={`panel ${className}`}><header><div><Icon size={15} /><strong>{title}</strong></div>{action}</header><div className="panel-body">{children}</div></section>;
 }
 
-export function MiniTable({ columns, rows }) {
+export function MiniTable({ columns, rows, emptyMessage }) {
   const safeRows = normalizeTableRows(rows);
-  return <div className="mini-table"><div className="mini-row mini-head" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>{columns.map((column) => <span key={column}>{column}</span>)}</div>{safeRows.map((row, rowIndex) => <div className="mini-row" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }} key={`${row.join("-")}-${rowIndex}`}>{row.map((cell, index) => <span key={`${cell}-${index}`} className={index === row.length - 1 ? `cell-${toneFromStatus(cell)}` : ""}>{cell}</span>)}</div>)}</div>;
+  return <div className="mini-table"><div className="mini-row mini-head" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>{columns.map((column) => <span key={column}>{column}</span>)}</div>{!safeRows.length && <div className="mini-row mini-empty" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}><span className="occupancy-muted">{emptyMessage || "Nothing to show yet."}</span></div>}{safeRows.map((row, rowIndex) => <div className="mini-row" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }} key={`${row.join("-")}-${rowIndex}`}>{row.map((cell, index) => <span key={`${cell}-${index}`} className={index === row.length - 1 ? `cell-${toneFromStatus(cell)}` : ""}>{cell}</span>)}</div>)}</div>;
 }
 
 export function trainingCompliancePercent(records = []) {
@@ -30,9 +30,9 @@ export function trainingCompliancePercent(records = []) {
   return Math.round(records.reduce((sum, record) => sum + Number(record.completion || 0), 0) / records.length);
 }
 
-export function DataTable({ columns, rows, query }) {
-  const filtered = useMemo(() => rows.filter((row) => row.join(" ").toLowerCase().includes(query.toLowerCase())), [rows, query]);
-  return <div className="data-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{filtered.map((row) => <tr key={row.join("-")}>{row.map((cell, index) => <td key={`${cell}-${index}`}>{index === row.length - 1 ? <Badge>{cell}</Badge> : cell}</td>)}</tr>)}</tbody></table>{!filtered.length && <div className="empty-table">No records match the current search.</div>}</div>;
+export function DataTable({ columns, rows, query = "" }) {
+  const filtered = useMemo(() => rows.filter((row) => row.join(" ").toLowerCase().includes(String(query || "").toLowerCase())), [rows, query]);
+  return <div className="data-table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{filtered.map((row) => <tr key={row.join("-")}>{row.map((cell, index) => <td key={`${cell}-${index}`}>{index === row.length - 1 ? <Badge>{cell}</Badge> : cell}</td>)}</tr>)}</tbody></table>{!filtered.length && <div className="empty-table">{String(query || "").trim() ? "No records match the current search." : "No records yet."}</div>}</div>;
 }
 
 export function Modal({ title, onClose, children }) {
