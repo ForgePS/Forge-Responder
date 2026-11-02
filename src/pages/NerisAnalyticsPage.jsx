@@ -12,9 +12,32 @@ import {
 import { isNerisFeatureEnabled } from "../lib/neris/featureFlags.js";
 import { useTenant } from "../context/TenantContext.jsx";
 import { labelFromKey } from "../lib/labelFromKey.js";
+import { INCIDENT_KINDS, primaryTypeLabel } from "../lib/neris/reportModel.js";
 import "../styles/neris-analytics.css";
 
 const NOT_ENOUGH = "Not enough data";
+
+/** "2026-10-28" -> "Oct 28, 2026"; anything else passes through. */
+function formatDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ""));
+  if (!match) return value || "—";
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    .toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+const money = (value) => `$${Math.round(Number(value) || 0).toLocaleString("en-US")}`;
+
+/** Readable incident type: "Diabetic Problems" rather than "MEDICAL: ILLNESS: DIABETIC_PROBLEMS". */
+function typeLabel(report) {
+  const label = primaryTypeLabel(report);
+  return label === "New incident" ? "Type not set" : label;
+}
+
+/** Category of a stored type ("MEDICAL: …" -> "Medical"); free text from CAD falls under Other. */
+function categoryOf(typeText = "") {
+  const prefix = String(typeText).split(":")[0].trim();
+  return INCIDENT_KINDS.find((kind) => kind.typePrefix === prefix)?.label || "Other";
+}
 
 function formatSeconds(value) {
   if (value == null) return "—";
@@ -66,12 +89,27 @@ export default function NerisAnalyticsPage({ reports = [] }) {
   const survey = useMemo(() => buildAnnualSurveyTotals(reports, surveyYear), [reports, surveyYear]);
   const noYearData = survey.totalIncidents === 0;
   const heatPoints = useMemo(() => buildHeatMapPoints(reports), [reports]);
+  const labelById = useMemo(() => new Map(reports.map((r) => [r.id, typeLabel(r)])), [reports]);
+  const byCategory = useMemo(() => {
+    const counts = {};
+    for (const [type, count] of Object.entries(survey.byType || {})) {
+      const category = categoryOf(type);
+      counts[category] = (counts[category] || 0) + count;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [survey]);
+  // Ad-hoc rows and filters use the readable type and date, so "structure fire" matches
+  // and the CSV reads the same as the screen.
+  const readableReports = useMemo(
+    () => reports.map((r) => ({ ...r, incidentTypeSummary: labelById.get(r.id), incidentDate: formatDate(r.incidentDate) })),
+    [reports, labelById],
+  );
   const adHoc = useMemo(
-    () => runAdHocReport(reports, {
+    () => runAdHocReport(readableReports, {
       columns: ["reportNumber", "incidentDate", "incidentTypeSummary", "incidentAddress", "status"],
       filters: { status: adHocFilter.status, incidentTypeSummary: adHocFilter.incidentType },
     }),
-    [reports, adHocFilter],
+    [readableReports, adHocFilter],
   );
 
   const tabs = [
@@ -151,6 +189,7 @@ export default function NerisAnalyticsPage({ reports = [] }) {
                   <tr>
                     <th>Report</th>
                     <th>Date</th>
+                    <th>Type</th>
                     <th>Call processing</th>
                     <th>Turnout</th>
                     <th>Travel</th>
@@ -162,7 +201,8 @@ export default function NerisAnalyticsPage({ reports = [] }) {
                   {nfpa1710.incidents.slice(0, 25).map((row, index) => (
                     <tr key={row.incidentId || index}>
                       <td>{row.reportNumber || "—"}</td>
-                      <td>{row.incidentDate || "—"}</td>
+                      <td>{formatDate(row.incidentDate)}</td>
+                      <td>{labelById.get(row.incidentId) || "—"}</td>
                       <td>{formatSeconds(row.callProcessingSeconds)}</td>
                       <td>{formatSeconds(row.turnoutSeconds)}</td>
                       <td>{formatSeconds(row.travelSeconds)}</td>
@@ -171,7 +211,7 @@ export default function NerisAnalyticsPage({ reports = [] }) {
                     </tr>
                   ))}
                   {!nfpa1710.incidents.length ? (
-                    <tr><td colSpan={7}>No reports have response times yet. Add them on the Response step of each report.</td></tr>
+                    <tr><td colSpan={8}>No reports have response times yet. Add them on the Response step of each report.</td></tr>
                   ) : null}
                 </tbody>
               </table>
@@ -220,11 +260,32 @@ export default function NerisAnalyticsPage({ reports = [] }) {
             />
             <MetricCard
               label="Property and contents loss"
-              value={survey.lossReports ? `${survey.propertyLoss.toLocaleString()}` : NOT_ENOUGH}
+              value={survey.lossReports ? money(survey.propertyLoss) : NOT_ENOUGH}
               empty={!survey.lossReports}
               sub={survey.lossReports ? `from ${survey.lossReports} of ${survey.totalIncidents} reports with a loss amount` : "No report this year has a loss amount entered"}
             />
           </div>
+          {byCategory.length ? (
+            <section className="panel">
+              <header><strong>Incidents by category, {surveyYear}</strong></header>
+              <div className="panel-body">
+                <table className="data-table">
+                  <thead>
+                    <tr><th>Category</th><th>Incidents</th><th>Share</th></tr>
+                  </thead>
+                  <tbody>
+                    {byCategory.map(([category, count]) => (
+                      <tr key={category}>
+                        <td>{category}</td>
+                        <td>{count}</td>
+                        <td>{Math.round((count / survey.totalIncidents) * 100)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
         </section>
       ) : null}
 
@@ -237,7 +298,7 @@ export default function NerisAnalyticsPage({ reports = [] }) {
                 {heatPoints.slice(0, 50).map((point) => (
                   <li key={point.id}>
                     <strong>{point.address || "Unknown address"}</strong>
-                    <span>{point.incidentType} · {point.date}</span>
+                    <span>{labelById.get(point.id) || "Type not set"} · {formatDate(point.date)}</span>
                     <small>{point.lat.toFixed(5)}, {point.lng.toFixed(5)}</small>
                   </li>
                 ))}
@@ -258,7 +319,7 @@ export default function NerisAnalyticsPage({ reports = [] }) {
             </label>
             <label>
               Type filter
-              <input value={adHocFilter.incidentType} onChange={(e) => setAdHocFilter((f) => ({ ...f, incidentType: e.target.value }))} placeholder="Structure fire…" />
+              <input value={adHocFilter.incidentType} onChange={(e) => setAdHocFilter((f) => ({ ...f, incidentType: e.target.value }))} placeholder="Chest pain, fire…" />
             </label>
             <button
               type="button"

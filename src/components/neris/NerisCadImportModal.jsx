@@ -1,11 +1,38 @@
-import { useRef, useState } from "react";
-import { Check, ClipboardPaste, UploadCloud, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Check, ClipboardPaste, Radio, UploadCloud, X } from "lucide-react";
+import { useTenant } from "../../context/TenantContext.jsx";
+import { DEMO_DEPARTMENT_ID } from "../../lib/tenantPaths.js";
+import { buildDemoCadRuns } from "../../data/demoCadRuns.js";
 import {
   applyCadImport,
   buildCadImportPreview,
   parseCadFile,
   parseCadPayload,
 } from "../../lib/neris/cadImport.js";
+
+/** "2026-11-01T14:02" -> "Nov 1, 2026 14:02"; "2026-11-01" -> "Nov 1, 2026". */
+function displayValue(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}:\d{2}))?/.exec(String(value || ""));
+  if (!match) return String(value ?? "");
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const day = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return match[4] ? `${day} ${match[4]}` : day;
+}
+
+/** Plain rows for people: one "Units" row, no duplicate call number. */
+function displayRows(fields) {
+  const byKey = Object.fromEntries(fields.map((f) => [f.key, f]));
+  const unitIds = fields.filter((f) => /^unit-\d+-unitId$/.test(f.key)).map((f) => f.value);
+  const rows = [];
+  for (const field of fields) {
+    // Per-unit details (times, station) are imported; the preview just names the units.
+    if (/^unit-\d+-/.test(field.key)) continue;
+    if (field.key === "cadCallNumber" && byKey.incidentNumber?.value === field.value) continue;
+    rows.push({ key: field.key, label: field.label, value: displayValue(field.value) });
+  }
+  if (unitIds.length) rows.push({ key: "units", label: "Units", value: unitIds.join(", ") });
+  return rows;
+}
 
 function ModalShell({ title, onClose, children }) {
   return (
@@ -36,9 +63,17 @@ export default function NerisCadImportModal({
   onClose,
   report,
   onApply,
+  startsNewReport = false,
 }) {
+  const { departmentId } = useTenant();
+  // Demo department only: sample dispatch records to import with one click.
+  const sampleRuns = useMemo(
+    () => (departmentId === DEMO_DEPARTMENT_ID ? buildDemoCadRuns() : []),
+    [departmentId],
+  );
   const fileInputRef = useRef(null);
-  const [mode, setMode] = useState("paste");
+  const [mode, setMode] = useState(sampleRuns.length ? "recent" : "paste");
+  const [pickedRun, setPickedRun] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [fileName, setFileName] = useState("");
   const [errors, setErrors] = useState([]);
@@ -49,8 +84,22 @@ export default function NerisCadImportModal({
 
   if (!open) return null;
 
+  function handlePickRun(run) {
+    setPickedRun(run.incident_number);
+    setErrors([]);
+    const result = parseCadPayload(JSON.stringify(run));
+    if (!result.ok || !result.payload) {
+      setErrors(result.errors);
+      setPreviewFields([]);
+      setPendingPayload(null);
+      return;
+    }
+    showPreview(result.payload, { sourceType: "file-json", filename: `CAD ${run.incident_number}` });
+  }
+
   function resetState() {
-    setMode("paste");
+    setMode(sampleRuns.length ? "recent" : "paste");
+    setPickedRun("");
     setPasteText("");
     setFileName("");
     setErrors([]);
@@ -128,10 +177,21 @@ export default function NerisCadImportModal({
   return (
     <ModalShell title="Import from CAD" onClose={handleClose}>
       <p className="auth-help">
-        Paste call details from your CAD system or upload a CAD export file.
+        {sampleRuns.length
+          ? "Pick a recent call from CAD, paste call details, or upload a CAD export file."
+          : "Paste call details from your CAD system or upload a CAD export file."}
       </p>
 
       <div className="neris-cad-import-tabs">
+        {sampleRuns.length ? (
+          <button
+            type="button"
+            className={mode === "recent" ? "active" : ""}
+            onClick={() => setMode("recent")}
+          >
+            <Radio size={14} /> Recent CAD calls
+          </button>
+        ) : null}
         <button
           type="button"
           className={mode === "paste" ? "active" : ""}
@@ -148,7 +208,33 @@ export default function NerisCadImportModal({
         </button>
       </div>
 
-      {mode === "paste" ? (
+      {mode === "recent" ? (
+        <div className="neris-cad-recent" role="list">
+          {sampleRuns.map((run) => {
+            const on = pickedRun === run.incident_number;
+            return (
+              <button
+                key={run.incident_number}
+                type="button"
+                role="listitem"
+                className={`neris-cad-recent-row${on ? " on" : ""}`}
+                aria-pressed={on}
+                onClick={() => handlePickRun(run)}
+              >
+                <span className="neris-cad-recent-main">
+                  <strong>{run.incident_type}</strong>
+                  <small>{run.address} · {run.units.map((u) => u.unit_id).join(", ")}</small>
+                </span>
+                <span className="neris-cad-recent-meta">
+                  <span>{displayValue(run.received_time)}</span>
+                  <small>#{run.incident_number}</small>
+                </span>
+              </button>
+            );
+          })}
+          <p className="auth-help">Sample calls for the demo. A live department connects its own CAD.</p>
+        </div>
+      ) : mode === "paste" ? (
         <div className="neris-cad-import-pane">
           <label className="neris-field neris-field-wide">
             <span>Call details from CAD</span>
@@ -196,27 +282,20 @@ export default function NerisCadImportModal({
 
       {previewFields.length ? (
         <div className="neris-cad-import-preview">
-          <h4>Fields to import</h4>
+          <h4>What will be filled in</h4>
           <table className="neris-table">
-            <thead>
-              <tr>
-                <th>Field</th>
-                <th>Value</th>
-                <th>Target</th>
-              </tr>
-            </thead>
             <tbody>
-              {previewFields.map((field) => (
+              {displayRows(previewFields).map((field) => (
                 <tr key={field.key}>
-                  <td>{field.label}</td>
+                  <th scope="row">{field.label}</th>
                   <td>{field.value}</td>
-                  <td><code>{field.target}</code></td>
                 </tr>
               ))}
             </tbody>
           </table>
           <p className="auth-help">
-            Imported fields will be marked as <span className="neris-auto-badge">CAD</span> and merged into the current report.
+            Imported fields are marked <span className="neris-auto-badge">CAD</span>
+            {startsNewReport ? " in the new report. You can edit anything afterward." : " and merged into this report."}
           </p>
         </div>
       ) : null}
@@ -229,7 +308,7 @@ export default function NerisCadImportModal({
           disabled={!pendingPayload || !previewFields.length}
           onClick={handleApply}
         >
-          <Check size={14} /> Apply to report
+          <Check size={14} /> {startsNewReport ? "Start report" : "Apply to report"}
         </button>
       </div>
     </ModalShell>
