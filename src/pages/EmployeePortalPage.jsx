@@ -1012,8 +1012,8 @@ export default function EmployeePortalPage({
                 </div>
                 {vacancyDays.length > 0 && (
                   <div className="employee-schedule-vacancies">
-                    <h3>Open shifts on opposite platoons</h3>
-                    <div className="operational-notes">
+                    <h3>{onRotation ? "Open shifts on other platoons" : "Open shifts"}</h3>
+                    <div className="operational-notes employee-vacancy-list">
                       {vacancyDays.slice(0, 5).map((day) => (
                         <p key={day.id}>
                           <time>{day.weekday} {day.date}</time>

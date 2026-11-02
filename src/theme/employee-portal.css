@@ -361,7 +361,8 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
 
 .operational-notes.employee-cert-list p,
 .operational-notes.employee-leave-history p,
-.operational-notes.employee-trade-history p {
+.operational-notes.employee-trade-history p,
+.operational-notes.employee-vacancy-list p {
   grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
 }
 
