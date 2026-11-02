@@ -1083,7 +1083,15 @@ export default function EmployeePortalPage({
             )}
             tradesPanel={(
               <>
-                {canSubmitTrades ? (
+                {!onRotation ? (
+                  <div className="employee-trade-not-on-shift">
+                    <strong>Shift trades are for A, B and C Shift members</strong>
+                    <span>
+                      {`You're on ${myPerson?.shift || membership?.assignedShift || "day staff"}, so you don't have rotation shifts to trade. `}
+                      {pendingTradeActions.length ? "Trades waiting for your approval are listed below." : "Trades that need your approval will show here."}
+                    </span>
+                  </div>
+                ) : canSubmitTrades ? (
                   <>
                     <ShiftTradeForm
                       value={tradeForm}
