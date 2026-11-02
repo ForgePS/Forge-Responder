@@ -33,6 +33,13 @@ export function formatMaintenanceReportDate(dateValue = "") {
   }
 }
 
+/** Uploaded photos only (url + name); local previews never get saved. */
+export function savedPhotos(photos = []) {
+  return (Array.isArray(photos) ? photos : [])
+    .filter((photo) => photo && photo.url)
+    .map((photo) => ({ url: photo.url, storagePath: photo.storagePath || "", name: photo.name || "", contentType: photo.contentType || "" }));
+}
+
 export function buildMaintenanceIssueMessageBody(form = {}, submittedBy = "") {
   const lines = [
     "Maintenance / damage report submitted from the employee portal.",
@@ -46,6 +53,10 @@ export function buildMaintenanceIssueMessageBody(form = {}, submittedBy = "") {
     "",
     `Person filling out the form: ${submittedBy || "Employee"}`,
   ];
+  const photos = savedPhotos(form.photos);
+  if (photos.length) {
+    lines.push("", `Photos (${photos.length}):`, ...photos.map((photo, index) => `${index + 1}. ${photo.url}`));
+  }
   return lines.join("\n");
 }
 
@@ -72,6 +83,7 @@ export function buildMaintenanceWorkOrderRecord(form = {}, submittedBy = "", exi
     reportedBy: submittedBy,
     source: "employee-portal",
     submittedAt: new Date().toISOString(),
+    photos: savedPhotos(form.photos),
   };
 }
 
@@ -87,4 +99,5 @@ export const defaultMaintenanceIssueForm = () => ({
   location: "",
   equipment: "",
   damageDescription: "",
+  photos: [],
 });

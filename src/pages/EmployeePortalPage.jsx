@@ -86,6 +86,7 @@ import { useTenant } from "../context/TenantContext.jsx";
 import { uniqueRecordId } from "../lib/recordIds.js";
 import { acknowledgementKeys, pendingForPerson, withAcknowledgement } from "../lib/documentAcknowledgement.js";
 import { loadDepartmentMembership } from "../lib/departmentMembership.js";
+import { uploadDamageReportPhotos } from "../lib/damageReportPhotos.js";
 
 const CERT_ALERT_DAYS = 90;
 
@@ -726,8 +727,22 @@ export default function EmployeePortalPage({
       // One id for the classic list row and the Fleet work order, so the Fleet sync never
       // copies this report twice (and two members submitting at once never share an id).
       const reportId = `WO-P${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+
+      // Photos go up first: if they fail, nothing is sent and the member can try again.
+      let photos = [];
+      if ((maintenanceForm.photos || []).length) {
+        try {
+          photos = await uploadDamageReportPhotos(departmentId, reportId, maintenanceForm.photos);
+        } catch (photoError) {
+          console.error("Damage report photos failed to upload", photoError);
+          setMessage("The photos couldn't be uploaded, so the report wasn't sent. Check your connection and submit again.");
+          return;
+        }
+      }
+      const report = { ...maintenanceForm, photos };
+
       const record = {
-        ...buildMaintenanceWorkOrderRecord(maintenanceForm, submittedByName, workOrders.length),
+        ...buildMaintenanceWorkOrderRecord(report, submittedByName, workOrders.length),
         id: reportId,
       };
 
@@ -737,7 +752,7 @@ export default function EmployeePortalPage({
       let fleetDefect = null;
       const fleetActor = { actorUid: user?.uid || "", actorName: submittedByName };
       try {
-        const { concern, ...fleetInput } = portalReportToFleetWorkOrderInput(maintenanceForm, record, submittedByName);
+        const { concern, ...fleetInput } = portalReportToFleetWorkOrderInput(report, record, submittedByName);
         const asset = await resolveFleetAsset(departmentId, fleetInput.unit).catch(() => null);
         const isFleetAsset = Boolean(asset?.id && String(asset.source || "").startsWith("fleet_"));
         if (concern && isFleetAsset) {
@@ -780,7 +795,7 @@ export default function EmployeePortalPage({
 
       await sendInternalEmail(departmentId, {
         subject,
-        body: buildMaintenanceIssueMessageBody(maintenanceForm, submittedByName),
+        body: buildMaintenanceIssueMessageBody(report, submittedByName),
         category: "maintenance",
         priority: "high",
         recipients,
@@ -799,7 +814,7 @@ export default function EmployeePortalPage({
         actorName: membership?.displayName,
       });
 
-      await createPortalDamageFormRecord(departmentId, maintenanceForm, record, submittedByName);
+      await createPortalDamageFormRecord(departmentId, report, record, submittedByName);
 
       const unitLabel = fleetWorkOrder?.unitDesignation || fleetWorkOrder?.fleetNumber || maintenanceForm.location;
       setMessage(fleetWorkOrder
@@ -807,6 +822,9 @@ export default function EmployeePortalPage({
           fleetDefect ? " and the unit was flagged with a safety defect" : ""
         }, and ${chiefLabel} ${chiefs.length > 1 ? "were" : "was"} notified.`
         : `Damage report sent to ${chiefLabel}. The fleet work order could not be opened right now; it will be added automatically the next time an officer opens Fleet Work Orders.`);
+      for (const photo of maintenanceForm.photos || []) {
+        if (photo.previewUrl) URL.revokeObjectURL(photo.previewUrl);
+      }
       setMaintenanceForm(defaultMaintenanceIssueForm());
     } catch (error) {
       console.error("Failed to submit maintenance issue", error);

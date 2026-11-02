@@ -1,3 +1,4 @@
+import DamagePhotoGrid from "./DamagePhotoGrid.jsx";
 import { doc, onSnapshot } from "firebase/firestore";
 import { Download, ExternalLink, FileWarning, LoaderCircle, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -219,6 +220,7 @@ function DamageFormDetail({ record, departmentId = "", onClose }) {
               {activeRecord.summary ? (
                 <p className="damage-form-summary">{activeRecord.summary}</p>
               ) : null}
+              <DamagePhotoGrid photos={activeRecord.photos} />
 
               {hasAnswers ? (
                 <dl className="damage-form-answers">

@@ -228,7 +228,7 @@ export default function NerisReportEditor({
 
           {stepId === "scene" ? (
             <>
-              <Section title="Location and property" icon={Building2} description={ws.location?.occupancyName && report.autoPopulateSources?.["workspace.location"] ? "Filled from your occupancy records — check it's right." : undefined}>
+              <Section title="Location and property" icon={Building2} description={ws.location?.occupancyName && report.autoPopulateSources?.["workspace.location"] ? "Filled from the building's occupancy record, preplan and inspections — check it's right." : undefined}>
                 <Field label="Business or property name"><TextInput value={ws.location?.occupancyName} disabled={!editable} onChange={(v) => updateWorkspace("location", { occupancyName: v })} /></Field>
                 <Field label="Property use"><TextInput value={ws.location?.propertyUse} disabled={!editable} placeholder="e.g. Single family home" onChange={(v) => updateWorkspace("location", { propertyUse: v })} /></Field>
                 <Field label="Construction type"><TextInput value={ws.location?.constructionType} disabled={!editable} onChange={(v) => updateWorkspace("location", { constructionType: v })} /></Field>
@@ -236,6 +236,9 @@ export default function NerisReportEditor({
                 <Field label="Fire alarm"><TextInput value={ws.location?.alarmStatus} disabled={!editable} onChange={(v) => updateWorkspace("location", { alarmStatus: v })} /></Field>
                 <Field label="Knox Box"><TextInput value={ws.location?.knoxBox} disabled={!editable} onChange={(v) => updateWorkspace("location", { knoxBox: v })} /></Field>
                 <Field label="Known hazards" wide><TextArea rows={2} value={ws.location?.hazards} disabled={!editable} onChange={(v) => updateWorkspace("location", { hazards: v })} /></Field>
+                <Field label="Water supply"><TextInput value={ws.location?.waterSupply} disabled={!editable} onChange={(v) => updateWorkspace("location", { waterSupply: v })} /></Field>
+                <Field label="Access"><TextInput value={ws.location?.access} disabled={!editable} onChange={(v) => updateWorkspace("location", { access: v })} /></Field>
+                <Field label="Last inspection" wide><TextInput value={ws.location?.lastInspection} disabled={!editable} onChange={(v) => updateWorkspace("location", { lastInspection: v })} /></Field>
               </Section>
               <Section title="People and animals" icon={Users}>
                 <Field label="Was anyone displaced from their home or business?">

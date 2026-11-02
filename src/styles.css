@@ -2372,7 +2372,19 @@ html[data-theme="dark"] .shift-legend-chip {
 .neris-cad-import-modal .modal-body {
   padding: 14px;
   display: grid;
+  /* One column no wider than the window, so long CAD comments wrap instead of
+     pushing the whole window sideways. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+}
+
+.neris-cad-import-modal {
+  overflow-x: hidden;
+}
+
+.neris-cad-import-preview td {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .neris-cad-import-tabs {
