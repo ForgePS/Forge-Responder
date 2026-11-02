@@ -202,7 +202,7 @@ export default function ScheduleCalendar({
           })}
           <span className="schedule-calendar-legend-chip schedule-calendar-legend-muted">
             <i className="schedule-calendar-swatch schedule-calendar-swatch-cap" />
-            CAP (approved off)
+            Off = approved leave
           </span>
           <span className="schedule-calendar-legend-chip schedule-calendar-legend-muted">
             <i className="schedule-calendar-swatch schedule-calendar-swatch-deficit" />
@@ -277,15 +277,12 @@ export default function ScheduleCalendar({
             <>
               <div className="schedule-calendar-day-top">
                 <span className="schedule-calendar-date">{cell.calendarDay}</span>
-                <div className="schedule-calendar-badges">
-                  <span
-                    className="schedule-calendar-shift-badge"
-                    style={shiftBadgeStyle(cell.shift, resolvedRotation)}
-                  >
-                    {shiftShortLabel(cell.shift)} Shift
-                  </span>
-                  <span className="schedule-calendar-cap-badge">CAP: {capCount}</span>
-                </div>
+                <span
+                  className="schedule-calendar-shift-badge"
+                  style={shiftBadgeStyle(cell.shift, resolvedRotation)}
+                >
+                  {shiftShortLabel(cell.shift)} Shift
+                </span>
               </div>
 
               <div className="schedule-calendar-day-body">
@@ -299,7 +296,7 @@ export default function ScheduleCalendar({
                       <span className="schedule-calendar-scheduled-time">{scheduled.timeWindow}</span>
                     </div>
                   </div>
-                ) : staffingLabel ? (
+                ) : staffingLabel && !/^0\s*\/\s*0$/.test(String(staffingLabel)) ? (
                   <div className="schedule-calendar-staffing-block">
                     <strong>{staffingLabel}</strong>
                     <span>staffed</span>
@@ -308,12 +305,15 @@ export default function ScheduleCalendar({
               </div>
 
               <div className="schedule-calendar-day-footer">
-                {showMegaphone ? (
-                  <Megaphone size={13} className="schedule-calendar-megaphone" aria-hidden="true" />
-                ) : <span />}
+                {capCount > 0 ? (
+                  <span className="schedule-calendar-cap-badge" title={`${capCount} on approved leave`}>
+                    {capCount} off
+                  </span>
+                ) : null}
                 {badgeCount > 0 ? (
                   <span className="schedule-calendar-count-badge" aria-label={`${badgeCount} open`}>
-                    {badgeCount}
+                    {showMegaphone ? <Megaphone size={11} aria-hidden="true" /> : null}
+                    {badgeCount} open
                   </span>
                 ) : null}
               </div>
@@ -329,6 +329,7 @@ export default function ScheduleCalendar({
                 onClick={() => handleSelect(cell)}
                 aria-label={`${cell.weekday}, ${cell.date}, ${cell.shift}`}
                 aria-pressed={selected}
+                style={{ "--day-shift-color": shiftBadgeStyle(cell.shift, resolvedRotation).background }}
               >
                 {content}
               </button>
@@ -345,6 +346,7 @@ export default function ScheduleCalendar({
               aria-label={`${cell.weekday}, ${cell.date}, ${cell.shift}`}
               aria-pressed={selected}
               aria-disabled={disabled}
+              style={{ "--day-shift-color": shiftBadgeStyle(cell.shift, resolvedRotation).background }}
             >
               {content}
             </button>

@@ -75,7 +75,13 @@ export function isLieutenantRank(person = {}) {
   return rank.includes("lieutenant") || /\blt\.?\b/.test(rank);
 }
 
+/** Chief officers and staff ranks never go through a company officer, whatever their EMS level. */
+function isChiefOfficerRank(person = {}) {
+  return /\bchief\b|marshal|inspector|director|coordinator/.test(normalizeText(person.rank));
+}
+
 export function isLineMemberRole(person = {}) {
+  if (isChiefOfficerRank(person)) return false;
   const rank = normalizeText(person.rank);
   const position = normalizeText(person.position);
   const ems = normalizeText(person.ems);
@@ -131,12 +137,129 @@ export function requiresDirectBattalionApproval(leaveType = "") {
   return normalized.includes("sick") || normalized.includes("military");
 }
 
-export function buildLeaveApprovalMeta(person = {}, personnel = [], leaveType = "") {
+// ---------- Chain of command for leave ----------
+//   Fire Chief          → no approval needed (approved on submit)
+//   Deputy Chief        → Fire Chief
+//   Battalion Chiefs and staff not on the A/B/C rotation → Deputy Chief or Fire Chief
+//   Shift members       → their shift's Battalion Chief (vacation goes to their officer first);
+//                         if that Battalion Chief is on extended leave, the Deputy Chief or Fire Chief
+
+const isActive = (p) => p && !/inactive|terminated|retired/i.test(String(p.status || ""));
+
+export function isFireChiefRank(person = {}) {
+  const rank = normalizeText(person.rank);
+  return rank === "fire chief" || rank === "chief" || rank === "chief of department";
+}
+
+export function isDeputyChiefRank(person = {}) {
+  return /deputy chief|assistant chief/.test(normalizeText(person.rank));
+}
+
+export function isBattalionChiefRank(person = {}) {
+  return normalizeText(person.rank).includes("battalion chief");
+}
+
+export function resolveFireChief(personnel = []) {
+  return personnel.find((p) => isActive(p) && isFireChiefRank(p)) || null;
+}
+
+export function resolveDeputyChief(personnel = []) {
+  return personnel.find((p) => isActive(p) && isDeputyChiefRank(p)) || null;
+}
+
+/**
+ * A Battalion Chief is "on extended leave" for a request when they are absent from the
+ * day it is put in until after the requested dates: every shift they would work from
+ * today through the last requested day is covered by their approved leave. Days they
+ * aren't scheduled to work don't count either way.
+ */
+export function isOnExtendedLeave(person, leaveRequests = [], { dayIds = [], today = new Date(), rotation = defaultShiftRotation } = {}) {
+  if (!person?.id) return false;
+  const requested = [...dayIds].filter(Boolean).sort();
+  if (!requested.length) return false;
+
+  const onLeave = new Set();
+  for (const request of leaveRequests) {
+    if (request.personnelId !== person.id || !/^approved$/i.test(String(request.status || ""))) continue;
+    for (const day of request.selectedDates || []) onLeave.add(day);
+  }
+  if (!onLeave.size) return false;
+
+  const start = parseDayId(formatDayId(today));
+  const end = parseDayId(requested[requested.length - 1]);
+  let workDays = 0;
+  for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
+    const id = formatDayId(day);
+    const works = isRotationShift(person.shift, rotation) ? isEmployeeShiftWorkDay(id, person.shift, rotation) : day.getDay() >= 1 && day.getDay() <= 5;
+    if (!works) continue;
+    workDays += 1;
+    if (!onLeave.has(id)) return false;
+  }
+  return workDays > 0;
+}
+
+function chiefApproval(approver, alternate, extra = {}) {
+  const names = [approver?.name, alternate?.name].filter(Boolean);
+  return {
+    approvalRoute: "chief",
+    approvalStage: "chief",
+    status: "Pending Chief Approval",
+    assignedOfficer: "",
+    assignedOfficerId: "",
+    assignedBattalionChief: "",
+    assignedBattalionChiefId: "",
+    assignedApprover: names.join(" or ") || "Fire Chief",
+    assignedApproverId: approver?.id || alternate?.id || "",
+    assignedApproverIds: [approver?.id, alternate?.id].filter(Boolean),
+    ...extra,
+  };
+}
+
+/**
+ * @param {object} person requester
+ * @param {object[]} personnel
+ * @param {string} leaveType
+ * @param {{ leaveRequests?: object[], rotation?: object, dayIds?: string[], today?: Date }} [options]
+ */
+export function buildLeaveApprovalMeta(person = {}, personnel = [], leaveType = "", options = {}) {
+  const { leaveRequests = [], rotation = defaultShiftRotation, dayIds = [], today = new Date() } = options;
+  const fireChief = resolveFireChief(personnel);
+  const deputy = resolveDeputyChief(personnel);
+
+  if (isFireChiefRank(person)) {
+    return {
+      approvalRoute: "auto",
+      approvalStage: "complete",
+      status: "Approved",
+      autoApproved: true,
+      approvedAt: today.toISOString(),
+      assignedOfficer: "",
+      assignedOfficerId: "",
+      assignedBattalionChief: "",
+      assignedBattalionChiefId: "",
+      assignedApprover: "",
+      assignedApproverId: "",
+    };
+  }
+  if (isDeputyChiefRank(person)) {
+    return chiefApproval(fireChief, null);
+  }
+  if (isBattalionChiefRank(person) || !isRotationShift(person.shift, rotation)) {
+    return chiefApproval(deputy && deputy.id !== person.id ? deputy : null, fireChief);
+  }
+
   const officerName = resolveOfficerName(person);
   const officer = findPersonnelByName(personnel, officerName);
   const battalionChief = resolveShiftBattalionChief(personnel, person.shift);
+  // A Battalion Chief on extended leave can't approve: the Deputy Chief or Fire Chief covers.
+  if (battalionChief && isOnExtendedLeave(battalionChief, leaveRequests, { dayIds, today, rotation })) {
+    return chiefApproval(deputy, fireChief, { coveringFor: battalionChief.name, coveringForId: battalionChief.id });
+  }
+  // The officer step needs a real member to approve it; a supervisor who isn't in
+  // personnel (e.g. "City Administrator") would leave the request stuck.
+  const officerIsMember = Boolean(officer && officer.id && officer.id !== person.id);
 
-  if (requiresOfficerApprovalForLeave(person, leaveType)) {
+  if (requiresOfficerApprovalForLeave(person, leaveType) && officerIsMember) {
     return {
       approvalRoute: "officer-then-battalion",
       approvalStage: "officer",
@@ -190,6 +313,10 @@ export function leaveStatusDetail(item = {}) {
   if (item.approvalStage === "battalionChief") {
     return `${item.status} · ${item.assignedBattalionChief || "Battalion Chief"}`;
   }
+  if (item.approvalStage === "chief") {
+    return `${item.status} · ${item.assignedApprover || "Fire Chief"}`;
+  }
+  if (item.autoApproved) return "Approved · no approval needed";
   return item.status || "—";
 }
 
@@ -251,6 +378,24 @@ export function shiftLabelForDay(dayId = "", rotation = defaultShiftRotation) {
 export function isEmployeeShiftWorkDay(dayId = "", employeeShift = "", rotation = defaultShiftRotation) {
   if (!dayId || !employeeShift) return false;
   return isPlatoonWorkDay(parseDayId(dayId), employeeShift, rotation);
+}
+
+/** True when the shift is one of the rotation's platoons (A/B/C), not day staff. */
+export function isRotationShift(shift = "", rotation = defaultShiftRotation) {
+  const target = normalizeText(shift);
+  if (!target) return false;
+  return resolveShiftRotation(rotation).sequence.some((label) => normalizeText(label) === target);
+}
+
+/**
+ * Days a member can pick for leave: their platoon's work days, or Monday–Friday
+ * for day staff (Administration, Prevention, Training) who aren't on the rotation.
+ */
+export function isLeaveSelectableDay(dayId = "", employeeShift = "", rotation = defaultShiftRotation) {
+  if (!dayId) return false;
+  if (isRotationShift(employeeShift, rotation)) return isEmployeeShiftWorkDay(dayId, employeeShift, rotation);
+  const weekday = parseDayId(dayId).getDay();
+  return weekday >= 1 && weekday <= 5;
 }
 
 export function isOppositeShiftWorkDay(dayId = "", employeeShift = "", rotation = defaultShiftRotation) {

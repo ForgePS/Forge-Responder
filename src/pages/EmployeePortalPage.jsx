@@ -137,15 +137,27 @@ function Panel({ title, icon: Icon, action, children }) {
   );
 }
 
-function buildLeaveApprovalHint(person, personnel, leaveType) {
-  const meta = buildLeaveApprovalMeta(person, personnel, leaveType);
+function buildLeaveApprovalHint(person, personnel, leaveType, options = {}) {
+  const meta = buildLeaveApprovalMeta(person, personnel, leaveType, options);
+  const kind = leaveType || "Leave";
+  if (meta.approvalRoute === "auto") {
+    return `As Fire Chief, your ${kind.toLowerCase()} requests don't need approval. They're approved when you submit them.`;
+  }
+  if (meta.approvalRoute === "chief") {
+    return meta.coveringFor
+      ? `Your shift's Battalion Chief (${meta.coveringFor}) is on leave, so ${kind.toLowerCase()} requests are sent to ${meta.assignedApprover} for approval.`
+      : `${kind} requests are sent to ${meta.assignedApprover} for approval.`;
+  }
+  const chief = meta.assignedBattalionChief;
+  const chiefPerson = personnel.find((p) => p?.id === meta.assignedBattalionChiefId);
+  const sameShift = chiefPerson && String(chiefPerson.shift || "").toLowerCase() === String(person?.shift || "").toLowerCase();
+  // "your shift's Battalion Chief (Battalion C. Demo)" for platoon members; day staff
+  // aren't on a shift, so just name the chief.
+  const chiefLabel = sameShift ? `your shift's Battalion Chief (${chief})` : `${chief} (Battalion Chief)`;
   if (meta.approvalRoute === "officer-then-battalion") {
-    return `Vacation requests are sent to ${meta.assignedOfficer} for approval, then to ${meta.assignedBattalionChief} for final approval.`;
+    return `${kind} requests go to your officer, ${meta.assignedOfficer}, first, then to ${chiefLabel} for final approval.`;
   }
-  if (meta.approvalRoute === "direct-battalion" || meta.approvalRoute === "battalion") {
-    return `${leaveType} requests go directly to ${meta.assignedBattalionChief} for approval.`;
-  }
-  return `This request will be sent to ${meta.assignedBattalionChief} for approval.`;
+  return `${kind} requests are sent to ${chiefLabel} for approval.`;
 }
 
 function shiftTradeActionLabel(role = "") {
@@ -313,8 +325,10 @@ export default function EmployeePortalPage({
   ]);
 
   const leaveApprovalHint = useMemo(
-    () => (myPerson ? buildLeaveApprovalHint(myPerson, personnel, leaveForm.type) : ""),
-    [myPerson, personnel, leaveForm.type]
+    () => (myPerson
+      ? buildLeaveApprovalHint(myPerson, personnel, leaveForm.type, { leaveRequests, rotation, dayIds: leaveForm.selectedDates })
+      : ""),
+    [myPerson, personnel, leaveForm.type, leaveForm.selectedDates, leaveRequests, rotation]
   );
 
   const coverageOptions = useMemo(() => {
@@ -591,7 +605,11 @@ export default function EmployeePortalPage({
     }
 
     const endTime = calculateEndTime(leaveForm.startTime, totalHours);
-    const approvalMeta = buildLeaveApprovalMeta(myPerson || {}, personnel, leaveForm.type);
+    const approvalMeta = buildLeaveApprovalMeta(myPerson || {}, personnel, leaveForm.type, {
+      leaveRequests,
+      rotation,
+      dayIds: leaveForm.selectedDates,
+    });
     const id = uniqueRecordId("L");
     const record = {
       id,
@@ -994,8 +1012,8 @@ export default function EmployeePortalPage({
                 </div>
                 {vacancyDays.length > 0 && (
                   <div className="employee-schedule-vacancies">
-                    <h3>Open shifts on opposite platoons</h3>
-                    <div className="operational-notes">
+                    <h3>{onRotation ? "Open shifts on other platoons" : "Open shifts"}</h3>
+                    <div className="operational-notes employee-vacancy-list">
                       {vacancyDays.slice(0, 5).map((day) => (
                         <p key={day.id}>
                           <time>{day.weekday} {day.date}</time>

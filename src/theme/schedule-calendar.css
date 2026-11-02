@@ -190,66 +190,69 @@
   max-width: 100%;
 }
 
+/* Seven equal columns that fill the panel; phones scroll sideways instead of squashing. */
 .schedule-calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 168px);
-  width: 1176px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  width: 100%;
+  min-width: 720px;
   max-width: none;
-  gap: 2px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  gap: 1px;
+  border: 1px solid var(--rms-border, #e2e8f0);
+  border-radius: 10px;
   overflow: hidden;
-  background: #d1d5db;
+  background: var(--rms-border, #e2e8f0);
 }
 
 .schedule-calendar-weekday {
-  min-height: 32px;
+  min-height: 34px;
   display: grid;
   place-items: center;
-  background: #e5e7eb;
-  color: #4b5563;
-  font-size: 12px;
+  background: var(--rms-bg-surface-2, #f8fafc);
+  color: var(--rms-text-muted, #64748b);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .schedule-calendar-day {
   position: relative;
-  min-height: 168px;
-  width: 168px;
+  min-width: 0;
+  min-height: 108px;
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 6px;
-  padding: 8px 8px 6px;
+  padding: 10px 10px 8px;
   border: 0;
-  background: #f9fafb;
-  color: #111827;
+  border-top: 3px solid var(--day-shift-color, transparent);
+  background: var(--rms-bg-surface, #fff);
+  color: var(--rms-text-strong, #0f172a);
   text-align: left;
   cursor: pointer;
-  overflow: visible;
+  overflow: hidden;
   transition: background 0.12s ease, box-shadow 0.12s ease;
 }
 
 .schedule-calendar-compact .schedule-calendar-grid {
-  grid-template-columns: repeat(7, 132px);
-  width: 924px;
+  min-width: 560px;
 }
 
 .schedule-calendar-compact .schedule-calendar-day {
-  width: 132px;
-  min-height: 120px;
-  padding: 6px 6px 5px;
+  min-height: 84px;
+  padding: 8px 8px 6px;
 }
 
 .schedule-calendar-compact .schedule-calendar-shift-badge,
-.schedule-calendar-compact .schedule-calendar-cap-badge {
-  font-size: 9px;
-  padding: 2px 4px;
+.schedule-calendar-compact .schedule-calendar-cap-badge,
+.schedule-calendar-compact .schedule-calendar-count-badge {
+  font-size: 10px;
+  padding: 1px 6px;
 }
 
 .schedule-calendar-day.is-hidden-day {
-  background: transparent;
+  background: var(--rms-bg-surface-2, #f8fafc);
+  border-top-color: transparent;
   border: 0;
   box-shadow: none;
   pointer-events: none;
@@ -258,29 +261,34 @@
 
 html[data-theme="dark"] .schedule-calendar-day.is-hidden-day,
 :root:not([data-theme="light"]) .schedule-calendar-day.is-hidden-day {
-  background: transparent;
+  background: #111827;
 }
 
 .schedule-calendar-day:hover {
-  background: #f3f4f6;
+  background: var(--rms-bg-hover, #f1f5f9);
 }
 
 .schedule-calendar-day.is-outside-month {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: var(--rms-bg-surface-2, #f8fafc);
+  color: var(--rms-text-muted, #94a3b8);
 }
 
-.schedule-calendar-day.is-today {
-  background: #fff;
-  box-shadow: inset 0 0 0 2px #111827;
+.schedule-calendar-day.is-outside-month .schedule-calendar-shift-badge {
+  opacity: 0.55;
+}
+
+.schedule-calendar-day.is-today .schedule-calendar-date {
+  background: var(--rms-accent, #0f766e);
+  color: #fff;
 }
 
 .schedule-calendar-day.is-selected {
-  background: #dbeafe;
+  background: color-mix(in srgb, var(--rms-accent, #0f766e) 12%, var(--rms-bg-surface, #fff));
+  box-shadow: inset 0 0 0 2px var(--rms-accent, #0f766e);
 }
 
 .schedule-calendar-day.is-deficit:not(.is-selected) {
-  background: #fef2f2;
+  background: color-mix(in srgb, #ef4444 7%, var(--rms-bg-surface, #fff));
 }
 
 .schedule-calendar-day.is-disabled {
@@ -289,11 +297,19 @@ html[data-theme="dark"] .schedule-calendar-day.is-hidden-day,
 }
 
 .schedule-calendar-day-top {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .schedule-calendar-date {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 999px;
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
@@ -307,20 +323,23 @@ html[data-theme="dark"] .schedule-calendar-day.is-hidden-day,
 }
 
 .schedule-calendar-shift-badge,
-.schedule-calendar-cap-badge {
+.schedule-calendar-cap-badge,
+.schedule-calendar-count-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.35;
   white-space: nowrap;
 }
 
 .schedule-calendar-cap-badge {
-  background: #d1d5db;
-  color: #374151;
+  background: var(--rms-bg-surface-2, #f1f5f9);
+  color: var(--rms-text-muted, #475569);
+  box-shadow: inset 0 0 0 1px var(--rms-border, #e2e8f0);
 }
 
 .schedule-calendar-day-body {
@@ -396,28 +415,15 @@ html[data-theme="dark"] .schedule-calendar-day.is-hidden-day,
 
 .schedule-calendar-day-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
-  justify-content: space-between;
-  min-height: 16px;
-}
-
-.schedule-calendar-megaphone {
-  color: #9ca3af;
-  flex-shrink: 0;
+  gap: 4px;
+  min-height: 0;
 }
 
 .schedule-calendar-count-badge {
-  display: inline-grid;
-  place-items: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 3px;
-  border-radius: 3px;
-  background: #0891b2;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1;
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .schedule-calendar-help,
@@ -445,6 +451,12 @@ html[data-theme="dark"] .schedule-calendar-grid,
   background: #334155;
 }
 
+html[data-theme="dark"] .schedule-calendar-count-badge,
+:root:not([data-theme="light"]) .schedule-calendar-count-badge {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+}
+
 html[data-theme="dark"] .schedule-calendar-weekday,
 :root:not([data-theme="light"]) .schedule-calendar-weekday {
   background: #1e293b;
@@ -465,8 +477,7 @@ html[data-theme="dark"] .schedule-calendar-day.is-outside-month,
 
 html[data-theme="dark"] .schedule-calendar-day.is-today,
 :root:not([data-theme="light"]) .schedule-calendar-day.is-today {
-  background: #111827;
-  box-shadow: inset 0 0 0 2px #f8fafc;
+  background: #0f172a;
 }
 
 html[data-theme="dark"] .schedule-calendar-day.is-selected,
@@ -487,4 +498,10 @@ html[data-theme="dark"] .schedule-calendar-day.is-selected,
   border: 0;
   padding: 12px;
   background: transparent;
+}
+
+/* A Shift is black: outline it so it doesn't disappear on the dark background. */
+html[data-theme="dark"] .schedule-calendar-shift-badge,
+:root:not([data-theme="light"]) .schedule-calendar-shift-badge {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }

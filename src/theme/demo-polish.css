@@ -70,7 +70,7 @@ html[data-theme="dark"] {
 .cert-table { min-width: 900px; }
 .work-order-table { min-width: 900px; }
 .admin-page .data-editor-table { min-width: 860px; }
-.schedule-calendar-grid { grid-template-columns: repeat(7, minmax(110px, 1fr)); width: 100%; min-width: 800px; }
+
 
 /* ---------- Phone width ---------- */
 @media (max-width: 700px) {
