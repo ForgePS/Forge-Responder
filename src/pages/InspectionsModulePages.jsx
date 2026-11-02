@@ -61,7 +61,11 @@ function formatDue(value) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString();
+  // Due dates are days: show the time only when one was actually set.
+  const midnight = date.getHours() === 0 && date.getMinutes() === 0;
+  return midnight
+    ? date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : date.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function Field({ label, children }) {

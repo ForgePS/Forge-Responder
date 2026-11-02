@@ -435,10 +435,10 @@ const demoApparatus = [
 ];
 
 const demoWorkOrders = [
-  { id: "WO-D41", unit: "Engine 4", issue: "Pump relief valve failed annual pump test", category: "Pump", priority: "High", opened: shortDate(-6), vendor: "Riverside Fleet Services", cost: "$2,450", status: "In Progress" },
-  { id: "WO-D42", unit: "Truck 3", issue: "Preventive maintenance and annual aerial inspection", category: "PM", priority: "Medium", opened: shortDate(-2), vendor: "Internal Fleet", cost: "$780", status: "Scheduled" },
-  { id: "WO-D39", unit: "Rescue 1", issue: "Compartment light replacement", category: "Electrical", priority: "Low", opened: shortDate(-9), vendor: "Internal Fleet", cost: "$95", status: "Awaiting Parts" },
-  { id: "WO-D37", unit: "Engine 2", issue: "Front brake pads and rotors", category: "Brakes", priority: "Medium", opened: shortDate(-17), vendor: "Riverside Fleet Services", cost: "$1,120", status: "Complete" },
+  { id: "WO-D41", unit: "Engine 4", issue: "Pump relief valve failed annual pump test", category: "Pump", priority: "High", opened: longDate(-6), vendor: "Riverside Fleet Services", cost: "$2,450", status: "In Progress" },
+  { id: "WO-D42", unit: "Truck 3", issue: "Preventive maintenance and annual aerial inspection", category: "PM", priority: "Medium", opened: longDate(-2), vendor: "Internal Fleet", cost: "$780", status: "Scheduled" },
+  { id: "WO-D39", unit: "Rescue 1", issue: "Compartment light replacement", category: "Electrical", priority: "Low", opened: longDate(-9), vendor: "Internal Fleet", cost: "$95", status: "Awaiting Parts" },
+  { id: "WO-D37", unit: "Engine 2", issue: "Front brake pads and rotors", category: "Brakes", priority: "Medium", opened: longDate(-17), vendor: "Riverside Fleet Services", cost: "$1,120", status: "Complete" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -563,4 +563,4 @@ export const DEMO_LIST_KEYS = Object.keys(DEMO_LIST_SEEDS);
  * Bump whenever the demo seed data above changes: demo sign-ins reseed the
  * sandbox when this differs from the version last written (see demoService.js).
  */
-export const DEMO_SEED_VERSION = 2;
+export const DEMO_SEED_VERSION = 3;
