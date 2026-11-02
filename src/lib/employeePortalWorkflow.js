@@ -75,7 +75,13 @@ export function isLieutenantRank(person = {}) {
   return rank.includes("lieutenant") || /\blt\.?\b/.test(rank);
 }
 
+/** Chief officers and staff ranks never go through a company officer, whatever their EMS level. */
+function isChiefOfficerRank(person = {}) {
+  return /\bchief\b|marshal|inspector|director|coordinator/.test(normalizeText(person.rank));
+}
+
 export function isLineMemberRole(person = {}) {
+  if (isChiefOfficerRank(person)) return false;
   const rank = normalizeText(person.rank);
   const position = normalizeText(person.position);
   const ems = normalizeText(person.ems);
@@ -135,8 +141,11 @@ export function buildLeaveApprovalMeta(person = {}, personnel = [], leaveType = 
   const officerName = resolveOfficerName(person);
   const officer = findPersonnelByName(personnel, officerName);
   const battalionChief = resolveShiftBattalionChief(personnel, person.shift);
+  // The officer step needs a real member to approve it; a supervisor who isn't in
+  // personnel (e.g. "City Administrator") would leave the request stuck.
+  const officerIsMember = Boolean(officer && officer.id && officer.id !== person.id);
 
-  if (requiresOfficerApprovalForLeave(person, leaveType)) {
+  if (requiresOfficerApprovalForLeave(person, leaveType) && officerIsMember) {
     return {
       approvalRoute: "officer-then-battalion",
       approvalStage: "officer",
@@ -251,6 +260,24 @@ export function shiftLabelForDay(dayId = "", rotation = defaultShiftRotation) {
 export function isEmployeeShiftWorkDay(dayId = "", employeeShift = "", rotation = defaultShiftRotation) {
   if (!dayId || !employeeShift) return false;
   return isPlatoonWorkDay(parseDayId(dayId), employeeShift, rotation);
+}
+
+/** True when the shift is one of the rotation's platoons (A/B/C), not day staff. */
+export function isRotationShift(shift = "", rotation = defaultShiftRotation) {
+  const target = normalizeText(shift);
+  if (!target) return false;
+  return resolveShiftRotation(rotation).sequence.some((label) => normalizeText(label) === target);
+}
+
+/**
+ * Days a member can pick for leave: their platoon's work days, or Monday–Friday
+ * for day staff (Administration, Prevention, Training) who aren't on the rotation.
+ */
+export function isLeaveSelectableDay(dayId = "", employeeShift = "", rotation = defaultShiftRotation) {
+  if (!dayId) return false;
+  if (isRotationShift(employeeShift, rotation)) return isEmployeeShiftWorkDay(dayId, employeeShift, rotation);
+  const weekday = parseDayId(dayId).getDay();
+  return weekday >= 1 && weekday <= 5;
 }
 
 export function isOppositeShiftWorkDay(dayId = "", employeeShift = "", rotation = defaultShiftRotation) {

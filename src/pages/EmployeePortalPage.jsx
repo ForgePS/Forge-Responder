@@ -139,13 +139,17 @@ function Panel({ title, icon: Icon, action, children }) {
 
 function buildLeaveApprovalHint(person, personnel, leaveType) {
   const meta = buildLeaveApprovalMeta(person, personnel, leaveType);
+  const chief = meta.assignedBattalionChief;
+  const chiefPerson = personnel.find((p) => p?.id === meta.assignedBattalionChiefId);
+  const sameShift = chiefPerson && String(chiefPerson.shift || "").toLowerCase() === String(person?.shift || "").toLowerCase();
+  // "your shift's Battalion Chief (Battalion C. Demo)" for platoon members; day staff
+  // aren't on a shift, so just name the chief.
+  const chiefLabel = sameShift ? `your shift's Battalion Chief (${chief})` : `${chief} (Battalion Chief)`;
+  const kind = leaveType || "Leave";
   if (meta.approvalRoute === "officer-then-battalion") {
-    return `Vacation requests are sent to ${meta.assignedOfficer} for approval, then to ${meta.assignedBattalionChief} for final approval.`;
+    return `${kind} requests go to your officer, ${meta.assignedOfficer}, first, then to ${chiefLabel} for final approval.`;
   }
-  if (meta.approvalRoute === "direct-battalion" || meta.approvalRoute === "battalion") {
-    return `${leaveType} requests go directly to ${meta.assignedBattalionChief} for approval.`;
-  }
-  return `This request will be sent to ${meta.assignedBattalionChief} for approval.`;
+  return `${kind} requests are sent to ${chiefLabel} for approval.`;
 }
 
 function shiftTradeActionLabel(role = "") {

@@ -7,7 +7,8 @@ import {
   formatSelectedDatesLabel,
   formatTimeLabel,
   isDayWithinRange,
-  isEmployeeShiftWorkDay,
+  isLeaveSelectableDay,
+  isRotationShift,
   isVacationLeaveType,
   LEAVE_START_TIME_OPTIONS,
 } from "../../lib/employeePortalWorkflow.js";
@@ -46,20 +47,22 @@ export default function LeaveRequestForm({
   const minDate = isVacation ? vacationWindow.minDate : "";
   const maxDate = isVacation ? vacationWindow.maxDate : "";
   const myShift = myPerson?.shift || "";
+  const onRotation = isRotationShift(myShift, rotation);
+  // Platoon members see their shift's work days; day staff see Monday–Friday.
   const isLeaveDayDisplayed = useMemo(
-    () => (dayId) => isEmployeeShiftWorkDay(dayId, myShift, rotation),
+    () => (dayId) => isLeaveSelectableDay(dayId, myShift, rotation),
     [myShift, rotation]
   );
   const pickerRangeHint = [
     isVacation ? vacationRulesHint(portalRules) : "",
-    myShift ? "Only your shift work days are shown." : "",
+    onRotation ? "Only your shift work days are shown." : "Weekdays are shown.",
   ].filter(Boolean).join(" ");
 
   useEffect(() => {
     if (!value.selectedDates?.length) return;
 
     const filtered = value.selectedDates.filter((dayId) => {
-      if (myShift && !isEmployeeShiftWorkDay(dayId, myShift, rotation)) return false;
+      if (!isLeaveSelectableDay(dayId, myShift, rotation)) return false;
       if (isVacation && !isDayWithinRange(dayId, vacationWindow.minDate, vacationWindow.maxDate)) return false;
       return true;
     });
@@ -146,7 +149,7 @@ export default function LeaveRequestForm({
         minDate={minDate}
         maxDate={maxDate}
         rangeHint={pickerRangeHint}
-        isDayDisplayed={myShift ? isLeaveDayDisplayed : null}
+        isDayDisplayed={isLeaveDayDisplayed}
         onChange={(selectedDates) => update({
           selectedDates,
           dates: formatSelectedDatesLabel(selectedDates),
