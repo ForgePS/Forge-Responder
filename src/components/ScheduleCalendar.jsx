@@ -279,7 +279,7 @@ export default function ScheduleCalendar({
                 <span className="schedule-calendar-date">{cell.calendarDay}</span>
                 <span
                   className="schedule-calendar-shift-badge"
-                  style={shiftBadgeStyle(cell.shift, resolvedRotation)}
+                  style={{ "--badge-color": shiftBadgeStyle(cell.shift, resolvedRotation).background }}
                 >
                   {shiftShortLabel(cell.shift)} Shift
                 </span>
