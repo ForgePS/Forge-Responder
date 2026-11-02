@@ -16,9 +16,10 @@ import { formatDayId, shiftForDate } from "../lib/shiftCalendar.js";
  * maintenance always sit in the recent past / next few weeks.
  *
  * Staffing model (must match demoDepartmentSettings.schedulingSettings):
- *   24/48 A/B/C rotation, 9 members per shift, minimum staffing 8.
+ *   24/48 A/B/C rotation, 14 members per shift, minimum staffing 13.
  *   Battalion 1 (BC) · Engine 1 (Captain, Driver, FF) · Engine 2 (Lt, Driver, FF)
- *   · Truck 3 (Lt, Driver). Rescue 1 is cross-staffed by the Engine 1 crew.
+ *   · Truck 3 (Lt, Driver, FF) · Medic 1 and Medic 2 (Paramedic, EMT/Driver).
+ *   Rescue 1 is cross-staffed by the Engine 1 crew.
  */
 
 // ---------------------------------------------------------------------------
@@ -96,6 +97,8 @@ const PERSONNEL_SPEC = [
   ["DEMO-002", "Deputy B. Example", "Deputy Chief", "Administration", "Operations", "Station 1", "Paramedic", "Approved", "deputy", "Chief A. Sample", 14],
   ["DEMO-007", "Marshal G. Inspector", "Fire Marshal", "Administration", "Fire Prevention", "Station 1", "EMT", "Approved", "marshal", "Chief A. Sample", 12],
   ["DEMO-008", "Captain H. Instructor", "Captain", "Administration", "Training Division", "Station 1", "Paramedic", "Approved", "training", "Deputy B. Example", 11],
+  ["DEMO-009", "Captain K. Protocol", "Captain", "Administration", "EMS Division", "Station 1", "Paramedic", "Approved", "ems", "Deputy B. Example", 13],
+  ["DEMO-033", "Inspector L. Checklist", "Fire Inspector", "Administration", "Fire Prevention", "Station 1", "EMT", "Approved", "inspector", "Marshal G. Inspector", 4],
   // A Shift
   ["DEMO-003", "Battalion C. Demo", "Battalion Chief", "A Shift", "Battalion 1", "Station 1", "AEMT", "Approved", "battalion", "Deputy B. Example", 12],
   ["DEMO-010", "Captain J. Pilot", "Captain", "A Shift", "Engine 1", "Station 1", "Paramedic", "Approved", "a-e1-captain", "Battalion C. Demo", 10],
@@ -106,6 +109,11 @@ const PERSONNEL_SPEC = [
   ["DEMO-014", "Firefighter N. Proxy", "Firefighter", "A Shift", "Engine 2", "Station 2", "Paramedic", "Trainee", "a-e2-ff", "Lieutenant L. Model", 3],
   ["DEMO-015", "Lieutenant O. Template", "Lieutenant", "A Shift", "Truck 3", "Station 3", "EMT", "Approved", "a-t3-lieutenant", "Battalion C. Demo", 8],
   ["DEMO-016", "Engineer P. Fixture", "Engineer", "A Shift", "Truck 3", "Station 3", "EMT", "Approved", "a-t3-engineer", "Lieutenant O. Template", 6],
+  ["DEMO-034", "Firefighter G. Baseline", "Firefighter", "A Shift", "Truck 3", "Station 3", "EMT", "Trainee", "a-t3-ff", "Lieutenant O. Template", 2],
+  ["DEMO-035", "Firefighter H. Sandbox", "Firefighter", "A Shift", "Medic 1", "Station 1", "Paramedic", "Approved", "a-m1-medic", "Captain J. Pilot", 6],
+  ["DEMO-036", "Firefighter I. Prototype", "Firefighter", "A Shift", "Medic 1", "Station 1", "EMT", "Approved", "a-m1-emt", "Captain J. Pilot", 3],
+  ["DEMO-037", "Firefighter J. Placeholder", "Firefighter", "A Shift", "Medic 2", "Station 2", "Paramedic", "Approved", "a-m2-medic", "Lieutenant L. Model", 8],
+  ["DEMO-038", "Firefighter K. Sketch", "Firefighter", "A Shift", "Medic 2", "Station 2", "AEMT", "Approved", "a-m2-emt", "Lieutenant L. Model", 4],
   // B Shift
   ["DEMO-017", "Battalion Q. Scenario", "Battalion Chief", "B Shift", "Battalion 1", "Station 1", "Paramedic", "Approved", "b-battalion", "Deputy B. Example", 15],
   ["DEMO-004", "Captain D. Trainee", "Captain", "B Shift", "Engine 1", "Station 1", "Paramedic", "Approved", "captain", "Battalion Q. Scenario", 10],
@@ -116,6 +124,11 @@ const PERSONNEL_SPEC = [
   ["DEMO-022", "Firefighter V. Practice", "Firefighter", "B Shift", "Engine 2", "Station 2", "EMT", "Trainee", "b-e2-ff", "Lieutenant T. Outline", 2],
   ["DEMO-023", "Lieutenant W. Tabletop", "Lieutenant", "B Shift", "Truck 3", "Station 3", "EMT", "Approved", "b-t3-lieutenant", "Battalion Q. Scenario", 11],
   ["DEMO-024", "Engineer X. Walkthrough", "Engineer", "B Shift", "Truck 3", "Station 3", "AEMT", "Approved", "b-t3-engineer", "Lieutenant W. Tabletop", 6],
+  ["DEMO-039", "Firefighter L. Storyboard", "Firefighter", "B Shift", "Truck 3", "Station 3", "EMT", "Trainee", "b-t3-ff", "Lieutenant W. Tabletop", 1],
+  ["DEMO-040", "Firefighter M. Benchmark", "Firefighter", "B Shift", "Medic 1", "Station 1", "Paramedic", "Approved", "b-m1-medic", "Captain D. Trainee", 9],
+  ["DEMO-041", "Firefighter N. Simulation", "Firefighter", "B Shift", "Medic 1", "Station 1", "EMT", "Approved", "b-m1-emt", "Captain D. Trainee", 2],
+  ["DEMO-042", "Firefighter O. Wireframe", "Firefighter", "B Shift", "Medic 2", "Station 2", "Paramedic", "Approved", "b-m2-medic", "Lieutenant T. Outline", 5],
+  ["DEMO-043", "Firefighter P. Exhibit", "Firefighter", "B Shift", "Medic 2", "Station 2", "EMT", "Approved", "b-m2-emt", "Lieutenant T. Outline", 3],
   // C Shift
   ["DEMO-025", "Battalion Y. Showcase", "Battalion Chief", "C Shift", "Battalion 1", "Station 1", "Paramedic", "Approved", "c-battalion", "Deputy B. Example", 17],
   ["DEMO-026", "Captain Z. Trial", "Captain", "C Shift", "Engine 1", "Station 1", "Paramedic", "Approved", "c-e1-captain", "Battalion Y. Showcase", 12],
@@ -126,6 +139,11 @@ const PERSONNEL_SPEC = [
   ["DEMO-031", "Firefighter E. Instance", "Firefighter", "C Shift", "Engine 2", "Station 2", "Paramedic", "Trainee", "c-e2-ff", "Lieutenant C. Rehearsal", 1],
   ["DEMO-032", "Lieutenant F. Drill", "Lieutenant", "C Shift", "Truck 3", "Station 3", "Paramedic", "Approved", "c-t3-lieutenant", "Battalion Y. Showcase", 10],
   ["DEMO-005", "Firefighter E. Member", "Firefighter", "C Shift", "Truck 3", "Station 3", "EMT", "Approved", "ff-emt", "Lieutenant F. Drill", 6],
+  ["DEMO-044", "Firefighter Q. Sampler", "Firefighter", "C Shift", "Medic 1", "Station 1", "Paramedic", "Approved", "c-m1-medic", "Captain Z. Trial", 7],
+  ["DEMO-045", "Firefighter R. Scaffold", "Firefighter", "C Shift", "Medic 1", "Station 1", "EMT", "Approved", "c-m1-emt", "Captain Z. Trial", 2],
+  ["DEMO-046", "Firefighter S. Blueprint", "Firefighter", "C Shift", "Medic 2", "Station 2", "Paramedic", "Approved", "c-m2-medic", "Lieutenant C. Rehearsal", 10],
+  ["DEMO-047", "Firefighter T. Facsimile", "Firefighter", "C Shift", "Medic 2", "Station 2", "AEMT", "Approved", "c-m2-emt", "Lieutenant C. Rehearsal", 4],
+  ["DEMO-048", "Firefighter U. Casefile", "Firefighter", "C Shift", "Truck 3", "Station 3", "EMT", "Trainee", "c-t3-ff", "Lieutenant F. Drill", 1],
 ];
 
 /** Certifications due within 90 days (feature showcase); everything else is comfortably current. */
@@ -149,6 +167,7 @@ function certTypesFor(spec) {
   types.push(["Firefighter II", "Fire", 3]);
   if (FIRE_OFFICER_BY_RANK[rank]) types.push([FIRE_OFFICER_BY_RANK[rank], "Fire", 3]);
   if (rank === "Engineer") types.push([assignment === "Truck 3" ? "Driver/Operator - Aerial" : "Driver/Operator - Pumper", "Driver", 3]);
+  if (rank === "Fire Inspector") types.push(["Fire Inspector I", "Prevention", 3]);
   if (rank === "Fire Marshal") types.push(["Fire Inspector II", "Prevention", 3], ["Fire Investigator", "Prevention", 3]);
   if (id === "DEMO-008") types.push(["Fire Instructor II", "Fire", 3]);
   if (id === "DEMO-004") types.push(["Fire Instructor I", "Fire", 3]);
@@ -223,7 +242,7 @@ const personById = Object.fromEntries(demoPersonnel.map((person) => [person.id, 
 // Leave, trades, overtime (relative to the rotation so they land on real work days)
 // ---------------------------------------------------------------------------
 
-// One future B-shift day is short (two approved leaves → 7 of 8) to show deficit + overtime.
+// One future B-shift day is short (two approved leaves → 12 of 13) to show deficit + overtime.
 const DEFICIT_DAY = nextWorkDay("B Shift", 5);
 const ROSTER_A_VACATION = nextWorkDay("A Shift", 7);
 const MEMBER_VACATION_1 = nextWorkDay("C Shift", 12);
@@ -352,8 +371,8 @@ const demoOvertimeOffers = [
 ];
 
 // Saved schedule-day records (live roster math overrides staffed/minimum; these are the fallback).
-const SHIFT_SIZE = 9;
-const MINIMUM_STAFFING = 8;
+const SHIFT_SIZE = 14;
+const MINIMUM_STAFFING = 13;
 const demoScheduleDays = Array.from({ length: 35 }, (_, index) => {
   const offset = index - 7;
   const id = isoDate(offset);
@@ -431,6 +450,8 @@ const demoApparatus = [
   { id: "APP-D02", unit: "Engine 2", type: "Pumper", station: "Station 2", year: "2018", mileage: "44,091", engineHours: "6,104", pumpHours: "591", fuel: "76%", pmDue: longDate(23), status: "In Service", operator: "M. Draft", checks: [["Daily cab check", "Complete"], ["Pump test", "Complete"]] },
   { id: "APP-D03", unit: "Truck 3", type: "Aerial", station: "Station 3", year: "2020", mileage: "26,445", engineHours: "3,870", pumpHours: "214", fuel: "74%", pmDue: longDate(9), status: "In Service", operator: "P. Fixture", checks: [["Daily cab check", "Complete"], ["Aerial controls", "Complete"]] },
   { id: "APP-D04", unit: "Rescue 1", type: "Heavy Rescue", station: "Station 1", year: "2022", mileage: "19,230", engineHours: "2,991", pumpHours: "N/A", fuel: "91%", pmDue: longDate(72), status: "In Service", operator: "Engine 1 crew (cross-staffed)", checks: [["Daily cab check", "Complete"], ["Extrication tools", "Complete"]] },
+  { id: "APP-D06", unit: "Medic 1", type: "Ambulance (ALS)", station: "Station 1", year: "2024", mileage: "38,904", engineHours: "3,412", pumpHours: "N/A", fuel: "86%", pmDue: longDate(28), status: "In Service", operator: "H. Sandbox", checks: [["Daily cab check", "Complete"], ["Medical inventory", "Complete"], ["Cardiac monitor check", "Complete"]] },
+  { id: "APP-D07", unit: "Medic 2", type: "Ambulance (ALS)", station: "Station 2", year: "2021", mileage: "71,226", engineHours: "6,880", pumpHours: "N/A", fuel: "79%", pmDue: longDate(15), status: "In Service", operator: "J. Placeholder", checks: [["Daily cab check", "Complete"], ["Medical inventory", "Complete"], ["Stretcher inspection", "Complete"]] },
   { id: "APP-D05", unit: "Engine 4", type: "Pumper (Reserve)", station: "Station 2", year: "2009", mileage: "88,312", engineHours: "11,460", pumpHours: "1,204", fuel: "64%", pmDue: longDate(-4), status: "Out of Service", operator: "Reserve", checks: [["Daily cab check", "Complete"], ["Pump test", "Failed"]] },
 ];
 
@@ -563,4 +584,4 @@ export const DEMO_LIST_KEYS = Object.keys(DEMO_LIST_SEEDS);
  * Bump whenever the demo seed data above changes: demo sign-ins reseed the
  * sandbox when this differs from the version last written (see demoService.js).
  */
-export const DEMO_SEED_VERSION = 3;
+export const DEMO_SEED_VERSION = 4;

@@ -44,16 +44,18 @@ export const demoDepartmentSettings = {
     logoUrl: "/forge-logo.png"
   },
   subscription: defaultSubscriptionDates(),
-  // Matches the demo roster in demoSeeds.js: 9 members per shift, 8 required on duty.
+  // Matches the demo roster in demoSeeds.js: 14 members per shift, 13 required on duty.
   schedulingSettings: {
-    displayApparatus: ["Battalion 1", "Engine 1", "Engine 2", "Truck 3"],
+    displayApparatus: ["Battalion 1", "Engine 1", "Engine 2", "Truck 3", "Medic 1", "Medic 2"],
     crewSlotsByUnit: {
       "Battalion 1": ["Battalion Chief"],
       "Engine 1": ["Captain", "Driver", "Firefighter"],
       "Engine 2": ["Lieutenant", "Driver", "Firefighter"],
-      "Truck 3": ["Lieutenant", "Driver"]
+      "Truck 3": ["Lieutenant", "Driver", "Firefighter"],
+      "Medic 1": ["Paramedic", "EMT/Driver"],
+      "Medic 2": ["Paramedic", "EMT/Driver"]
     },
-    minimumStaffing: 8
+    minimumStaffing: 13
   },
   isDemo: true
 };
