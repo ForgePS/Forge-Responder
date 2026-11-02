@@ -1,4 +1,71 @@
-import { CirclePlus } from "lucide-react";
+import { useRef } from "react";
+import { Camera, CirclePlus, ImagePlus, X } from "lucide-react";
+import { MAX_DAMAGE_PHOTOS } from "../../lib/damageReportPhotos.js";
+
+let photoSeq = 0;
+
+function DamagePhotoPicker({ photos = [], onChange }) {
+  const cameraRef = useRef(null);
+  const libraryRef = useRef(null);
+  const room = MAX_DAMAGE_PHOTOS - photos.length;
+
+  function addFiles(fileList) {
+    const files = [...(fileList || [])].filter((file) => String(file.type || "").startsWith("image/")).slice(0, Math.max(room, 0));
+    if (!files.length) return;
+    onChange([
+      ...photos,
+      ...files.map((file) => ({ id: `photo-${Date.now()}-${photoSeq += 1}`, file, name: file.name, previewUrl: URL.createObjectURL(file) })),
+    ]);
+  }
+
+  function remove(id) {
+    const photo = photos.find((p) => p.id === id);
+    if (photo?.previewUrl) URL.revokeObjectURL(photo.previewUrl);
+    onChange(photos.filter((p) => p.id !== id));
+  }
+
+  return (
+    <div className="maintenance-block-field">
+      <span>Photos of the damage <small className="maintenance-optional">(optional, up to {MAX_DAMAGE_PHOTOS})</small></span>
+      <div className="maintenance-photo-actions">
+        <button type="button" className="secondary-button" disabled={room <= 0} onClick={() => cameraRef.current?.click()}>
+          <Camera size={15} /> Take photo
+        </button>
+        <button type="button" className="secondary-button" disabled={room <= 0} onClick={() => libraryRef.current?.click()}>
+          <ImagePlus size={15} /> Choose photos
+        </button>
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          hidden
+          onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }}
+        />
+        <input
+          ref={libraryRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }}
+        />
+      </div>
+      {photos.length ? (
+        <ul className="maintenance-photo-grid">
+          {photos.map((photo, index) => (
+            <li key={photo.id}>
+              <img src={photo.previewUrl} alt={`Damage photo ${index + 1}`} />
+              <button type="button" className="maintenance-photo-remove" aria-label={`Remove photo ${index + 1}`} onClick={() => remove(photo.id)}>
+                <X size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 export default function MaintenanceIssueForm({
   value,
@@ -69,27 +136,28 @@ export default function MaintenanceIssueForm({
         />
       </label>
 
-      <label className="maintenance-line-field maintenance-oos-check">
+      <DamagePhotoPicker photos={value.photos || []} onChange={(photos) => update({ photos })} />
+
+      <label className={`maintenance-oos-check${value.unitOutOfService ? " is-checked" : ""}`}>
         <input
           type="checkbox"
           checked={Boolean(value.unitOutOfService)}
           onChange={(event) => update({ unitOutOfService: event.target.checked })}
         />
-        <span>This unit can't safely respond (out of service until it's fixed)</span>
+        <span>
+          <strong>Take this unit out of service</strong>
+          <small>Check this if the unit can't safely respond until it's fixed.</small>
+        </span>
       </label>
 
-      <label className="maintenance-line-field">
-        <span>Person Filling out the form:</span>
-        <input
-          type="text"
-          className="employee-computed-value"
-          value={submittedByName || "Employee"}
-          readOnly
-        />
-      </label>
+      <div className="maintenance-submitted-by">
+        <span>Submitted by</span>
+        <strong>{submittedByName || "Employee"}</strong>
+        <small>From your sign-in</small>
+      </div>
 
       <button type="submit" className="primary-button" disabled={submitting}>
-        <CirclePlus size={14} /> {submitting ? "Submitting..." : "Submit Damage Report"}
+        <CirclePlus size={14} /> {submitting ? ((value.photos || []).length ? "Uploading photos…" : "Submitting...") : "Submit Damage Report"}
       </button>
     </form>
   );

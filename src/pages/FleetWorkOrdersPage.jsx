@@ -37,6 +37,7 @@ import {
   workOrderTypeLabel,
 } from "../lib/fleet/workOrderLoopLogic.js";
 import { friendlyError } from "../lib/friendlyError.js";
+import DamagePhotoGrid from "../components/DamagePhotoGrid.jsx";
 
 function Field({ label, children }) {
   return (
@@ -335,6 +336,7 @@ export default function FleetWorkOrdersPage({
                     <div><span className="occupancy-muted">Opened</span><strong>{selected.openedAt ? new Date(selected.openedAt).toLocaleString() : "—"}</strong></div>
                   </div>
                   <p>{selected.complaint}</p>
+                  <DamagePhotoGrid photos={selected.photos} title="Photos from the report" />
 
                   {canEdit ? (
                     <>

@@ -36,6 +36,10 @@ export function buildNerisAttachmentPath(departmentId, reportId, fileName = "att
   return `departments/${departmentId}/neris-attachments/${reportId}/${Date.now()}-${safeFileName(fileName)}`;
 }
 
+export function buildDamageReportPhotoPath(departmentId, reportId, index = 0, fileName = "photo.jpg") {
+  return `departments/${departmentId}/damage-reports/${reportId}/${Date.now()}-${index + 1}-${safeFileName(fileName)}`;
+}
+
 export function buildHydrantInspectionPhotoPath(departmentId, hydrantId, fileName = "photo.jpg") {
   const scope = hydrantId || "general";
   return `departments/${departmentId}/hydrant-inspections/${scope}/${Date.now()}-${safeFileName(fileName)}`;

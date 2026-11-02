@@ -90,7 +90,7 @@ export async function loadDamageFormSettings(departmentId) {
   if (!snap.exists()) return null;
   // Older departments may still have the key and webhook token here until an admin
   // opens the setup screen (the server then moves them); never pass them on.
-  const { apiKey, webhookToken: _webhookToken, ...rest } = snap.data();
+  const { apiKey, webhookToken: _webhookToken, ...rest } = snap.data();
   return { ...rest, apiKeyConfigured: Boolean(apiKey) };
 }
 
@@ -154,6 +154,9 @@ export async function createPortalDamageFormRecord(departmentId, form = {}, work
     equipment: form.equipment || workOrder.equipment || "",
     damageDescription: summary,
     workOrderId: workOrder.id,
+    photos: (Array.isArray(form.photos) ? form.photos : workOrder.photos || [])
+      .filter((photo) => photo && photo.url)
+      .map((photo) => ({ url: photo.url, name: photo.name || "" })),
     answers: [
       { label: "Date", value: form.date || workOrder.reportDate || "" },
       { label: "Location", value: form.location || workOrder.location || "" },

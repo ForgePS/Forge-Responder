@@ -103,6 +103,9 @@ export function portalReportToFleetWorkOrderInput(form = {}, classicRecord = {},
     oosRequired: concern === "out_of_service",
     safetyImpact: concern ? (concern === "out_of_service" ? "Reported out of service" : "Reported unsafe") : "",
     openedAt: new Date().toISOString(),
+    photos: (Array.isArray(form.photos) ? form.photos : [])
+      .filter((photo) => photo && photo.url)
+      .map((photo) => ({ url: photo.url, storagePath: photo.storagePath || "", name: photo.name || "" })),
     concern,
   };
 }

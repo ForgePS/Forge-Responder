@@ -105,6 +105,8 @@ export function normalizeFleetWorkOrder(raw = {}, departmentId = "") {
     completedAt: data.completedAt || "",
     closedAt: data.closedAt || "",
     complaint: data.complaint || data.issue || "",
+    // Photos attached when the problem was reported (employee portal damage report).
+    photos: Array.isArray(data.photos) ? data.photos.filter((photo) => photo && photo.url) : [],
     diagnosis: data.diagnosis || "",
     cause: data.cause || "",
     correction: data.correction || "",
