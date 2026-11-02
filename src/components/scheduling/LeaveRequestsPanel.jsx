@@ -16,6 +16,14 @@ import {
 import { parseDayId } from "../../lib/shiftCalendar.js";
 import "../../theme/leave-requests.css";
 
+const APPROVAL_ROUTE_LABELS = {
+  auto: "Approved on submit (Fire Chief)",
+  chief: "Deputy Chief / Fire Chief",
+  "officer-then-battalion": "Officer, then Battalion Chief",
+  battalion: "Battalion Chief",
+  "direct-battalion": "Battalion Chief",
+};
+
 const FILTER_OPTIONS = ["All", "Pending", "Approved", "Denied"];
 
 function Badge({ children }) {
@@ -67,9 +75,16 @@ function buildLeaveDetailRows(request = {}) {
     ["Total Hours", hoursLabel],
     ["Time Window", timeLabel],
     ["Status", leaveStatusDetail(request)],
-    ["Approval Route", request.approvalRoute || "—"],
-    ["Assigned Officer", request.assignedOfficer || "—"],
-    ["Battalion Chief", request.assignedBattalionChief || "—"],
+    ["Approval Route", APPROVAL_ROUTE_LABELS[request.approvalRoute] || request.approvalRoute || "—"],
+    ...(request.approvalRoute === "chief" || request.approvalRoute === "auto"
+      ? [
+        ["Approver", request.autoApproved ? "No approval needed (Fire Chief)" : request.assignedApprover || "—"],
+        ...(request.coveringFor ? [["Covering for", `${request.coveringFor} (on leave)`]] : []),
+      ]
+      : [
+        ["Assigned Officer", request.assignedOfficer || "—"],
+        ["Battalion Chief", request.assignedBattalionChief || "—"],
+      ]),
     ["Submitted", formatSubmittedAt(request.submittedAt)],
     ["Accrual Deducted", request.accrualDeducted ? `${request.accrualDeductedHours || request.totalHours || "—"} hrs` : "No"],
   ];

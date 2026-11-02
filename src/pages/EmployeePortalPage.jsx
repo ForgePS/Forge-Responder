@@ -137,15 +137,23 @@ function Panel({ title, icon: Icon, action, children }) {
   );
 }
 
-function buildLeaveApprovalHint(person, personnel, leaveType) {
-  const meta = buildLeaveApprovalMeta(person, personnel, leaveType);
+function buildLeaveApprovalHint(person, personnel, leaveType, options = {}) {
+  const meta = buildLeaveApprovalMeta(person, personnel, leaveType, options);
+  const kind = leaveType || "Leave";
+  if (meta.approvalRoute === "auto") {
+    return `As Fire Chief, your ${kind.toLowerCase()} requests don't need approval. They're approved when you submit them.`;
+  }
+  if (meta.approvalRoute === "chief") {
+    return meta.coveringFor
+      ? `Your shift's Battalion Chief (${meta.coveringFor}) is on leave, so ${kind.toLowerCase()} requests are sent to ${meta.assignedApprover} for approval.`
+      : `${kind} requests are sent to ${meta.assignedApprover} for approval.`;
+  }
   const chief = meta.assignedBattalionChief;
   const chiefPerson = personnel.find((p) => p?.id === meta.assignedBattalionChiefId);
   const sameShift = chiefPerson && String(chiefPerson.shift || "").toLowerCase() === String(person?.shift || "").toLowerCase();
   // "your shift's Battalion Chief (Battalion C. Demo)" for platoon members; day staff
   // aren't on a shift, so just name the chief.
   const chiefLabel = sameShift ? `your shift's Battalion Chief (${chief})` : `${chief} (Battalion Chief)`;
-  const kind = leaveType || "Leave";
   if (meta.approvalRoute === "officer-then-battalion") {
     return `${kind} requests go to your officer, ${meta.assignedOfficer}, first, then to ${chiefLabel} for final approval.`;
   }
@@ -317,8 +325,10 @@ export default function EmployeePortalPage({
   ]);
 
   const leaveApprovalHint = useMemo(
-    () => (myPerson ? buildLeaveApprovalHint(myPerson, personnel, leaveForm.type) : ""),
-    [myPerson, personnel, leaveForm.type]
+    () => (myPerson
+      ? buildLeaveApprovalHint(myPerson, personnel, leaveForm.type, { leaveRequests, rotation, dayIds: leaveForm.selectedDates })
+      : ""),
+    [myPerson, personnel, leaveForm.type, leaveForm.selectedDates, leaveRequests, rotation]
   );
 
   const coverageOptions = useMemo(() => {
@@ -595,7 +605,11 @@ export default function EmployeePortalPage({
     }
 
     const endTime = calculateEndTime(leaveForm.startTime, totalHours);
-    const approvalMeta = buildLeaveApprovalMeta(myPerson || {}, personnel, leaveForm.type);
+    const approvalMeta = buildLeaveApprovalMeta(myPerson || {}, personnel, leaveForm.type, {
+      leaveRequests,
+      rotation,
+      dayIds: leaveForm.selectedDates,
+    });
     const id = uniqueRecordId("L");
     const record = {
       id,
