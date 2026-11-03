@@ -944,3 +944,51 @@ html[data-theme="dark"] .daily-roster-time-part,
   font: inherit;
   font-size: 13px;
 }
+
+.employee-approval-queue {
+  margin-bottom: 14px;
+  border-color: color-mix(in srgb, #f59e0b 45%, var(--rms-border));
+}
+
+.employee-approval-queue header .employee-approval-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.employee-approval-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rms-border);
+}
+
+.employee-approval-row:last-child {
+  border-bottom: 0;
+}
+
+.employee-approval-row > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.employee-approval-row strong {
+  color: var(--rms-text-strong);
+  font-size: 14px;
+}
+
+.employee-approval-row span {
+  color: var(--rms-text-muted);
+  font-size: 13px;
+}

@@ -37,9 +37,14 @@ export default function ShiftTradeForm({
     [myShift, rotation]
   );
 
+  const options = coverageOptions.map((option) => (typeof option === "string" ? { value: option, label: option } : option));
+  // Once a partner is chosen, only their shift's days can be received.
+  const partnerShift = options.find((option) => option.value === value.coverage)?.shift || "";
   const isReceiveDayDisplayed = useMemo(
-    () => (dayId) => isOppositeShiftWorkDay(dayId, myShift, rotation),
-    [myShift, rotation]
+    () => (dayId) => (partnerShift
+      ? isEmployeeShiftWorkDay(dayId, partnerShift, rotation)
+      : isOppositeShiftWorkDay(dayId, myShift, rotation)),
+    [myShift, partnerShift, rotation]
   );
 
   useEffect(() => {
@@ -99,8 +104,8 @@ export default function ShiftTradeForm({
               onChange={(event) => update({ coverage: event.target.value })}
             >
               <option value="">Select member...</option>
-              {coverageOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
+              {options.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           ) : (
@@ -150,7 +155,7 @@ export default function ShiftTradeForm({
           roster={roster}
           minDate={tradeWindow.minDate}
           maxDate={tradeWindow.maxDate}
-          rangeHint={[tradeRangeHint, "Only the other shift days are shown."].filter(Boolean).join(" ")}
+          rangeHint={[tradeRangeHint, partnerShift ? `Only ${value.coverage}'s ${partnerShift} days are shown.` : "Other shifts' days are shown; pick a coverage member to narrow it to their shift."].filter(Boolean).join(" ")}
           isDayDisplayed={isReceiveDayDisplayed}
           onChange={(selectedDates) => updateReceiveDay(selectedDates[0] || "")}
         />
