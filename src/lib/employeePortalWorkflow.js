@@ -294,6 +294,22 @@ export function buildLeaveApprovalMeta(person = {}, personnel = [], leaveType = 
   };
 }
 
+/**
+ * True when this pending leave request is waiting on `person` at its current step:
+ * the officer step, their shift's Battalion Chief step, or the Deputy/Fire Chief step.
+ */
+export function isLeaveAwaitingPerson(request = {}, person = null) {
+  if (!person?.id || !isLeavePending(request)) return false;
+  if (String(request.personnelId || "") === String(person.id)) return false;
+  if (request.approvalStage === "officer") return request.assignedOfficerId === person.id;
+  if (request.approvalStage === "battalionChief") return request.assignedBattalionChiefId === person.id;
+  if (request.approvalStage === "chief") {
+    const ids = Array.isArray(request.assignedApproverIds) ? request.assignedApproverIds : [request.assignedApproverId];
+    return ids.includes(person.id);
+  }
+  return false;
+}
+
 export function isLeavePending(request = {}) {
   return /pending/i.test(String(request.status || ""));
 }

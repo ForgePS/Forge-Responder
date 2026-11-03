@@ -101,3 +101,18 @@ test("platoon members pick their work days; day staff pick weekdays", () => {
   const week = ["2026-11-02", "2026-11-03", "2026-11-04"];
   assert.equal(week.filter((d) => isLeaveSelectableDay(d, "C Shift")).length, 1);
 });
+
+test("a pending request shows only for the member it's waiting on", async () => {
+  const { isLeaveAwaitingPerson } = await import("../../src/lib/employeePortalWorkflow.js");
+  const officerStep = { status: "Pending Officer Approval", approvalStage: "officer", assignedOfficerId: "CPT-C", assignedBattalionChiefId: "BC-C", personnelId: "FF-C" };
+  assert.equal(isLeaveAwaitingPerson(officerStep, byId["CPT-C"]), true);
+  assert.equal(isLeaveAwaitingPerson(officerStep, byId["BC-C"]), false);
+  const bcStep = { ...officerStep, status: "Pending Battalion Chief", approvalStage: "battalionChief" };
+  assert.equal(isLeaveAwaitingPerson(bcStep, byId["BC-C"]), true);
+  const chiefStep = { status: "Pending Chief Approval", approvalStage: "chief", assignedApproverIds: ["DEP", "CHIEF"], personnelId: "BC-A" };
+  assert.equal(isLeaveAwaitingPerson(chiefStep, byId.DEP), true);
+  assert.equal(isLeaveAwaitingPerson(chiefStep, byId.CHIEF), true);
+  assert.equal(isLeaveAwaitingPerson({ ...chiefStep, status: "Approved" }, byId.CHIEF), false);
+  // Nobody approves their own request.
+  assert.equal(isLeaveAwaitingPerson({ ...chiefStep, personnelId: "DEP" }, byId.DEP), false);
+});

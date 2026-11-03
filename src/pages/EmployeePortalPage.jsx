@@ -64,6 +64,8 @@ import {
   buildShiftTradeApprovalMeta,
   buildShiftTradeDateWindow,
   leaveStatusDetail,
+  advanceLeaveApproval,
+  isLeaveAwaitingPerson,
   buildVacationDateWindow,
   calculateEndTime,
   formatSelectableDateRange,
@@ -88,6 +90,7 @@ import { uniqueRecordId } from "../lib/recordIds.js";
 import { acknowledgementKeys, pendingForPerson, withAcknowledgement } from "../lib/documentAcknowledgement.js";
 import { loadDepartmentMembership } from "../lib/departmentMembership.js";
 import { uploadDamageReportPhotos } from "../lib/damageReportPhotos.js";
+import { processLeaveDecision } from "../lib/leaveAccrualIntegration.js";
 
 const CERT_ALERT_DAYS = 90;
 
@@ -159,6 +162,44 @@ function buildLeaveApprovalHint(person, personnel, leaveType, options = {}) {
     return `${kind} requests go to your officer, ${meta.assignedOfficer}, first, then to ${chiefLabel} for final approval.`;
   }
   return `${kind} requests are sent to ${chiefLabel} for approval.`;
+}
+
+const LEAVE_STAGE_ROLE = { officer: "officer", battalionChief: "Battalion Chief", chief: "chief officer" };
+
+/** "Waiting for your approval": leave and shift trades this member can approve now. */
+function ApprovalQueue({ leaveActions = [], tradeActions = [], onDecideLeave, onDecideTrade }) {
+  const total = leaveActions.length + tradeActions.length;
+  return (
+    <section className="panel employee-approval-queue">
+      <header><div><Check size={15} /><strong>Waiting for your approval</strong></div><span className="employee-approval-count">{total}</span></header>
+      <div className="panel-body">
+        {leaveActions.map((request) => (
+          <div className="employee-approval-row" key={request.id}>
+            <div>
+              <strong>{request.person} · {request.type}</strong>
+              <span>{request.dates}{request.hours ? ` · ${request.hours}` : ""} · as {LEAVE_STAGE_ROLE[request.approvalStage] || "approver"}{request.coveringFor ? ` (covering for ${request.coveringFor})` : ""}</span>
+            </div>
+            <div className="inline-actions">
+              <button type="button" onClick={() => onDecideLeave(request.id, "Approved")}><Check size={13} /> Approve</button>
+              <button type="button" onClick={() => onDecideLeave(request.id, "Denied")}><X size={13} /> Deny</button>
+            </div>
+          </div>
+        ))}
+        {tradeActions.map(({ trade, role }) => (
+          <div className="employee-approval-row" key={trade.id}>
+            <div>
+              <strong>{trade.requestedBy} · Shift trade</strong>
+              <span>{trade.give} → {trade.receive} · as {shiftTradeActionLabel(role)}</span>
+            </div>
+            <div className="inline-actions">
+              <button type="button" onClick={() => onDecideTrade(trade.id, "Approved")}><Check size={13} /> Approve</button>
+              <button type="button" onClick={() => onDecideTrade(trade.id, "Denied")}><X size={13} /> Deny</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function shiftTradeActionLabel(role = "") {
@@ -333,6 +374,7 @@ export default function EmployeePortalPage({
     [myPerson, personnel, leaveForm.type, leaveForm.selectedDates, leaveRequests, rotation]
   );
 
+  // Trade partners work a different platoon: they take your shift and you take theirs.
   const coverageOptions = useMemo(() => {
     if (!myPerson?.shift) return [];
     const shift = String(myPerson.shift).trim().toLowerCase();
@@ -340,12 +382,13 @@ export default function EmployeePortalPage({
       .filter(Boolean)
       .filter((person) => (
         person.id !== myPerson.id
-        && String(person.shift || "").trim().toLowerCase() === shift
-        && String(person.status || "").toLowerCase() !== "inactive"
+        && String(person.shift || "").trim().toLowerCase() !== shift
+        && isRotationShift(person.shift, rotation)
+        && !/inactive|terminated/i.test(String(person.status || ""))
       ))
-      .map((person) => person.name)
-      .sort((a, b) => a.localeCompare(b));
-  }, [personnel, myPerson]);
+      .sort((a, b) => String(a.shift).localeCompare(String(b.shift)) || String(a.name).localeCompare(String(b.name)))
+      .map((person) => ({ value: person.name, label: `${person.name} · ${person.shift}${person.rank ? ` · ${person.rank}` : ""}`, shift: person.shift }));
+  }, [personnel, myPerson, rotation]);
 
   const scheduleContext = useMemo(
     () => resolveEmployeeScheduleContext(scheduleDays, myPerson, membership, rotation),
@@ -401,6 +444,13 @@ export default function EmployeePortalPage({
       })),
     [shiftTrades, myPerson, membership]
   );
+
+  // Leave requests waiting on this member (as officer, Battalion Chief, or Deputy/Fire Chief).
+  const pendingLeaveActions = useMemo(
+    () => leaveRequests.filter((request) => isLeaveAwaitingPerson(request, myPerson)),
+    [leaveRequests, myPerson]
+  );
+  const approvalCount = pendingLeaveActions.length + pendingTradeActions.length;
 
   const tradeApprovalHint = useMemo(
     () => buildShiftTradeApprovalHint(tradeForm),
@@ -697,6 +747,44 @@ export default function EmployeePortalPage({
     setTradeForm(defaultTradeForm);
   }
 
+  /** Same steps as Scheduling → Leave Requests: advance the stage, deduct accruals when final. */
+  async function decideLeaveApproval(requestId, decision) {
+    const request = leaveRequests.find((item) => item.id === requestId);
+    if (!request || !isLeaveAwaitingPerson(request, myPerson)) {
+      setMessage("You can't act on this leave request.");
+      return;
+    }
+    const approverName = myPerson?.name || membership?.displayName || "";
+    const decidedBy = { decidedBy: approverName, decidedById: myPerson?.id || "", decidedAt: new Date().toISOString() };
+    let patch;
+    let resultMessage;
+    if (decision === "Denied") {
+      const result = processLeaveDecision(request, "Denied", personnel);
+      patch = { ...result.leavePatch, approvalStage: "complete", ...decidedBy };
+      resultMessage = result.message;
+      if (result.personnelChanged && setPersonnel) setPersonnel(result.personnel);
+    } else {
+      const step = advanceLeaveApproval(request, "Approved");
+      if (step.isFinal) {
+        const result = processLeaveDecision({ ...request, ...step.leavePatch }, "Approved", personnel);
+        patch = { ...step.leavePatch, ...result.leavePatch, ...decidedBy };
+        resultMessage = result.message || step.message;
+        if (result.personnelChanged && setPersonnel) setPersonnel(result.personnel);
+      } else {
+        patch = { ...step.leavePatch, officerApprovedBy: approverName };
+        resultMessage = step.message;
+      }
+    }
+    setLeaveRequests((current) => current.map((item) => (item.id === requestId ? { ...item, ...patch } : item)));
+    await logAction(
+      decision === "Approved" ? "approve" : "deny",
+      "Employee Portal",
+      `Leave request for ${request.person} ${decision.toLowerCase()} by ${approverName}`,
+      requestId
+    );
+    setMessage(resultMessage || `Leave request ${decision.toLowerCase()}.`);
+  }
+
   async function decideTradeApproval(tradeId, decision) {
     const trade = shiftTrades.find((item) => item.id === tradeId);
     if (!trade) return;
@@ -907,10 +995,18 @@ export default function EmployeePortalPage({
       {current === "My Dashboard" && (
         <>
           <section className="training-summary">
-            {[["Next Shift", myShift ? `${myShift.date} · ${myShift.shift}` : (!onRotation && (myPerson?.shift || membership?.assignedShift) ? "Day staff" : "—"), "info"], ["Certification Alerts", certAlerts, certAlerts ? "warning" : "success"], ["Training Due", trainingDue, trainingDue ? "warning" : "success"], ["Documents", myDocs.length, myDocs.length ? "warning" : "success"], ["Pending Trades", pendingTrades, pendingTrades ? "warning" : "info"]].map(([label, value, tone]) => (
+            {[["Next Shift", scheduleContext.isWorkDayToday && myPerson?.shift ? `Today · ${myPerson.shift}` : myShift ? `${myShift.date} · ${myShift.shift}` : (!onRotation && (myPerson?.shift || membership?.assignedShift) ? "Day staff" : "—"), "info"], ["Certification Alerts", certAlerts, certAlerts ? "warning" : "success"], ["Training Due", trainingDue, trainingDue ? "warning" : "success"], ["Documents", myDocs.length, myDocs.length ? "warning" : "success"], ["Pending Trades", pendingTrades, pendingTrades ? "warning" : "info"]].map(([label, value, tone]) => (
               <div key={label} className={`fleet-stat stat-${tone}`}><strong>{value}</strong><span>{label}</span></div>
             ))}
           </section>
+          {approvalCount ? (
+            <ApprovalQueue
+              leaveActions={pendingLeaveActions}
+              tradeActions={pendingTradeActions}
+              onDecideLeave={decideLeaveApproval}
+              onDecideTrade={decideTradeApproval}
+            />
+          ) : null}
           <section className="dashboard-grid">
             <div className="dashboard-column">
               <Panel title="Certification Alerts" icon={FileCheck2}>
@@ -1057,6 +1153,9 @@ export default function EmployeePortalPage({
             )}
             leavePanel={(
               <>
+                {pendingLeaveActions.length ? (
+                  <ApprovalQueue leaveActions={pendingLeaveActions} onDecideLeave={decideLeaveApproval} onDecideTrade={decideTradeApproval} />
+                ) : null}
                 {canSubmitLeave ? (
                   <>
                     <LeaveRequestForm
