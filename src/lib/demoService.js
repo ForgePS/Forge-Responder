@@ -8,6 +8,7 @@ import { ensureDefaultRoles } from "./roleService.js";
 import { seedInternalEmailsForScope } from "./internalEmailService.js";
 import { refreshDemoPreventionRecords } from "./demoPrevention.js";
 import { refreshDemoFleetRecords } from "./demoFleet.js";
+import { refreshDemoHydrantRecords } from "./demoHydrants.js";
 import { sanitizeItemsForFirestore } from "./firestoreSanitize.js";
 import { DEMO_DEPARTMENT_ID, departmentListSegments } from "./tenantPaths.js";
 import { readTenantList, replaceTenantList } from "./tenantListStore.js";
@@ -105,6 +106,7 @@ export async function ensureDemoAccess(user) {
       seedInternalEmailsForScope(DEMO_DEPARTMENT_ID, user),
       refreshDemoPreventionRecords().catch((error) => console.warn("Demo inspections refresh skipped", error)),
       refreshDemoFleetRecords().catch((error) => console.warn("Demo fleet refresh skipped", error)),
+      refreshDemoHydrantRecords().catch((error) => console.warn("Demo hydrant refresh skipped", error)),
     ]);
     await setDoc(profileRef, {
       demoSeed: { version: DEMO_SEED_VERSION, at: new Date().toISOString() },
