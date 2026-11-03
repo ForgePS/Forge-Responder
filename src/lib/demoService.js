@@ -87,6 +87,27 @@ function demoSeedIsFresh(profile) {
   return Number.isFinite(seededAt) && Date.now() - seededAt < DEMO_RESEED_INTERVAL_MS;
 }
 
+/**
+ * Put the demo sandbox back to its sample data: lists, messages, prevention,
+ * fleet and hydrant records. Used on sign-in when the data is stale, and by the
+ * banner's "Reset demo data" button before a meeting.
+ */
+export async function resetDemoData(user) {
+  const db = getFirestoreDb();
+  if (!db || !user?.uid) return false;
+  await Promise.all([
+    bootstrapDemoLists(user.uid),
+    seedInternalEmailsForScope(DEMO_DEPARTMENT_ID, user),
+    refreshDemoPreventionRecords().catch((error) => console.warn("Demo inspections refresh skipped", error)),
+    refreshDemoFleetRecords().catch((error) => console.warn("Demo fleet refresh skipped", error)),
+    refreshDemoHydrantRecords().catch((error) => console.warn("Demo hydrant refresh skipped", error)),
+  ]);
+  await setDoc(doc(db, "departments", DEMO_DEPARTMENT_ID, "profile", "main"), {
+    demoSeed: { version: DEMO_SEED_VERSION, at: new Date().toISOString() },
+  }, { merge: true }).catch((error) => console.warn("Demo seed stamp skipped", error));
+  return true;
+}
+
 export async function ensureDemoAccess(user) {
   const db = getFirestoreDb();
   if (!db || !user?.uid) return null;
@@ -101,16 +122,7 @@ export async function ensureDemoAccess(user) {
   // Reseeding takes several seconds, so only do it when the sample data is
   // missing, out of date, or hasn't been reset for a while.
   if (!demoSeedIsFresh(profileSnap?.exists() ? profileSnap.data() : null)) {
-    await Promise.all([
-      bootstrapDemoLists(user.uid),
-      seedInternalEmailsForScope(DEMO_DEPARTMENT_ID, user),
-      refreshDemoPreventionRecords().catch((error) => console.warn("Demo inspections refresh skipped", error)),
-      refreshDemoFleetRecords().catch((error) => console.warn("Demo fleet refresh skipped", error)),
-      refreshDemoHydrantRecords().catch((error) => console.warn("Demo hydrant refresh skipped", error)),
-    ]);
-    await setDoc(profileRef, {
-      demoSeed: { version: DEMO_SEED_VERSION, at: new Date().toISOString() },
-    }, { merge: true }).catch((error) => console.warn("Demo seed stamp skipped", error));
+    await resetDemoData(user);
   }
 
   const now = new Date().toISOString();

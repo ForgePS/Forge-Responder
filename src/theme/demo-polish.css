@@ -142,3 +142,10 @@ html[data-theme="dark"] .dd-library-table tbody tr:hover { background: var(--rms
 @media (max-width: 700px) {
   .kpi-card > span:first-of-type { font-size: 13px; line-height: 1.25; }
 }
+
+.demo-mode-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
