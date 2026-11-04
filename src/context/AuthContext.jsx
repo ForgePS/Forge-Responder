@@ -35,6 +35,7 @@ import {
 import { loadRolesMap } from "../lib/roleService.js";
 import { isDemoModeActive } from "../lib/demoMode.js";
 import { ensureDemoAccess } from "../lib/demoService.js";
+import { applyDemoPersona } from "../lib/demoPersona.js";
 import {
   persistGatewayContext,
   resolveActiveDepartmentId,
@@ -424,7 +425,11 @@ export function AuthProvider({ children }) {
     setMembership(null);
   }
 
+  // Demo only: the role the visitor chose to view the demo as (kept in this tab).
+  const effectiveMembership = useMemo(() => applyDemoPersona(membership), [membership]);
+
   const permissions = useMemo(() => {
+    const membership = effectiveMembership;
     if (isPlatformCreatorUser(membership, { isPlatformCreator: isCreator })) {
       return { ...CREATOR_PERMISSIONS };
     }
@@ -437,7 +442,7 @@ export function AuthProvider({ children }) {
         : getDefaultRolePermissions("fireChief");
     }
     return merged;
-  }, [membership, rolesById, isCreator, user]);
+  }, [effectiveMembership, rolesById, isCreator, user]);
 
   async function switchCreatorDepartment(departmentId) {
     if (!user || !isCreator || !departmentId || departmentId === PLATFORM_SCOPE_ID) return;
@@ -471,7 +476,7 @@ export function AuthProvider({ children }) {
   const value = useMemo(
     () => ({
       user,
-      membership,
+      membership: effectiveMembership,
       permissions,
       rolesById,
       isCreator,
@@ -493,7 +498,7 @@ export function AuthProvider({ children }) {
       dismissInviteNotice: () => setInviteNotice(""),
       authRequired: firebaseEnabled
     }),
-    [user, membership, permissions, rolesById, isCreator, authLoading, membershipLoading, authError, recoveryLoading, patchMembership, inviteNotice, inviteError, inviteNeedsVerification]
+    [user, effectiveMembership, permissions, rolesById, isCreator, authLoading, membershipLoading, authError, recoveryLoading, patchMembership, inviteNotice, inviteError, inviteNeedsVerification]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

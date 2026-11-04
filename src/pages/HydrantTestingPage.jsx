@@ -67,6 +67,12 @@ import {
   hydrantPathForTab,
   resolveInitialHydrantTab,
 } from "../lib/hydrantAppRouting.js";
+import {
+  departmentInitials,
+  resolveFieldAppForms,
+  resolveFireCodeDocumentBase,
+  resolveImportantNumbers,
+} from "../lib/fieldAppConfig.js";
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[ch]));
@@ -99,29 +105,14 @@ function hydrantKeys() {
   return hydrantLocalKeys(hydrantDepartmentId);
 }
 const hoseTestingBaselineYear = "2026";
-const importantNumbers = [
-  { name: "American Tire Shop", numbers: [{ label: "Shop", value: "(662)449-0110" }, { label: "Mobile", value: "(901)561-0034" }] },
-  { name: "EEP D'Angelo", numbers: [{ label: "Mobile", value: "(901)831-0253" }, { label: "Shop", value: "(662)280-4729" }] },
-  { name: "HL City Shop", numbers: [{ label: "Shop", value: "(662)342-4505" }, { label: "On Call", value: "(901)826-0761" }] },
-  { name: "HL Dispatch", numbers: [{ label: "Main", value: "(662)393-6174" }] },
-  { name: "HL IT", numbers: [{ label: "Daniel", value: "(662)548-6655" }, { label: "Jonathan", value: "(662)470-1704" }] },
-  { name: "HL Public Works", numbers: [{ label: "Main", value: "(662)342-7099" }, { label: "Alt", value: "(662)342-4505" }] },
-  { name: "HL Public Works Director", numbers: [{ label: "Steve Box", value: "(901)652-1307" }] },
-  { name: "HL Water", numbers: [{ label: "Rodney", value: "(901)517-6182" }] },
-  { name: "HL Animal Shelter", numbers: [{ label: "Main", value: "(662)393-5857" }] },
-  { name: "Magnolia Tire", numbers: [{ label: "Main", value: "(662)342-0194" }] },
-  { name: "Mississippi DEQ", numbers: [{ label: "Main", value: "(601)961-5171" }] },
-  { name: "North MS Two Way", numbers: [{ label: "Main", value: "(662)429-5732" }] },
-  { name: "Red Cross", numbers: [{ label: "Main", value: "(833)583-3111" }] },
-  { name: "Board Up", numbers: [{ label: "Main", value: "1-800-262-7387" }] }
-];
 
 function phoneHref(number) {
   const cleaned = String(number || "").replace(/[^\d+]/g, "");
   return `tel:${cleaned}`;
 }
 
-const cityBoundsDefault = [[34.928, -90.125], [34.995, -89.965]];
+// Neutral continental-US view, only used when no department bounds or hydrants are known.
+const neutralMapBounds = [[24.5, -125], [49.5, -66.9]];
 const inspectionItems = [
   ["No Obstructions", "Area clear and accessible."],
   ["Operable (Turns Open/Closed)", "Operated smoothly."],
@@ -273,7 +264,6 @@ const aclsMedicationSources = [
   { label: "AHA Pediatric Bradycardia Algorithm", url: "https://cpr.heart.org/-/media/CPR-Files/CPR-Guidelines-Files/2025-Algorithms/Algorithm-PALS-Bradycardia-250121.pdf?sc_lang=en" },
   { label: "AHA Pediatric Tachyarrhythmia Algorithm", url: "https://cpr.heart.org/-/media/CPR-Files/CPR-Guidelines-Files/2025-Accessible/Algorithm-PALS-Tachyarrhythmia-LngDscrp-250729-Ed.pdf" }
 ];
-const fireCodeAssetBase = "https://dept-app-k85k.onrender.com";
 const upCodesBase = "https://up.codes/viewer/international/ifc-2024";
 const fireCodePdfUrls = {
   1: "/codes/100 - Scope and Administration.pdf",
@@ -639,6 +629,24 @@ function readLocalJson(keyName, fallback) {
   return readHydrantLocalJson(hydrantDepartmentId, keyName, fallback);
 }
 
+/**
+ * Hose tests saved on this device. Older builds stored them under the key "undefined"
+ * (a bug); still show those so nothing saved only on the device disappears.
+ */
+function readHoseTestsOnDevice() {
+  const current = readLocalJson("hoseTests", []);
+  let legacy = [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem("undefined") || "[]");
+    legacy = Array.isArray(parsed) ? parsed.filter((row) => row && typeof row === "object" && row.hoseId) : [];
+  } catch {
+    legacy = [];
+  }
+  if (!legacy.length) return current;
+  const seen = new Set(current.map((row) => row.id));
+  return [...current, ...legacy.filter((row) => !seen.has(row.id))];
+}
+
 function writeLocalJson(keyName, value) {
   writeHydrantLocalJson(hydrantDepartmentId, keyName, value);
 }
@@ -794,7 +802,7 @@ function rememberHydrantMapView(map) {
   hydrantMapViewStore.zoom = map.getZoom();
 }
 
-function HydrantMap({ hydrants, selected, onSelect, mapBounds = cityBoundsDefault }) {
+function HydrantMap({ hydrants, selected, onSelect, mapBounds = neutralMapBounds }) {
   const mapRef = useRef(null);
   const layerRef = useRef(null);
   const markerRef = useRef(new Map());
@@ -2634,7 +2642,7 @@ function EmsProtocolsPage() {
 }
 
 function PreFirePlansDatabase() {
-  const preFirePlanFormUrl = "https://form.jotform.com/260863576120053";
+  const { preFirePlanFormUrl } = resolveFieldAppForms(hydrantProfile);
   const [plans, setPlans] = useState(() => readLocalJson("preFirePlans", []));
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(blankPreFirePlan);
@@ -2789,7 +2797,9 @@ function PreFirePlansDatabase() {
         </div>
         <div className="resource-actions">
           <button className="primary" onClick={savePlan}><UploadCloud size={16} /> Upload Plan</button>
-          <button className="secondary" onClick={() => window.open(preFirePlanFormUrl, "_blank", "noopener,noreferrer")?.focus?.()}><ExternalLink size={16} /> New Plan</button>
+          {preFirePlanFormUrl
+            ? <button className="secondary" onClick={() => window.open(preFirePlanFormUrl, "_blank", "noopener,noreferrer")?.focus?.()}><ExternalLink size={16} /> New Plan</button>
+            : <span className="module-chip">No form linked for this department.</span>}
           {form.id && <button className="secondary" onClick={() => removePlan(form)}>Remove</button>}
         </div>
       </section>
@@ -2825,7 +2835,7 @@ function PreFirePlansDatabase() {
 
 function HoseTestingPage() {
   const hoseInventory = useFirebaseList("hoseInventory", defaultHoseInventory);
-  const [records, setRecords] = useState(() => readLocalJson("hlfd_hose_tests_v1", []));
+  const [records, setRecords] = useState(() => readHoseTestsOnDevice());
   const [hoseSizeFilter, setHoseSizeFilter] = useState("All");
   const [apparatusFilter, setApparatusFilter] = useState("All");
   const [openApparatus, setOpenApparatus] = useState({});
@@ -2911,7 +2921,7 @@ function HoseTestingPage() {
     loadTenantHydrantCollection(hydrantDepartmentId, "hoseTests", [])
       .then((cloudRecords) => {
         if (!mounted) return;
-        setRecords(mergeRecords(readLocalJson("hlfd_hose_tests_v1", []), cloudRecords));
+        setRecords(mergeRecords(readHoseTestsOnDevice(), cloudRecords));
       })
       .catch(() => {});
     return () => { mounted = false; };
@@ -2985,7 +2995,7 @@ function HoseTestingPage() {
     });
     const next = [...newRecords, ...records];
     setRecords(next);
-    writeLocalJson("hlfd_hose_tests_v1", next);
+    writeLocalJson("hoseTests", next);
     await Promise.all(newRecords.map((record) => saveTenantHydrantCollectionRecord(hydrantDepartmentId, "hoseTests", firebaseDocId(record.id), record).catch(() => null)));
     setSelectedHoses([]);
     setForm({ hoseId: "", apparatus: "", diameter: form.diameter, length: form.length, pressure: form.pressure, result: "Passed", testedBy: form.testedBy, notes: "" });
@@ -3307,11 +3317,29 @@ function FireFormsPage({ requestedView = "", setTab, setFireFormsView }) {
   );
 }
 
-function InspectionDivisionPage({ setTab }) {
+function InspectionDivisionPage({ setTab, setFireFormsView, inPlatform = false }) {
   const path = window.location.pathname.toLowerCase();
-  const initialPopup = path.includes("fire-inspection-form") ? "inspection" : null;
+  const initialPopup = !inPlatform && path.includes("fire-inspection-form") ? "inspection" : null;
   const [popup, setPopup] = useState(initialPopup);
-  const inspectionFormUrl = "https://form.jotform.com/260886407564063";
+  const { inspectionFormUrl } = resolveFieldAppForms(hydrantProfile);
+
+  // Inside the platform the tools switch tabs; the standalone app uses its own paths.
+  function openPreFirePlans() {
+    if (inPlatform && setTab) {
+      setFireFormsView?.("plans");
+      setTab("fireForms");
+      return;
+    }
+    window.location.href = "/pre-fire-plans";
+  }
+
+  function openFireCodes() {
+    if (inPlatform && setTab) {
+      setTab("fireCodes");
+      return;
+    }
+    window.location.href = "/inspection-division/codes";
+  }
 
   return (
     <section className="module-page department-module inspection-division-page">
@@ -3325,19 +3353,19 @@ function InspectionDivisionPage({ setTab }) {
             <strong>Forms</strong>
             <button className="inspection-division-card" onClick={() => setPopup("inspection")}>
               <ClipboardCheck size={24} />
-              <span><b>Fire Inspection Form</b><em>Open</em></span>
+              <span><b>Fire Inspection Form</b><em>{inspectionFormUrl ? "Open" : "No form linked for this department."}</em></span>
             </button>
           </section>
           <section className="inspection-card-group">
             <strong>Pre-Fire Plans</strong>
-            <button className="inspection-division-card" onClick={() => { window.location.href = "/pre-fire-plans"; }}>
+            <button className="inspection-division-card" onClick={openPreFirePlans}>
               <ClipboardList size={24} />
               <span><b>Pre-Fire Plans</b><em>Search and upload plans by address</em></span>
             </button>
           </section>
           <section className="inspection-card-group">
             <strong>Field Tools</strong>
-            <button className="inspection-division-card" onClick={() => { window.location.href = "/inspection-division/codes"; }}>
+            <button className="inspection-division-card" onClick={openFireCodes}>
               <ShieldCheck size={24} />
               <span><b>Fire Codes & Regulations</b><em>Browse</em></span>
             </button>
@@ -3355,12 +3383,16 @@ function InspectionDivisionPage({ setTab }) {
               <span>Fire Inspection Form</span>
               <button className="icon-close" onClick={() => setPopup(null)}>Close</button>
             </div>
-            <div className="inspection-form-frame-wrap">
-              <iframe className="inspection-form-frame" src={inspectionFormUrl} title="Fire Inspection Form" allowFullScreen />
-            </div>
+            {inspectionFormUrl ? (
+              <div className="inspection-form-frame-wrap">
+                <iframe className="inspection-form-frame" src={inspectionFormUrl} title="Fire Inspection Form" allowFullScreen />
+              </div>
+            ) : (
+              <p className="empty">No form linked for this department. An administrator can add the department's inspection form link.</p>
+            )}
             <div className="code-popup-actions">
               <button className="secondary" onClick={() => setPopup(null)}>Done</button>
-              <button className="primary" onClick={() => window.open(inspectionFormUrl, "_blank", "noopener,noreferrer")?.focus?.()}><ExternalLink size={16} /> Source</button>
+              {inspectionFormUrl && <button className="primary" onClick={() => window.open(inspectionFormUrl, "_blank", "noopener,noreferrer")?.focus?.()}><ExternalLink size={16} /> Source</button>}
             </div>
           </article>
         </div>
@@ -3593,11 +3625,11 @@ function FireCodesPage() {
     if (code.sourceKind === "PDF source" && code.sourceFile) {
       return new URL(`${import.meta.env.BASE_URL}documents/codes/${encodeURIComponent(code.sourceFile)}`, window.location.origin).toString();
     }
+    // Chapter documents only when the department hosts its own copies.
+    const documentBase = resolveFireCodeDocumentBase(hydrantProfile);
     const pdfSource = fireCodePdfUrls[code.chapter];
-    if (pdfSource) return `${fireCodeAssetBase}${pdfSource}`;
-    const source = new URL("/inspection-division/codes", fireCodeAssetBase);
-    source.searchParams.set("section", code.section);
-    return source.toString();
+    if (documentBase && pdfSource) return `${documentBase}${encodeURI(pdfSource)}`;
+    return "";
   }
 
   function sourceLabel(code) {
@@ -3605,8 +3637,8 @@ function FireCodesPage() {
     if (code.sourceKind === "Word document") return code.sourceFile || "2024 IFC Word source";
     if (code.sourceKind === "PDF source" && code.sourceFile) return code.sourceFile;
     const pdfPath = fireCodePdfUrls[code.chapter];
-    if (pdfPath) return `Chapter ${code.chapter} source`;
-    return "Reference app source";
+    if (pdfPath && resolveFireCodeDocumentBase(hydrantProfile)) return `Chapter ${code.chapter} source`;
+    return "2024 IFC (up.codes)";
   }
 
   function codeBody(code) {
@@ -3719,7 +3751,9 @@ function FireCodesPage() {
               </div>
             </section>
             <div className="resource-actions">
-              <a className="primary" href={codeSourceUrl(selected)} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} /> Open Source</a>
+              {codeSourceUrl(selected)
+                ? <a className="primary" href={codeSourceUrl(selected)} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} /> Open Source</a>
+                : <a className="primary" href={upCodesBase} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} /> View 2024 IFC (up.codes)</a>}
             </div>
           </article>
         </div>
@@ -3796,6 +3830,7 @@ function AppHome({ setTab }) {
 }
 
 function ImportantNumbersPage() {
+  const importantNumbers = resolveImportantNumbers(hydrantProfile);
   return (
     <section className="module-page department-module">
       <div className="module-card">
@@ -3803,6 +3838,9 @@ function ImportantNumbersPage() {
           <strong>Important Numbers</strong>
           <span>Tap a number to call city support, vendors, dispatch, and department resources.</span>
         </div>
+        {importantNumbers.length === 0 && (
+          <p className="empty" style={{ padding: 16 }}>No numbers yet. A department administrator can add the department's call list.</p>
+        )}
         <div className="important-number-page">
           {importantNumbers.map((contact) => (
             <section key={contact.name} className="important-number-card">
@@ -3852,8 +3890,14 @@ function FireQuickTabs({ active = "", setTab, setFireFormsView }) {
   );
 }
 
+/**
+ * mode:
+ *   (default)   standalone field app (own side nav) or, with `embedded`, the RMS hydrant tabs.
+ *   "fieldApp"  the full tool hub inside the RMS (RMS keeps its own sidebar; tabs live in state).
+ */
 export default function HydrantTestingPage({
   embedded = false,
+  mode = "",
   initialTab = "dashboard",
   departmentId = "",
   profile = {},
@@ -3888,11 +3932,13 @@ export default function HydrantTestingPage({
   const [selected, setSelected] = useState(null);
   const [detailHydrant, setDetailHydrant] = useState(null);
   const [editorHydrant, setEditorHydrant] = useState(null);
-  const [tab, setTab] = useState(() => initialTab || resolveInitialHydrantTab({ embedded, preferDashboard: !embedded }));
+  const fieldAppMode = mode === "fieldApp";
+  const [tab, setTab] = useState(() => (fieldAppMode ? "app" : initialTab || resolveInitialHydrantTab({ embedded, preferDashboard: !embedded })));
   const [fireFormsView, setFireFormsView] = useState(() => window.location.pathname.toLowerCase().startsWith("/pre-fire-plans") ? "plans" : "forms");
 
   function selectHydrantTab(nextTab) {
     setTab(nextTab);
+    if (fieldAppMode) return;
     if (embedded) {
       window.location.hash = `#${nextTab}`;
       return;
@@ -3904,6 +3950,7 @@ export default function HydrantTestingPage({
   }
 
   useEffect(() => {
+    if (fieldAppMode) return undefined;
     function syncTabFromNavigation() {
       const nextTab = resolveInitialHydrantTab({ embedded, preferDashboard: !embedded });
       setTab((current) => (current === nextTab ? current : nextTab));
@@ -3914,7 +3961,7 @@ export default function HydrantTestingPage({
       window.removeEventListener("hashchange", syncTabFromNavigation);
       window.removeEventListener("popstate", syncTabFromNavigation);
     };
-  }, [embedded]);
+  }, [embedded, fieldAppMode]);
   const [toastState, setToastState] = useState(null);
   const toast = toastState?.text || "";
   const toastWarn = toastState?.tone === "warn";
@@ -4041,6 +4088,56 @@ export default function HydrantTestingPage({
     );
   }
 
+  if (fieldAppMode) {
+    const fieldTabs = [
+      ["app", "Home", Home],
+      ["dashboard", "Hydrants", Droplets],
+      ["ems", "EMS", Activity],
+      ["fireForms", "Fire", Flame],
+      ["inspectionDivision", "Inspection Division", ClipboardCheck],
+      ["investigations", "Investigations", Search],
+      ["importantNumbers", "Important Numbers", Mail],
+      ["fireCodes", "Fire Codes", ShieldCheck],
+    ];
+    const isActiveFieldTab = (id) => (id === "dashboard" ? isHydrantToolTab : tab === id);
+    return (
+      <div className="hydrant-module-root hydrant-rms-theme field-app-root">
+        <datalist id="tested-by-options">{crewUserOptions.map((name) => <option key={name} value={name} />)}</datalist>
+        {toast && <div className={toastWarn ? "toast toast-warn" : "toast"} role={toastWarn ? "alert" : "status"}>{toastWarn ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {toast}</div>}
+        {/* One header block + one body keeps the root's two-row grid layout. */}
+        <div className="field-app-nav">
+          <nav className="hydrant-work-tabs field-app-tabs" aria-label="Field App tools">
+            {fieldTabs.map(([id, label, Icon]) => (
+              <button key={id} className={isActiveFieldTab(id) ? "active" : ""} onClick={() => selectHydrantTab(id)}><Icon size={16} /> {label}</button>
+            ))}
+          </nav>
+          {isHydrantToolTab && (
+            <nav className="hydrant-work-tabs" aria-label="Hydrant tools">
+              {hydrantTabs.map(([id, label, Icon]) => (
+                <button key={id} className={tab === id ? "active" : ""} onClick={() => selectHydrantTab(id)}><Icon size={16} /> {label}</button>
+              ))}
+            </nav>
+          )}
+        </div>
+        {tab === "app" ? (
+          <section className="page-body field-app-home"><AppHome setTab={selectHydrantTab} /></section>
+        ) : (
+          <section className="page-body">
+            {hydrantPageBody}
+            {tab === "ems" && <EmsProtocolsPage />}
+            {tab === "fireForms" && <FireFormsPage requestedView={fireFormsView} setTab={selectHydrantTab} setFireFormsView={setFireFormsView} />}
+            {tab === "inspectionDivision" && <InspectionDivisionPage inPlatform setTab={selectHydrantTab} setFireFormsView={setFireFormsView} />}
+            {tab === "investigations" && <InvestigationsPage />}
+            {tab === "importantNumbers" && <ImportantNumbersPage />}
+            {tab === "fireCodes" && <FireCodesPage />}
+          </section>
+        )}
+        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={handleReportDamage} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
+        {editorHydrant && <HydrantEditorModal hydrant={editorHydrant} crew={crew} onClose={() => setEditorHydrant(null)} onSaved={saved} />}
+      </div>
+    );
+  }
+
   if (tab === "app") {
     return (
       <main className="command-app-root">
@@ -4066,7 +4163,7 @@ export default function HydrantTestingPage({
           <button className={tab === "importantNumbers" ? "active" : ""} onClick={() => setTab("importantNumbers")}><Mail size={16} /> Important Numbers</button>
           <button className={tab === "settings" ? "active" : ""} onClick={() => setTab("settings")}><Settings size={16} /> Settings</button>
         </nav>
-        <div className="side-user"><span>HLFD</span><div><strong>{crew.tested_by || "Field User"}</strong><em>{crew.shift || "No Shift Set"}</em></div></div>
+        <div className="side-user"><span>{departmentInitials(profile)}</span><div><strong>{crew.tested_by || "Field User"}</strong><em>{crew.shift || "No Shift Set"}</em></div></div>
       </aside>
       <section className="main-stage">
         <nav className="ipad-tabs">

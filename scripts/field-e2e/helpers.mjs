@@ -30,3 +30,20 @@ window.__f = {
 };
 true;
 `;
+
+/**
+ * These tests write into the demo department (the only sandbox). Afterwards, press
+ * the demo banner's "Reset demo data" so the demo is back to its sample data and
+ * no test records (failed checks, test defects, test drafts) are left for visitors.
+ */
+export async function resetDemoAfterRun(page, base) {
+  await page.goto(`${base}/forge-demo`);
+  await page.waitFor(`[...document.querySelectorAll(".demo-mode-banner button")].some((b) => b.textContent.includes("Reset demo data"))`, { timeout: 60000, label: "reset button" });
+  await page.eval(`(() => {
+    window.confirm = () => true;
+    [...document.querySelectorAll(".demo-mode-banner button")].find((b) => b.textContent.includes("Reset demo data")).click();
+    return true;
+  })()`);
+  // The page reloads when the reset finishes.
+  await page.waitFor(`!document.body.innerText.includes("Resetting…") && !!document.querySelector(".demo-mode-banner")`, { timeout: 120000, label: "demo reset" });
+}

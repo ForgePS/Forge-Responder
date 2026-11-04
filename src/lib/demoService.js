@@ -7,6 +7,7 @@ import { ensureDepartmentRegistry } from "./platformService.js";
 import { ensureDefaultRoles } from "./roleService.js";
 import { seedInternalEmailsForScope } from "./internalEmailService.js";
 import { refreshDemoPreventionRecords } from "./demoPrevention.js";
+import { refreshDemoPreventionExtras } from "./demoPreventionExtras.js";
 import { refreshDemoFleetRecords } from "./demoFleet.js";
 import { refreshDemoHydrantRecords } from "./demoHydrants.js";
 import { sanitizeItemsForFirestore } from "./firestoreSanitize.js";
@@ -98,7 +99,10 @@ export async function resetDemoData(user) {
   await Promise.all([
     bootstrapDemoLists(user.uid),
     seedInternalEmailsForScope(DEMO_DEPARTMENT_ID, user),
-    refreshDemoPreventionRecords().catch((error) => console.warn("Demo inspections refresh skipped", error)),
+    // Preplans and systems link to the buildings, so they go after the buildings are refreshed.
+    refreshDemoPreventionRecords()
+      .then(() => refreshDemoPreventionExtras())
+      .catch((error) => console.warn("Demo prevention refresh skipped", error)),
     refreshDemoFleetRecords().catch((error) => console.warn("Demo fleet refresh skipped", error)),
     refreshDemoHydrantRecords().catch((error) => console.warn("Demo hydrant refresh skipped", error)),
   ]);

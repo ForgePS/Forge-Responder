@@ -79,6 +79,7 @@ const navPermissionMap = {
   Preplans: "viewPreplans",
   Hydrants: "viewHydrants",
   "Hydrant Overview": "viewHydrants",
+  "Field App": "viewHydrants",
   "Damage Reports": "viewHydrantDamageReports",
   "Open Damage Reports": "viewHydrantDamageReports",
   "Awaiting Water Company": "viewHydrantDamageReports",

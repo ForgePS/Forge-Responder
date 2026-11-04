@@ -50,6 +50,7 @@ import {
   startInspection,
 } from "../lib/inspections/index.js";
 import { friendlyError } from "../lib/friendlyError.js";
+import { labelFromKey } from "../lib/labelFromKey.js";
 
 // Stored lowercase ("normal"); shown capitalized.
 function formatPriority(value) {
@@ -788,7 +789,7 @@ function InspectionsShellPage({
                           <div className="inspection-chart-bars">
                             {(rows || []).slice(0, 6).map((row) => (
                               <div key={row.key} className="inspection-chart-row">
-                                <span>{row.key}</span>
+                                <span>{row.label || labelFromKey(row.key)}</span>
                                 <div className="inspection-chart-track">
                                   <div style={{ width: `${Math.max(4, ((Number(row.count) || 0) / max) * 100)}%` }} />
                                 </div>

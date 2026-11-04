@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { launchChrome, openPage, sleep } from "./cdp.mjs";
-import { HELPERS } from "./helpers.mjs";
+import { HELPERS, resetDemoAfterRun } from "./helpers.mjs";
 
 const BASE = process.argv[2] || "http://localhost:4180";
 const SHOTS = process.argv[3] || join(tmpdir(), "forge-field-e2e-v2");
@@ -302,6 +302,8 @@ async function main() {
     console.log(page.console.filter((line) => !/WebChannel|Synced departments/.test(line)).slice(-20).join("\n"));
     process.exitCode = 1;
   } finally {
+    // Put the demo back so test records never linger for visitors.
+    await resetDemoAfterRun(page, BASE).catch((error) => console.warn("Demo reset after the run failed:", error.message));
     console.log(JSON.stringify(results, null, 2));
     chrome.proc.kill();
   }

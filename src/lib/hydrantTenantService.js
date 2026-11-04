@@ -11,6 +11,7 @@ export function hydrantLocalKeys(departmentId = "") {
     preFirePlans: `${prefix}_pre_fire_plans_v1`,
     hydrantInspections: `${prefix}_hydrant_inspections_v1`,
     hydrantFlowTests: `${prefix}_hydrant_flow_tests_v1`,
+    hoseTests: `${prefix}_hose_tests_v1`,
     crewSession: `${prefix}-hydrant-crew-session`,
   };
 }

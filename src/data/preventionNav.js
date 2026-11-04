@@ -17,6 +17,7 @@ import {
   Map,
   Settings2,
   ShieldCheck,
+  Tablet,
   UserRound,
   Wifi,
   Wrench,
@@ -105,6 +106,7 @@ export const PREVENTION_NAV_TREE = [
     icon: Activity,
     children: [
       { name: "Hydrant Overview", icon: Activity },
+      { name: "Field App", icon: Tablet },
       {
         id: "prevention-damage-reports",
         label: "Damage Reports",

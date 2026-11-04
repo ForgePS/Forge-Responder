@@ -56,7 +56,7 @@ function ChartBars({ title, rows = [], valueKey = "count" }) {
           <div className="inspection-chart-bars">
             {rows.slice(0, 8).map((row) => {
               const value = Number(row[valueKey]) || 0;
-              const label = row.key || row.status || row.type || row.group || "—";
+              const label = row.label || labelFromKey(row.key || row.status || row.type || row.group || "") || "—";
               return (
                 <div key={label} className="inspection-chart-row">
                   <span>{label}</span>

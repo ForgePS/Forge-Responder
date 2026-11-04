@@ -12,17 +12,20 @@ import { defaultPlatformConfig } from "../data/platformBrand.js";
 import { demoDepartmentProfile } from "../data/demoDepartment.js";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { DEMO_PERSONAS, getDemoPersona, setDemoPersona } from "../lib/demoPersona.js";
 
 export default function DemoEntryPage() {
   const { signIn, signOut, user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const { email, password } = getDemoCredentials();
+  const [personaId, setPersonaId] = useState(() => getDemoPersona().id);
 
   async function launchDemo() {
     setSubmitting(true);
     setError("");
     activateDemoMode();
+    setDemoPersona(personaId);
 
     try {
       const usingDemoAccount = user?.email?.toLowerCase() === email.toLowerCase();
@@ -75,6 +78,26 @@ export default function DemoEntryPage() {
           <li>Full RMS modules enabled for walkthroughs and classes</li>
           <li>Share this link: <code>{resolvePublicDemoUrl()}</code></li>
         </ul>
+
+        <fieldset className="demo-persona-picker">
+          <legend>View the demo as</legend>
+          <div className="demo-persona-options">
+            {DEMO_PERSONAS.map((persona) => (
+              <label key={persona.id} className={`demo-persona-option${personaId === persona.id ? " is-selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="demo-persona"
+                  value={persona.id}
+                  checked={personaId === persona.id}
+                  onChange={() => setPersonaId(persona.id)}
+                />
+                <strong>{persona.label}</strong>
+                <span>{persona.name}</span>
+                <small>{persona.description}</small>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         {error && <div className="auth-error">{error}</div>}
 

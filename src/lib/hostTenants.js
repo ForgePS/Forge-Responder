@@ -9,7 +9,8 @@
  */
 const HOST_TENANTS = [
   // Horn Lake Fire Department hydrant program, e.g. horn-lake-fire.web.app
-  { hostIncludes: "horn-lake-fire", departmentId: "horn-lake-fd", hydrantApp: true },
+  // hydrantReportPrefix: their hydrants are labeled "HL 123", so reports keep that prefix.
+  { hostIncludes: "horn-lake-fire", departmentId: "horn-lake-fd", hydrantApp: true, hydrantReportPrefix: "HL" },
 ];
 
 function normalizeHost(hostname) {
@@ -23,6 +24,11 @@ export function resolveHostTenant(
   const host = normalizeHost(hostname);
   if (!host) return null;
   return HOST_TENANTS.find((entry) => host.includes(entry.hostIncludes)) || null;
+}
+
+/** Prefix a department prints before hydrant IDs on reports ("HL" → "HL 123"), or "". */
+export function hydrantReportPrefixFor(departmentId = "") {
+  return HOST_TENANTS.find((entry) => entry.departmentId === departmentId)?.hydrantReportPrefix || "";
 }
 
 /** Department id locked by the current hostname, or "". */
