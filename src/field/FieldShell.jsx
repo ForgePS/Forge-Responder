@@ -135,6 +135,9 @@ export default function FieldShell({ snapshot, online, accessLive }) {
   const [sync, setSync] = useState(getSyncState);
   const [toasts, setToasts] = useState([]);
   const [crew, setCrewState] = useState(null);
+  // The saved crew session loads in the background; screens wait for it before
+  // starting a new one, so a saved choice is never overwritten.
+  const [crewLoaded, setCrewLoaded] = useState(false);
   const [updateReady, setUpdateReady] = useState(false);
   const refRef = useRef(refData);
   const capsRef = useRef(caps);
@@ -195,7 +198,11 @@ export default function FieldShell({ snapshot, online, accessLive }) {
 
   /* ------------------------------ reference data ------------------------------ */
   useEffect(() => {
-    loadCrewSession(snapshot.departmentId).then(setCrewState).catch(() => null);
+    setCrewLoaded(false);
+    loadCrewSession(snapshot.departmentId)
+      .then(setCrewState)
+      .catch(() => null)
+      .finally(() => setCrewLoaded(true));
   }, [snapshot.departmentId]);
 
   const setCrew = useCallback(async (session) => {
@@ -288,6 +295,7 @@ export default function FieldShell({ snapshot, online, accessLive }) {
     config,
     rulesFor,
     crew,
+    crewLoaded,
     setCrew,
     online,
     refData,
@@ -303,7 +311,7 @@ export default function FieldShell({ snapshot, online, accessLive }) {
     back,
     toast,
     actor,
-  }), [snapshot, caps, config, rulesFor, crew, setCrew, online, refData, refLoading, refError, refresh, records, counts, recent, sync, navigate, back, toast, actor]);
+  }), [snapshot, caps, config, rulesFor, crew, crewLoaded, setCrew, online, refData, refLoading, refError, refresh, records, counts, recent, sync, navigate, back, toast, actor]);
 
   const isTab = TAB_ROOTS.has(route.name);
 

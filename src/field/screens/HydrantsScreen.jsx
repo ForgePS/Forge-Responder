@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertOctagon, ChevronRight, Droplets, Gauge, List, LocateFixed, Loader2, Map as MapIcon, MapPin, Pencil, Search, TriangleAlert, UserRound, X,
 } from "lucide-react";
@@ -20,34 +20,52 @@ const STATUS_FILTERS = [
   { value: "oos", label: "Out of service" },
 ];
 
-/** Crew session panel: who, shift, date and district (8 hours), like the desktop hydrant app. */
+/**
+ * Crew session: who is testing, which shift and date (8 hours), like the desktop
+ * hydrant app. When the shift and name are already known it starts by itself;
+ * once set it's one line with Change, not a form on every screen.
+ */
 export function CrewSessionPanel({ compact = false }) {
-  const { crew, setCrew, refData, snapshot, recent } = useField();
-  const hydrants = refItems(refData, "hydrants");
+  const { crew, crewLoaded, setCrew, refData, snapshot, recent } = useField();
   const personnel = refItems(refData, "personnel");
-  const [editing, setEditing] = useState(!isCrewSessionActive(crew));
+  const active = isCrewSessionActive(crew);
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => ({
-    testedBy: crew?.testedBy || snapshot.displayName,
+    testedBy: crew?.testedBy || snapshot.displayName || "",
     shift: crew?.shift || recent.shift || snapshot.assignedShift || "",
     date: localDate(),
-    district: crew?.district || "",
   }));
   const [sheet, setSheet] = useState("");
-  const districts = districtCounts(hydrants).map((row) => row.district);
-  const active = isCrewSessionActive(crew);
+  const autoStartedRef = useRef(false);
+  const [autoFailed, setAutoFailed] = useState(false);
+
+  // Known shift and name (this person, their usual or last shift): start the
+  // shift instead of waiting for a tap. Waits for any saved shift to load first.
+  const knownShift = recent.shift || snapshot.assignedShift || "";
+  const knownName = snapshot.displayName || "";
+  useEffect(() => {
+    if (!crewLoaded || active || editing || autoStartedRef.current || !knownShift || !knownName) return;
+    autoStartedRef.current = true;
+    setCrew({ testedBy: knownName, shift: knownShift, date: localDate() }).catch(() => setAutoFailed(true));
+  }, [crewLoaded, active, editing, knownShift, knownName, setCrew]);
 
   if (active && !editing) {
     return (
-      <button type="button" className="fa-crew" onClick={() => setEditing(true)}>
+      <button type="button" className={cx("fa-crew", compact && "is-compact")} onClick={() => {
+        setDraft({ testedBy: crew.testedBy, shift: crew.shift, date: crew.date || localDate() });
+        setEditing(true);
+      }}>
         <UserRound size={20} />
         <span>
           <strong>{crew.testedBy} · {crew.shift}</strong>
-          <small>{crew.district ? `District ${crew.district} · ` : "All districts · "}until {new Date(crew.expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small>
+          <small>Your shift · until {new Date(crew.expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small>
         </span>
         <span className="fa-link">Change</span>
       </button>
     );
   }
+  // Waiting for the saved shift or the automatic start (a moment).
+  if (!active && !editing && !autoFailed && (!crewLoaded || (knownShift && knownName))) return null;
   return (
     <Section title="Set your shift" hint={compact ? "" : "Used on every inspection and flow test for the next 8 hours."}>
       <div className="fa-grid-2">
@@ -61,12 +79,9 @@ export function CrewSessionPanel({ compact = false }) {
       <Field label="Tested by" required>
         <PickerButton value={draft.testedBy} onClick={() => setSheet("by")} />
       </Field>
-      <Field label="District">
-        <Segmented value={draft.district} options={[{ value: "", label: "All" }, ...districts.map((value) => ({ value, label: value }))]} onChange={(value) => setDraft((current) => ({ ...current, district: value }))} columns={Math.min(4, districts.length + 1)} />
-      </Field>
       <div className="fa-inline-actions">
         <button type="button" className="fa-btn fa-btn-primary fa-btn-grow" disabled={!draft.shift || !draft.testedBy} onClick={async () => { await setCrew(draft); setEditing(false); }}>
-          Set shift
+          {active ? "Save" : "Set shift"}
         </button>
         {active ? <button type="button" className="fa-btn fa-btn-ghost" onClick={() => setEditing(false)}>Cancel</button> : null}
       </div>
@@ -147,7 +162,7 @@ function HydrantDetail({ hydrant, onClose }) {
         <div><span>Provider</span><strong>{hydrant.provider || hydrant.water_assoc || "—"}</strong></div>
         <div><span>This year</span><strong>{checkedLabel(hydrant)}</strong></div>
       </div>
-      {needsSession && caps.hydrants && !privateHydrant ? <CrewSessionPanel compact /> : null}
+      {caps.hydrants && !privateHydrant ? <CrewSessionPanel compact /> : null}
       <div className="fa-action-list">
         {caps.hydrants && !privateHydrant ? (
           <button type="button" className="fa-action tone-blue" disabled={needsSession} onClick={() => navigate("hydrantInspection", { hydrantKey: key })}>
@@ -163,7 +178,7 @@ function HydrantDetail({ hydrant, onClose }) {
             <ChevronRight size={22} />
           </button>
         ) : null}
-        {caps.hydrants ? (
+        {caps.hydrantEdit ? (
           <button type="button" className="fa-action tone-slate" disabled={needsSession} onClick={() => navigate("hydrantEdit", { hydrantKey: key })}>
             <Pencil size={26} />
             <span><strong>Edit hydrant info</strong><small>{needsSession ? "Set your shift first" : "Status, district, GPS, provider, notes"}</small></span>
@@ -183,10 +198,10 @@ function HydrantDetail({ hydrant, onClose }) {
 }
 
 export default function HydrantsScreen({ params = {} }) {
-  const { refData, back, navigate, crew, caps } = useField();
+  const { refData, back, navigate, caps } = useField();
   const hydrants = refItems(refData, "hydrants");
   const [query, setQuery] = useState("");
-  const [district, setDistrict] = useState(() => crew?.district || "all");
+  const [district, setDistrict] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [view, setView] = useState("list");
   const [position, setPosition] = useState(null);
