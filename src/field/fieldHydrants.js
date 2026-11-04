@@ -50,7 +50,11 @@ export function searchHydrants(hydrants = [], query = "", position = null, limit
   let rows = hydrants;
   if (q) {
     rows = hydrants.filter((hydrant) => {
-      const text = `${hydrant.hydrant_id || ""} ${hydrant.official_hydrant_id || ""} ${hydrant.location_id || ""} ${hydrantAddress(hydrant)}`.toLowerCase();
+      // Same fields as the desktop hydrant search.
+      const text = [
+        hydrant.hydrant_id, hydrant.official_hydrant_id, hydrant.location_id, hydrantAddress(hydrant), hydrant.location,
+        hydrant.district, hydrant.subdivision, hydrant.water_assoc, hydrant.provider, hydrant.fire_response_area,
+      ].map((value) => String(value || "")).join(" ").toLowerCase();
       if (text.includes(q)) return true;
       if (qDigits.length >= 2) {
         return [hydrant.hydrant_id, hydrant.official_hydrant_id].some((value) => String(value || "").replace(/\D/g, "").includes(qDigits));
@@ -143,3 +147,14 @@ export function hydrantSummary(hydrants = []) {
     private: hydrants.filter(isPrivateHydrant).length,
   };
 }
+
+/** Map colour key (same as the desktop hydrant map). */
+export const MAP_LEGEND = [
+  { label: "Class AA", color: "#2563eb" },
+  { label: "Class A", color: "#16a34a" },
+  { label: "Class B", color: "#f97316" },
+  { label: "Class C", color: "#dc2626" },
+  { label: "Unknown", color: "#64748b" },
+  { label: "Private", color: "#5b21b6" },
+  { label: "OOS", color: "#050505" },
+];

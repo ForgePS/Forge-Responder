@@ -17,7 +17,7 @@ function formatBytes(bytes) {
 }
 
 export default function SettingsScreen() {
-  const { snapshot, refData, refresh, refLoading, refError, online, counts } = useField();
+  const { snapshot, refData, refresh, refLoading, refError, online, counts, navigate } = useField();
   const { signOut } = useAuth();
   const [theme, setTheme] = useState(readThemePref);
   const [offlineReady, setOfflineReady] = useState(null);
@@ -42,7 +42,7 @@ export default function SettingsScreen() {
   ];
 
   return (
-    <Screen title="This device">
+    <Screen title="This device" onBack={() => navigate("home", {}, { replace: true })}>
       <Section title="Offline">
         <div className="fa-kv">
           <div>
