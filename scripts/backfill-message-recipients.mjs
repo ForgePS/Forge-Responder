@@ -25,13 +25,22 @@ const db = getFirestore();
 async function main() {
   console.log(`\nProject ${PROJECT_ID}: ${APPLY ? "APPLY" : "dry run (no changes)"}\n`);
   const total = { updated: 0, unchanged: 0 };
+  const skipped = [];
   for (const dept of await db.collection("departments").listDocuments()) {
+    // Archived or disabled departments (old test or legacy ones) are left alone.
+    const registry = await db.doc(`platformDepartments/${dept.id}`).get();
+    const status = registry.exists ? registry.get("status") : "";
+    if (["archived", "disabled"].includes(status)) {
+      skipped.push(`${dept.id} (${status})`);
+      continue;
+    }
     const counts = await backfillDepartmentMessages(db, dept.id, { dryRun: !APPLY });
     if (!counts.updated && !counts.unchanged) continue;
     console.log(`${dept.id}: ${APPLY ? "updated" : "would update"} ${counts.updated}, already current ${counts.unchanged}`);
     total.updated += counts.updated;
     total.unchanged += counts.unchanged;
   }
+  if (skipped.length) console.log(`\nSkipped (archived or disabled): ${skipped.join(", ")}`);
   console.log(`\nTotal: ${total.updated} to update, ${total.unchanged} current.`);
   if (!APPLY) console.log("Dry run only. Add --apply to make the change.\n");
 }
