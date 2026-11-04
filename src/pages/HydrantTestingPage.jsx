@@ -396,8 +396,10 @@ const fireCodeSectionNotes = {
   "Appendix H": ["HMMP/HMIS information tells reviewers what hazardous materials are present, where they are, and in what quantities.", "Needed details include material identity, hazard class, amounts, storage/use locations, containers, control areas, and emergency contacts."]
 };
 
+/** Today on this device (local time). UTC would already be tomorrow on US evenings. */
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 function isoDateOffset(days = 0, base = new Date()) {
@@ -1904,8 +1906,8 @@ function Reports({
   const [district, setDistrict] = useState("All Districts");
   const [shift, setShift] = useState("");
   const [user, setUser] = useState("");
-  const [dateFrom, setDateFrom] = useState(crew.date || today());
-  const [dateTo, setDateTo] = useState(crew.date || today());
+  const [dateFrom, setDateFrom] = useState(() => startOfMonthIso());
+  const [dateTo, setDateTo] = useState(() => today());
   const [selectedColumns, setSelectedColumns] = useState(
     () => HYDRANT_DETAIL_EXPORT_COLUMNS.filter((column) => column.default).map((column) => column.id)
   );
@@ -2160,22 +2162,44 @@ function Reports({
     }
   }
 
-  return (
-    <section className="form-panel reports">
-      <h2>Reports</h2>
+  const datePresets = [
+    { id: "today", label: "Today", from: today(), to: today() },
+    { id: "week", label: "This week", from: startOfWeekIso(), to: today() },
+    { id: "month", label: "This month", from: startOfMonthIso(), to: today() },
+    { id: "year", label: "Year to date", from: startOfYearIso(), to: today() },
+    { id: "all", label: "All dates", from: "", to: "" },
+  ];
+  const activePreset = datePresets.find((preset) => preset.from === dateFrom && preset.to === dateTo)?.id || "";
+  const columnCount = HYDRANT_DETAIL_EXPORT_COLUMNS.length;
 
-      <div className="detail-export-panel">
-        <div className="daily-report-head">
+  return (
+    <section className="form-panel reports hydrant-reports">
+      <h2>Reports</h2>
+      {message && <p className="status-line hydrant-reports-message" role="status">{message}</p>}
+
+      <div className="hydrant-reports-card">
+        <header className="hydrant-reports-card-head">
           <div>
-            <strong>Inspection & Flow Test Detail Export</strong>
-            <span>Full checklist and flow metrics, filterable by water department, district, shift, and user.</span>
+            <strong>Inspection &amp; flow test records</strong>
+            <span>Find, print or download inspections and flow tests. Filter by date, water department, district, shift or person.</span>
           </div>
+        </header>
+
+        <div className="hydrant-reports-types" role="group" aria-label="Record types">
+          <label className={`hydrant-reports-chip${includeInspections ? " is-on" : ""}`}>
+            <input type="checkbox" checked={includeInspections} onChange={(event) => setIncludeInspections(event.target.checked)} />
+            Inspections
+          </label>
+          <label className={`hydrant-reports-chip${includeFlowTests ? " is-on" : ""}`}>
+            <input type="checkbox" checked={includeFlowTests} onChange={(event) => setIncludeFlowTests(event.target.checked)} />
+            Flow tests
+          </label>
         </div>
 
         <div className="detail-export-filters">
           <Field label="Water department">
             <select value={waterDepartment} onChange={(event) => setWaterDepartment(event.target.value)}>
-              {waterDeptOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              {waterDeptOptions.map((option) => <option key={option} value={option}>{option === "All" ? "All water departments" : option}</option>)}
             </select>
           </Field>
           <Field label="District">
@@ -2190,29 +2214,31 @@ function Reports({
               ))}
             </select>
           </Field>
-          <Field label="User">
+          <Field label="Done by">
             <select value={user} onChange={(event) => setUser(event.target.value)}>
               {userOptions.map((option) => (
-                <option key={option || "all-users"} value={option}>{option || "All users"}</option>
+                <option key={option || "all-users"} value={option}>{option || "Everyone"}</option>
               ))}
             </select>
           </Field>
         </div>
 
-        <div className="detail-export-date-range" aria-label="Date range">
-          <div className="detail-export-date-range-head">
-            <strong>Date range</strong>
-            <span>Choose a preset or set From / To dates.</span>
+        <div className="hydrant-reports-dates" aria-label="Date range">
+          <div className="hydrant-reports-presets" role="group" aria-label="Date range presets">
+            {datePresets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className={`hydrant-reports-preset${activePreset === preset.id ? " is-active" : ""}`}
+                aria-pressed={activePreset === preset.id}
+                onClick={() => applyDateRange(preset.from, preset.to)}
+              >
+                {preset.label}
+              </button>
+            ))}
           </div>
-          <div className="detail-export-date-presets" role="group" aria-label="Date range presets">
-            <button type="button" className="button button-secondary" onClick={() => applyDateRange(today(), today())}>Today</button>
-            <button type="button" className="button button-secondary" onClick={() => applyDateRange(startOfWeekIso(), today())}>This week</button>
-            <button type="button" className="button button-secondary" onClick={() => applyDateRange(startOfMonthIso(), today())}>This month</button>
-            <button type="button" className="button button-secondary" onClick={() => applyDateRange(startOfYearIso(), today())}>Year to date</button>
-            <button type="button" className="button button-secondary" onClick={() => applyDateRange("", "")}>All dates</button>
-          </div>
-          <div className="detail-export-date-fields">
-            <Field label="From date">
+          <div className="hydrant-reports-date-fields">
+            <Field label="From">
               <input
                 type="date"
                 value={dateFrom}
@@ -2227,7 +2253,7 @@ function Reports({
                 }}
               />
             </Field>
-            <Field label="To date">
+            <Field label="To">
               <input
                 type="date"
                 value={dateTo}
@@ -2245,27 +2271,27 @@ function Reports({
           </div>
         </div>
 
-        <div className="detail-export-toggles" aria-label="Record types">
-          <label className="detail-export-check">
-            <input
-              type="checkbox"
-              checked={includeInspections}
-              onChange={(event) => setIncludeInspections(event.target.checked)}
-            />
-            Include inspections
-          </label>
-          <label className="detail-export-check">
-            <input
-              type="checkbox"
-              checked={includeFlowTests}
-              onChange={(event) => setIncludeFlowTests(event.target.checked)}
-            />
-            Include flow tests
-          </label>
+        <div className="hydrant-reports-toolbar">
+          <p className="hydrant-reports-count" aria-live="polite">
+            {detailLoading ? "Loading records…" : (
+              <>
+                <strong>{detailCounts.total}</strong> {detailCounts.total === 1 ? "record" : "records"}
+                <span> · {detailCounts.inspections} inspection{detailCounts.inspections === 1 ? "" : "s"} · {detailCounts.flowTests} flow test{detailCounts.flowTests === 1 ? "" : "s"}</span>
+              </>
+            )}
+          </p>
+          <div className="hydrant-reports-actions">
+            <button className="button" type="button" onClick={exportDetailCsv} disabled={detailLoading || !detailCounts.total}>
+              <Download size={16} /> Download CSV
+            </button>
+            <button className="button" type="button" onClick={printDetailReport} disabled={detailLoading || !detailCounts.total}>
+              <FileText size={16} /> Print / PDF
+            </button>
+          </div>
         </div>
 
         <details className="detail-export-columns">
-          <summary>Customize columns ({selectedColumns.length} selected)</summary>
+          <summary>Columns in the CSV and printout ({selectedColumns.length} of {columnCount})</summary>
           <div className="detail-export-column-grid">
             {HYDRANT_DETAIL_EXPORT_COLUMNS.map((column) => (
               <label key={column.id} className="detail-export-check">
@@ -2274,35 +2300,20 @@ function Reports({
                   checked={selectedColumns.includes(column.id)}
                   onChange={() => toggleColumn(column.id)}
                 />
-                {column.label}
+                <span>{column.label}</span>
               </label>
             ))}
           </div>
         </details>
 
-        <div className="daily-report-stats" aria-label="Detail export counts">
-          <div><span>Matching</span><strong>{detailLoading ? "…" : detailCounts.total}</strong></div>
-          <div><span>Inspections</span><strong>{detailLoading ? "…" : detailCounts.inspections}</strong></div>
-          <div><span>Flow Tests</span><strong>{detailLoading ? "…" : detailCounts.flowTests}</strong></div>
-        </div>
-
-        <div className="report-actions">
-          <button className="button" type="button" onClick={exportDetailCsv} disabled={detailLoading}>
-            <Download size={16} /> Export Detail CSV
-          </button>
-          <button className="button" type="button" onClick={printDetailReport} disabled={detailLoading}>
-            <FileText size={16} /> Print / PDF Report
-          </button>
-        </div>
-
-        <div className="daily-report-table detail-export-preview" role="table" aria-label="Detail export preview">
+        <div className="daily-report-table detail-export-preview" role="table" aria-label="Matching records">
           <div className="daily-report-row table-head" role="row">
             <span>Date</span>
             <span>Type</span>
             <span>Hydrant</span>
             <span>Water dept</span>
             <span>District</span>
-            <span>User</span>
+            <span>Done by</span>
             <span>Shift</span>
             <span>Result</span>
           </div>
@@ -2320,79 +2331,115 @@ function Reports({
               <span>{row.flow_result || row.nfpa_class || row.inspection_summary || row.status || "—"}</span>
             </div>
           )) : (
-            <div className="daily-report-empty">No matching inspection or flow-test records for these filters.</div>
+            <div className="daily-report-empty">
+              {!recordTypes.length
+                ? "Choose Inspections, Flow tests or both."
+                : activePreset !== "all"
+                  ? <>No records in this date range. <button type="button" className="link-button" onClick={() => applyDateRange("", "")}>Show all dates</button></>
+                  : "No records match these filters."}
+            </div>
           )}
           {!detailLoading && filteredDetailRows.length > 50 ? (
-            <div className="daily-report-empty">Showing first 50 of {filteredDetailRows.length} matching records. Export CSV for the full set.</div>
+            <div className="daily-report-empty">Showing the first 50 of {filteredDetailRows.length}. Download the CSV for all of them.</div>
           ) : null}
         </div>
       </div>
 
-      <hr className="detail-export-divider" />
-
-      <div className="report-actions">
-        <button className="button" onClick={exportAllHydrants}><Download size={16} /> Hydrants CSV</button>
-        <button className="button" onClick={exportDailyActivity}><Download size={16} /> Download Daily Activity</button>
-        <button className="button" onClick={exportHydrants}><Download size={16} /> Local Hydrant Edits</button>
-        <button className="button" onClick={exportRawDailyActivity}><Download size={16} /> All Activity Records ({date})</button>
-        <a className="button" href="/sample-daily-activity-report.csv"><Download size={16} /> Sample Daily Activity</a>
-      </div>
-      <div className="daily-report-head">
-        <div>
-          <strong>Daily Activity Report</strong>
-          <span>
-            {reportRows.length} hydrants done for {date}
-            {activityLoading ? " · Loading…" : activityLoadedAt ? ` · Updated ${activityLoadedAt.toLocaleTimeString()}` : ""}
-          </span>
-        </div>
-        <Field label="Report Date"><input type="date" value={date} onChange={(event) => setReportDate(event.target.value)} /></Field>
-        <button type="button" className="secondary" disabled={activityLoading} onClick={() => setActivityRefreshKey((n) => n + 1)}>Refresh</button>
-      </div>
-      {activityLoadError ? <p className="status-line hydrant-form-error" role="alert">{activityLoadError}</p> : null}
-      <div className="daily-report-stats" aria-label="Daily activity live counts">
-        <div><span>Total Done</span><strong>{activityCounts.total}</strong></div>
-        <div><span>Inspections</span><strong>{activityCounts.inspections}</strong></div>
-        <div><span>Flow Tests</span><strong>{activityCounts.flowTests}</strong></div>
-        <div><span>Hydrants</span><strong>{activityCounts.hydrants}</strong></div>
-      </div>
-      <div className="daily-report-table" role="table" aria-label="Daily activity report">
-        <div className="daily-report-row table-head" role="row">
-          <span>Time</span>
-          <span>Type</span>
-          <span>Hydrant</span>
-          <span>User</span>
-          <span>Shift</span>
-          <span>Result</span>
-          <span>Notes</span>
-        </div>
-        {reportRows.length ? reportRows.map((row) => (
-          <div className="daily-report-row" role="row" key={row.id}>
-            <span>{row.time}</span>
-            <span>{row.type}</span>
-            <span>{row.hydrant}</span>
-            <span>{row.user}</span>
-            <span>{row.shift}</span>
-            <span>{row.result}</span>
-            <span>{row.notes}</span>
+      <div className="hydrant-reports-card">
+        <header className="hydrant-reports-card-head">
+          <div>
+            <strong>Daily activity</strong>
+            <span>
+              Everything the crews did on one day
+              {activityLoading ? " · Loading…" : activityLoadedAt ? ` · Updated ${activityLoadedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}
+            </span>
           </div>
-        )) : (
-          <div className="daily-report-empty">No daily activity records found for this date.</div>
-        )}
+          <div className="hydrant-reports-head-controls">
+            <Field label="Day"><input type="date" value={date} onChange={(event) => setReportDate(event.target.value)} /></Field>
+            <button type="button" className="secondary" disabled={activityLoading} onClick={() => setActivityRefreshKey((n) => n + 1)}>Refresh</button>
+          </div>
+        </header>
+        {activityLoadError ? <p className="status-line hydrant-form-error" role="alert">{activityLoadError}</p> : null}
+        <div className="daily-report-stats" aria-label="Daily activity counts">
+          <div><span>Total done</span><strong>{activityCounts.total}</strong></div>
+          <div><span>Inspections</span><strong>{activityCounts.inspections}</strong></div>
+          <div><span>Flow tests</span><strong>{activityCounts.flowTests}</strong></div>
+          <div><span>Hydrants</span><strong>{activityCounts.hydrants}</strong></div>
+        </div>
+        <div className="daily-report-table" role="table" aria-label="Daily activity">
+          <div className="daily-report-row table-head" role="row">
+            <span>Time</span>
+            <span>Type</span>
+            <span>Hydrant</span>
+            <span>Done by</span>
+            <span>Shift</span>
+            <span>Result</span>
+            <span>Notes</span>
+          </div>
+          {reportRows.length ? reportRows.map((row) => (
+            <div className="daily-report-row" role="row" key={row.id}>
+              <span>{row.time}</span>
+              <span>{row.type}</span>
+              <span>{row.hydrant}</span>
+              <span>{row.user}</span>
+              <span>{row.shift}</span>
+              <span>{row.result}</span>
+              <span>{row.notes}</span>
+            </div>
+          )) : (
+            <div className="daily-report-empty">Nothing recorded on {date}.</div>
+          )}
+        </div>
+        <div className="hydrant-reports-actions">
+          <button className="button" type="button" onClick={exportDailyActivity} disabled={!reportRows.length}>
+            <Download size={16} /> Download summary (CSV)
+          </button>
+          <button className="button" type="button" onClick={exportRawDailyActivity} disabled={!activityRows.length}>
+            <Download size={16} /> Download full detail (CSV)
+          </button>
+        </div>
+
+        <div className="hydrant-reports-email">
+          <strong>Email this day's activity</strong>
+          {reportEmailRecipients.length ? (
+            <div className="recipient-row">
+              <Field label="Saved recipients">
+                <select value={selectedRecipient} onChange={(e) => setSelectedRecipient(e.target.value)}>
+                  {reportEmailRecipients.map((email) => <option key={email}>{email}</option>)}
+                </select>
+              </Field>
+              <button type="button" className="secondary" onClick={addRecipient}>Add</button>
+              <button type="button" className="secondary" onClick={clearRecipients}>Clear</button>
+            </div>
+          ) : null}
+          <Field label="Send to (separate addresses with commas)">
+            <textarea value={emails} onChange={(e) => setEmails(e.target.value)} placeholder="name@example.com, name2@example.com" rows={2} />
+          </Field>
+          <button type="button" className="primary" onClick={emailCsv} disabled={!emails.trim()}><Mail size={16} /> Email daily activity</button>
+        </div>
       </div>
-      <div className="recipient-row">
-        <Field label="Saved Recipients">
-          <select value={selectedRecipient} onChange={(e) => setSelectedRecipient(e.target.value)}>
-            {reportEmailRecipients.map((email) => <option key={email}>{email}</option>)}
-          </select>
-        </Field>
-        <button className="secondary" onClick={addRecipient}>Add Recipient</button>
-        <button className="secondary" onClick={clearRecipients}>Clear</button>
+
+      <div className="hydrant-reports-card">
+        <header className="hydrant-reports-card-head">
+          <div>
+            <strong>Other downloads</strong>
+          </div>
+        </header>
+        <ul className="hydrant-reports-downloads">
+          <li>
+            <button className="button" type="button" onClick={exportAllHydrants}><Download size={16} /> All hydrants (CSV)</button>
+            <span>Every hydrant in the inventory with its details.</span>
+          </li>
+          <li>
+            <button className="button" type="button" onClick={exportHydrants}><Download size={16} /> Edits saved on this device (CSV)</button>
+            <span>Hydrant changes made on this computer or tablet, for checking what it has stored.</span>
+          </li>
+          <li>
+            <a className="button" href="/sample-daily-activity-report.csv"><Download size={16} /> Daily activity example (CSV)</a>
+            <span>A sample file showing the daily activity layout.</span>
+          </li>
+        </ul>
       </div>
-      <Field label="Daily Activity Email Recipients">
-        <textarea value={emails} onChange={(e) => setEmails(e.target.value)} placeholder="email1@example.com, email2@example.com" rows={4} />
-      </Field>
-      <button className="primary" onClick={emailCsv}><Mail size={16} /> Email Daily Activity</button>
-      {message && <p className="status-line">{message}</p>}
     </section>
   );
 }
