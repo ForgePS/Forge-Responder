@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { defaultPlatformConfig } from "../data/platformBrand.js";
-import { isForgeLogoUrl, resolvePlatformLogoUrl } from "../lib/brandAssets.js";
+import { isForgeLogoUrl } from "../lib/brandAssets.js";
+import forgeResponderLogo from "../assets/forge-responder-logo.png";
 import { loadPublicPlatformBranding } from "../lib/platformService.js";
 
 const CACHE_KEY = "forge-platform-brand";
@@ -14,13 +14,14 @@ function readCached() {
   }
 }
 
+// Sign-in pages show the FORGE Responder logo (transparent) unless the platform
+// settings name a different one.
 function toBrand(data = {}) {
-  const url = data?.logoUrl || defaultPlatformConfig.logoUrl;
+  const url = data?.logoUrl || "";
+  const custom = url && !isForgeLogoUrl(url);
   return {
-    logoUrl: resolvePlatformLogoUrl(url),
-    name: data?.name || defaultPlatformConfig.name,
-    // The built-in logo has a solid background that the page blends away.
-    builtIn: isForgeLogoUrl(url),
+    logoUrl: custom ? url : forgeResponderLogo,
+    name: data?.name || "FORGE Responder",
   };
 }
 

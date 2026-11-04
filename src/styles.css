@@ -3955,8 +3955,8 @@ html[data-theme="light"] .apparatus-check-card { background: #fff; border-color:
   margin-bottom: 10px;
 }
 
-/* An uploaded platform logo on the sign-in page: kept to a sensible size, shown as-is. */
-.auth-forge-logo img.auth-platform-logo-custom {
+/* Platform logo on the sign-in page: shown as-is (transparent), kept to a sensible size. */
+.auth-forge-logo img.auth-platform-logo {
   width: auto;
   max-width: 100%;
   max-height: 160px;
