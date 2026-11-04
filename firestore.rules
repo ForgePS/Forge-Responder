@@ -718,9 +718,9 @@ service cloud.firestore {
               .hasOnly(["internalEmailGroups", "departmentId", "updatedAt"]))
           )
           && (isPlatformCreator() || (subscriptionFieldUnchanged() && enabledModulesUnchanged()));
-        // FORGE Field settings (settings/fieldApp) are admin-only through the rule above.
+        // FORGE FIELD settings (settings/fieldApp) are admin-only through the rule above.
       }
-      // FORGE Field: EMS unit / supply closet check-off lists (built by admins)
+      // FORGE FIELD: EMS unit / supply closet check-off lists (built by admins)
       // and the counts crews submit from the field.
       match /fieldCheckoffLists/{listId} {
         allow read: if canAccessDepartment(departmentId);

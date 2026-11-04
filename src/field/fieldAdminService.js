@@ -1,5 +1,5 @@
 /**
- * Server reads and writes for FORGE Field settings, used by the RMS admin page
+ * Server reads and writes for FORGE FIELD settings, used by the RMS admin page
  * and by the field app's data download.
  */
 import { doc, getDoc, setDoc } from "firebase/firestore";

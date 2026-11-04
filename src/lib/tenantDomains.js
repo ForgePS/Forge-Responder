@@ -23,7 +23,7 @@ export const PLATFORM_SUBDOMAIN = "app";
 export const RESERVED_SUBDOMAINS = new Set([
   PLATFORM_SUBDOMAIN, "www", "admin", "api", "auth", "console", "creator", "creator-console",
   "demo", "docs", "help", "login", "mail", "status", "support", "staging", "dev", "test",
-  "field", // field.forgeresponder.com is the FORGE Field app
+  "field", // field.forgeresponder.com is the FORGE FIELD app
 ]);
 
 const SUBDOMAIN_LINKS_FORCED = String(import.meta.env?.VITE_TENANT_SUBDOMAINS || "").toLowerCase() === "true";

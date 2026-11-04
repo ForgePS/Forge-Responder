@@ -1,4 +1,4 @@
-// FORGE Field airplane-mode test on the production build.
+// FORGE FIELD airplane-mode test on the production build.
 //
 //   npm run build && npx vite preview --port 4180
 //   npm run test:field-offline -- http://localhost:4180 <screenshotDir>

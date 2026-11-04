@@ -707,7 +707,7 @@ async function registerPlanPhotos(ctx, planId, photos) {
       mimeType: "image/jpeg",
       storagePath: photo.storagePath,
       downloadUrl: photo.url,
-      description: "Added from FORGE Field",
+      description: "Added from FORGE FIELD",
     }, ctx.actor);
   }
 }
@@ -770,7 +770,7 @@ async function syncPlanCreate(record, ctx) {
       riskLevel: data.plan.riskLevel || "Moderate",
       responsibleStation: data.plan.station || "",
       sectionAnswers: data.sectionAnswers || {},
-      notes: "Created in FORGE Field",
+      notes: "Created in FORGE FIELD",
     }, ctx.actor);
     await updatePreplan(ctx.departmentId, data.planId, { facilityName: data.plan.name }, ctx.actor).catch(() => null);
   }

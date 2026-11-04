@@ -1,7 +1,7 @@
 {
   "id": "/field",
-  "name": "FORGE Field",
-  "short_name": "FORGE Field",
+  "name": "FORGE FIELD",
+  "short_name": "FORGE FIELD",
   "description": "Offline field app for Fire/EMS crews: truck checks, hydrants, hose testing, damage forms, daily logs and incident reports.",
   "start_url": "/field",
   "scope": "/",
