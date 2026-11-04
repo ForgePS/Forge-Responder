@@ -110,7 +110,7 @@ function SignIn() {
     <Gate
       logo
       title={resolver ? "Enter your code" : "Sign in to FORGE Field"}
-      actions={<a className="fa-btn fa-btn-ghost fa-btn-block" href={rmsPathFromFieldPath()}>Use the full RMS sign-in</a>}
+      actions={<a className="fa-btn fa-btn-ghost fa-btn-block" href={rmsPathFromFieldPath()}>Sign in on FORGE Responder</a>}
     >
       <p>
         {resolver
@@ -231,7 +231,7 @@ export default function FieldApp() {
       <Gate
         icon={<ShieldAlert size={34} />}
         title="Finish two-factor sign-in"
-        actions={<a className="fa-btn fa-btn-primary fa-btn-block" href={rmsPathFromFieldPath()}>Open the RMS sign-in</a>}
+        actions={<a className="fa-btn fa-btn-primary fa-btn-block" href={rmsPathFromFieldPath()}>Open the FORGE Responder sign-in</a>}
       >
         <p>Your account needs two-factor login. Complete it in the RMS, then come back to FORGE Field.</p>
       </Gate>

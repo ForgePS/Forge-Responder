@@ -99,7 +99,7 @@ export default function SettingsScreen() {
           <div><span>Department</span><strong>{snapshot.departmentName}</strong></div>
           <div><span>Access checked</span><strong>{formatWhen(snapshot.savedAt)}</strong></div>
         </div>
-        <a className="fa-btn fa-btn-ghost fa-btn-block" href={rmsPathFromFieldPath()}><ExternalLink size={20} /> Open the full RMS</a>
+        <a className="fa-btn fa-btn-ghost fa-btn-block" href={rmsPathFromFieldPath()}><ExternalLink size={20} /> Open FORGE Responder</a>
         <button type="button" className="fa-btn fa-btn-danger-ghost fa-btn-block" onClick={() => setConfirmSignOut(true)}><LogOut size={20} /> Sign out</button>
       </Section>
 

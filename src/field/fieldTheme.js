@@ -20,7 +20,7 @@ export function applyFieldTheme(pref) {
   const theme = resolveTheme(pref);
   document.documentElement.setAttribute("data-field-theme", theme);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", theme === "dark" ? "#0b0f14" : "#ffffff");
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#111827" : "#ffffff");
   return theme;
 }
 
