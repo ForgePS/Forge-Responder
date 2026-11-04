@@ -17,6 +17,7 @@ import { completeSignInWithCode, isSecondFactorRequiredError, secondFactorResolv
 import { buildAccessSnapshot, loadAccessSnapshot, saveAccessSnapshot } from "./fieldSession.js";
 import { requestPersistentStorage } from "./fieldDb.js";
 import { rmsPathFromFieldPath } from "./fieldPaths.js";
+import { forgeResponderLogo } from "../lib/brandAssets.js";
 import { readThemePref, applyFieldTheme } from "./fieldTheme.js";
 import { registerFieldServiceWorker } from "./registerFieldSW.js";
 import "./fieldInstall.js";
@@ -48,11 +49,13 @@ function Splash({ message = "Opening FORGE Field…" }) {
   );
 }
 
-function Gate({ icon, title, children, actions }) {
+function Gate({ icon, logo = false, title, children, actions }) {
   return (
     <div className="fa-gate">
       <div className="fa-gate-card">
-        <div className="fa-gate-icon">{icon}</div>
+        {logo
+          ? <img className="fa-gate-logo" src={forgeResponderLogo} alt="FORGE Responder" />
+          : <div className="fa-gate-icon">{icon}</div>}
         <h1>{title}</h1>
         <div className="fa-gate-body">{children}</div>
         {actions ? <div className="fa-gate-actions">{actions}</div> : null}
@@ -105,7 +108,7 @@ function SignIn() {
 
   return (
     <Gate
-      icon={<Flame size={34} />}
+      logo
       title={resolver ? "Enter your code" : "Sign in to FORGE Field"}
       actions={<a className="fa-btn fa-btn-ghost fa-btn-block" href={rmsPathFromFieldPath()}>Use the full RMS sign-in</a>}
     >

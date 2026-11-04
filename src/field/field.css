@@ -2044,3 +2044,11 @@ html[data-field-theme="dark"] .fa-seg-btn.is-active.tone-muted {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
 }
+
+/* FORGE Responder logo on the sign-in screen */
+.fa-gate-logo {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+}
