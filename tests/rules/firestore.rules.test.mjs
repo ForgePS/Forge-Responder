@@ -985,3 +985,18 @@ describe("hydrant and fleet records follow permissions", () => {
     await assertSucceeds(deleteDoc(doc(adminA().firestore(), `departments/${A}/fleetChecks/c1`)));
   });
 });
+
+describe("public platform look", () => {
+  it("anyone can read it (sign-in page); only platform creators change it", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "platformBranding/public"), { logoUrl: "https://example.com/logo.png", name: "FORGE Responder" });
+      await setDoc(doc(ctx.firestore(), "platformConfig/main"), { name: "FORGE", integrationNotes: "private" });
+    });
+    await assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), "platformBranding/public")));
+    // The full platform settings stay private.
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "platformConfig/main")));
+    await assertFails(setDoc(doc(adminA().firestore(), "platformBranding/public"), { logoUrl: "https://evil.example/x.png" }));
+    await assertFails(setDoc(doc(env.unauthenticatedContext().firestore(), "platformBranding/public"), { logoUrl: "x" }));
+    await assertSucceeds(setDoc(doc(creator().firestore(), "platformBranding/public"), { logoUrl: "https://example.com/new.png", name: "FORGE Responder" }));
+  });
+});

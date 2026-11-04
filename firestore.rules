@@ -519,6 +519,13 @@ service cloud.firestore {
       allow write: if isPlatformCreator();
     }
 
+    // The platform's public look (logo, name, tagline) for the signed-out
+    // "Find Your Department" and sign-in pages. Copied from platformConfig on save.
+    match /platformBranding/{document} {
+      allow read: if true;
+      allow write: if isPlatformCreator();
+    }
+
     match /platformSubscriptionPlans/{planId} {
       allow read: if isAuthenticated();
       allow write: if isPlatformCreator();

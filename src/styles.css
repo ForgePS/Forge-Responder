@@ -3954,3 +3954,11 @@ html[data-theme="light"] .apparatus-check-card { background: #fff; border-color:
   color: var(--rms-primary);
   margin-bottom: 10px;
 }
+
+/* An uploaded platform logo on the sign-in page: kept to a sensible size, shown as-is. */
+.auth-forge-logo img.auth-platform-logo-custom {
+  width: auto;
+  max-width: 100%;
+  max-height: 160px;
+  margin: 0 auto;
+}
