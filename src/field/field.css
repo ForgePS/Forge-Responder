@@ -2052,3 +2052,317 @@ html[data-field-theme="dark"] .fa-seg-btn.is-active.tone-muted {
   max-width: 280px;
   height: auto;
 }
+
+/* ---- Same look as the desktop app (FORGE Responder) ----
+   The field app uses the desktop design tokens (src/theme/tokens.css), which
+   switch with data-theme (set by fieldTheme.js). */
+html[data-field-theme] {
+  --fa-bg: var(--rms-bg-body);
+  --fa-surface: var(--rms-bg-panel);
+  --fa-surface-2: var(--rms-bg-surface-2);
+  --fa-text: var(--rms-text-strong);
+  --fa-text-2: var(--rms-text-body);
+  --fa-muted: var(--rms-text-muted);
+  --fa-border: var(--rms-border);
+  --fa-border-strong: color-mix(in srgb, var(--rms-text-muted) 45%, var(--rms-border));
+  --fa-primary: var(--rms-primary-solid);
+  --fa-primary-hover: var(--rms-primary-hover);
+  --fa-primary-text: #ffffff;
+  --fa-focus: var(--rms-primary);
+  --fa-muted-bg: var(--rms-bg-surface-3);
+  --fa-shadow: var(--rms-shadow-sm);
+  --fa-radius: 12px;
+  --fa-tile-teal: var(--rms-primary);
+}
+
+html[data-field-theme] .fa-app,
+html[data-field-theme] .fa-gate,
+html[data-field-theme] .fa-splash {
+  font-family: var(--rms-font-display);
+  font-size: 16px;
+}
+
+/* Header like the desktop top bar: the logo at a readable size. */
+.fa-brand img {
+  width: auto;
+  max-width: 110px;
+  height: 36px;
+  border-radius: 0;
+}
+
+/* ---- Quick cards (home screen) ---- */
+.fa-quick-cards {
+  display: grid;
+  gap: 14px;
+}
+
+@media (min-width: 720px) {
+  .fa-quick-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
+
+.fa-qc {
+  --fa-qc-color: var(--fa-primary);
+  background: var(--fa-surface);
+  border: 1px solid var(--fa-border);
+  border-radius: var(--fa-radius);
+  box-shadow: var(--fa-shadow);
+  overflow: hidden;
+}
+
+.fa-qc.tone-red { --fa-qc-color: var(--fa-tile-red); }
+.fa-qc.tone-blue { --fa-qc-color: var(--fa-tile-blue); }
+.fa-qc.tone-teal { --fa-qc-color: var(--fa-tile-teal); }
+.fa-qc.tone-amber { --fa-qc-color: var(--fa-tile-amber); }
+.fa-qc.tone-violet { --fa-qc-color: var(--fa-tile-violet); }
+.fa-qc.tone-slate { --fa-qc-color: var(--fa-tile-slate); }
+
+.fa-qc-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--fa-border);
+  border-top: 4px solid var(--fa-qc-color);
+}
+
+.fa-qc-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--fa-text);
+}
+
+.fa-qc-head-icon {
+  display: inline-flex;
+  color: var(--fa-qc-color);
+}
+
+.fa-qc-items {
+  display: grid;
+}
+
+.fa-qc-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--fa-tap);
+  padding: 12px 16px;
+  border: 0;
+  border-top: 1px solid var(--fa-border);
+  background: transparent;
+  color: var(--fa-text);
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+  width: 100%;
+}
+
+.fa-qc-item:first-child {
+  border-top: 0;
+}
+
+.fa-qc-item:hover,
+.fa-qc-item:focus-visible {
+  background: var(--fa-surface-2);
+}
+
+.fa-qc-item:focus-visible {
+  outline: 3px solid var(--fa-focus);
+  outline-offset: -3px;
+}
+
+.fa-qc-item-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: var(--fa-qc-color);
+  background: color-mix(in srgb, var(--fa-qc-color) 14%, transparent);
+}
+
+.fa-qc-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.fa-qc-item-text strong {
+  font-size: 1.05rem;
+}
+
+.fa-qc-item-text small {
+  color: var(--fa-muted);
+  font-size: 0.92rem;
+}
+
+.fa-qc-chev {
+  flex: 0 0 auto;
+  color: var(--fa-muted);
+}
+
+.fa-qc-item.is-soon {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.fa-qc-item.is-soon:hover {
+  background: transparent;
+}
+
+.fa-qc-soon {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--fa-muted);
+  background: var(--fa-muted-bg);
+  white-space: nowrap;
+}
+
+/* ---- Home: category cards (each opens its own screen of tools) ---- */
+.fa-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .fa-cat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.fa-cat {
+  --fa-cat-color: var(--fa-primary);
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 6px;
+  min-height: 132px;
+  padding: 16px;
+  border: 1px solid var(--fa-border);
+  border-top: 5px solid var(--fa-cat-color);
+  border-radius: var(--fa-radius);
+  background: var(--fa-surface);
+  color: var(--fa-text);
+  box-shadow: var(--fa-shadow);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.fa-cat:active { transform: scale(0.98); }
+.fa-cat:focus-visible { outline: 3px solid var(--fa-focus); outline-offset: 2px; }
+
+.fa-cat.tone-red { --fa-cat-color: var(--fa-tile-red); }
+.fa-cat.tone-blue { --fa-cat-color: var(--fa-tile-blue); }
+.fa-cat.tone-teal { --fa-cat-color: var(--fa-tile-teal); }
+.fa-cat.tone-amber { --fa-cat-color: var(--fa-tile-amber); }
+.fa-cat.tone-violet { --fa-cat-color: var(--fa-tile-violet); }
+.fa-cat.tone-slate { --fa-cat-color: var(--fa-tile-slate); }
+
+.fa-cat-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  color: var(--fa-cat-color);
+  background: color-mix(in srgb, var(--fa-cat-color) 14%, transparent);
+  margin-bottom: 4px;
+}
+
+.fa-cat-icon svg { width: 28px; height: 28px; }
+
+.fa-cat strong {
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.fa-cat small {
+  color: var(--fa-muted);
+  font-size: 0.88rem;
+}
+
+.fa-cat.is-soon { opacity: 0.7; }
+
+/* Tools on a category screen that aren't built yet */
+.fa-tile.is-soon {
+  cursor: default;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+/* ---- Cards in the desktop dashboard style (white card, thin border, round tinted icon) ---- */
+.fa-cat {
+  border: 1px solid var(--rms-border);
+  border-radius: var(--fa-radius);
+  background: var(--rms-bg-panel);
+  box-shadow: var(--rms-shadow-sm);
+  min-height: 118px;
+  padding: 14px;
+}
+
+.fa-cat:hover {
+  border-color: color-mix(in srgb, var(--rms-primary) 35%, var(--rms-border));
+  box-shadow: var(--rms-shadow-md);
+}
+
+.fa-cat-icon,
+.fa-tool .fa-tile-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+}
+
+.fa-cat-icon svg { width: 22px; height: 22px; }
+
+.fa-cat strong {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--rms-text-strong);
+}
+
+.fa-cat small {
+  color: var(--rms-text-muted);
+  font-size: 0.82rem;
+}
+
+.fa-tool {
+  min-height: 72px;
+  border: 1px solid var(--rms-border);
+  border-radius: var(--fa-radius);
+  background: var(--rms-bg-panel);
+  box-shadow: var(--rms-shadow-sm);
+}
+
+.fa-tool:hover {
+  border-color: color-mix(in srgb, var(--rms-primary) 35%, var(--rms-border));
+  box-shadow: var(--rms-shadow-md);
+}
+
+.fa-tool .fa-tile-text strong {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--rms-text-strong);
+}
+
+.fa-tool .fa-tile-text small {
+  font-size: 0.85rem;
+  color: var(--rms-text-muted);
+}
+
+.fa-hello h1 {
+  font-weight: 700;
+}
+
+/* Cards that open an outside page are links: no underline, same text colours. */
+a.fa-tile,
+a.fa-tile:visited {
+  text-decoration: none;
+  color: var(--fa-text);
+}

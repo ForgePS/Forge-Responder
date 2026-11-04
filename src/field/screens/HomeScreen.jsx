@@ -1,25 +1,12 @@
-import { useMemo } from "react";
 import {
   AlertTriangle,
-  BookOpen,
-  Building,
-  ChevronRight,
-  ClipboardList,
-  PackageOpen,
-  Stethoscope,
-  ClipboardCheck,
-  Droplets,
-  FileWarning,
   Flame,
   RefreshCw,
-  Siren,
-  Waves,
   WifiOff,
 } from "lucide-react";
 import { useField } from "../fieldContext.jsx";
 import { FORM_FOR_KIND } from "../fieldKinds.js";
-import { refItems } from "../fieldRefData.js";
-import { localDate } from "../fieldValidation.js";
+import { cardSummary, useQuickCards } from "../quickCards.jsx";
 import { Banner, StatusChip, formatWhen } from "../ui.jsx";
 
 function greeting() {
@@ -34,133 +21,25 @@ function firstName(name = "") {
   return parts.length > 1 && /^(chief|capt|captain|lt|lieutenant|ff|eng|engineer)\.?$/i.test(parts[0]) ? parts.slice(1).join(" ") : parts[0] || "";
 }
 
-function Tile({ icon, title, detail, onClick, tone }) {
+/** A category on the home screen; opens its own screen of tools. */
+function CategoryTile({ card, onOpen }) {
+  const summary = cardSummary(card);
+  const soon = card.items.every((item) => item.soon);
   return (
-    <button type="button" className={`fa-tile tone-${tone}`} onClick={onClick}>
-      <span className="fa-tile-icon">{icon}</span>
-      <span className="fa-tile-text">
-        <strong>{title}</strong>
-        {detail ? <small>{detail}</small> : null}
-      </span>
-      <ChevronRight size={22} className="fa-tile-chev" aria-hidden="true" />
+    <button type="button" className={`fa-cat tone-${card.tone}${soon ? " is-soon" : ""}`} onClick={onOpen}>
+      <span className="fa-cat-icon">{card.icon}</span>
+      <strong>{card.title}</strong>
+      <small>{summary}</small>
     </button>
   );
 }
 
 export default function HomeScreen() {
-  const { snapshot, caps, refData, refLoading, refError, refresh, records, counts, navigate, online } = useField();
-  const today = localDate();
-  const assets = refItems(refData, "assets");
-
-  const checkedToday = useMemo(() => {
-    const ids = new Set();
-    assets.forEach((asset) => {
-      if (asset.lastCheckAt && localDate(new Date(asset.lastCheckAt)) === today) ids.add(asset.id);
-    });
-    records.forEach((record) => {
-      if (record.kind === "truckCheck" && record.status !== "draft" && record.data?.completedAt && localDate(new Date(record.data.completedAt)) === today) {
-        ids.add(record.data.assetId);
-      }
-    });
-    return ids;
-  }, [assets, records, today]);
-
-  const hoseThisYear = refItems(refData, "hoseTests").length
-    + records.filter((record) => record.kind === "hoseTest" && record.status !== "synced").reduce((sum, record) => sum + (record.data?.hoseIds?.length || 0), 0);
+  const { snapshot, refData, refLoading, refError, refresh, records, counts, navigate, online } = useField();
+  const cards = useQuickCards().filter((card) => card.items.length);
   const drafts = records.filter((record) => record.status === "draft");
-  const todaysLogs = refItems(refData, "dailyLogs").filter((log) => log.date === today);
-  const checkoffLists = refItems(refData, "checkoffLists");
-  const emsLists = checkoffLists.filter((list) => list.kind === "ems");
-  const supplyLists = checkoffLists.filter((list) => list.kind === "supply");
-  const doneToday = (kind) => new Set(records
-    .filter((record) => record.kind === "checkoff" && record.status !== "draft" && record.data?.list?.kind === kind && record.data?.completedAt && localDate(new Date(record.data.completedAt)) === today)
-    .map((record) => record.data.listId)).size;
-  const assignedInspections = refItems(refData, "inspections");
-  const planCount = refItems(refData, "preplans").length + refItems(refData, "legacyPlans").length;
   const noData = !refData.fetchedAt;
-
-  const tiles = [
-    caps.truckChecks && {
-      key: "truck",
-      icon: <ClipboardCheck size={30} />,
-      title: "Truck check",
-      detail: assets.length ? `${checkedToday.size} of ${assets.length} units checked today` : "Daily apparatus check",
-      onClick: () => navigate("truckCheck"),
-      tone: "red",
-    },
-    caps.emsCheckoff && emsLists.length > 0 && {
-      key: "ems",
-      icon: <Stethoscope size={30} />,
-      title: "EMS unit check-off",
-      detail: `${doneToday("ems")} of ${emsLists.length} done today`,
-      onClick: () => navigate("checkoffs", { kind: "ems" }),
-      tone: "red",
-    },
-    caps.supplyCheckoff && supplyLists.length > 0 && {
-      key: "supply",
-      icon: <PackageOpen size={30} />,
-      title: "Supply closet check-off",
-      detail: `${supplyLists.length} list${supplyLists.length === 1 ? "" : "s"} · counts and expirations`,
-      onClick: () => navigate("checkoffs", { kind: "supply" }),
-      tone: "teal",
-    },
-    caps.inspections && {
-      key: "inspections",
-      icon: <ClipboardList size={30} />,
-      title: "Inspections",
-      detail: assignedInspections.length ? `${assignedInspections.length} assigned to you` : "None assigned right now",
-      onClick: () => navigate("inspections"),
-      tone: "violet",
-    },
-    caps.preFirePlans && {
-      key: "plans",
-      icon: <Building size={30} />,
-      title: "Pre-fire plans",
-      detail: planCount ? `${planCount} plans on this device` : "Find a plan by address or nearest",
-      onClick: () => navigate("plans"),
-      tone: "amber",
-    },
-    (caps.hydrants || caps.hydrantDamage) && {
-      key: "hydrants",
-      icon: <Droplets size={30} />,
-      title: "Hydrants",
-      detail: caps.hydrants ? "Inspect · Flow test · Report damage" : "Report hydrant damage",
-      onClick: () => navigate("hydrants"),
-      tone: "blue",
-    },
-    caps.hoseTests && {
-      key: "hose",
-      icon: <Waves size={30} />,
-      title: "Hose testing",
-      detail: `${hoseThisYear} tested in ${new Date().getFullYear()}`,
-      onClick: () => navigate("hoseTest"),
-      tone: "teal",
-    },
-    caps.damageForm && {
-      key: "damage",
-      icon: <FileWarning size={30} />,
-      title: "Damage form",
-      detail: "Damaged property or equipment",
-      onClick: () => navigate("damageForm"),
-      tone: "amber",
-    },
-    caps.dailyLogView && {
-      key: "log",
-      icon: <BookOpen size={30} />,
-      title: "Daily log",
-      detail: todaysLogs.length ? `${todaysLogs.length} log${todaysLogs.length === 1 ? "" : "s"} today` : "Crew and shift notes",
-      onClick: () => navigate("dailyLog"),
-      tone: "violet",
-    },
-    caps.incidents && {
-      key: "incident",
-      icon: <Siren size={30} />,
-      title: "Incident report",
-      detail: "Start a NERIS report from the scene",
-      onClick: () => navigate("incidents"),
-      tone: "slate",
-    },
-  ].filter(Boolean);
+  const hasWork = cards.some((card) => card.items.some((item) => item && !item.soon && !item.href));
 
   return (
     <div className="fa-screen">
@@ -207,10 +86,10 @@ export default function HomeScreen() {
         </section>
       ) : null}
 
-      <div className="fa-tiles">
-        {tiles.map((tile) => <Tile key={tile.key} {...tile} />)}
+      <div className="fa-cat-grid">
+        {cards.map((card) => <CategoryTile key={card.key} card={card} onOpen={() => navigate("quickCard", { card: card.key })} />)}
       </div>
-      {!tiles.length ? (
+      {!hasWork ? (
         <Banner tone="info" icon={<Flame size={22} />} title="Nothing to do here yet">
           Your role or your department's plan doesn't include field workflows. Ask your administrator.
         </Banner>

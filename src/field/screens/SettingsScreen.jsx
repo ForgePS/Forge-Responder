@@ -82,14 +82,14 @@ export default function SettingsScreen() {
       <Section title="Display">
         <Segmented
           value={theme}
-          options={[{ value: "auto", label: "Auto" }, { value: "light", label: "Sunlight" }, { value: "dark", label: "Dark" }]}
+          options={[{ value: "auto", label: "Auto" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]}
           onChange={(value) => {
             setTheme(value);
             saveThemePref(value);
           }}
           columns={3}
         />
-        <p className="fa-hint">Sunlight uses maximum contrast for outdoor use. Auto follows your phone.</p>
+        <p className="fa-hint">Auto uses the same light or dark setting as your FORGE Responder account.</p>
       </Section>
 
       <Section title="Account">
@@ -99,7 +99,7 @@ export default function SettingsScreen() {
           <div><span>Department</span><strong>{snapshot.departmentName}</strong></div>
           <div><span>Access checked</span><strong>{formatWhen(snapshot.savedAt)}</strong></div>
         </div>
-        <a className="fa-btn fa-btn-ghost fa-btn-block" href={rmsPathFromFieldPath()}><ExternalLink size={20} /> Open the full RMS</a>
+        <a className="fa-btn fa-btn-ghost fa-btn-block" href={rmsPathFromFieldPath()}><ExternalLink size={20} /> Open FORGE Responder</a>
         <button type="button" className="fa-btn fa-btn-danger-ghost fa-btn-block" onClick={() => setConfirmSignOut(true)}><LogOut size={20} /> Sign out</button>
       </Section>
 
