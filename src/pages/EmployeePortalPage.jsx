@@ -219,6 +219,7 @@ export default function EmployeePortalPage({
   showInternalEmail = true,
   personnel = [],
   certifications = [],
+  setCertifications,
   training = [],
   documents = [],
   setDocuments,
@@ -1062,6 +1063,9 @@ export default function EmployeePortalPage({
                 person={myPerson}
                 setPersonnel={setPersonnel}
                 certifications={myCerts}
+                setCertifications={setCertifications}
+                canEditCertifications={isCreator || hasPermission(permissions, "editCertifications")}
+                isSelf={!previewPerson}
                 user={previewPerson ? null : user}
                 membership={previewPerson ? null : membership}
                 roleLabel={previewPerson ? "" : formatRoleLabel(membership?.role, membership)}

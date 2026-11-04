@@ -706,6 +706,9 @@ describe("role-aware rules", () => {
       await setDoc(doc(db, `${lists}/hlfd-rms-documents/items/D1`), { id: "D1", title: "SOG 1", acknowledgements: {}, _order: 1 });
       await setDoc(doc(db, `${lists}/hlfd-rms-call-shifts/items/C1`), { id: "C1", status: "active", responses: [], _order: 1 });
       await setDoc(doc(db, `${lists}/hlfd-rms-personnel/items/P-X`), { id: "P-X", name: "Pat", activityLog: [], _order: 1 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-certifications`), { storage: "items" });
+      await setDoc(doc(db, `${lists}/hlfd-rms-certifications/items/C-FF`), { id: "C-FF", personnelId: "P-FF", type: "EMT", expires: "2027-01-01", _order: 1 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-certifications/items/C-X`), { id: "C-X", personnelId: "P-X", type: "EMT", expires: "2027-01-01", _order: 2 });
       await setDoc(doc(db, `${lists}/hlfd-rms-personnel/items/P-FF`), { id: "P-FF", name: "Fran", rank: "FF", phone: "1", _order: 2 });
       await setDoc(doc(db, `departments/${A}/personnelPrivate/P-FF`), { socialSecurityNumber: "x" });
       await setDoc(doc(db, `departments/${A}/personnelPrivate/P-X`), { socialSecurityNumber: "y" });
@@ -746,6 +749,15 @@ describe("role-aware rules", () => {
     await assertFails(put(ffA(), mine, { ...base, socialSecurityNumber: "1" }));
     await assertFails(put(ffA(), `${lists}/hlfd-rms-personnel/items/P-X`, { id: "P-X", name: "Pat", activityLog: [], city: "Town", _order: 1 }));
     await assertSucceeds(put(editorA(), mine, { ...base, rank: "Captain", issuedEquipment: [{ item: "Coat" }] }));
+  });
+
+  it("members attach copies of their own certificates only", async () => {
+    const certs = `${lists}/hlfd-rms-certifications/items`;
+    const copy = { document: "emt.pdf", documentUrl: "https://x", documentStoragePath: "departments/a/certifications/C-FF/1-emt.pdf", documentUploadedAt: "now" };
+    await assertSucceeds(put(ffA(), `${certs}/C-FF`, { id: "C-FF", personnelId: "P-FF", type: "EMT", expires: "2027-01-01", _order: 1, ...copy }));
+    await assertFails(put(ffA(), `${certs}/C-FF`, { id: "C-FF", personnelId: "P-FF", type: "EMT", expires: "2030-01-01", _order: 1, ...copy }));
+    await assertFails(put(ffA(), `${certs}/C-X`, { id: "C-X", personnelId: "P-X", type: "EMT", expires: "2027-01-01", _order: 2, ...copy }));
+    await assertSucceeds(put(ffA(), `${lists}/hlfd-rms-personnel/items/P-FF`, { id: "P-FF", name: "Fran", rank: "FF", phone: "1", _order: 2, nrCertificate: { name: "nr.pdf", url: "https://x" } }));
   });
 
   it("a battalion chief's trade approval may note it on the requester's record", async () => {

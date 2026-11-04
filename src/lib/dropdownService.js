@@ -1,4 +1,5 @@
-import { defaultDropdowns } from "../data/defaultDropdowns.js";
+import { DEFAULT_OPTION_RENAMES, UPGRADED_DROPDOWN_IDS, defaultDropdowns } from "../data/defaultDropdowns.js";
+import { upgradeDropdownOptions } from "./dropdownUpgrade.js";
 import { createRecord, listRecords, updateRecord } from "./firestoreService.js";
 
 export async function ensureDefaultDropdowns(departmentId) {
@@ -19,11 +20,23 @@ export async function ensureDefaultDropdowns(departmentId) {
   await Promise.all(defaultDropdowns.map(async (defaults) => {
     const record = existing.find((item) => item.id === defaults.id);
     if (!record) return;
-    if (record.label === defaults.label && record.module === defaults.module) return;
-    await updateRecord(departmentId, "dropdowns", defaults.id, {
-      label: defaults.label,
-      module: defaults.module,
-    });
+    const patch = {};
+    if (record.label !== defaults.label || record.module !== defaults.module) {
+      patch.label = defaults.label;
+      patch.module = defaults.module;
+    }
+    // Newer default options (Paid Per Call, EMT, Paramedic…) for departments set up earlier.
+    if (UPGRADED_DROPDOWN_IDS.includes(defaults.id)) {
+      const options = upgradeDropdownOptions(record, defaults, DEFAULT_OPTION_RENAMES);
+      if (options) patch.options = options;
+    }
+    if (!Object.keys(patch).length) return;
+    try {
+      await updateRecord(departmentId, "dropdowns", defaults.id, patch);
+    } catch (error) {
+      // Members who can't change dropdowns still get the saved lists.
+      console.warn("Dropdown defaults not updated", defaults.id, error?.code || error);
+    }
   }));
 
   return listRecords(departmentId, "dropdowns");

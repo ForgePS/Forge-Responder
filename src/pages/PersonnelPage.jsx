@@ -36,6 +36,9 @@ export default function PersonnelPage({
   records = [],
   setRecords,
   training = [],
+  certificationRecords = [],
+  setCertificationRecords,
+  canEditCertifications = false,
   departmentId,
   canEditPhoto = false,
   canEditProfile = false,
@@ -463,6 +466,9 @@ export default function PersonnelPage({
           onPhotoCropCancel={() => setPendingPhotoFile(null)}
           onPhotoCropConfirm={uploadProfilePhotoBlob}
           training={training}
+          certificationRecords={certificationRecords}
+          setCertificationRecords={setCertificationRecords}
+          canEditCertifications={canEditCertifications}
           isNewRecord={isNewRecord}
           onOpenEmployeeProfile={onOpenEmployeeProfile}
           departmentId={departmentId}

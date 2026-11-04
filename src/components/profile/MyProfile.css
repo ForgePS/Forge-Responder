@@ -382,3 +382,11 @@
   .profile-row-edit { grid-template-columns: 1fr 1fr; }
   .profile-row-edit > input:first-child { grid-column: 1 / -1; }
 }
+
+/* Certificate copies */
+.profile-copy { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.profile-copy a { display: inline-flex; align-items: center; gap: 4px; color: var(--rms-text-link); font-weight: 700; }
+.profile-copy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--rms-border-subtle); font-size: 13px; }
+.profile-copy-row > span:first-child { color: var(--rms-text-muted); font-weight: 700; }
+.profile-spin { animation: profile-spin 0.9s linear infinite; }
+@keyframes profile-spin { to { transform: rotate(360deg); } }

@@ -34,6 +34,9 @@ export default function PersonnelDetailView({
   onPhotoCropCancel,
   onPhotoCropConfirm,
   training = [],
+  certificationRecords = [],
+  setCertificationRecords,
+  canEditCertifications = false,
   isNewRecord = false,
   onOpenEmployeeProfile,
   departmentId = "",
@@ -150,6 +153,9 @@ export default function PersonnelDetailView({
             updateDraftField={updateDraftField}
             setEmergencySameAddress={setEmergencySameAddress}
             training={training}
+            certificationRecords={certificationRecords}
+            setCertificationRecords={setCertificationRecords}
+            canEditCertifications={canEditCertifications}
             onSave={onSave}
             onCancel={onCancelEdit}
             isNewRecord={isNewRecord}

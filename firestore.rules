@@ -279,7 +279,8 @@ service cloud.firestore {
         "emergencyRelationship", "emergencyAddress", "emergencyCity", "emergencyState", "emergencyZip",
         "emergencySameAddress", "emergency2FirstName", "emergency2LastName", "emergency2Phone",
         "emergency2Relationship", "emergency2Address", "emergency2City", "emergency2State", "emergency2Zip",
-        "emergency2SameAddress", "updatedAt", "_order"];
+        "emergency2SameAddress", "nrCertificate", "stateLicenseCertificate", "agencyLicenseCertificate",
+        "updatedAt", "_order"];
     }
     function isOwnProfileEdit(departmentId, listKey) {
       return listKey == "hlfd-rms-personnel"
@@ -336,6 +337,9 @@ service cloud.firestore {
           && storedIsMine(departmentId) && unchanged("personnelId") && unchanged("departmentHeadSignature")
           && resource.data.get("departmentHeadSignature", "") in [null, ""])
         || (listKey == "hlfd-rms-documents" && changedKeys().hasOnly(["acknowledgements", "updatedAt", "_order"]))
+        // A copy of your own certificate (My Profile), nothing else on the record.
+        || (listKey == "hlfd-rms-certifications" && storedIsMine(departmentId)
+          && changedKeys().hasOnly(["document", "documentUrl", "documentStoragePath", "documentUploadedAt", "updatedAt", "_order"]))
         // A battalion chief's final trade approval notes it on the requester's record.
         || (listKey == "hlfd-rms-personnel" && changedKeys().hasOnly(["activityLog", "updatedAt", "_order"]));
     }
