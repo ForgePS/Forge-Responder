@@ -22,7 +22,7 @@ export default function IncidentsScreen() {
   return (
     <Screen
       title="Incident reports"
-      subtitle="Start at the scene, finish in the RMS"
+      subtitle="The same NERIS report as the RMS · works offline"
       onBack={back}
       footer={(
         <button type="button" className="fa-btn fa-btn-primary fa-btn-block" onClick={() => navigate("incidentForm")}>
@@ -32,7 +32,7 @@ export default function IncidentsScreen() {
     >
       {!rows.length ? (
         <Banner tone="info" icon={<Siren size={22} />} title="No recent draft reports">
-          Start a report with the basics — address, type, times, units and crew. The full NERIS report is finished in the RMS.
+          Start the NERIS report at the scene. It is the same report as in the RMS, saved on this phone and sent when there is signal.
         </Banner>
       ) : null}
       <div className="fa-list">

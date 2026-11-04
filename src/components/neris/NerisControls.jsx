@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 
 /** Labelled field wrapper. */
-export function Field({ label, help, required = false, wide = false, missing = false, children, id }) {
+export function Field({ label, help, required = false, wide = false, missing = false, emphasis = false, children, id }) {
   return (
-    <div className={`nr-field${wide ? " nr-wide" : ""}${missing ? " nr-missing" : ""}`} id={id}>
+    <div className={`nr-field${wide ? " nr-wide" : ""}${missing ? " nr-missing" : ""}${emphasis ? " nr-field-emphasis" : ""}`} id={id}>
       <span className="nr-label">
         {label}
         {required ? <em className="nr-req" aria-label="required">Required</em> : null}

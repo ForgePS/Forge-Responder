@@ -193,7 +193,7 @@ html[data-theme="dark"] .nr-page {
   background: var(--nr-surface); border: 1px solid var(--nr-border); box-shadow: var(--nr-shadow);
 }
 .nr-editor-title { flex: 1; min-width: 200px; }
-.nr-editor-title h1 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
+.nr-editor-title h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
 .nr-editor-title p { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--nr-muted); font-size: 13px; }
 .nr-editor-title p span { display: inline-flex; align-items: center; gap: 4px; }
 .nr-editor-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -218,7 +218,7 @@ html[data-theme="dark"] .nr-page {
 
 .nr-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
 .nr-main { display: grid; gap: 14px; min-width: 0; }
-.nr-step-head h2 { margin: 4px 0 0; font-size: 22px; letter-spacing: -0.01em; }
+.nr-step-head h2 { margin: 4px 0 0; font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
 .nr-step-head p { margin: 2px 0 0; color: var(--nr-muted); }
 .nr-step-nav { display: flex; justify-content: space-between; gap: 12px; padding-top: 4px; }
 
@@ -244,7 +244,7 @@ html[data-theme="dark"] .nr-page {
 .nr-section > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .nr-section-title { display: flex; gap: 12px; align-items: flex-start; }
 .nr-section-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--nr-accent-soft); color: var(--nr-accent); flex: none; }
-.nr-section h3 { margin: 0; font-size: 16px; }
+.nr-section h3 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.005em; }
 .nr-section header p { margin: 2px 0 0; color: var(--nr-muted); font-size: 13px; }
 .nr-section-missing { border-color: rgba(217, 119, 6, 0.45); }
 .nr-section-ok { border-color: rgba(22, 163, 74, 0.4); }
@@ -397,3 +397,24 @@ html[data-theme="dark"] .nr-page {
   .nr-report-side .nr-status { display: none; }
   .nr-editor-head { padding: 12px 14px; }
 }
+
+/* Actions taken: the heart of the report, so it stands out. */
+.nr-field-emphasis > .nr-label { font-size: 18px; font-weight: 800; }
+
+/* Newer CAD information for this incident. */
+.nr-cad-update {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.4);
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--nr-text);
+}
+.nr-cad-update > svg { color: #2563eb; flex: none; }
+.nr-cad-update > div { display: grid; gap: 2px; flex: 1 1 260px; min-width: 0; }
+.nr-cad-update strong { font-size: 15px; }
+.nr-cad-update small { color: var(--nr-muted); font-size: 13px; }

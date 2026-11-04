@@ -68,7 +68,7 @@ export default function NerisCadImportModal({
   const { departmentId } = useTenant();
   // Demo department only: sample dispatch records to import with one click.
   const sampleRuns = useMemo(
-    () => (departmentId === DEMO_DEPARTMENT_ID ? buildDemoCadRuns() : []),
+    () => (departmentId === DEMO_DEPARTMENT_ID ? buildDemoCadRuns({ stage: "initial" }) : []),
     [departmentId],
   );
   const fileInputRef = useRef(null);

@@ -1,3 +1,4 @@
+import { buildCadSnapshot } from "./cadReseed.js";
 /**
  * Parse CAD dispatch payloads (JSON, CSV, XML, or key-value text) and map to NERIS workspace fields.
  */
@@ -238,6 +239,8 @@ export function applyCadImport(report, payload, meta) {
       fieldCount: buildCadImportPreview(payload).length,
       preview: meta.pastedPreview?.slice(0, 500) || null,
     },
+    // What CAD said, so a later Reseed from CAD can tell CAD changes from hand edits.
+    cadSnapshot: buildCadSnapshot(payload),
     completionPercentage: undefined,
   };
 
