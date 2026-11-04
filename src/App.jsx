@@ -1001,6 +1001,20 @@ function AppShell() {
     setSetupWizardDismissed(false);
     setSetupWizardOpen(false);
   }, [departmentId]);
+  // Lists only some pages use load when one of those pages first opens (then stay
+  // loaded), so a department's whole history isn't downloaded on every visit.
+  const inPortal = effectiveAppView === "employee";
+  const onPage = (...pages) => !inPortal && pages.includes(current);
+  const lazyLists = {
+    nerisFireReports: { enabled: onPage("NERIS Fire Reports", "NERIS Analytics") },
+    preplans: { enabled: onPage("NERIS Fire Reports") },
+    occupancies: { enabled: onPage("Occupancies", "NERIS Fire Reports") },
+    digitalDashboard: { enabled: onPage("Digital Dashboard") },
+    hoseTests: { enabled: onPage("Fleet Tests", "Hose Testing") },
+    overtimeOffers: { enabled: onPage("Scheduling") },
+    dailyLogs: { enabled: onPage("Daily Log") || (inPortal && employeeSection === "Daily Log") },
+    timeCards: { enabled: onPage("Time Sheets") || (inPortal && employeeSection === "Time Card") },
+  };
   const [certifications, setCertifications] = useTenantPersistentState(departmentId, LIST_KEYS.certifications, getTenantListFallback(departmentId, LIST_KEYS.certifications));
   const [training, setTraining] = useTenantPersistentState(departmentId, LIST_KEYS.training, getTenantListFallback(departmentId, LIST_KEYS.training));
   const [apparatus, setApparatus] = useTenantPersistentState(departmentId, LIST_KEYS.apparatus, getTenantListFallback(departmentId, LIST_KEYS.apparatus));
@@ -1104,27 +1118,27 @@ function AppShell() {
   }, [current, fleetCutover.redirectApparatusToFleetAssets]);
   const [assets, setAssets] = useTenantPersistentState(departmentId, LIST_KEYS.assets, getTenantListFallback(departmentId, LIST_KEYS.assets));
   const [documents, setDocuments] = useTenantPersistentState(departmentId, LIST_KEYS.documents, getTenantListFallback(departmentId, LIST_KEYS.documents));
-  const [occupancies, setOccupancies] = useTenantPersistentState(departmentId, LIST_KEYS.occupancies, getTenantListFallback(departmentId, LIST_KEYS.occupancies));
+  const [occupancies, setOccupancies] = useTenantPersistentState(departmentId, LIST_KEYS.occupancies, getTenantListFallback(departmentId, LIST_KEYS.occupancies), lazyLists.occupancies);
   const [inspections, setInspections] = useTenantPersistentState(departmentId, LIST_KEYS.inspections, getTenantListFallback(departmentId, LIST_KEYS.inspections));
-  const [preplans, setPreplans] = useTenantPersistentState(departmentId, LIST_KEYS.preplans, getTenantListFallback(departmentId, LIST_KEYS.preplans));
-  const [hoseTests, setHoseTests] = useTenantPersistentState(departmentId, LIST_KEYS.hoseTests, getTenantListFallback(departmentId, LIST_KEYS.hoseTests));
+  const [preplans, setPreplans] = useTenantPersistentState(departmentId, LIST_KEYS.preplans, getTenantListFallback(departmentId, LIST_KEYS.preplans), lazyLists.preplans);
+  const [hoseTests, setHoseTests] = useTenantPersistentState(departmentId, LIST_KEYS.hoseTests, getTenantListFallback(departmentId, LIST_KEYS.hoseTests), lazyLists.hoseTests);
   const [scheduleDays, setScheduleDays] = useTenantPersistentState(departmentId, LIST_KEYS.scheduleDays, getTenantListFallback(departmentId, LIST_KEYS.scheduleDays));
   const [roster, setRoster, rosterLoaded] = useTenantPersistentState(departmentId, LIST_KEYS.roster, getTenantListFallback(departmentId, LIST_KEYS.roster));
   const [leaveRequests, setLeaveRequests] = useTenantPersistentState(departmentId, LIST_KEYS.leaveRequests, getTenantListFallback(departmentId, LIST_KEYS.leaveRequests));
-  const [overtimeOffers, setOvertimeOffers] = useTenantPersistentState(departmentId, LIST_KEYS.overtimeOffers, getTenantListFallback(departmentId, LIST_KEYS.overtimeOffers));
+  const [overtimeOffers, setOvertimeOffers] = useTenantPersistentState(departmentId, LIST_KEYS.overtimeOffers, getTenantListFallback(departmentId, LIST_KEYS.overtimeOffers), lazyLists.overtimeOffers);
   const [vacancyPickups, setVacancyPickups] = useTenantPersistentState(departmentId, LIST_KEYS.vacancyPickups, getTenantListFallback(departmentId, LIST_KEYS.vacancyPickups));
   const [shiftTrades, setShiftTrades] = useTenantPersistentState(departmentId, LIST_KEYS.shiftTrades, getTenantListFallback(departmentId, LIST_KEYS.shiftTrades));
   const [callShifts, setCallShifts] = useTenantPersistentState(departmentId, LIST_KEYS.callShifts, getTenantListFallback(departmentId, LIST_KEYS.callShifts));
-  const [digitalDashboardDisplays, setDigitalDashboardDisplays] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardDisplays, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardDisplays));
-  const [digitalDashboardMedia, setDigitalDashboardMedia] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardMedia, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardMedia));
-  const [digitalDashboardPlaylists, setDigitalDashboardPlaylists] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardPlaylists, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardPlaylists));
-  const [digitalDashboardSchedules, setDigitalDashboardSchedules] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardSchedules, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardSchedules));
-  const [active911Alerts, setActive911Alerts] = useTenantPersistentState(departmentId, LIST_KEYS.active911Alerts, getTenantListFallback(departmentId, LIST_KEYS.active911Alerts));
-  const [alertDashboardConfig, setAlertDashboardConfig] = useTenantPersistentState(departmentId, LIST_KEYS.alertDashboardConfig, getTenantListFallback(departmentId, LIST_KEYS.alertDashboardConfig));
-  const [alertBusinessDirectory, setAlertBusinessDirectory] = useTenantPersistentState(departmentId, LIST_KEYS.alertBusinessDirectory, getTenantListFallback(departmentId, LIST_KEYS.alertBusinessDirectory));
-  const [dailyLogs, setDailyLogs] = useTenantPersistentState(departmentId, LIST_KEYS.dailyLogs, getTenantListFallback(departmentId, LIST_KEYS.dailyLogs));
-  const [timeCards, setTimeCards] = useTenantPersistentState(departmentId, LIST_KEYS.timeCards, getTenantListFallback(departmentId, LIST_KEYS.timeCards));
-  const [nerisFireReports, setNerisFireReports] = useTenantPersistentState(departmentId, LIST_KEYS.nerisFireReports, getTenantListFallback(departmentId, LIST_KEYS.nerisFireReports));
+  const [digitalDashboardDisplays, setDigitalDashboardDisplays] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardDisplays, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardDisplays), lazyLists.digitalDashboard);
+  const [digitalDashboardMedia, setDigitalDashboardMedia] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardMedia, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardMedia), lazyLists.digitalDashboard);
+  const [digitalDashboardPlaylists, setDigitalDashboardPlaylists] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardPlaylists, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardPlaylists), lazyLists.digitalDashboard);
+  const [digitalDashboardSchedules, setDigitalDashboardSchedules] = useTenantPersistentState(departmentId, LIST_KEYS.digitalDashboardSchedules, getTenantListFallback(departmentId, LIST_KEYS.digitalDashboardSchedules), lazyLists.digitalDashboard);
+  const [active911Alerts, setActive911Alerts] = useTenantPersistentState(departmentId, LIST_KEYS.active911Alerts, getTenantListFallback(departmentId, LIST_KEYS.active911Alerts), lazyLists.digitalDashboard);
+  const [alertDashboardConfig, setAlertDashboardConfig] = useTenantPersistentState(departmentId, LIST_KEYS.alertDashboardConfig, getTenantListFallback(departmentId, LIST_KEYS.alertDashboardConfig), lazyLists.digitalDashboard);
+  const [alertBusinessDirectory, setAlertBusinessDirectory] = useTenantPersistentState(departmentId, LIST_KEYS.alertBusinessDirectory, getTenantListFallback(departmentId, LIST_KEYS.alertBusinessDirectory), lazyLists.digitalDashboard);
+  const [dailyLogs, setDailyLogs] = useTenantPersistentState(departmentId, LIST_KEYS.dailyLogs, getTenantListFallback(departmentId, LIST_KEYS.dailyLogs), lazyLists.dailyLogs);
+  const [timeCards, setTimeCards] = useTenantPersistentState(departmentId, LIST_KEYS.timeCards, getTenantListFallback(departmentId, LIST_KEYS.timeCards), lazyLists.timeCards);
+  const [nerisFireReports, setNerisFireReports] = useTenantPersistentState(departmentId, LIST_KEYS.nerisFireReports, getTenantListFallback(departmentId, LIST_KEYS.nerisFireReports), lazyLists.nerisFireReports);
   const isHydrantsView = current === "Hydrants" || current === "Hydrant Overview" || current === "Field App";
   const showPlatformBrand = inPlatformScope || current === "Creator Console";
   const headerProfile = showPlatformBrand

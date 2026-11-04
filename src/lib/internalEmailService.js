@@ -1,4 +1,4 @@
-import { createRecord, deleteRecord, listRecords, updateRecord } from "./firestoreService.js";
+import { createRecord, deleteRecord, getRecord, listRecentRecords, updateRecord } from "./firestoreService.js";
 import { getFirestoreDb } from "./firebaseClient.js";
 import { doc, setDoc } from "firebase/firestore";
 import { isPlatformScope } from "./tenantPaths.js";
@@ -37,7 +37,8 @@ export function isMessageUnread(message = {}, userId = "") {
 export async function listInternalEmails(departmentId) {
   const scopeId = resolveEmailBoardScopeId(departmentId);
   if (!scopeId) return [];
-  const items = await listRecords(scopeId, INTERNAL_EMAIL_COLLECTION);
+  // Newest 500 messages (every message carries createdAt from createRecord).
+  const items = await listRecentRecords(scopeId, INTERNAL_EMAIL_COLLECTION, "createdAt", 500);
   return items.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 }
 
@@ -73,8 +74,7 @@ export async function sendInternalEmail(departmentId, payload = {}) {
 export async function markInternalEmailRead(departmentId, messageId, userId) {
   if (!messageId || !userId) return null;
   const scopeId = resolveEmailBoardScopeId(departmentId);
-  const messages = await listRecords(scopeId, INTERNAL_EMAIL_COLLECTION);
-  const message = messages.find((item) => item.id === messageId);
+  const message = await getRecord(scopeId, INTERNAL_EMAIL_COLLECTION, messageId);
   if (!message) return null;
   const readBy = { ...(message.readBy || {}), [userId]: new Date().toISOString() };
   return updateRecord(scopeId, INTERNAL_EMAIL_COLLECTION, messageId, { readBy });
@@ -140,7 +140,7 @@ export async function seedInternalEmailsForScope(departmentId, actor = {}) {
   const seeds = DEFAULT_INTERNAL_EMAIL_SEEDS[scopeId] || [];
   if (!seeds.length) return 0;
 
-  const existing = await listRecords(scopeId, INTERNAL_EMAIL_COLLECTION);
+  const existing = await listRecentRecords(scopeId, INTERNAL_EMAIL_COLLECTION, "createdAt", 1);
   if (existing.length) return 0;
 
   let count = 0;
