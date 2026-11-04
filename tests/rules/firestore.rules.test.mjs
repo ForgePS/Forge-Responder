@@ -75,7 +75,8 @@ beforeEach(async () => {
     // Grants as functions/lib/memberGrants.js writes them.
     const ffGrant = { viewCertifications: true, viewTraining: true, viewSchedule: true, viewDailyLog: true, editDailyLog: true,
       viewDocuments: true, accessEmployeePortal: true, submitLeaveRequests: true, submitShiftTrades: true,
-      submitVacancyPickups: true, submitMaintenanceIssues: true, viewInternalEmail: true, sendInternalEmail: true };
+      submitVacancyPickups: true, submitMaintenanceIssues: true, viewInternalEmail: true, sendInternalEmail: true,
+      viewHydrants: true, createHydrantDamageReports: true };
     await setDoc(doc(db, `departments/${A}/memberGrants/member-a`), { permissions: ffGrant });
     await setDoc(doc(db, `departments/${A}/memberGrants/ff-a`), { permissions: ffGrant });
     await setDoc(doc(db, `departments/${A}/memberGrants/editor-a`), { permissions: {
@@ -140,10 +141,9 @@ describe("members keep normal access", () => {
     await assertSucceeds(setDoc(doc(db, `departments/${A}/users/member-a`), { uid: "member-a", preferences: { theme: "dark" }, updatedAt: "now" }, { merge: true }));
   });
 
-  it("member can link personnelId once, but not change it after", async () => {
+  it("member can't link themselves to a personnel record (the server does it by verified email)", async () => {
     const db = memberA().firestore();
-    await assertSucceeds(setDoc(doc(db, `departments/${A}/users/member-a`), { personnelId: "P1", updatedAt: "now" }, { merge: true }));
-    await assertFails(setDoc(doc(db, `departments/${A}/users/member-a`), { personnelId: "P2", updatedAt: "now" }, { merge: true }));
+    await assertFails(setDoc(doc(db, `departments/${A}/users/member-a`), { personnelId: "P1", updatedAt: "now" }, { merge: true }));
   });
 
   it("member can read roles but not write them", async () => {
@@ -740,6 +740,10 @@ describe("role-aware rules", () => {
     await assertSucceeds(put(editorA(), `${lists}/hlfd-rms-leave-requests/items/L-OTHER`, { id: "L-OTHER", personnelId: "P-X", status: "Denied", _order: 1 }));
   });
 
+  it("leave: a member not linked to a personnel record can't file as someone else", async () => {
+    await assertFails(put(memberA(), `${lists}/hlfd-rms-leave-requests/items/L-UNLINKED`, { id: "L-UNLINKED", personnelId: "P-X", status: "Pending Officer Approval", _order: 0 }));
+  });
+
   it("trades: the assigned battalion chief can act on someone else's trade", async () => {
     await assertSucceeds(put(ffA(), `${lists}/hlfd-rms-shift-trades/items/TR-1`, { id: "TR-1", personnelId: "P-X", coveragePersonnelId: "P-Y", assignedBattalionChiefIds: ["P-FF"], status: "Approved", _order: 1 }));
     await assertFails(put(memberA(), `${lists}/hlfd-rms-shift-trades/items/TR-1`, { id: "TR-1", personnelId: "P-X", status: "Denied", _order: 1 }));
@@ -865,5 +869,51 @@ describe("FORGE Field settings and records", () => {
     await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/fieldPlanUpdates/PFU-1`), { status: "applied", reviewedBy: "Chief", reviewedAt: "now" }));
     await assertFails(updateDoc(doc(adminA().firestore(), `departments/${A}/fieldPlanUpdates/PFU-1`), { note: "rewritten" }));
     await assertFails(deleteDoc(doc(adminA().firestore(), `departments/${A}/fieldPlanUpdates/PFU-1`)));
+  });
+});
+
+describe("hydrant and fleet records follow permissions", () => {
+  const readOnlyA = () => as("readonly-a", { email: "ro@a.gov", email_verified: true });
+  const put = (ctx, path, data) => setDoc(doc(ctx.firestore(), path), data);
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `departments/${A}/users/readonly-a`), membership("readonly-a", A, { roleIds: ["readOnly"] }));
+      await setDoc(doc(db, `departments/${A}/memberGrants/readonly-a`), { permissions: { viewDocuments: true } });
+      await setDoc(doc(db, `departments/${A}/hydrants/h1`), { id: "h1" });
+      await setDoc(doc(db, `departments/${A}/hydrantInspections/i1`), { id: "i1" });
+      await setDoc(doc(db, `departments/${A}/hydrantDamageReports/r1`), { id: "r1", status: "draft" });
+      await setDoc(doc(db, `departments/${A}/fleetChecks/c1`), { status: "done" });
+    });
+  });
+
+  it("a member without hydrant access can read but not change hydrant records", async () => {
+    const ro = readOnlyA();
+    await assertSucceeds(getDoc(doc(ro.firestore(), `departments/${A}/hydrants/h1`)));
+    await assertFails(put(ro, `departments/${A}/hydrants/h1`, { id: "h1", status: "Out of Service" }));
+    await assertFails(put(ro, `departments/${A}/hydrantInspections/i2`, { id: "i2" }));
+    await assertFails(deleteDoc(doc(ro.firestore(), `departments/${A}/hydrants/h1`)));
+    await assertFails(put(ro, `departments/${A}/hydrantDamageReports/r2`, { id: "r2" }));
+  });
+
+  it("crews record hydrant tests and damage reports, but only admins delete", async () => {
+    const ff = ffA();
+    await assertSucceeds(put(ff, `departments/${A}/hydrants/h1`, { id: "h1", last_tested: "2026-11-03" }));
+    await assertSucceeds(put(ff, `departments/${A}/hydrantInspections/i2`, { id: "i2" }));
+    await assertSucceeds(put(ff, `departments/${A}/hydrantFlowTests/f1`, { id: "f1" }));
+    await assertSucceeds(put(ff, `departments/${A}/dailyActivity/a1`, { id: "a1" }));
+    await assertSucceeds(put(ff, `departments/${A}/hydrantDamageReports/r2`, { id: "r2", status: "draft" }));
+    await assertFails(deleteDoc(doc(ff.firestore(), `departments/${A}/hydrants/h1`)));
+    await assertFails(deleteDoc(doc(ff.firestore(), `departments/${A}/hydrantInspections/i1`)));
+    await assertFails(deleteDoc(doc(ff.firestore(), `departments/${A}/hydrantDamageReports/r1`)));
+    await assertSucceeds(deleteDoc(doc(adminA().firestore(), `departments/${A}/hydrants/h1`)));
+    await assertSucceeds(deleteDoc(doc(adminA().firestore(), `departments/${A}/hydrantDamageReports/r1`)));
+  });
+
+  it("anyone records fleet checks; only fleet staff delete them", async () => {
+    await assertSucceeds(put(ffA(), `departments/${A}/fleetChecks/c2`, { status: "in_progress" }));
+    await assertFails(deleteDoc(doc(ffA().firestore(), `departments/${A}/fleetChecks/c1`)));
+    await assertSucceeds(deleteDoc(doc(adminA().firestore(), `departments/${A}/fleetChecks/c1`)));
   });
 });

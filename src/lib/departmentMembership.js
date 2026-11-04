@@ -1,8 +1,8 @@
 import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { legacyRoleMap } from "../data/defaultRoles.js";
-import { getFirestoreDb } from "./firebaseClient.js";
+import { httpsCallable } from "firebase/functions";
+import { getFirebaseFunctions, getFirestoreDb } from "./firebaseClient.js";
 import { isPlatformScope } from "./tenantPaths.js";
-import { readTenantList } from "./tenantListStore.js";
 import { ensureDefaultRoles } from "./roleService.js";
 import { isPlatformBootstrapEmail } from "./platformBootstrap.js";
 import { ensureCreatorDepartmentAccess, loadPlatformCreator } from "./platformService.js";
@@ -48,45 +48,21 @@ export async function createDepartmentMembership(departmentId, user, role = "rea
   return { id: user.uid, ...payload };
 }
 
-async function resolvePersonnelIdByEmail(departmentId, email) {
-  if (!email) return "";
-  const firestoreDb = getFirestoreDb();
-  if (!firestoreDb) return "";
-
-  const list = await readTenantList(firestoreDb, departmentId, "hlfd-rms-personnel");
-  if (!list.exists) return "";
-
-  const { items } = list;
-  const normalizedEmail = email.toLowerCase();
-  const match = items.find((person) => String(person.email || "").toLowerCase() === normalizedEmail);
-  if (match?.id) return match.id;
-
-  const emailLocal = normalizedEmail.split("@")[0];
-  const localMatch = items.find((person) => (
-    String(person.email || "").toLowerCase().split("@")[0] === emailLocal
-  ));
-  return localMatch?.id || "";
-}
-
+// The server links a member to their personnel record by their verified email
+// (exact match). Members can't write personnelId themselves (firestore.rules).
 async function linkMembershipToPersonnel(departmentId, membership) {
   if (membership?.personnelId || !membership?.email) return membership;
-
-  const personnelId = await resolvePersonnelIdByEmail(departmentId, membership.email);
-  if (!personnelId) return membership;
-
-  const updatedAt = new Date().toISOString();
+  const functions = getFirebaseFunctions();
+  if (!functions) return membership;
   try {
-    // Only write the link fields: rules allow a member to set their own personnelId once.
-    await setDoc(
-      doc(getFirestoreDb(), "departments", departmentId, "users", membership.uid),
-      { personnelId, updatedAt },
-      { merge: true }
-    );
+    const result = await httpsCallable(functions, "linkMyPersonnelRecord")({ departmentId });
+    const personnelId = result.data?.personnelId || "";
+    if (!result.data?.linked || !personnelId) return membership;
+    return { ...membership, personnelId, updatedAt: new Date().toISOString() };
   } catch (error) {
     console.warn("Could not link membership to personnel record", error);
     return membership;
   }
-  return { ...membership, personnelId, updatedAt };
 }
 
 export async function ensureMembershipForUser(user, departmentId) {

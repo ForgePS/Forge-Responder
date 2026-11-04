@@ -5,6 +5,7 @@
  */
 const { HttpsError } = require("firebase-functions/v2/https");
 const { assertDepartmentAccess } = require("./access");
+const { isDemoDepartment, logDemoOutbound } = require("./demoGuard");
 
 const MAX_RECIPIENTS = 10;
 const MAX_CSV_BYTES = 500 * 1024;
@@ -78,6 +79,10 @@ async function sendDailyActivityEmail(db, request, { sendTextEmail, assertAccess
 
   const senderEmail = String(request.auth.token?.email || "").trim();
   const subject = `${input.departmentName || "Hydrant"} daily activity ${input.date}`;
+  if (isDemoDepartment(input.departmentId)) {
+    logDemoOutbound("hydrant activity email", { to: input.emails, subject });
+    return { ok: true, status: "logged", recipients: input.emails.length };
+  }
   const status = await sendTextEmail({
     to: input.emails,
     replyTo: senderEmail,

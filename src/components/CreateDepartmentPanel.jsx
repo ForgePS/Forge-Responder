@@ -23,6 +23,7 @@ const EMPTY_FORM = {
   address: "",
   city: "",
   zip: "",
+  trial: false,
   ...defaultSubscriptionDates(),
 };
 
@@ -131,7 +132,7 @@ export default function CreateDepartmentPanel({
           startDate: form.startDate,
           expirationDate: form.expirationDate,
         },
-      }, { user });
+      }, { user, trial: Boolean(form.trial) });
 
       // Register <department>.forgeresponder.com (best effort; can be retried).
       setDomainNotice("");
@@ -283,6 +284,14 @@ export default function CreateDepartmentPanel({
             onChange={(event) => updateField("expirationDate", event.target.value)}
             required
           />
+        </label>
+        <label className="create-department-trial">
+          <input
+            type="checkbox"
+            checked={Boolean(form.trial)}
+            onChange={(event) => updateField("trial", event.target.checked)}
+          />
+          <span>Start as a trial (sends trial-ending reminders; becomes past due after the expiration date unless changed)</span>
         </label>
       </form>
 

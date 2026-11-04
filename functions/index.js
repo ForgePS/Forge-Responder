@@ -3,7 +3,9 @@ const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https")
 const { defineSecret } = require("firebase-functions/params");
 const twilio = require("twilio");
 const { assertDepartmentAccess, assertDepartmentAccessOrPublicGateway, assertMemberPermission, assertPlatformSuperAdmin, isPlatformCreator } = require("./lib/access");
-const { resolvePersonnelPhones } = require("./lib/personnel");
+const { DEMO_OUTBOUND_MESSAGE, isDemoDepartment, logDemoOutbound } = require("./lib/demoGuard");
+const { safeAppOrigin } = require("./lib/invites");
+const { linkMyPersonnelRecord, resolvePersonnelPhones } = require("./lib/personnel");
 const { toUsE164 } = require("./lib/phone");
 const {
   connectIntegration,
@@ -130,6 +132,19 @@ exports.sendShiftBroadcastSms = onCall(
     }
     if (String(message || "").length > SMS_BROADCAST_MAX_CHARS) {
       throw new HttpsError("invalid-argument", `Keep the message under ${SMS_BROADCAST_MAX_CHARS} characters.`);
+    }
+
+    if (isDemoDepartment(departmentId)) {
+      logDemoOutbound("shift text", { broadcastId, recipients: personnelIds.length });
+      return {
+        broadcastId,
+        attempted: personnelIds.length,
+        sent: 0,
+        skipped: personnelIds.map((personnelId) => ({ personnelId, reason: DEMO_OUTBOUND_MESSAGE })),
+        failed: [],
+        deliveries: [],
+        demo: true,
+      };
     }
 
     const secrets = {
@@ -881,10 +896,25 @@ exports.sendHydrantDamageReport = onCall(
       departmentName: departmentName || "Fire Department",
     });
 
-    const origin = String(
+    if (isDemoDepartment(departmentId)) {
+      logDemoOutbound("hydrant damage report", { reportId, to: recipients });
+      if (attemptId) {
+        await db.doc(`departments/${departmentId}/hydrantDamageEmailAttempts/${attemptId}`).set({
+          status: "logged",
+          providerStatus: "demo",
+          error: DEMO_OUTBOUND_MESSAGE,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      return { accepted: false, error: DEMO_OUTBOUND_MESSAGE, providerStatus: "demo", providerMessageId: "" };
+    }
+
+    // Only our own app addresses: the link goes to a water utility, so it must
+    // never point at a site the caller chose.
+    const origin = safeAppOrigin(
       request.data?.origin
       || process.env.RMS_APP_ORIGIN
-      || "https://rms.forgepublicsafety.com"
+      || "https://app.forgeresponder.com"
     ).replace(/\/$/, "");
     const ackToken = await issueHydrantDamageAckToken(db, {
       departmentId,
@@ -1003,6 +1033,10 @@ exports.acceptDepartmentInvite = onCall(async (request) =>
 
 exports.previewDepartmentInvite = onCall({ invoker: "public" }, async (request) =>
   invites.previewInvite(admin.firestore(), request));
+
+// Members link their own personnel record only through here (matched by verified email).
+exports.linkMyPersonnelRecord = onCall(async (request) =>
+  linkMyPersonnelRecord(admin.firestore(), request));
 
 // ---------------------------------------------------------------------------
 // Department subdomains (<department>.forgeresponder.com) on Firebase Hosting.

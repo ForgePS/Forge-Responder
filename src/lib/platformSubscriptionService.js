@@ -378,23 +378,24 @@ export async function ensureCustomerSubscription(departmentId, userId = "", opti
     options.legacySubscription || settings?.subscription || department?.subscription || {}
   );
   const today = todayIso();
-  // Complimentary (no trial) only when the creator asks for it explicitly;
-  // no customer is special-cased by id.
+  // Departments are approved by hand, so a new one is active. A trial only when the
+  // creator asks for one; complimentary only when asked explicitly.
   const isDefault = Boolean(options.complimentary);
+  const isTrial = !isDefault && options.trial === true;
   const periodStart = legacy.startDate || today;
-  const periodEnd = legacy.expirationDate || addDaysIso(today, isDefault ? 365 : 30);
+  const periodEnd = legacy.expirationDate || addDaysIso(today, isTrial ? 30 : 365);
 
   const payload = {
     departmentId,
     departmentName: department?.name ?? departmentId,
     planId: options.planId ?? (isDefault ? "enterprise" : "standard"),
-    status: isDefault ? SUBSCRIPTION_STATUSES.ACTIVE : SUBSCRIPTION_STATUSES.TRIAL,
+    status: isTrial ? SUBSCRIPTION_STATUSES.TRIAL : SUBSCRIPTION_STATUSES.ACTIVE,
     billingCycle: isDefault ? "complimentary" : "monthly",
     currency: "USD",
     amountCents: 0,
     // The trial runs for the term chosen when the department was created (billing
     // reminders key off this date), not a fixed 30 days.
-    trialEndsAt: isDefault ? "" : periodEnd,
+    trialEndsAt: isTrial ? periodEnd : "",
     currentPeriodStart: periodStart,
     currentPeriodEnd: periodEnd,
     renewalDate: periodEnd,

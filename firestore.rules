@@ -97,16 +97,13 @@ service cloud.firestore {
     }
 
     // A member may edit only their own profile/preference fields — never role, roleIds,
-    // status, departmentId or platform flags. personnelId may be linked once (when empty).
+    // status, departmentId, platform flags or personnelId. The personnel link is set by
+    // an admin or by the linkMyPersonnelRecord function (matched by verified email).
     function isSafeSelfMembershipUpdate() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "preferences", "updatedAt", "lastLoginAt", "displayName", "uid", "personnelId"
+          "preferences", "updatedAt", "lastLoginAt", "displayName", "uid"
         ])
-        && request.resource.data.get("uid", request.auth.uid) == request.auth.uid
-        && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(["personnelId"])
-          || resource.data.get("personnelId", "") == ""
-        );
+        && request.resource.data.get("uid", request.auth.uid) == request.auth.uid;
     }
 
     function canAccessDepartment(departmentId) {
@@ -193,6 +190,15 @@ service cloud.firestore {
     function hydrantAdminKeys() {
       return ["manageWaterCompanies", "manageWaterDistricts", "editHydrants", "manageSystemSettings"];
     }
+    // Crews record hydrant tests and inspections (which also update the hydrant).
+    function hydrantFieldKeys() {
+      return ["viewHydrants", "editHydrants", "manageSystemSettings"];
+    }
+    function hydrantDamageWorkKeys() {
+      return ["createHydrantDamageReports", "editHydrantDamageDrafts", "sendHydrantDamageReports",
+        "verifyHydrantDamageReports", "acknowledgeHydrantDamageReports", "escalateHydrantDamageReports",
+        "editHydrants", "manageSystemSettings"];
+    }
 
     // ---- Lists: who may change what ----
     // The personnel record a member is linked to ("" if not linked yet).
@@ -267,10 +273,11 @@ service cloud.firestore {
     function isDecided(data) {
       return data.get("status", "") in ["Approved", "Denied"];
     }
-    // A new request is the member's own (or they aren't linked to a personnel record yet).
+    // A new request is the member's own. Members not yet linked to a personnel
+    // record can't file requests (they'd be able to file as anyone).
     function newIsMine(departmentId) {
-      return myPersonnelId(departmentId) == ""
-        || request.resource.data.get("personnelId", "") == myPersonnelId(departmentId);
+      return myPersonnelId(departmentId) != ""
+        && request.resource.data.get("personnelId", "") == myPersonnelId(departmentId);
     }
     function storedIsMine(departmentId) {
       return myPersonnelId(departmentId) != ""
@@ -629,7 +636,8 @@ service cloud.firestore {
         "profile", "public", "roles", "settings",
         "users", "violationCatalog", "violations", "waterCompanies",
         "waterCompanyContacts", "waterDistricts",
-        "fieldCheckoffLists", "fieldCheckoffs", "fieldPlanUpdates"
+        "fieldCheckoffLists", "fieldCheckoffs", "fieldPlanUpdates",
+        "hydrants", "hydrantInspections", "hydrantFlowTests", "dailyActivity"
       ];
     }
 
@@ -1153,12 +1161,13 @@ service cloud.firestore {
       }
       match /fleetChecks/{checkId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "apparatus");
+        allow create, update: if canWriteModule(departmentId, "apparatus");
+        allow delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetMeterReadings/{readingId} {
         allow read: if canAccessDepartment(departmentId);
         allow create, update: if canWriteModule(departmentId, "apparatus");
-        allow delete: if canWriteModule(departmentId, "apparatus");
+        allow delete: if canManageModule(departmentId, "apparatus", fleetWorkKeys());
       }
       match /fleetDefects/{defectId} {
         allow read: if canAccessDepartment(departmentId);
@@ -1455,11 +1464,36 @@ service cloud.firestore {
       }
       match /hydrantOwnershipReview/{reviewId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "hydrants");
+        allow create, update: if canManageModule(departmentId, "hydrants", hydrantDamageWorkKeys())
+          || canManageModule(departmentId, "hydrants", hydrantAdminKeys());
+        allow delete: if canManageModule(departmentId, "hydrants", hydrantAdminKeys());
       }
       match /hydrantDamageReports/{reportId} {
         allow read: if canAccessDepartment(departmentId);
-        allow create, update, delete: if canWriteModule(departmentId, "hydrants");
+        allow create, update: if canManageModule(departmentId, "hydrants", hydrantDamageWorkKeys());
+        allow delete: if canManageModule(departmentId, "hydrants", hydrantAdminKeys());
+      }
+      // Hydrants and their test records: crews with hydrant access record; only
+      // hydrant admins delete. (Which hydrant fields a crew may change is checked in the app.)
+      match /hydrants/{hydrantId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create, update: if canManageModule(departmentId, "hydrants", hydrantFieldKeys());
+        allow delete: if canManageModule(departmentId, "hydrants", hydrantAdminKeys());
+      }
+      match /hydrantInspections/{recordId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create, update: if canManageModule(departmentId, "hydrants", hydrantFieldKeys());
+        allow delete: if canManageModule(departmentId, "hydrants", hydrantAdminKeys());
+      }
+      match /hydrantFlowTests/{recordId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create, update: if canManageModule(departmentId, "hydrants", hydrantFieldKeys());
+        allow delete: if canManageModule(departmentId, "hydrants", hydrantAdminKeys());
+      }
+      match /dailyActivity/{recordId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create, update: if canManageModule(departmentId, "hydrants", hydrantFieldKeys());
+        allow delete: if canManageModule(departmentId, "hydrants", hydrantAdminKeys());
       }
       match /hydrantDamageEmailAttempts/{attemptId} {
         allow read: if canAccessDepartment(departmentId);

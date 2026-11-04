@@ -12,6 +12,7 @@ const { Timestamp } = require("firebase-admin/firestore");
 const { isPlatformCreator } = require("./access");
 const { assertAdminSecondFactor } = require("./twoFactor");
 const { sendTextEmail } = require("./mailer");
+const { isDemoDepartment, logDemoOutbound } = require("./demoGuard");
 
 const INVITE_TTL_DAYS = 14;
 const ADMIN_ROLE_IDS = ["fireChief", "itAdmin"];
@@ -230,9 +231,14 @@ async function createInvite(db, request) {
   await batch.commit();
 
   const inviteUrl = buildInviteUrl(data.appOrigin, departmentId, token);
+  // The demo sign-in is public: show the link in the app, never email it.
+  const demoSkip = isDemoDepartment(departmentId) && data.sendEmail !== false;
+  if (demoSkip) logDemoOutbound("invite email", { to: email, departmentId });
   const emailStatus = data.sendEmail === false
     ? "skipped"
-    : await sendInviteEmail({
+    : demoSkip
+      ? "logged"
+      : await sendInviteEmail({
       to: email,
       departmentName,
       inviteUrl,
