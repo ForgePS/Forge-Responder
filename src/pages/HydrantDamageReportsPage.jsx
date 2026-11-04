@@ -3,12 +3,15 @@ import { ArrowLeft, CirclePlus, Search } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import HydrantDamageModuleLayout, {
+  HYDRANT_DAMAGE_TABS,
   HydrantDamagePermissionGate,
   HydrantDamageStatusBadge,
 } from "../components/hydrants/HydrantDamageModuleLayout.jsx";
 import HydrantDamageWizard from "../components/hydrants/HydrantDamageWizard.jsx";
 import OutOfServiceHydrantList, {
+  findOpenDamageReportForHydrant,
   hydrantRecordKey,
+  listOutOfServiceHydrants,
 } from "../components/hydrants/OutOfServiceHydrantList.jsx";
 import {
   canCreateHydrantDamage,
@@ -42,7 +45,6 @@ import {
   sendHydrantDamageReport,
   setDamageReportSlaPaused,
   submitHydrantDamageVerification,
-  summarizeSlaQueue,
   syncOfflineDamageDrafts,
   updateHydrantDamageReport,
 } from "../lib/hydrantDamage/index.js";
@@ -51,6 +53,19 @@ import { isOutOfServiceHydrant } from "../lib/hydrantCompletionStats.js";
 import { applyHydrantStatusChange } from "../lib/hydrantStatusSync.js";
 import { hydrantMatchesDamageReport, shouldOfferReturnToService } from "../lib/hydrantDamage/returnToService.js";
 import { friendlyError } from "../lib/friendlyError.js";
+
+const EDITABLE_STATUSES = new Set(["draft", "ready_to_send", "ownership_review_required", "reopened"]);
+
+// Plain-language heading for each list.
+const QUEUE_TEXT = {
+  all: { title: "All damage reports", description: "Every hydrant damage report, newest first.", empty: "No damage reports yet." },
+  open: { title: "Not sent yet", description: "Reports still being written. Finish them and send them to the water company.", empty: "Nothing waiting to be sent." },
+  awaiting: { title: "Waiting on the water company", description: "Sent reports the water company hasn't answered yet.", empty: "No reports waiting on the water company." },
+  repairs: { title: "Being repaired", description: "The water company has the report and is working on the repair.", empty: "No repairs in progress." },
+  verification: { title: "Ready to check", description: "The water company says the repair is done. Check the hydrant and put it back in service.", empty: "Nothing waiting to be checked." },
+  overdue: { title: "Overdue", description: "Reports past their response or repair deadline.", empty: "Nothing overdue." },
+  closed: { title: "Closed", description: "Finished reports.", empty: "No closed reports." },
+};
 
 function queueIdFromNav(navName = "") {
   const views = getDamageQueueViews();
@@ -136,7 +151,7 @@ export default function HydrantDamageReportsPage({
         if (!seen.has(key)) merged.push(row);
       }
       setHydrants(merged);
-      setSelectedId((current) => current || nextReports[0]?.id || "");
+      setSelectedId((current) => current || filterDamageReportsByQueue(nextReports, queueId)[0]?.id || "");
     } catch (loadError) {
       console.error(loadError);
       setError(friendlyError(loadError, "Couldn't load damage reports."));
@@ -238,7 +253,26 @@ export default function HydrantDamageReportsPage({
     );
   }, [reports, queueId, search]);
 
-  const slaSummary = useMemo(() => summarizeSlaQueue(reports), [reports]);
+  // Opening another list shows its first report (not one from a different list).
+  const [shownQueue, setShownQueue] = useState(queueId);
+  if (shownQueue !== queueId) {
+    setShownQueue(queueId);
+    setSelectedId(filterDamageReportsByQueue(reports, queueId)[0]?.id || "");
+  }
+  const queueCounts = useMemo(
+    () => Object.fromEntries(HYDRANT_DAMAGE_TABS.map((tab) => [tab.id, QUEUE_TEXT[tab.id] ? filterDamageReportsByQueue(reports, tab.id).length : null])),
+    [reports]
+  );
+  const tabs = useMemo(
+    () => HYDRANT_DAMAGE_TABS.map((tab) => (queueCounts[tab.id] === null ? tab : { ...tab, count: queueCounts[tab.id] })),
+    [queueCounts]
+  );
+  // Out-of-service hydrants that don't have a damage report open yet.
+  const hydrantsNeedingReport = useMemo(
+    () => listOutOfServiceHydrants(hydrants).filter((row) => !findOpenDamageReportForHydrant(reports, hydrantRecordKey(row))),
+    [hydrants, reports]
+  );
+  const queueText = QUEUE_TEXT[queueId] || QUEUE_TEXT.all;
   const draftSla = useMemo(() => (draft ? getSlaSnapshot(draft) : null), [draft]);
   const escalateGate = useMemo(() => (draft ? canEscalateDamageReport(draft) : { ok: false }), [draft]);
 
@@ -585,6 +619,207 @@ export default function HydrantDamageReportsPage({
   ].includes(draft.status);
   const showReopen = draft && ["closed", "verified", "cancelled"].includes(draft.status);
 
+  // A report that has gone to the water company: show what to do next first,
+  // and the report itself (read-only reference) underneath.
+  const isSent = Boolean(draft) && !EDITABLE_STATUSES.has(String(draft.status || ""));
+  const wizardNode = draft ? (
+    <HydrantDamageWizard
+      key={draft.id}
+      startStep={isSent ? 7 : undefined}
+      draft={draft}
+      setDraft={setDraft}
+      hydrants={hydrants}
+      companies={companies}
+      reports={reports}
+      canEdit={canEdit}
+      canSend={canSend}
+      saving={saving}
+      departmentName={departmentName}
+      onSave={handleSave}
+      onReadyToSend={handleReadyToSend}
+      onSend={handleSend}
+      onAssignHydrant={handleAssignHydrant}
+      onClose={handleCloseDraft}
+    />
+  ) : null;
+  const actionNodes = draft ? (
+    <>
+      {showAckPanel && canAck ? (
+        <div className="occupancy-form-grid" style={{ marginTop: 18, borderTop: "1px solid var(--rms-border)", paddingTop: 14 }}>
+          <div className="config-field wide">
+            <span>Water company response</span>
+            <p className="occupancy-muted">
+              When the water company replies by phone or email, record it here, then update the repair as it moves along. Marking the repair completed sends it to the fire department to check; it doesn't close the report.
+            </p>
+          </div>
+          <label className="config-field">
+            <span>Acknowledged by</span>
+            <input
+              value={ackDraft.acknowledgedByName}
+              onChange={(e) => setAckDraft((c) => ({ ...c, acknowledgedByName: e.target.value }))}
+              placeholder="Utility contact name"
+            />
+          </label>
+          <label className="config-field">
+            <span>Contact email</span>
+            <input
+              value={ackDraft.acknowledgedByEmail}
+              onChange={(e) => setAckDraft((c) => ({ ...c, acknowledgedByEmail: e.target.value }))}
+            />
+          </label>
+          <label className="config-field">
+            <span>Work order #</span>
+            <input
+              value={ackDraft.utilityWorkOrderNumber || draft.utilityWorkOrderNumber || ""}
+              onChange={(e) => setAckDraft((c) => ({ ...c, utilityWorkOrderNumber: e.target.value }))}
+            />
+          </label>
+          <label className="config-field">
+            <span>Expected repair date</span>
+            <input
+              type="datetime-local"
+              value={(ackDraft.estimatedRepairAt || "").slice(0, 16)}
+              onChange={(e) => setAckDraft((c) => ({ ...c, estimatedRepairAt: e.target.value ? new Date(e.target.value).toISOString() : "" }))}
+            />
+          </label>
+          <label className="config-field wide">
+            <span>Utility notes</span>
+            <textarea
+              rows={2}
+              value={ackDraft.utilityNotes}
+              onChange={(e) => setAckDraft((c) => ({ ...c, utilityNotes: e.target.value }))}
+            />
+          </label>
+          <div className="occupancy-detail-actions">
+            <button className="primary-button" type="button" disabled={saving} onClick={handleAcknowledge}>
+              Save response
+            </button>
+            <button className="secondary-button" type="button" disabled={saving} onClick={() => handleRepairUpdate("scheduled")}>
+              Repair scheduled
+            </button>
+            <button className="secondary-button" type="button" disabled={saving} onClick={() => handleRepairUpdate("in_progress")}>
+              In progress
+            </button>
+            <button className="secondary-button" type="button" disabled={saving} onClick={() => handleRepairUpdate("completed")}>
+              Repair completed
+            </button>
+            <button className="secondary-button" type="button" disabled={saving} onClick={handleReadyForVerification}>
+              Ready for verification
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {showVerifyPanel && canVerify ? (
+        <div className="occupancy-form-grid" style={{ marginTop: 18, borderTop: "1px solid var(--rms-border)", paddingTop: 14 }}>
+          <div className="config-field wide">
+            <span>Check the repair</span>
+            <p className="occupancy-muted">
+              Inspect the hydrant. If it passes, it can go back in service and the report closes. If it fails, the repair goes back to the water company.
+            </p>
+          </div>
+          <label className="config-field">
+            <span>How it was checked</span>
+            <select
+              value={verifyDraft.verificationType}
+              onChange={(e) => setVerifyDraft((c) => ({ ...c, verificationType: e.target.value }))}
+            >
+              {getVerificationTypeOptions().map((row) => (
+                <option key={row.id} value={row.id}>{row.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="config-field">
+            <span>Result</span>
+            <select
+              value={verifyDraft.result}
+              onChange={(e) => setVerifyDraft((c) => ({ ...c, result: e.target.value }))}
+            >
+              {getVerificationResultOptions().map((row) => (
+                <option key={row.id} value={row.id}>{row.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="checkbox-inline">
+            <input
+              type="checkbox"
+              checked={verifyDraft.returnToService}
+              onChange={(e) => setVerifyDraft((c) => ({ ...c, returnToService: e.target.checked }))}
+            />
+            <span>Put the hydrant back in service if it passes</span>
+          </label>
+          <label className="checkbox-inline">
+            <input
+              type="checkbox"
+              checked={verifyDraft.leakageObserved}
+              onChange={(e) => setVerifyDraft((c) => ({ ...c, leakageObserved: e.target.checked }))}
+            />
+            <span>Leakage observed</span>
+          </label>
+          <label className="config-field wide">
+            <span>Notes</span>
+            <textarea
+              rows={2}
+              value={verifyDraft.notes}
+              onChange={(e) => setVerifyDraft((c) => ({ ...c, notes: e.target.value }))}
+            />
+          </label>
+          <div className="occupancy-detail-actions">
+            <button className="primary-button" type="button" disabled={saving} onClick={handleVerify}>
+              Save check
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {showReopen && canVerify ? (
+        <div className="occupancy-detail-actions" style={{ marginTop: 14 }}>
+          <button className="secondary-button" type="button" disabled={saving} onClick={handleReopen}>
+            Reopen report
+          </button>
+        </div>
+      ) : null}
+      {canEscalate && isSent && !showReopen ? (
+        <div className="occupancy-form-grid" style={{ marginTop: 18, borderTop: "1px solid var(--rms-border)", paddingTop: 14 }}>
+          <div className="config-field wide">
+            <span>Follow up on a late report</span>
+            <p className="occupancy-muted">
+              Note who you contacted at the water company and why. You can record a follow-up once every 4 hours.
+            </p>
+          </div>
+          <label className="config-field wide">
+            <span>Escalation notes</span>
+            <textarea
+              rows={2}
+              value={escalateNotes}
+              onChange={(e) => setEscalateNotes(e.target.value)}
+              placeholder="Who you contacted and what they said"
+            />
+          </label>
+          <div className="occupancy-detail-actions">
+            <button
+              className="primary-button"
+              type="button"
+              disabled={saving || !escalateGate.ok}
+              title={escalateGate.reason || ""}
+              onClick={handleEscalate}
+            >
+              Record follow-up
+            </button>
+            <button className="secondary-button" type="button" disabled={saving} onClick={handleToggleSlaPause}>
+              {draft.slaPaused ? "Resume deadline" : "Pause deadline"}
+            </button>
+            {!escalateGate.ok ? <span className="occupancy-muted">{escalateGate.reason}</span> : null}
+          </div>
+          {(draft.escalationHistory || []).length ? (
+            <p className="occupancy-muted">
+              Last follow-up: {new Date(draft.escalationHistory[0].at).toLocaleString()}
+              {draft.escalationHistory[0].notes ? ` — ${draft.escalationHistory[0].notes}` : ""}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  ) : null;
+
   function handleCloseDraft() {
     setSelectedId("");
     setDraft(null);
@@ -593,22 +828,15 @@ export default function HydrantDamageReportsPage({
   return (
     <HydrantDamagePermissionGate allowed={allowed}>
       <HydrantDamageModuleLayout
-        title={activeNavName || "Damage Reports"}
-        description="Select out-of-service hydrants from current inventory to create and email damage reports to the responsible water company."
+        title={queueText.title}
+        description={queueText.description}
         activeNavName={activeNavName}
         onNavigate={onNavigate}
+        tabs={canManageWaterCompanies(permissions, isCreator) ? tabs : tabs.filter((tab) => tab.id !== "directory")}
         actions={canCreate ? (
           <div className="occupancy-detail-actions">
             <button className="primary-button" type="button" disabled={saving} onClick={handleCreateBlank}>
               <CirclePlus size={14} /> New damage report
-            </button>
-            {canManageWaterCompanies(permissions, isCreator) ? (
-              <button className="secondary-button" type="button" onClick={() => onNavigate?.("Water Company Directory")}>
-                Water companies
-              </button>
-            ) : null}
-            <button className="secondary-button" type="button" onClick={() => onNavigate?.("Water Districts")}>
-              Water districts
             </button>
           </div>
         ) : null}
@@ -629,45 +857,29 @@ export default function HydrantDamageReportsPage({
 
         {!loading ? (
           <>
-            <div className="hydrant-damage-sla-strip" style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
-              <HydrantDamageStatusBadge status={slaSummary.overdue ? "overdue" : "ok"} label={`${slaSummary.overdue} overdue`} />
-              <HydrantDamageStatusBadge status="awaiting_acknowledgment" label={`${slaSummary.awaitingAck} awaiting ack`} />
-              <HydrantDamageStatusBadge status="ready_for_verification" label={`${slaSummary.readyVerify} ready to verify`} />
-              <HydrantDamageStatusBadge status="paused" label={`${slaSummary.paused} SLA paused`} />
-            </div>
-
-            <section className="panel oos-hydrant-panel">
-              <div className="panel-body">
-                <OutOfServiceHydrantList
-                  hydrants={hydrants}
-                  reports={reports}
-                  selectedKey={draft?.hydrantId || ""}
-                  onSelect={(key) => {
-                    if (draft && canEdit) {
-                      handleAssignHydrant(key);
-                      return;
-                    }
-                    const open = reports.find((row) =>
-                      String(row.hydrantId || "") === key
-                      && !["closed", "verified", "cancelled"].includes(String(row.status || ""))
-                    );
-                    if (open) setSelectedId(open.id);
-                  }}
-                  onIssueReport={canCreate ? handleIssueFromOutOfService : undefined}
-                  canCreate={canCreate}
-                  saving={saving}
-                />
-              </div>
-            </section>
+            {canCreate && hydrantsNeedingReport.length && ["all", "open"].includes(queueId) ? (
+              <section className="panel oos-hydrant-panel">
+                <div className="panel-body">
+                  <OutOfServiceHydrantList
+                    title="Out of service, no damage report yet"
+                    hydrants={hydrantsNeedingReport}
+                    reports={reports}
+                    onIssueReport={handleIssueFromOutOfService}
+                    canCreate={canCreate}
+                    saving={saving}
+                  />
+                </div>
+              </section>
+            ) : null}
 
           <section className="personnel-workspace occupancy-workspace">
             <section className="panel">
               <header>
-                <div><strong>Queue</strong></div>
+                <div><strong>Reports</strong></div>
                 <label className="config-inline-search">
                   <Search size={14} aria-hidden />
                   <input
-                    placeholder="Filter"
+                    placeholder="Search reports"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -686,7 +898,7 @@ export default function HydrantDamageReportsPage({
                         <strong>{item.reportNumber}</strong>
                         <small>
                           {item.hydrantLabel || "No hydrant"} · {item.waterCompanyName || "No utility"} · {item.severityLabel}
-                          {getSlaSnapshot(item).overdue ? " · SLA overdue" : ""}
+                          
                         </small>
                       </span>
                       <HydrantDamageStatusBadge
@@ -695,7 +907,7 @@ export default function HydrantDamageReportsPage({
                       />
                     </button>
                   ))}
-                  {!visible.length ? <p className="occupancy-muted">No reports in this queue.</p> : null}
+                  {!visible.length ? <p className="occupancy-muted">{search.trim() ? "No reports match your search." : queueText.empty}</p> : null}
                 </div>
               </div>
             </section>
@@ -722,201 +934,26 @@ export default function HydrantDamageReportsPage({
                   {draftSla?.reasons?.length ? (
                     <p className="occupancy-muted">{draftSla.reasons.join(" · ")}</p>
                   ) : null}
-                  <HydrantDamageWizard
-                    draft={draft}
-                    setDraft={setDraft}
-                    hydrants={hydrants}
-                    companies={companies}
-                    reports={reports}
-                    canEdit={canEdit}
-                    canSend={canSend}
-                    saving={saving}
-                    departmentName={departmentName}
-                    onSave={handleSave}
-                    onReadyToSend={handleReadyToSend}
-                    onSend={handleSend}
-                    onAssignHydrant={handleAssignHydrant}
-                    onClose={handleCloseDraft}
-                  />
-                  {canEscalate && draft.status !== "draft" && draft.status !== "ownership_review_required" ? (
-                    <div className="occupancy-form-grid" style={{ marginTop: 18, borderTop: "1px solid var(--rms-border)", paddingTop: 14 }}>
-                      <div className="config-field wide">
-                        <span>SLA / escalation</span>
-                        <p className="occupancy-muted">
-                          Escalations are recorded with rate limiting (4h). This does not fake an email send.
-                        </p>
-                      </div>
-                      <label className="config-field wide">
-                        <span>Escalation notes</span>
-                        <textarea
-                          rows={2}
-                          value={escalateNotes}
-                          onChange={(e) => setEscalateNotes(e.target.value)}
-                          placeholder="Why escalate / who was notified"
-                        />
-                      </label>
-                      <div className="occupancy-detail-actions">
-                        <button
-                          className="primary-button"
-                          type="button"
-                          disabled={saving || !escalateGate.ok}
-                          title={escalateGate.reason || ""}
-                          onClick={handleEscalate}
-                        >
-                          Escalate
-                        </button>
-                        <button className="secondary-button" type="button" disabled={saving} onClick={handleToggleSlaPause}>
-                          {draft.slaPaused ? "Resume SLA" : "Pause SLA"}
-                        </button>
-                        {!escalateGate.ok ? <span className="occupancy-muted">{escalateGate.reason}</span> : null}
-                      </div>
-                      {(draft.escalationHistory || []).length ? (
-                        <p className="occupancy-muted">
-                          Last escalation: {new Date(draft.escalationHistory[0].at).toLocaleString()}
-                          {draft.escalationHistory[0].notes ? ` — ${draft.escalationHistory[0].notes}` : ""}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {showAckPanel && canAck ? (
-                    <div className="occupancy-form-grid" style={{ marginTop: 18, borderTop: "1px solid var(--rms-border)", paddingTop: 14 }}>
-                      <div className="config-field wide">
-                        <span>Utility acknowledgment / repair updates</span>
-                        <p className="occupancy-muted">
-                          Record acknowledgment from the water company (phone/email reply). Completing repair queues FD verification (does not auto-close).
-                        </p>
-                      </div>
-                      <label className="config-field">
-                        <span>Acknowledged by</span>
-                        <input
-                          value={ackDraft.acknowledgedByName}
-                          onChange={(e) => setAckDraft((c) => ({ ...c, acknowledgedByName: e.target.value }))}
-                          placeholder="Utility contact name"
-                        />
-                      </label>
-                      <label className="config-field">
-                        <span>Contact email</span>
-                        <input
-                          value={ackDraft.acknowledgedByEmail}
-                          onChange={(e) => setAckDraft((c) => ({ ...c, acknowledgedByEmail: e.target.value }))}
-                        />
-                      </label>
-                      <label className="config-field">
-                        <span>Work order #</span>
-                        <input
-                          value={ackDraft.utilityWorkOrderNumber || draft.utilityWorkOrderNumber || ""}
-                          onChange={(e) => setAckDraft((c) => ({ ...c, utilityWorkOrderNumber: e.target.value }))}
-                        />
-                      </label>
-                      <label className="config-field">
-                        <span>Est. repair</span>
-                        <input
-                          type="datetime-local"
-                          value={(ackDraft.estimatedRepairAt || "").slice(0, 16)}
-                          onChange={(e) => setAckDraft((c) => ({ ...c, estimatedRepairAt: e.target.value ? new Date(e.target.value).toISOString() : "" }))}
-                        />
-                      </label>
-                      <label className="config-field wide">
-                        <span>Utility notes</span>
-                        <textarea
-                          rows={2}
-                          value={ackDraft.utilityNotes}
-                          onChange={(e) => setAckDraft((c) => ({ ...c, utilityNotes: e.target.value }))}
-                        />
-                      </label>
-                      <div className="occupancy-detail-actions">
-                        <button className="primary-button" type="button" disabled={saving} onClick={handleAcknowledge}>
-                          Record acknowledgment
-                        </button>
-                        <button className="secondary-button" type="button" disabled={saving} onClick={() => handleRepairUpdate("scheduled")}>
-                          Repair scheduled
-                        </button>
-                        <button className="secondary-button" type="button" disabled={saving} onClick={() => handleRepairUpdate("in_progress")}>
-                          In progress
-                        </button>
-                        <button className="secondary-button" type="button" disabled={saving} onClick={() => handleRepairUpdate("completed")}>
-                          Repair completed
-                        </button>
-                        <button className="secondary-button" type="button" disabled={saving} onClick={handleReadyForVerification}>
-                          Ready for verification
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                  {showVerifyPanel && canVerify ? (
-                    <div className="occupancy-form-grid" style={{ marginTop: 18, borderTop: "1px solid var(--rms-border)", paddingTop: 14 }}>
-                      <div className="config-field wide">
-                        <span>Fire department verification</span>
-                        <p className="occupancy-muted">
-                          Utility completion does not close the report. Pass to return to service, or fail to reopen repair.
-                        </p>
-                      </div>
-                      <label className="config-field">
-                        <span>Verification type</span>
-                        <select
-                          value={verifyDraft.verificationType}
-                          onChange={(e) => setVerifyDraft((c) => ({ ...c, verificationType: e.target.value }))}
-                        >
-                          {getVerificationTypeOptions().map((row) => (
-                            <option key={row.id} value={row.id}>{row.label}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="config-field">
-                        <span>Result</span>
-                        <select
-                          value={verifyDraft.result}
-                          onChange={(e) => setVerifyDraft((c) => ({ ...c, result: e.target.value }))}
-                        >
-                          {getVerificationResultOptions().map((row) => (
-                            <option key={row.id} value={row.id}>{row.label}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="checkbox-inline">
-                        <input
-                          type="checkbox"
-                          checked={verifyDraft.returnToService}
-                          onChange={(e) => setVerifyDraft((c) => ({ ...c, returnToService: e.target.checked }))}
-                        />
-                        <span>Return to service on pass</span>
-                      </label>
-                      <label className="checkbox-inline">
-                        <input
-                          type="checkbox"
-                          checked={verifyDraft.leakageObserved}
-                          onChange={(e) => setVerifyDraft((c) => ({ ...c, leakageObserved: e.target.checked }))}
-                        />
-                        <span>Leakage observed</span>
-                      </label>
-                      <label className="config-field wide">
-                        <span>Notes</span>
-                        <textarea
-                          rows={2}
-                          value={verifyDraft.notes}
-                          onChange={(e) => setVerifyDraft((c) => ({ ...c, notes: e.target.value }))}
-                        />
-                      </label>
-                      <div className="occupancy-detail-actions">
-                        <button className="primary-button" type="button" disabled={saving} onClick={handleVerify}>
-                          Submit verification
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                  {showReopen && canVerify ? (
-                    <div className="occupancy-detail-actions" style={{ marginTop: 14 }}>
-                      <button className="secondary-button" type="button" disabled={saving} onClick={handleReopen}>
-                        Reopen report
-                      </button>
-                    </div>
-                  ) : null}
+                  {isSent ? (
+                    <>
+                      {actionNodes}
+                      <details className="hydrant-damage-report-details">
+                        <summary>View the report</summary>
+                        {wizardNode}
+                      </details>
+                    </>
+                  ) : (
+                    <>
+                      {wizardNode}
+                      {actionNodes}
+                    </>
+                  )}
                 </div>
               </section>
             ) : (
               <section className="panel">
                 <div className="panel-body">
-                  <p className="occupancy-muted">Select a report or create a new damage report.</p>
+                  <p className="occupancy-muted">Pick a report from the list{canCreate ? ", or start a new one with New damage report" : ""}.</p>
                 </div>
               </section>
             )}

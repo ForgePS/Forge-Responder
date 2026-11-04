@@ -2,10 +2,10 @@ import { AlertTriangle } from "lucide-react";
 
 export const HYDRANT_DAMAGE_TABS = [
   { id: "all", label: "All Reports", navName: "Damage Reports" },
-  { id: "open", label: "Open", navName: "Open Damage Reports" },
-  { id: "awaiting", label: "Awaiting Utility", navName: "Awaiting Water Company" },
-  { id: "repairs", label: "Repairs", navName: "Repairs in Progress" },
-  { id: "verification", label: "Verification", navName: "Ready for Verification" },
+  { id: "open", label: "Not sent yet", navName: "Open Damage Reports" },
+  { id: "awaiting", label: "Waiting on utility", navName: "Awaiting Water Company" },
+  { id: "repairs", label: "Being repaired", navName: "Repairs in Progress" },
+  { id: "verification", label: "Ready to check", navName: "Ready for Verification" },
   { id: "overdue", label: "Overdue", navName: "Overdue Repairs" },
   { id: "closed", label: "Closed", navName: "Closed Reports" },
   { id: "directory", label: "Water Companies", navName: "Water Company Directory" },
@@ -43,6 +43,9 @@ export default function HydrantDamageModuleLayout({
               onClick={() => onNavigate(tab.navName)}
             >
               {tab.label}
+              {typeof tab.count === "number" ? (
+                <span className={`inspections-subnav-count${tab.count ? "" : " empty"}`}>{tab.count}</span>
+              ) : null}
             </button>
           ))}
         </nav>

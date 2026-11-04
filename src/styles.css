@@ -3920,3 +3920,37 @@ html[data-theme="light"] .apparatus-check-card { background: #fff; border-color:
   color: var(--muted, #64748b);
   font-size: 0.9rem;
 }
+
+/* Hydrant damage reports: count on each list tab. */
+.inspections-subnav-count {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--rms-primary);
+  color: #fff;
+  font-size: 0.75rem;
+  line-height: 18px;
+  text-align: center;
+}
+
+.inspections-subnav-count.empty {
+  background: transparent;
+  color: var(--rms-text-muted, #64748b);
+  border: 1px solid var(--rms-border);
+}
+
+/* The sent report itself, shown under the next-step actions. */
+.hydrant-damage-report-details {
+  margin-top: 18px;
+  border-top: 1px solid var(--rms-border);
+  padding-top: 12px;
+}
+
+.hydrant-damage-report-details > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--rms-primary);
+  margin-bottom: 10px;
+}
