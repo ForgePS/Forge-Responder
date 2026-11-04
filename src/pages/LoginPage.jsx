@@ -234,7 +234,7 @@ export default function LoginPage() {
       <section className="auth-card auth-card-login">
         <div className="auth-forge-logo">
           <img
-            className="auth-platform-logo"
+            className={platformBrand.builtIn ? "auth-platform-logo auth-platform-logo-builtin" : "auth-platform-logo"}
             src={platformBrand.logoUrl}
             alt={platformBrand.name}
           />

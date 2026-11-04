@@ -22,6 +22,8 @@ function toBrand(data = {}) {
   return {
     logoUrl: custom ? url : forgeResponderLogo,
     name: data?.name || "FORGE Responder",
+    // The built-in logo file has wide transparent margins the page trims.
+    builtIn: !custom,
   };
 }
 

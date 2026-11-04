@@ -3962,3 +3962,13 @@ html[data-theme="light"] .apparatus-check-card { background: #fff; border-color:
   max-height: 160px;
   margin: 0 auto;
 }
+
+/* The built-in FORGE Responder logo: full card width, transparent margins of the
+   original file trimmed by the box (the image itself is untouched). */
+.auth-forge-logo img.auth-platform-logo-builtin {
+  width: 100%;
+  max-height: none;
+  aspect-ratio: 1657 / 651;
+  object-fit: cover;
+  object-position: center;
+}
