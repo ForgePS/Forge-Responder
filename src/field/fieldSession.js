@@ -112,6 +112,8 @@ export function fieldCapabilities(snapshot, config = null) {
     dailyLogEdit: allowed("dailyLog") && on("dailyLog") && (isCreator || hasPermission(permissions, "editDailyLog") || hasPermission(permissions, "editSchedule")),
     incidents: allowed("incident") && on("nerisFireReports") && canEditNerisReports(permissions, isCreator),
     inspections: allowed("inspections") && on("inspections") && canEditInspectionsModule(permissions, isCreator),
+    // EMS protocols / HazMat documents (Documents permission).
+    referenceDocs: isCreator || hasPermission(permissions, "viewDocuments"),
     // Fire codes: the desktop Code Library (opened in the browser).
     fireCodes: isCreator || nav("Browse Codes"),
     preFirePlans,

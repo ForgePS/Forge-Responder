@@ -20,9 +20,23 @@ export const HYDRANT_INSPECTION_ITEMS = [
   "Adequate Clearance (3 ft all sides)",
 ];
 
+// What a good result looks like (the desktop's note hints).
+const ITEM_HINTS = {
+  "No Obstructions": "Area clear and accessible.",
+  "Operable (Turns Open/Closed)": "Operated smoothly.",
+  "Caps Present": "All caps present.",
+  "Threads in Good Condition": "Threads clean and intact.",
+  "Oil Nut Provided": "Oil nut in place.",
+  "Barrel Drains Properly": "Drains as expected.",
+  "Leaks (Valve / Caps / Barrel)": "No leaks detected.",
+  "Steamer Port / Pumper Outlet Good": "Outlet threads good.",
+  "Adequate Clearance (3 ft all sides)": "Meets clearance requirement.",
+};
+
+// Same answers as the desktop checklist.
 const RESULT_OPTIONS = [
-  { value: "Yes", label: "OK", tone: "ok" },
-  { value: "No", label: "Problem", tone: "bad" },
+  { value: "Yes", label: "Yes", tone: "ok" },
+  { value: "No", label: "No", tone: "bad" },
   { value: "N/A", label: "N/A", tone: "muted" },
 ];
 
@@ -109,7 +123,7 @@ export default function HydrantInspectionScreen({ params = {} }) {
         title="Checklist"
         aside={unanswered ? (
           <button type="button" className="fa-link" onClick={() => { update((current) => ({ checklist: current.checklist.map((row) => (row.result ? row : { ...row, result: "Yes" })) })); form.setErrors((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !/^row\d+$/.test(key)))); }}>
-            <CheckCheck size={18} /> All OK
+            <CheckCheck size={18} /> Rest Yes
           </button>
         ) : null}
       >
@@ -129,14 +143,18 @@ export default function HydrantInspectionScreen({ params = {} }) {
                   <Field label="What's wrong?" required error={errors[`row${index}:note`]}>
                     <TextArea value={row.notes} onChange={(value) => setRow(index, { notes: value })} rows={2} placeholder="Describe the problem" />
                   </Field>
+                ) : row.result ? (
+                  <Field label="Notes">
+                    <TextArea value={row.notes} onChange={(value) => setRow(index, { notes: value })} rows={1} placeholder={ITEM_HINTS[row.item] || "Optional"} />
+                  </Field>
                 ) : null}
                 {row.result && row.result !== "N/A" && rules.show("repairNeeded") ? (
                   <Field label="Repair needed">
                     <Segmented value={row.repair_needed} options={[{ value: "No", label: "No", tone: "ok" }, { value: "Yes", label: "Yes", tone: "bad" }]} onChange={(value) => setRow(index, { repair_needed: value })} columns={2} />
                   </Field>
                 ) : null}
-                {row.result === "No" && rules.show("rowPhotos") ? (
-                  <Field label="Photo" required={rules.required("rowPhotos")} error={errors[`row${index}:photo`]}>
+                {row.result && rules.show("rowPhotos") ? (
+                  <Field label="Photo" required={row.result === "No" && rules.required("rowPhotos")} error={errors[`row${index}:photo`]}>
                     <PhotoStrip
                       attachments={rowPhotos}
                       max={3}

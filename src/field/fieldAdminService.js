@@ -23,8 +23,13 @@ export async function loadFieldAppConfig(departmentId) {
 
 export async function saveFieldAppConfig(departmentId, config, actor = {}) {
   const db = getFirestoreDb();
+  const normalized = normalizeFieldAppConfig(config);
+  // Rows left completely empty in the editor aren't saved.
+  const filled = (row) => Object.entries(row).some(([key, value]) => key !== "id" && String(value).trim());
   const payload = sanitizeForFirestore({
-    ...normalizeFieldAppConfig(config),
+    ...normalized,
+    contacts: normalized.contacts.filter(filled),
+    drugDosages: normalized.drugDosages.filter(filled),
     updatedAt: new Date().toISOString(),
     updatedBy: actor.actorName || actor.actorUid || "",
   });

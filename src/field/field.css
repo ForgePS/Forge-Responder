@@ -1378,6 +1378,13 @@ html[data-field-theme="dark"] .fa-seg-btn.is-active.tone-muted {
   font-weight: 800;
 }
 
+.fa-gpm-status {
+  flex-basis: 100%;
+  color: var(--fa-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .fa-gpm-swatch {
   width: 22px !important;
   height: 22px;
@@ -1923,6 +1930,178 @@ html[data-field-theme="dark"] .fa-seg-btn.is-active.tone-muted {
   place-items: center;
 }
 
+/* Map with live location */
+.fa-map-wrap {
+  position: relative;
+}
+
+.fa-map-tools {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 500;
+  display: grid;
+  gap: 8px;
+}
+
+.fa-map-tool {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid var(--fa-border);
+  background: var(--fa-surface);
+  color: var(--fa-text);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25);
+  cursor: pointer;
+}
+
+.fa-map-tool.is-on {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+  color: #ffffff;
+}
+
+.fa-map-status {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.78);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.fa-map-live {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+  animation: fa-live-pulse 1.8s ease-out infinite;
+}
+
+@keyframes fa-live-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+  100% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+}
+
+/* "You are here": blue dot, pulsing halo, direction cone while moving */
+.fa-me {
+  position: relative;
+  background: none;
+  border: 0;
+}
+
+.fa-me-dot {
+  position: absolute;
+  left: 13px;
+  top: 13px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #0ea5e9;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.55), 0 1px 4px rgba(0, 0, 0, 0.4);
+  animation: fa-me-pulse 2s ease-out infinite;
+}
+
+@keyframes fa-me-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.55), 0 1px 4px rgba(0, 0, 0, 0.4); }
+  100% { box-shadow: 0 0 0 16px rgba(14, 165, 233, 0), 0 1px 4px rgba(0, 0, 0, 0.4); }
+}
+
+.fa-me-cone {
+  display: none;
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--fa-heading, 0deg));
+}
+
+.fa-me.has-heading .fa-me-cone {
+  display: block;
+}
+
+.fa-me-cone::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  transform: translateX(-50%);
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 18px solid rgba(14, 165, 233, 0.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fa-me-dot, .fa-map-live { animation: none; }
+}
+
+.fa-map-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--fa-radius);
+  border: 1px solid var(--fa-border);
+  background: var(--fa-surface);
+}
+
+.fa-map-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fa-map-card-meta {
+  margin: 0;
+  color: var(--fa-muted);
+  font-size: 0.92rem;
+}
+
+.fa-map-card-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.fa-nearest {
+  border: 1px solid #0ea5e9;
+}
+
+.fa-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 0.85rem;
+  color: var(--fa-muted);
+}
+
+.fa-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fa-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.25);
+}
+
+.fa-legend i.fa-legend-me {
+  background: #0ea5e9;
+  border: 2px solid #ffffff;
+}
+
 .fa-swatch {
   display: inline-block;
   width: 14px;
@@ -2365,4 +2544,79 @@ a.fa-tile,
 a.fa-tile:visited {
   text-decoration: none;
   color: var(--fa-text);
+}
+
+/* ---- Reference screens (drug dosages, contacts) ---- */
+.fa-ref-list {
+  display: grid;
+  gap: 10px;
+}
+
+.fa-ref-card {
+  border: 1px solid var(--rms-border);
+  border-radius: var(--fa-radius);
+  background: var(--rms-bg-panel);
+  box-shadow: var(--rms-shadow-sm);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.fa-ref-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fa-ref-card header strong {
+  display: block;
+  font-size: 1.05rem;
+  color: var(--rms-text-strong);
+}
+
+.fa-ref-card header small {
+  color: var(--rms-text-muted);
+  font-size: 0.85rem;
+}
+
+.fa-ref-card .fa-tile-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  --fa-tile-color: var(--fa-tile-blue);
+}
+
+.fa-ref-card dl {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fa-ref-card dl > div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.fa-ref-card dt {
+  color: var(--rms-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.fa-ref-card dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--rms-text-strong);
+  white-space: pre-wrap;
+}
+
+.fa-ref-call {
+  flex: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--fa-primary);
+  color: var(--fa-primary-text);
+  font-weight: 700;
+  font-size: 0.9rem;
 }

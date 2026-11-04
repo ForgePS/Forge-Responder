@@ -1,5 +1,5 @@
 /**
- * Admin → FORGE Field: settings for the offline field app.
+ * Admin → FORGE FIELD: settings for the offline field app.
  *  - General: app name and logo
  *  - Workflows: on/off and which roles get each one
  *  - Form fields: show / hide / require each field, for everyone or per role
@@ -51,6 +51,8 @@ const TABS = [
   { id: "general", label: "General" },
   { id: "workflows", label: "Workflows" },
   { id: "fields", label: "Form fields" },
+  { id: "contacts", label: "Contacts" },
+  { id: "dosages", label: "Drug dosages" },
   { id: "lists", label: "Check-off lists" },
   { id: "results", label: "Check-off results" },
   { id: "updates", label: "Plan updates" },
@@ -92,6 +94,67 @@ function RoleChips({ roles, value = [], onChange, disabled, emptyLabel = "Everyo
           {role.name || role.label || role.id}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Rows of text inputs (contacts, drug dosages) with add, move and remove.
+ * columns: [{ key, label, placeholder, wide }]
+ */
+function RowsEditor({ rows = [], columns, onChange, disabled, addLabel, idPrefix }) {
+  const update = (index, key, value) => onChange(rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)));
+  const move = (index, delta) => {
+    const next = [...rows];
+    const [row] = next.splice(index, 1);
+    next.splice(Math.max(0, Math.min(next.length, index + delta)), 0, row);
+    onChange(next);
+  };
+  return (
+    <div className="fa-admin-rows">
+      <div className="fa-admin-table-wrap">
+        <table className="fa-admin-table">
+          <thead>
+            <tr>
+              {columns.map((column) => <th key={column.key}>{column.label}</th>)}
+              <th aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={row.id || index}>
+                {columns.map((column) => (
+                  <td key={column.key} className={column.wide ? "fa-admin-wide" : ""}>
+                    <input
+                      value={row[column.key] || ""}
+                      placeholder={column.placeholder || ""}
+                      aria-label={`${column.label}, row ${index + 1}`}
+                      disabled={disabled}
+                      onChange={(event) => update(index, column.key, event.target.value)}
+                    />
+                  </td>
+                ))}
+                <td className="fa-admin-actions">
+                  <button type="button" className="icon-button" title="Move up" disabled={disabled || index === 0} onClick={() => move(index, -1)}><ArrowUp size={14} /></button>
+                  <button type="button" className="icon-button" title="Move down" disabled={disabled || index === rows.length - 1} onClick={() => move(index, 1)}><ArrowDown size={14} /></button>
+                  <button type="button" className="icon-button danger-button" title="Remove" disabled={disabled} onClick={() => onChange(rows.filter((_, i) => i !== index))}><Trash2 size={14} /></button>
+                </td>
+              </tr>
+            ))}
+            {!rows.length ? (
+              <tr><td colSpan={columns.length + 1} className="hint-text">Nothing added yet.</td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+      <button
+        type="button"
+        className="secondary-button"
+        disabled={disabled}
+        onClick={() => onChange([...rows, { id: `${idPrefix}-${Date.now()}` }])}
+      >
+        <Plus size={14} /> {addLabel}
+      </button>
     </div>
   );
 }
@@ -202,7 +265,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
       setUpdates(nextUpdates);
       setDirty(false);
     } catch (error) {
-      setLoadError(friendlyError(error, "Couldn't load FORGE Field settings."));
+      setLoadError(friendlyError(error, "Couldn't load FORGE FIELD settings."));
     }
   }
 
@@ -221,9 +284,9 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
       const saved = await saveFieldAppConfig(departmentId, config, actor);
       setConfig(normalizeFieldAppConfig(saved));
       setDirty(false);
-      onMessage?.("FORGE Field settings saved — phones pick them up on their next update");
+      onMessage?.("FORGE FIELD settings saved — phones pick them up on their next update");
     } catch (error) {
-      onMessage?.(error?.code === "permission-denied" ? "Only department administrators can change FORGE Field settings." : friendlyError(error, "Couldn't save FORGE Field settings. Please try again."));
+      onMessage?.(error?.code === "permission-denied" ? "Only department administrators can change FORGE FIELD settings." : friendlyError(error, "Couldn't save FORGE FIELD settings. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -244,7 +307,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
   }
 
   if (!config) {
-    return <div className="fa-admin">{loadError ? <p className="auth-help">{loadError}</p> : <p className="hint-text">Loading FORGE Field settings…</p>}</div>;
+    return <div className="fa-admin">{loadError ? <p className="auth-help">{loadError}</p> : <p className="hint-text">Loading FORGE FIELD settings…</p>}</div>;
   }
 
   const formDef = FIELD_FORMS.find((row) => row.key === form) || FIELD_FORMS[0];
@@ -254,7 +317,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
 
   return (
     <div className="fa-admin">
-      <div className="department-config-nav" role="tablist" aria-label="FORGE Field settings">
+      <div className="department-config-nav" role="tablist" aria-label="FORGE FIELD settings">
         {TABS.map((item) => (
           <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={`admin-section-pill department-config-pill${tab === item.id ? " is-open" : ""}`} onClick={() => setTab(item.id)}>
             <span>
@@ -265,14 +328,14 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
           </button>
         ))}
         <span className="fa-admin-spacer" />
-        <a className="ghost-button" href={fieldAppUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open FORGE Field</a>
+        <a className="ghost-button" href={fieldAppUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open FORGE FIELD</a>
       </div>
 
-      {!canConfigure && ["general", "workflows", "fields", "lists"].includes(tab) ? (
+      {!canConfigure && ["general", "workflows", "fields", "contacts", "dosages", "lists"].includes(tab) ? (
         <p className="auth-help">Only department administrators (Fire Chief, IT Admin, Department Admin) can change these settings.</p>
       ) : null}
 
-      {["general", "workflows", "fields"].includes(tab) ? (
+      {["general", "workflows", "fields", "contacts", "dosages"].includes(tab) ? (
         <div className="fa-admin-savebar">
           <span className="hint-text">{dirty ? "Unsaved changes" : config.updatedAt ? `Saved ${formatWhen(config.updatedAt)}${config.updatedBy ? ` by ${config.updatedBy}` : ""}` : "Using defaults"}</span>
           <button type="button" className="primary-button" disabled={!canConfigure || !dirty || saving} onClick={saveConfig}><Save size={14} /> {saving ? "Saving…" : "Save settings"}</button>
@@ -281,7 +344,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
 
       {tab === "general" ? (
         <div className="workflow-form">
-          <label><span>App name (shown under the department name)</span><input value={config.appName} disabled={!canConfigure} onChange={(e) => change({ ...config, appName: e.target.value })} placeholder="FORGE Field" /></label>
+          <label><span>App name (shown under the department name)</span><input value={config.appName} disabled={!canConfigure} onChange={(e) => change({ ...config, appName: e.target.value })} placeholder="FORGE FIELD" /></label>
           <div className="wide-field" style={{ display: "grid", gap: "10px" }}>
             <span>Field app logo</span>
             <ObjectUploadField
@@ -299,7 +362,58 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
             />
             {config.logoUrl ? <button type="button" className="ghost-button" disabled={!canConfigure} onClick={() => change({ ...config, logoUrl: "", logoStoragePath: "" })}>Use the department logo instead</button> : null}
           </div>
-          <p className="hint-text wide-field">Crews open FORGE Field at <strong>{fieldAppUrl}</strong> on their phone and can add it to the home screen. Settings reach phones the next time they update (on open with signal, every 20 minutes, or Update on the home screen).</p>
+          <p className="hint-text wide-field">Crews open FORGE FIELD at <strong>{fieldAppUrl}</strong> on their phone and can add it to the home screen. Settings reach phones the next time they update (on open with signal, every 20 minutes, or Update on the home screen).</p>
+        </div>
+      ) : null}
+
+      {tab === "contacts" ? (
+        <div className="workflow-form">
+          <p className="hint-text wide-field">
+            Shown in FORGE FIELD under <strong>Important contacts</strong> with a Call button (saved on phones for use without signal).
+            A contact needs a name and a phone number. Contacts with the same group are listed together.
+          </p>
+          <div className="wide-field">
+            <RowsEditor
+              rows={config.contacts}
+              disabled={!canConfigure}
+              addLabel="Add contact"
+              idPrefix="contact"
+              onChange={(rows) => change({ ...config, contacts: rows })}
+              columns={[
+                { key: "name", label: "Name", placeholder: "Riverside Water Utility" },
+                { key: "group", label: "Group", placeholder: "Utilities" },
+                { key: "phone", label: "Phone", placeholder: "555-0100" },
+                { key: "notes", label: "Notes", placeholder: "24-hour dispatch", wide: true },
+              ]}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {tab === "dosages" ? (
+        <div className="workflow-form">
+          <p className="hint-text wide-field">
+            Shown in FORGE FIELD under <strong>EMS → Drug dosages</strong>, saved on phones for use without signal.
+            Enter them exactly as your medical director's protocols state. FORGE Responder doesn't supply any dosages.
+            A row needs a drug and an adult or pediatric dose.
+          </p>
+          <div className="wide-field">
+            <RowsEditor
+              rows={config.drugDosages}
+              disabled={!canConfigure}
+              addLabel="Add drug"
+              idPrefix="dose"
+              onChange={(rows) => change({ ...config, drugDosages: rows })}
+              columns={[
+                { key: "drug", label: "Drug" },
+                { key: "indication", label: "Indication" },
+                { key: "adult", label: "Adult dose" },
+                { key: "pediatric", label: "Pediatric dose" },
+                { key: "route", label: "Route" },
+                { key: "notes", label: "Notes", wide: true },
+              ]}
+            />
+          </div>
         </div>
       ) : null}
 

@@ -706,6 +706,7 @@ describe("role-aware rules", () => {
       await setDoc(doc(db, `${lists}/hlfd-rms-documents/items/D1`), { id: "D1", title: "SOG 1", acknowledgements: {}, _order: 1 });
       await setDoc(doc(db, `${lists}/hlfd-rms-call-shifts/items/C1`), { id: "C1", status: "active", responses: [], _order: 1 });
       await setDoc(doc(db, `${lists}/hlfd-rms-personnel/items/P-X`), { id: "P-X", name: "Pat", activityLog: [], _order: 1 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-personnel/items/P-FF`), { id: "P-FF", name: "Fran", rank: "FF", phone: "1", _order: 2 });
       await setDoc(doc(db, `departments/${A}/personnelPrivate/P-FF`), { socialSecurityNumber: "x" });
       await setDoc(doc(db, `departments/${A}/personnelPrivate/P-X`), { socialSecurityNumber: "y" });
       await setDoc(doc(db, `departments/${A}/preplans/PP1`), { status: "ready_for_review" });
@@ -734,6 +735,17 @@ describe("role-aware rules", () => {
   it("private fields can't go back into the shared personnel list", async () => {
     await assertFails(put(editorA(), `${lists}/hlfd-rms-personnel/items/P-X`, { id: "P-X", name: "Pat", socialSecurityNumber: "1", _order: 1 }));
     await assertSucceeds(put(editorA(), `${lists}/hlfd-rms-personnel/items/P-X`, { id: "P-X", name: "Pat R", _order: 1 }));
+  });
+
+  it("members edit their own contact details on My Profile, nothing else", async () => {
+    const mine = `${lists}/hlfd-rms-personnel/items/P-FF`;
+    const base = { id: "P-FF", name: "Fran", rank: "FF", phone: "1", _order: 2 };
+    await assertSucceeds(put(ffA(), mine, { ...base, phone: "2", phones: [{ number: "2", primary: true }], city: "Town", emergencyFirstName: "Sam", updatedAt: "now" }));
+    await assertFails(put(ffA(), mine, { ...base, rank: "Captain" }));
+    await assertFails(put(ffA(), mine, { ...base, issuedEquipment: [{ item: "Coat" }] }));
+    await assertFails(put(ffA(), mine, { ...base, socialSecurityNumber: "1" }));
+    await assertFails(put(ffA(), `${lists}/hlfd-rms-personnel/items/P-X`, { id: "P-X", name: "Pat", activityLog: [], city: "Town", _order: 1 }));
+    await assertSucceeds(put(editorA(), mine, { ...base, rank: "Captain", issuedEquipment: [{ item: "Coat" }] }));
   });
 
   it("a battalion chief's trade approval may note it on the requester's record", async () => {

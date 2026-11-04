@@ -22,7 +22,7 @@ export default function ActivityScreen({ params = {} }) {
   const waiting = counts.queued + counts.syncing;
 
   return (
-    <Screen title="Records on this device" subtitle={sync.lastSyncAt ? `Last sync check ${formatWhen(sync.lastSyncAt)}` : ""}>
+    <Screen title="Records on this device" subtitle={sync.lastSyncAt ? `Last sync check ${formatWhen(sync.lastSyncAt)}` : ""} onBack={() => navigate("home", {}, { replace: true })}>
       {!online ? (
         <Banner tone="info" icon={<CloudOff size={22} />} title="You're offline">
           {waiting ? `${waiting} record${waiting === 1 ? " is" : "s are"} saved on this device and will send automatically when you're back online.` : "New records are saved on this device until you're back online."}

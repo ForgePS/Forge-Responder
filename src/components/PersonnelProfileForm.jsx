@@ -17,6 +17,9 @@ import PersonnelAccrualsEditor from "./personnel/PersonnelAccrualsEditor.jsx";
 import PersonnelActivityLogView from "./personnel/PersonnelActivityLogView.jsx";
 import PersonnelSectionActions from "./personnel/PersonnelSectionActions.jsx";
 import PersonnelAcademyPanel from "./personnel/PersonnelAcademyPanel.jsx";
+import { FieldGroup, IssuedEquipment } from "./profile/ProfileParts.jsx";
+import { PROFILE_GROUPS, normalizeEquipment } from "../lib/personnelProfile.js";
+import "./profile/MyProfile.css";
 import ObjectUploadField from "./ObjectUploadField.jsx";
 import ObjectLifecycleActions from "./ObjectLifecycleActions.jsx";
 import { deleteFirebaseFile } from "../lib/firebaseClient.js";
@@ -526,6 +529,30 @@ export default function PersonnelProfileForm({
         </div>
       );
     }
+    case "credentials":
+      return (
+        <div className="personnel-form-card">
+          <header className="personnel-form-card-header"><strong>Licensure &amp; Education</strong></header>
+          <div className="profile-subcards">
+            {[PROFILE_GROUPS.nationalRegistry, PROFILE_GROUPS.stateLicense, PROFILE_GROUPS.agencyLicense, PROFILE_GROUPS.education].map((group) => (
+              <section key={group.title} className="profile-subcard">
+                <h4>{group.title}</h4>
+                <FieldGroup group={group} values={draft} editing={canEdit} onChange={updateDraftField} canEdit={() => true} />
+              </section>
+            ))}
+          </div>
+          <PersonnelSectionActions canEdit={canEdit} onSave={onSave} onCancel={onCancel} />
+        </div>
+      );
+    case "equipment":
+      return (
+        <div className="personnel-form-card">
+          <header className="personnel-form-card-header"><strong>Issued Equipment</strong></header>
+          {canEdit ? <p className="profile-hint">Structural gear retires 10 years after manufacture (NFPA 1851); that date is used when no expiration is entered.</p> : null}
+          <IssuedEquipment rows={normalizeEquipment(draft.issuedEquipment)} editing={canEdit} onChange={(rows) => updateDraftField("issuedEquipment", rows)} />
+          <PersonnelSectionActions canEdit={canEdit} onSave={onSave} onCancel={onCancel} />
+        </div>
+      );
     case "immunization":
       return (
         <div className="personnel-form-card">

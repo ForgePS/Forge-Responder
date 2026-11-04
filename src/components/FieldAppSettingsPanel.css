@@ -1,4 +1,4 @@
-/* Admin → FORGE Field (desktop RMS). Uses the RMS theme tokens. */
+/* Admin → FORGE FIELD (desktop RMS). Uses the RMS theme tokens. */
 
 .fa-admin {
   display: grid;
@@ -182,4 +182,34 @@
 .fa-admin-results {
   display: grid;
   gap: 10px;
+}
+
+
+/* Contacts and drug dosages editors */
+.fa-admin-rows {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.fa-admin-rows .fa-admin-table-wrap {
+  width: 100%;
+}
+
+.fa-admin-rows input {
+  width: 100%;
+  min-width: 110px;
+}
+
+.fa-admin-rows .fa-admin-wide input {
+  min-width: 180px;
+}
+
+.fa-admin-actions {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.fa-admin-actions .icon-button {
+  margin-left: 4px;
 }

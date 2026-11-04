@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertOctagon, ChevronRight, Droplets, Gauge, List, LocateFixed, Loader2, Map as MapIcon, MapPin, Pencil, Search, TriangleAlert, UserRound, X,
+  AlertOctagon, ChevronRight, Droplets, Gauge, List, LocateFixed, Loader2, Map as MapIcon, MapPin, Maximize2, Navigation, Pencil, Search, TriangleAlert, UserRound, X,
 } from "lucide-react";
 import { useField } from "../fieldContext.jsx";
 import { refItems } from "../fieldRefData.js";
@@ -8,8 +8,10 @@ import { localDate } from "../fieldValidation.js";
 import { isCrewSessionActive } from "../fieldCrew.js";
 import {
   checkedLabel, districtCounts, findHydrant, formatDistance, hydrantAddress, hydrantDistrict, hydrantFlowColor, hydrantKey, hydrantLabel,
-  hydrantSummary, isDueThisYear, isOutOfServiceHydrant, isPrivateHydrant, searchHydrants,
+  hydrantSummary, isDueThisYear, isOutOfServiceHydrant, isPrivateHydrant, MAP_LEGEND, searchHydrants,
 } from "../fieldHydrants.js";
+import { useLiveLocation } from "../fieldLocation.js";
+import { gpsText } from "./FlowTestScreen.jsx";
 import { Banner, Field, PickerButton, PickerSheet, Screen, Section, Segmented, cx, formatDay, formatWhen } from "../ui.jsx";
 
 const HydrantMap = lazy(() => import("./HydrantMap.jsx"));
@@ -161,6 +163,7 @@ function HydrantDetail({ hydrant, onClose }) {
         <div><span>Type</span><strong>{hydrant.hydrant_type || "—"}</strong></div>
         <div><span>Provider</span><strong>{hydrant.provider || hydrant.water_assoc || "—"}</strong></div>
         <div><span>This year</span><strong>{checkedLabel(hydrant)}</strong></div>
+        <div><span>Lat &amp; Long</span><strong>{gpsText(hydrant) || "—"}</strong></div>
       </div>
       {caps.hydrants && !privateHydrant ? <CrewSessionPanel compact /> : null}
       <div className="fa-action-list">
@@ -197,40 +200,97 @@ function HydrantDetail({ hydrant, onClose }) {
   );
 }
 
+const VIEW_PREF_KEY = "forge-field-hydrant-view";
+
+function readViewPref() {
+  try {
+    return window.localStorage.getItem(VIEW_PREF_KEY) === "list" ? "list" : "map";
+  } catch {
+    return "map";
+  }
+}
+
+/** Card under the map for the tapped hydrant, like the desktop hydrant info box. */
+function MapHydrantCard({ hydrant, distance, onClose }) {
+  const { caps, navigate, crew } = useField();
+  const key = hydrantKey(hydrant);
+  const privateHydrant = isPrivateHydrant(hydrant);
+  const needsSession = !isCrewSessionActive(crew);
+  const canTest = caps.hydrants && !privateHydrant;
+  return (
+    <div className="fa-map-card">
+      <div className="fa-map-card-head">
+        <span className="fa-dot" style={{ background: hydrantFlowColor(hydrant) }} aria-hidden="true" />
+        <span className="fa-row-text">
+          <strong>{hydrantLabel(hydrant)}</strong>
+          <small>{[hydrantAddress(hydrant), Number.isFinite(distance) ? formatDistance(distance) : ""].filter(Boolean).join(" · ") || "No address"}</small>
+        </span>
+        <button type="button" className="fa-icon-btn sm" onClick={onClose} aria-label="Close"><X size={18} /></button>
+      </div>
+      <p className="fa-map-card-meta">
+        Flow: {hydrant.nfpa_class || hydrant.flow_result || "Not tested"}{Number(hydrant.flow_gpm) > 0 ? ` · ${hydrant.flow_gpm} GPM` : ""} · <span className={cx(isDueThisYear(hydrant) && "tone-text-warn")}>{checkedLabel(hydrant)}</span>
+      </p>
+      {privateHydrant ? <p className="fa-error-text">Private hydrant — do not test. Report damage only.</p> : null}
+      {canTest && needsSession ? <p className="fa-hint">Set your shift above to inspect or flow test.</p> : null}
+      <div className="fa-map-card-actions">
+        {canTest ? (
+          <button type="button" className="fa-btn fa-btn-primary" disabled={needsSession} onClick={() => navigate("hydrantInspection", { hydrantKey: key })}>
+            <Droplets size={18} /> Inspect
+          </button>
+        ) : null}
+        {canTest ? (
+          <button type="button" className="fa-btn fa-btn-primary" disabled={needsSession} onClick={() => navigate("flowTest", { hydrantKey: key })}>
+            <Gauge size={18} /> Flow test
+          </button>
+        ) : null}
+        <button type="button" className="fa-btn fa-btn-secondary" onClick={() => navigate("hydrants", { hydrantKey: key })}>
+          More <ChevronRight size={18} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function HydrantsScreen({ params = {} }) {
   const { refData, back, navigate, caps } = useField();
   const hydrants = refItems(refData, "hydrants");
   const [query, setQuery] = useState("");
   const [district, setDistrict] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [view, setView] = useState("list");
-  const [position, setPosition] = useState(null);
-  const [locating, setLocating] = useState(false);
-  const [geoError, setGeoError] = useState("");
+  const [view, setViewState] = useState(readViewPref);
+  const [nearMe, setNearMe] = useState(false);
+  const [follow, setFollow] = useState(true);
+  const [mapSelected, setMapSelected] = useState("");
+  const [fitKey, setFitKey] = useState(0);
+  // The map always tracks you; the list does when "Near me" is on.
+  const live = useLiveLocation(!params.hydrantKey && (view === "map" || nearMe));
+  const position = live.position;
   const selected = params.hydrantKey ? findHydrant(hydrants, params.hydrantKey) : null;
   const inDistrict = useMemo(() => (district === "all" ? hydrants : hydrants.filter((hydrant) => hydrantDistrict(hydrant) === district)), [hydrants, district]);
   const filtered = useMemo(() => inDistrict.filter((hydrant) => (
     statusFilter === "all" || (statusFilter === "due" ? isDueThisYear(hydrant) : isOutOfServiceHydrant(hydrant))
   )), [inDistrict, statusFilter]);
   const results = useMemo(() => searchHydrants(filtered, query, position, 80), [filtered, query, position]);
+  // Map dots don't depend on your position, so they aren't redrawn as you move.
+  const mapHydrants = useMemo(() => (query ? searchHydrants(filtered, query, null, 2000).map((row) => row.hydrant) : filtered), [filtered, query]);
+  const nearest = useMemo(() => (position ? searchHydrants(filtered, "", position, 1)[0] || null : null), [filtered, position]);
   const summary = useMemo(() => hydrantSummary(inDistrict), [inDistrict]);
   const districts = useMemo(() => districtCounts(hydrants), [hydrants]);
+  const mapCard = mapSelected ? findHydrant(hydrants, mapSelected) : null;
 
   if (selected) return <HydrantDetail hydrant={selected} onClose={back} />;
 
-  function locate() {
-    if (!navigator.geolocation) {
-      setGeoError("This device can't share its location.");
-      return;
+  const setView = (value) => {
+    setViewState(value);
+    if (value === "map") setFollow(true);
+    try {
+      window.localStorage.setItem(VIEW_PREF_KEY, value);
+    } catch {
+      // ignore
     }
-    setLocating(true);
-    setGeoError("");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => { setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
-      (error) => { setGeoError(error.code === 1 ? "Location is blocked. Allow location for this site to find nearby hydrants." : "Couldn't get your location. Try again outside or search instead."); setLocating(false); },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
-    );
-  }
+  };
+
+  const locateLabel = live.status === "locating" ? "Finding you…" : follow && position ? "Following you" : "Center on me";
 
   return (
     <Screen title="Hydrants" subtitle={hydrants.length ? `${hydrants.length.toLocaleString()} on this device` : ""} onBack={back} wide>
@@ -256,23 +316,79 @@ export default function HydrantsScreen({ params = {} }) {
           <div className="fa-search-row">
             <label className="fa-search">
               <Search size={20} aria-hidden="true" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Hydrant number or street" enterKeyHint="search" autoComplete="off" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Hydrant number, street or district" enterKeyHint="search" autoComplete="off" />
               {query ? <button type="button" className="fa-icon-btn sm" onClick={() => setQuery("")} aria-label="Clear"><X size={18} /></button> : null}
             </label>
-            <button type="button" className={cx("fa-btn", position ? "fa-btn-primary" : "fa-btn-secondary")} onClick={position ? () => setPosition(null) : locate} disabled={locating} aria-label="Near me">
-              {locating ? <Loader2 size={20} className="fa-spin" /> : <LocateFixed size={20} />}<span className="fa-hide-sm">{position ? "Nearest" : "Near me"}</span>
-            </button>
+            {view === "list" ? (
+              <button type="button" className={cx("fa-btn", nearMe ? "fa-btn-primary" : "fa-btn-secondary")} onClick={() => setNearMe((on) => !on)} aria-label="Near me" aria-pressed={nearMe}>
+                {nearMe && live.status === "locating" ? <Loader2 size={20} className="fa-spin" /> : <LocateFixed size={20} />}<span className="fa-hide-sm">Near me</span>
+              </button>
+            ) : null}
           </div>
-          {geoError ? <p className="fa-error-text">{geoError}</p> : null}
           <div className="fa-hub-controls">
             <Segmented value={statusFilter} options={STATUS_FILTERS} onChange={setStatusFilter} columns={3} />
-            <Segmented value={view} options={[{ value: "list", label: <><List size={18} /> List</> }, { value: "map", label: <><MapIcon size={18} /> Map</> }]} onChange={setView} columns={2} />
+            <Segmented value={view} options={[{ value: "map", label: <><MapIcon size={18} /> Map</> }, { value: "list", label: <><List size={18} /> List</> }]} onChange={setView} columns={2} />
           </div>
+          {live.error && live.status !== "on" ? <p className="fa-error-text">{live.error}</p> : null}
           {view === "map" ? (
-            <Suspense fallback={<div className="fa-map fa-map-loading"><Loader2 size={24} className="fa-spin" /></div>}>
-              <HydrantMap hydrants={query ? results.map((row) => row.hydrant) : filtered} position={position} onSelect={(key) => navigate("hydrants", { hydrantKey: key })} />
-              {!navigator.onLine ? <p className="fa-hint">Offline: map pictures show only for areas viewed before; hydrant dots always show.</p> : null}
-            </Suspense>
+            <>
+              <div className="fa-map-wrap">
+                <Suspense fallback={<div className="fa-map fa-map-loading"><Loader2 size={24} className="fa-spin" /></div>}>
+                  <HydrantMap
+                    hydrants={mapHydrants}
+                    position={position}
+                    follow={follow}
+                    onFollowChange={setFollow}
+                    selectedKey={mapSelected}
+                    onSelect={(key) => { setMapSelected(key); setFollow(false); }}
+                    fitKey={fitKey}
+                  />
+                </Suspense>
+                <div className="fa-map-tools">
+                  <button
+                    type="button"
+                    className={cx("fa-map-tool", follow && position && "is-on")}
+                    onClick={() => setFollow(true)}
+                    aria-label={locateLabel}
+                    title={locateLabel}
+                  >
+                    {live.status === "locating" ? <Loader2 size={22} className="fa-spin" /> : follow && position ? <Navigation size={22} /> : <LocateFixed size={22} />}
+                  </button>
+                  <button type="button" className="fa-map-tool" onClick={() => { setFollow(false); setFitKey((n) => n + 1); }} aria-label="Show all hydrants" title="Show all hydrants">
+                    <Maximize2 size={20} />
+                  </button>
+                </div>
+                {position ? (
+                  <div className="fa-map-status" aria-live="polite">
+                    <span className="fa-map-live" aria-hidden="true" />
+                    {follow ? "Following you" : "Live location"}{position.accuracy ? ` · ±${formatDistance(position.accuracy)}` : ""}
+                  </div>
+                ) : null}
+              </div>
+              {mapCard ? (
+                <MapHydrantCard
+                  hydrant={mapCard}
+                  distance={position ? searchHydrants([mapCard], "", position, 1)[0]?.distance : Infinity}
+                  onClose={() => setMapSelected("")}
+                />
+              ) : nearest && Number.isFinite(nearest.distance) ? (
+                <button type="button" className="fa-row fa-nearest" onClick={() => { setMapSelected(hydrantKey(nearest.hydrant)); setFollow(false); }}>
+                  <span className="fa-dot" style={{ background: hydrantFlowColor(nearest.hydrant) }} aria-hidden="true" />
+                  <span className="fa-row-text">
+                    <strong>Nearest: {hydrantLabel(nearest.hydrant)}</strong>
+                    <small><MapPin size={13} /> {hydrantAddress(nearest.hydrant) || "No address"} · {formatDistance(nearest.distance)}</small>
+                  </span>
+                  <span className={cx("fa-row-meta", isDueThisYear(nearest.hydrant) && "tone-text-warn")}>{checkedLabel(nearest.hydrant)}</span>
+                </button>
+              ) : null}
+              <div className="fa-legend" aria-label="Map colours">
+                {MAP_LEGEND.map((item) => (
+                  <span key={item.label}><i style={{ background: item.color }} aria-hidden="true" />{item.label}</span>
+                ))}
+                <span><i className="fa-legend-me" aria-hidden="true" />You</span>
+              </div>
+              {!navigator.onLine ? <p className="fa-hint">Offline: map pictures show only for areas viewed before; hydrant dots and your location always show.</p> : null}
+            </>
           ) : (
             <div className="fa-list">
               {results.map(({ hydrant, distance }) => (

@@ -8,8 +8,8 @@ import { STATUS_LABELS, checkoffItemStatus, groupByCategory, summarizeCheckoff, 
 import { Banner, ErrorSummary, Field, Screen, Section, Stepper, TextArea, cx, formatWhen } from "../ui.jsx";
 
 const KIND_META = {
-  ems: { title: "EMS unit check-off", icon: Stethoscope, empty: "No EMS check-off lists yet. An administrator builds them in the RMS under Admin → FORGE Field." },
-  supply: { title: "Supply closet check-off", icon: PackageOpen, empty: "No supply closet lists yet. An administrator builds them in the RMS under Admin → FORGE Field." },
+  ems: { title: "EMS unit check-off", icon: Stethoscope, empty: "No EMS check-off lists yet. An administrator builds them in the RMS under Admin → FORGE FIELD." },
+  supply: { title: "Supply closet check-off", icon: PackageOpen, empty: "No supply closet lists yet. An administrator builds them in the RMS under Admin → FORGE FIELD." },
 };
 
 const STATUS_TONE = { ok: "ok", short: "warn", missing: "bad", expired: "bad", expiring: "warn", unchecked: "muted" };

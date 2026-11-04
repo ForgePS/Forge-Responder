@@ -84,6 +84,8 @@ import EmployeeScheduleHub from "../components/employee/EmployeeScheduleHub.jsx"
 import EmployeeDailyRoster from "../components/employee/EmployeeDailyRoster.jsx";
 import { resolveEmployeeVacancyDays, formatVacancyPickupSummary, buildVacancyPickupNotificationMessage } from "../lib/vacancyPickupWorkflow.js";
 import { hasPermission } from "../lib/permissions.js";
+import { formatRoleLabel } from "../lib/departmentMembership.js";
+import MyProfile from "../components/profile/MyProfile.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { uniqueRecordId } from "../lib/recordIds.js";
@@ -1056,12 +1058,18 @@ export default function EmployeePortalPage({
         <Panel title="My Profile" icon={UserRound}>
           {myPerson ? (
             <>
-              <div className="cert-detail-grid">
-                {[["Name", myPerson.name], ["ID", myPerson.id], ["Rank", myPerson.rank], ["Shift", myPerson.shift], ["Station", myPerson.station], ["Assignment", myPerson.assignment], ["Supervisor", myPerson.supervisor], ["EMS", myPerson.ems], ["Email", myPerson.email], ["Phone", myPerson.phone]].map(([label, value]) => (
-                  <div key={label}><span>{label}</span><strong>{value || "—"}</strong></div>
-                ))}
-              </div>
-              <div style={{ marginTop: 16 }}>
+              <MyProfile
+                person={myPerson}
+                setPersonnel={setPersonnel}
+                certifications={myCerts}
+                user={previewPerson ? null : user}
+                membership={previewPerson ? null : membership}
+                roleLabel={previewPerson ? "" : formatRoleLabel(membership?.role, membership)}
+                departmentId={departmentId}
+                canEditAll={isCreator || ["editPersonnel", "manageUsers", "manageSystemSettings"].some((key) => hasPermission(permissions, key))}
+                onNavigate={onNavigate}
+              />
+              <div style={{ marginTop: 24 }}>
                 <h3 style={{ marginBottom: 8 }}>Leave & Shift History</h3>
                 <p className="auth-help">Approved vacation, sick, military leave, and shift trades appear here automatically.</p>
                 <PersonnelActivityLogView entries={myPerson.activityLog || []} />

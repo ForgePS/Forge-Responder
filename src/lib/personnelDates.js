@@ -19,6 +19,11 @@ export function isPersonnelDateColumnLabel(label = "") {
 export function parsePersonnelDate(value = "") {
   const trimmed = String(value || "").trim();
   if (!trimmed) return null;
+  // "2017-03-01" is a calendar day: read it in local time. Date.parse treats it
+  // as midnight UTC, which is the day before in US time zones (and an edit
+  // box would then save the earlier day).
+  const day = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (day) return new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]), 12);
   const parsed = Date.parse(trimmed);
   if (Number.isNaN(parsed)) return null;
   return new Date(parsed);

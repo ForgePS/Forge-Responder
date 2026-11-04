@@ -24,6 +24,7 @@ import { activateUpdate, subscribeUpdateReady } from "./registerFieldSW.js";
 import { cx } from "./ui.jsx";
 import HomeScreen from "./screens/HomeScreen.jsx";
 import QuickCardScreen from "./screens/QuickCardScreen.jsx";
+import { ContactsScreen, DrugDosagesScreen, EmsProtocolsScreen, HazmatScreen } from "./screens/ReferenceScreens.jsx";
 import ActivityScreen from "./screens/ActivityScreen.jsx";
 import SettingsScreen from "./screens/SettingsScreen.jsx";
 import RecordScreen from "./screens/RecordScreen.jsx";
@@ -46,6 +47,10 @@ import HydrantEditScreen from "./screens/HydrantEditScreen.jsx";
 const SCREENS = {
   home: HomeScreen,
   quickCard: QuickCardScreen,
+  emsProtocols: EmsProtocolsScreen,
+  drugDosages: DrugDosagesScreen,
+  contacts: ContactsScreen,
+  hazmat: HazmatScreen,
   activity: ActivityScreen,
   settings: SettingsScreen,
   record: RecordScreen,

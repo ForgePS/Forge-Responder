@@ -17,7 +17,7 @@ function formatBytes(bytes) {
 }
 
 export default function SettingsScreen() {
-  const { snapshot, refData, refresh, refLoading, refError, online, counts } = useField();
+  const { snapshot, refData, refresh, refLoading, refError, online, counts, navigate } = useField();
   const { signOut } = useAuth();
   const [theme, setTheme] = useState(readThemePref);
   const [offlineReady, setOfflineReady] = useState(null);
@@ -42,7 +42,7 @@ export default function SettingsScreen() {
   ];
 
   return (
-    <Screen title="This device">
+    <Screen title="This device" onBack={() => navigate("home", {}, { replace: true })}>
       <Section title="Offline">
         <div className="fa-kv">
           <div>
@@ -65,11 +65,11 @@ export default function SettingsScreen() {
         <Section title="Install on this phone">
           {installable ? (
             <button type="button" className="fa-btn fa-btn-primary fa-btn-block" onClick={() => promptInstall()}>
-              <Smartphone size={20} /> Add FORGE Field to home screen
+              <Smartphone size={20} /> Add FORGE FIELD to home screen
             </button>
           ) : isIos() ? (
             <Banner tone="info" icon={<Share size={22} />} title="Add to Home Screen">
-              In Safari, tap the Share button, then “Add to Home Screen”. FORGE Field then opens like an app, even offline.
+              In Safari, tap the Share button, then “Add to Home Screen”. FORGE FIELD then opens like an app, even offline.
             </Banner>
           ) : (
             <Banner tone="info" icon={<MonitorSmartphone size={22} />}>

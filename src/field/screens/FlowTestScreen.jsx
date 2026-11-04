@@ -20,11 +20,11 @@ function describe(data) {
   };
 }
 
-function PsiInput({ label, value, onChange, error }) {
+function PsiInput({ label, value, onChange, error, last }) {
   return (
     <Field label={label} required error={error}>
       <div className="fa-unit-input">
-        <input className="fa-input fa-input-num" inputMode="decimal" value={value || ""} onChange={(event) => onChange(event.target.value.replace(/[^\d.]/g, ""))} placeholder="0" />
+        <input className="fa-input fa-input-num" inputMode="decimal" value={value || ""} onChange={(event) => onChange(event.target.value.replace(/[^\d.]/g, ""))} placeholder={last ? String(last) : "0"} />
         <span>psi</span>
       </div>
     </Field>
@@ -83,7 +83,16 @@ export default function FlowTestScreen({ params = {} }) {
   }
 
   const gpm = calculateFlowGpm(data.dischargeSize, data.pitotPsi);
-  const nfpaClass = data.nfpaOverride || nfpaClassForGpm(gpm);
+  // Linked like the desktop: an out-of-service or private hydrant keeps that class.
+  const statusClass = /out of service/i.test(data.info.status) ? "Out of Service" : /private/i.test(data.info.status) ? "Not Tested" : "";
+  const nfpaClass = data.nfpaOverride || statusClass || nfpaClassForGpm(gpm);
+  const lastSource = hydrant || data.hydrant;
+  const last = {
+    static: Number(lastSource.static_psi) > 0 ? lastSource.static_psi : "",
+    residual: Number(lastSource.residual_psi) > 0 ? lastSource.residual_psi : "",
+    pitot: Number(lastSource.pitot_psi) > 0 ? lastSource.pitot_psi : "",
+  };
+  const hasLast = last.static || last.residual || last.pitot;
   const setInfo = (patch) => update((current) => ({ info: { ...current.info, ...patch } }));
   const districts = districtCounts(hydrants).map((row) => row.district).filter((value) => value !== "Unassigned");
 
@@ -129,10 +138,15 @@ export default function FlowTestScreen({ params = {} }) {
           <Segmented value={data.dischargeSize} options={SIZES} onChange={(value) => update({ dischargeSize: value })} columns={3} />
         </Field>
         <div className="fa-grid-3">
-          <PsiInput label="Static" value={data.staticPsi} onChange={(value) => update({ staticPsi: value })} error={errors.staticPsi} />
-          <PsiInput label="Residual" value={data.residualPsi} onChange={(value) => update({ residualPsi: value })} error={errors.residualPsi} />
-          <PsiInput label="Pitot" value={data.pitotPsi} onChange={(value) => update({ pitotPsi: value })} error={errors.pitotPsi} />
+          <PsiInput label="Static" value={data.staticPsi} last={last.static} onChange={(value) => update({ staticPsi: value })} error={errors.staticPsi} />
+          <PsiInput label="Residual" value={data.residualPsi} last={last.residual} onChange={(value) => update({ residualPsi: value })} error={errors.residualPsi} />
+          <PsiInput label="Pitot" value={data.pitotPsi} last={last.pitot} onChange={(value) => update({ pitotPsi: value })} error={errors.pitotPsi} />
         </div>
+        {hasLast ? (
+          <p className="fa-hint">
+            Last test{lastSource.last_checked ? ` (${formatDay(lastSource.last_checked)})` : ""}: static {last.static || "—"} · residual {last.residual || "—"} · pitot {last.pitot || "—"} psi{Number(lastSource.flow_gpm) > 0 ? ` · ${lastSource.flow_gpm} GPM` : ""}
+          </p>
+        ) : null}
         <div className="fa-gpm" style={{ "--gpm-color": nfpaColorForClass(nfpaClass) }}>
           <div>
             <span>Flow</span>
@@ -140,8 +154,9 @@ export default function FlowTestScreen({ params = {} }) {
           </div>
           <div className="fa-gpm-class">
             <span className="fa-gpm-swatch" aria-hidden="true" />
-            {gpm || data.nfpaOverride ? `${nfpaClass} · ${nfpaColorNameForClass(nfpaClass)}` : "Enter pitot pressure"}
+            {gpm || data.nfpaOverride || statusClass ? `${nfpaClass} · ${nfpaColorNameForClass(nfpaClass)}` : "Enter pitot pressure"}
           </div>
+          <div className="fa-gpm-status">Status: {data.info.status || "In Service"}</div>
         </div>
         {rules.show("nfpaClass") ? (
           <Field label="NFPA class" hint="Leave on Auto to use the class from the calculated flow.">
