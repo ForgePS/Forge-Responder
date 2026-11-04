@@ -3,6 +3,8 @@ import { Check, CirclePlus, Gauge, Trash2, X } from "lucide-react";
 import { Badge, FleetSummary, Panel, Modal } from "../components/shell/ui.jsx";
 import { displayDate, todayIsoDate, uniqueRecordId } from "../lib/recordIds.js";
 import { exportCsv } from "../utils/dashboardMetrics.js";
+import ComboField from "../components/ComboField.jsx";
+import { useDropdowns } from "../context/DropdownContext.jsx";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -47,6 +49,15 @@ export default function HoseTestingPage({ records = [], setRecords, query = "", 
     .sort((a, b) => String(a.apparatus).localeCompare(String(b.apparatus)) || String(a.section).localeCompare(String(b.section)));
   const count = (s) => withStatus.filter((r) => r.status === s).length;
   const unitNames = [...new Set(apparatus.map((u) => u.unit).filter(Boolean))];
+  // Each field: the department list (System Admin → Dropdowns) plus values already used.
+  const { getOptions } = useDropdowns();
+  const used = (field) => records.map((record) => record[field]).filter(Boolean);
+  const fieldOptions = {
+    apparatus: [...unitNames, ...used("apparatus")].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })),
+    section: [...getOptions("hoseSections"), ...used("section")],
+    length: [...getOptions("hoseLengths"), ...used("length")],
+    diameter: [...getOptions("hoseDiameters"), ...used("diameter")],
+  };
 
   function addSection() {
     if (!section.apparatus.trim() || !section.section.trim()) { setError("Enter the apparatus and the hose section."); return; }
@@ -130,12 +141,17 @@ export default function HoseTestingPage({ records = [], setRecords, query = "", 
           <div className="workflow-form">
             {error ? <p className="form-error" role="alert">{error}</p> : null}
             <label><span>Apparatus</span>
-              <input list="hose-units" value={section.apparatus} onChange={(e) => setSection({ ...section, apparatus: e.target.value })} placeholder="e.g. Engine 1" />
-              <datalist id="hose-units">{unitNames.map((u) => <option key={u} value={u} />)}</datalist>
+              <ComboField ariaLabel="Apparatus" value={section.apparatus} onChange={(value) => setSection({ ...section, apparatus: value })} options={fieldOptions.apparatus} placeholder="Choose or type, e.g. Engine 1" />
             </label>
-            <label><span>Section / ID</span><input value={section.section} onChange={(e) => setSection({ ...section, section: e.target.value })} placeholder={'e.g. Crosslay 1 - 1¾"'} /></label>
-            <label><span>Length</span><input value={section.length} onChange={(e) => setSection({ ...section, length: e.target.value })} placeholder="e.g. 200 ft" /></label>
-            <label><span>Diameter</span><input value={section.diameter} onChange={(e) => setSection({ ...section, diameter: e.target.value })} placeholder={'e.g. 1¾"'} /></label>
+            <label><span>Section / ID</span>
+              <ComboField ariaLabel="Section / ID" value={section.section} onChange={(value) => setSection({ ...section, section: value })} options={fieldOptions.section} placeholder="Choose or type, e.g. Crosslay 1" />
+            </label>
+            <label><span>Length</span>
+              <ComboField ariaLabel="Length" value={section.length} onChange={(value) => setSection({ ...section, length: value })} options={fieldOptions.length} placeholder="Choose or type, e.g. 200 ft" />
+            </label>
+            <label><span>Diameter</span>
+              <ComboField ariaLabel="Diameter" value={section.diameter} onChange={(value) => setSection({ ...section, diameter: value })} options={fieldOptions.diameter} placeholder={'Choose or type, e.g. 1¾"'} />
+            </label>
           </div>
           <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setAdding(false)}>Cancel</button><button type="button" className="primary-button" onClick={addSection}><Check size={14} /> Add Section</button></div>
         </Modal>
