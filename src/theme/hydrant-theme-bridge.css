@@ -1137,3 +1137,266 @@ html[data-theme="dark"] .hydrant-module-root .session-pill.active {
   flex: none;
   margin: 0;
 }
+
+/* ---- Hydrant Reports tab ---- */
+.hydrant-reports .hydrant-reports-message {
+  margin: 0 0 12px;
+}
+
+.hydrant-reports .hydrant-reports-card {
+  border: 1px solid var(--rms-border);
+  border-radius: 10px;
+  background: var(--rms-bg-surface, transparent);
+  padding: 16px;
+  margin-bottom: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.hydrant-reports .hydrant-reports-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hydrant-reports .hydrant-reports-card-head strong {
+  display: block;
+  font-size: 1.05rem;
+  color: var(--rms-text-strong);
+}
+
+.hydrant-reports .hydrant-reports-card-head span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.9rem;
+  color: var(--rms-text-muted);
+}
+
+.hydrant-reports .hydrant-reports-head-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.hydrant-reports .hydrant-reports-head-controls .field {
+  min-width: 170px;
+}
+
+/* Record type chips */
+.hydrant-reports .hydrant-reports-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hydrant-reports .hydrant-reports-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--rms-border);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: var(--rms-text-body);
+}
+
+.hydrant-reports .hydrant-reports-chip.is-on {
+  border-color: var(--hydrant-brand-strong, #b91c1c);
+  color: var(--hydrant-brand-strong, #b91c1c);
+}
+
+/* Every checkbox here is a normal small box (they were stretching to fill space). */
+.hydrant-reports input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 auto;
+  accent-color: var(--hydrant-brand-strong, #b91c1c);
+}
+
+.hydrant-reports .detail-export-filters {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  margin: 0;
+}
+
+/* Dates: presets and From/To on one line where there's room */
+.hydrant-reports .hydrant-reports-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+}
+
+.hydrant-reports .hydrant-reports-presets {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--rms-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.hydrant-reports .hydrant-reports-preset {
+  border: 0;
+  border-right: 1px solid var(--rms-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--rms-text-body);
+  font-weight: 700;
+  font-size: 0.88rem;
+  padding: 8px 14px;
+  min-height: 36px;
+  cursor: pointer;
+}
+
+.hydrant-reports .hydrant-reports-preset:last-child {
+  border-right: 0;
+}
+
+.hydrant-reports .hydrant-reports-preset.is-active {
+  background: var(--hydrant-brand-strong, #b91c1c);
+  color: #fff;
+}
+
+.hydrant-reports .hydrant-reports-date-fields {
+  display: flex;
+  gap: 10px;
+}
+
+.hydrant-reports .hydrant-reports-date-fields .field {
+  min-width: 160px;
+}
+
+/* Count + actions */
+.hydrant-reports .hydrant-reports-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--rms-border-divider);
+}
+
+.hydrant-reports .hydrant-reports-count {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--rms-text-muted);
+}
+
+.hydrant-reports .hydrant-reports-count strong {
+  font-size: 1.35rem;
+  color: var(--rms-text-strong);
+}
+
+.hydrant-reports .hydrant-reports-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hydrant-reports .hydrant-reports-actions .button {
+  width: auto;
+}
+
+/* Column picker: tidy grid, label beside the box */
+.hydrant-reports .detail-export-columns {
+  margin: 0;
+}
+
+.hydrant-reports .detail-export-column-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px 16px;
+  margin: 10px 0 2px;
+}
+
+.hydrant-reports .detail-export-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+/* Preview table: eight columns that fit */
+.hydrant-reports .detail-export-preview .daily-report-row {
+  grid-template-columns: 96px 96px 100px minmax(120px, 1fr) minmax(90px, 0.8fr) minmax(110px, 1fr) 80px minmax(120px, 1fr);
+}
+
+.hydrant-reports .daily-report-table {
+  margin-bottom: 0;
+}
+
+.hydrant-reports .daily-report-stats {
+  margin-bottom: 0;
+}
+
+/* Email */
+.hydrant-reports .hydrant-reports-email {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rms-border-divider);
+}
+
+.hydrant-reports .hydrant-reports-email > .primary {
+  justify-self: start;
+}
+
+.hydrant-reports .recipient-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.hydrant-reports .recipient-row .field {
+  flex: 1 1 240px;
+  max-width: 420px;
+}
+
+.hydrant-reports .recipient-row .secondary {
+  width: auto;
+  min-width: 80px;
+}
+
+/* Other downloads */
+.hydrant-reports .hydrant-reports-downloads {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.hydrant-reports .hydrant-reports-downloads li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.hydrant-reports .hydrant-reports-downloads .button {
+  width: auto;
+  min-width: 250px;
+  justify-content: flex-start;
+}
+
+.hydrant-reports .hydrant-reports-downloads span {
+  color: var(--rms-text-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 700px) {
+  .hydrant-reports .hydrant-reports-date-fields { width: 100%; }
+  .hydrant-reports .hydrant-reports-date-fields .field { flex: 1 1 0; min-width: 0; }
+  .hydrant-reports .hydrant-reports-downloads .button { min-width: 0; width: 100%; }
+}
