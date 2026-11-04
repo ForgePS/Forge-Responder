@@ -45,19 +45,16 @@ export function getDemoCredentials() {
   };
 }
 
-/** Leave the demo and return to the sign-in page, where users pick their own department. */
 /**
- * Leave the demo: also signs out the shared demo account, so the next screen is
- * the normal sign-in (and your own account, e.g. for the Creator Console).
+ * Leave the demo for the sign-in page, where people pick their own department.
+ * Also signs out the shared demo account, so you can sign in as yourself (e.g.
+ * for the Creator Console).
+ *
+ * Sign out first: the app redraws on sign-out while still on the demo address
+ * and saves the demo as the current department again. Clearing that afterwards,
+ * in the same moment as leaving, means nothing can put it back.
  */
 export async function leaveDemoToProduction() {
-  clearDemoMode();
-  try {
-    window.localStorage.removeItem("rms-active-department-id");
-    persistGatewayContext("", "");
-  } catch {
-    // ignore
-  }
   try {
     const [{ getFirebaseAuth }, { signOut }] = await Promise.all([
       import("./firebaseClient.js"),
@@ -69,5 +66,13 @@ export async function leaveDemoToProduction() {
   } catch (error) {
     console.warn("Couldn't sign out of the demo account", error);
   }
-  window.location.href = "/";
+  clearDemoMode();
+  try {
+    window.localStorage.removeItem("rms-active-department-id");
+    window.localStorage.removeItem("rms-login-tenant-id");
+    persistGatewayContext("", "");
+  } catch {
+    // ignore
+  }
+  window.location.replace("/");
 }
