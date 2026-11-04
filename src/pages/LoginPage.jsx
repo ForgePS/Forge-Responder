@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { resolveDepartmentLogoUrl } from "../lib/brandAssets.js";
-import { platformBrand } from "../data/platformBrand.js";
+import { usePublicPlatformBrand } from "../hooks/usePublicPlatformBrand.js";
 import {
   buildDepartmentGatewayUrl,
   clearLoginTenantId,
@@ -86,6 +86,8 @@ function validateTenantId(value) {
 
 export default function LoginPage() {
   const { profile, gatewayDepartmentId, gatewayRecord, departmentId, setDepartmentId } = useTenant();
+  // Platform logo from Creator Console → Platform settings (built-in logo until set).
+  const platformBrand = usePublicPlatformBrand();
   const { signIn, signUp, setAuthError, inviteError } = useAuth();
   const [mode, setMode] = useState("signin");
   const invite = useInvitePreview(setMode);
@@ -231,7 +233,11 @@ export default function LoginPage() {
       </div>
       <section className="auth-card auth-card-login">
         <div className="auth-forge-logo">
-          <img className="forge-logo-knockout" src={platformBrand.logoUrl} alt={platformBrand.name} />
+          <img
+            className={platformBrand.builtIn ? "auth-platform-logo auth-platform-logo-builtin" : "auth-platform-logo"}
+            src={platformBrand.logoUrl}
+            alt={platformBrand.name}
+          />
         </div>
 
         {!creatorConsoleEntry && tenantLocked && (

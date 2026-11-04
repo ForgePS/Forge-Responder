@@ -404,6 +404,25 @@ export async function propagatePlatformConfigToDepartments(platformConfig = {}) 
   return { updated, total: departments.length };
 }
 
+/** The parts of the platform settings anyone may see (no settings, keys or module lists). */
+export function publicPlatformBranding(config = {}) {
+  return {
+    logoUrl: String(config.logoUrl || defaultPlatformConfig.logoUrl),
+    name: String(config.name || defaultPlatformConfig.name),
+    platformTitle: String(config.platformTitle || defaultPlatformConfig.platformTitle),
+    tagline: String(config.tagline || defaultPlatformConfig.tagline),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/** The public platform look, or null when it hasn't been saved yet. */
+export async function loadPublicPlatformBranding() {
+  const db = getFirestoreDb();
+  if (!db) return null;
+  const snap = await getDoc(doc(db, "platformBranding", "public"));
+  return snap.exists() ? snap.data() : null;
+}
+
 export async function savePlatformConfig(config = {}, options = {}) {
   const { propagate = true } = options;
   const db = getFirestoreDb();
@@ -415,6 +434,8 @@ export async function savePlatformConfig(config = {}, options = {}) {
     updatedAt: new Date().toISOString()
   };
   await setDoc(doc(db, "platformConfig", "main"), payload, { merge: true });
+  // Public copy of the look only, for the signed-out sign-in pages.
+  await setDoc(doc(db, "platformBranding", "public"), publicPlatformBranding(payload));
 
   if (propagate) {
     await propagatePlatformConfigToDepartments(payload);
