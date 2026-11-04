@@ -35,3 +35,6 @@ demo-rename*.txt
 !functions/.env.forge-rms-staging
 # Staging seed output (contains test login passwords)
 staging-seed.txt
+
+# Local Claude Code settings
+.claude/
