@@ -9,7 +9,11 @@ export const defaultDropdowns = [
       { id: "battalionChief", label: "Battalion Chief", active: true, sortOrder: 3 },
       { id: "captain", label: "Captain", active: true, sortOrder: 4 },
       { id: "lieutenant", label: "Lieutenant", active: true, sortOrder: 5 },
-      { id: "firefighter", label: "Firefighter", active: true, sortOrder: 6 }
+      { id: "driverEngineer", label: "Driver/Engineer", active: true, sortOrder: 6 },
+      { id: "firefighterEmt", label: "Firefighter/EMT", active: true, sortOrder: 7 },
+      { id: "firefighter", label: "Firefighter", active: true, sortOrder: 8 },
+      { id: "paramedic", label: "Paramedic", active: true, sortOrder: 9 },
+      { id: "emt", label: "EMT", active: true, sortOrder: 10 }
     ]
   },
   {
@@ -21,7 +25,8 @@ export const defaultDropdowns = [
       { id: "bShift", label: "B Shift", active: true, sortOrder: 2 },
       { id: "cShift", label: "C Shift", active: true, sortOrder: 3 },
       { id: "dayStaff", label: "Day Staff", active: true, sortOrder: 4 },
-      { id: "administration", label: "Administration", active: true, sortOrder: 5 }
+      { id: "administration", label: "Administration", active: true, sortOrder: 5 },
+      { id: "paidPerCall", label: "Paid Per Call", active: true, sortOrder: 6 }
     ]
   },
   {
@@ -219,7 +224,8 @@ export const defaultDropdowns = [
       { id: "driver", label: "Driver", active: true, sortOrder: 3 },
       { id: "firefighter", label: "Firefighter", active: true, sortOrder: 4 },
       { id: "emtDriver", label: "EMT/Driver", active: true, sortOrder: 5 },
-      { id: "medic", label: "Medic", active: true, sortOrder: 6 }
+      { id: "medic", label: "Paramedic", active: true, sortOrder: 6 },
+      { id: "emt", label: "EMT", active: true, sortOrder: 7 }
     ]
   },
   {
@@ -394,3 +400,14 @@ export const defaultDropdowns = [
     ]
   }
 ];
+
+/**
+ * Default options renamed after departments were set up: [dropdownId, optionId, oldLabel, newLabel].
+ * Applied only while the department still has the old default label.
+ */
+export const DEFAULT_OPTION_RENAMES = [
+  ["personnelPositions", "medic", "Medic", "Paramedic"],
+];
+
+/** Dropdowns whose newer default options are added to existing departments. */
+export const UPGRADED_DROPDOWN_IDS = ["ranks", "shifts", "personnelPositions"];

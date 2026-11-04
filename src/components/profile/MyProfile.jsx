@@ -19,10 +19,11 @@ import { documentDisplayName, documentDownloadUrl } from "../../lib/storagePaths
 import { isObjectVisibleInActiveList } from "../../lib/objectLifecycle.js";
 import { requestPasswordReset } from "../../lib/accountService.js";
 import {
-  PROFILE_GROUPS, SELF_EDIT_KEYS, contactPatch, isEquipmentInHand, lengthOfService, normalizeEquipment,
+  LICENSE_COPY_KEYS, PROFILE_GROUPS, SELF_EDIT_KEYS, contactPatch, isEquipmentInHand, lengthOfService, normalizeEquipment,
   profileAttention, profileEmails, profilePhones, usableEquipment,
 } from "../../lib/personnelProfile.js";
-import { ContactList, EmergencyContacts, ExpiryBadge, FieldGroup, HistoryTable, IssuedEquipment, RowsEditor } from "./ProfileParts.jsx";
+import { ContactList, EmergencyContacts, FieldGroup, HistoryTable, IssuedEquipment, RowsEditor } from "./ProfileParts.jsx";
+import { CertificateCopy, CertificationCopiesTable, certificationCopyPatch, uploadCertificateFile } from "./CertificateCopies.jsx";
 import "./MyProfile.css";
 
 const SECTIONS = [
@@ -72,7 +73,8 @@ function Card({ id, title, icon: Icon, editable, editing, onEdit, onCancel, onSa
 }
 
 export default function MyProfile({
-  person, setPersonnel, certifications = [], user, membership, roleLabel = "", departmentId, canEditAll = false, onNavigate,
+  person, setPersonnel, certifications = [], setCertifications, user, membership, roleLabel = "", departmentId, canEditAll = false,
+  canEditCertifications = false, isSelf = true, onNavigate,
 }) {
   const privateState = usePersonnelPrivate(departmentId, person?.id, Boolean(person?.id));
   const privateReady = privateState.status === "ready";
@@ -170,6 +172,18 @@ export default function MyProfile({
   };
   const lastSignIn = user?.metadata?.lastSignInTime ? new Date(user.metadata.lastSignInTime) : null;
   const G = PROFILE_GROUPS;
+  // Certificate copies: admins for anyone, each person for their own records.
+  const canUploadCert = (cert) => Boolean(setCertifications) && (canEditCertifications || canEditAll || (isSelf && cert.personnelId && cert.personnelId === person.id));
+  const uploadCert = async (cert, file) => {
+    const copy = await uploadCertificateFile(departmentId, { certId: cert.id }, file);
+    setCertifications((current) => current.map((row) => (row.id === cert.id ? { ...row, ...certificationCopyPatch(copy) } : row)));
+    setMessage({ tone: "ok", text: `Certificate copy saved for ${cert.type || "the certification"}.` });
+  };
+  const uploadLicenseCopy = async (key, file) => {
+    const copy = await uploadCertificateFile(departmentId, { personId: person.id }, file);
+    setPersonnel((current) => current.map((row) => (row.id === person.id ? { ...row, [key]: copy, updatedAt: new Date().toISOString() } : row)));
+    setMessage({ tone: "ok", text: "Certificate copy saved." });
+  };
 
   return (
     <div className="profile-page" ref={containerRef}>
@@ -271,10 +285,20 @@ export default function MyProfile({
           <h2 className="profile-section-title">Credentials</h2>
           <Card id="card-licensure" title="EMS licensure" icon={BadgeCheck} {...cardProps("licensure", [G.nationalRegistry, G.stateLicense, G.agencyLicense])}>
             <div className="profile-subcards">
-              {[G.nationalRegistry, G.stateLicense, G.agencyLicense].map((group) => (
+              {[["nationalRegistry", G.nationalRegistry], ["stateLicense", G.stateLicense], ["agencyLicense", G.agencyLicense]].map(([id, group]) => (
                 <section key={group.title} className="profile-subcard">
                   <h4>{group.title}</h4>
                   <FieldGroup group={group} values={shown("licensure")} editing={editing === "licensure"} onChange={change} canEdit={canEditField} />
+                  <div className="profile-copy-row">
+                    <span>Certificate copy</span>
+                    <CertificateCopy
+                      name={values[LICENSE_COPY_KEYS[id]]?.name}
+                      url={values[LICENSE_COPY_KEYS[id]]?.url}
+                      canUpload={canEditAll || isSelf}
+                      label={group.title}
+                      onUpload={(file) => uploadLicenseCopy(LICENSE_COPY_KEYS[id], file)}
+                    />
+                  </div>
                 </section>
               ))}
             </div>
@@ -283,11 +307,7 @@ export default function MyProfile({
             <FieldGroup group={G.education} values={shown("education")} editing={editing === "education"} onChange={change} canEdit={canEditField} />
           </Card>
           <Card id="card-certs" title="Additional certifications" icon={BadgeCheck} editable={false}>
-            <HistoryTable
-              columns={[["type", "Certification"], ["category", "Category"], ["id", "Certification ID"], ["issue", "Issued", "date"], ["expires", "Expires", "expires"], ["status", "Status"]]}
-              rows={certifications}
-              empty="No certifications on file."
-            />
+            <CertificationCopiesTable certs={certifications} canUpload={canUploadCert} onUpload={uploadCert} />
             {onNavigate ? <button type="button" className="profile-link" onClick={() => onNavigate("Certifications")}>Open Certifications</button> : null}
           </Card>
         </div>

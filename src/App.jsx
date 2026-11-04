@@ -1243,6 +1243,7 @@ function AppShell() {
       showInternalEmail={isModuleEnabled("internalEmail")}
       personnel={personnel}
       certifications={liveCertifications}
+      setCertifications={setCertifications}
       training={training}
       documents={documents}
       setDocuments={setDocuments}
@@ -1295,6 +1296,9 @@ function AppShell() {
         records={personnel}
         setRecords={setPersonnel}
         training={training}
+        certificationRecords={liveCertifications}
+        setCertificationRecords={setCertifications}
+        canEditCertifications={isCreator || hasPermission(permissions, "editCertifications") || canEditPersonnel(permissions, isCreator)}
         departmentId={departmentId}
         canEditPhoto={canEditPersonnel(permissions, isCreator)}
         canEditProfile={canEditPersonnel(permissions, isCreator)}

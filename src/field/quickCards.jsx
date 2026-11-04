@@ -1,6 +1,6 @@
 /**
  * FORGE FIELD quick cards: the categories on the home screen and the tools in
- * each one. Daily log, incident reports and supply check-offs stay in the RMS.
+ * each one. Daily log and supply check-offs stay in the RMS.
  * A tool the person's role can't use is left out; "soon" marks tools not built
  * yet; "href" opens an outside site.
  */
@@ -18,6 +18,8 @@ import {
   Flame,
   Phone,
   Pill,
+  Plus,
+  Siren,
   Stethoscope,
   Syringe,
   Waves,
@@ -62,8 +64,14 @@ export function useQuickCards() {
     .map((record) => record.data.listId)).size;
   const assignedInspections = refItems(refData, "inspections");
   const planCount = refItems(refData, "preplans").length + refItems(refData, "legacyPlans").length;
+  // Incident reports started here and not yet finished in the RMS.
+  const incidentIds = new Set([
+    ...refItems(refData, "incidents").map((report) => report.id),
+    ...records.filter((record) => record.kind === "incident").map((record) => record.data?.id),
+  ].filter(Boolean));
+  const unsentIncidents = records.filter((record) => record.kind === "incident" && record.status !== "synced").length;
 
-  // Quick cards. Daily log, incident reports and supply check-offs stay in the RMS.
+  // Quick cards. Daily log and supply check-offs stay in the RMS.
   const cards = [
     {
       key: "fire",
@@ -134,6 +142,30 @@ export function useQuickCards() {
           title: "Pill identifier",
           detail: online ? "Drugs.com · needs signal" : "Needs signal",
           href: PILL_IDENTIFIER_URL,
+        },
+      ],
+    },
+    {
+      key: "incident",
+      icon: <Siren size={24} />,
+      title: "Incident",
+      tone: "red",
+      items: [
+        caps.incidents && {
+          key: "incident-new",
+          icon: <Plus size={24} />,
+          title: "New incident report",
+          detail: "Address, type, times, units and crew · works offline",
+          onClick: () => navigate("incidentForm"),
+        },
+        caps.incidents && {
+          key: "incident-list",
+          icon: <Siren size={24} />,
+          title: "Incident reports",
+          detail: incidentIds.size
+            ? `${incidentIds.size} draft${incidentIds.size === 1 ? "" : "s"}${unsentIncidents ? ` · ${unsentIncidents} not sent yet` : ""} · finish in the RMS`
+            : "Drafts you started · finish in the RMS",
+          onClick: () => navigate("incidents"),
         },
       ],
     },

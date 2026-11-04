@@ -18,7 +18,8 @@ import PersonnelActivityLogView from "./personnel/PersonnelActivityLogView.jsx";
 import PersonnelSectionActions from "./personnel/PersonnelSectionActions.jsx";
 import PersonnelAcademyPanel from "./personnel/PersonnelAcademyPanel.jsx";
 import { FieldGroup, IssuedEquipment } from "./profile/ProfileParts.jsx";
-import { PROFILE_GROUPS, normalizeEquipment } from "../lib/personnelProfile.js";
+import { LICENSE_COPY_KEYS, PROFILE_GROUPS, normalizeEquipment } from "../lib/personnelProfile.js";
+import { CertificateCopy, CertificationCopiesTable, certificationCopyPatch, uploadCertificateFile } from "./profile/CertificateCopies.jsx";
 import "./profile/MyProfile.css";
 import ObjectUploadField from "./ObjectUploadField.jsx";
 import ObjectLifecycleActions from "./ObjectLifecycleActions.jsx";
@@ -262,6 +263,9 @@ export default function PersonnelProfileForm({
   updateDraftField,
   setEmergencySameAddress,
   training = [],
+  certificationRecords = [],
+  setCertificationRecords,
+  canEditCertifications = false,
   onSave,
   onCancel,
   isNewRecord = false,
@@ -344,6 +348,19 @@ export default function PersonnelProfileForm({
       return (
         <div className="personnel-form-card">
           <header className="personnel-form-card-header"><strong>Certifications</strong></header>
+
+          <h3 className="personnel-form-section-title">Certification records &amp; certificate copies</h3>
+          <div className="personnel-section-card">
+            <CertificationCopiesTable
+              certs={certificationRecords.filter((cert) => (cert.personnelId && cert.personnelId === selected.id) || (!cert.personnelId && cert.person && cert.person === selected.name))}
+              canUpload={() => Boolean(setCertificationRecords) && canEditCertifications}
+              onUpload={async (cert, file) => {
+                const copy = await uploadCertificateFile(departmentId, { certId: cert.id }, file);
+                setCertificationRecords((current) => current.map((row) => (row.id === cert.id ? { ...row, ...certificationCopyPatch(copy) } : row)));
+              }}
+              empty="No certification records for this member. Add them on the Certifications page."
+            />
+          </div>
 
           <h3 className="personnel-form-section-title">EMS Credentials</h3>
           <p className="auth-help personnel-ems-credentials-note">
@@ -534,10 +551,22 @@ export default function PersonnelProfileForm({
         <div className="personnel-form-card">
           <header className="personnel-form-card-header"><strong>Licensure &amp; Education</strong></header>
           <div className="profile-subcards">
-            {[PROFILE_GROUPS.nationalRegistry, PROFILE_GROUPS.stateLicense, PROFILE_GROUPS.agencyLicense, PROFILE_GROUPS.education].map((group) => (
+            {[["nationalRegistry", PROFILE_GROUPS.nationalRegistry], ["stateLicense", PROFILE_GROUPS.stateLicense], ["agencyLicense", PROFILE_GROUPS.agencyLicense], ["", PROFILE_GROUPS.education]].map(([id, group]) => (
               <section key={group.title} className="profile-subcard">
                 <h4>{group.title}</h4>
                 <FieldGroup group={group} values={draft} editing={canEdit} onChange={updateDraftField} canEdit={() => true} />
+                {id ? (
+                  <div className="profile-copy-row">
+                    <span>Certificate copy</span>
+                    <CertificateCopy
+                      name={draft[LICENSE_COPY_KEYS[id]]?.name}
+                      url={draft[LICENSE_COPY_KEYS[id]]?.url}
+                      canUpload={canEdit}
+                      label={group.title}
+                      onUpload={async (file) => updateDraftField(LICENSE_COPY_KEYS[id], await uploadCertificateFile(departmentId, { personId: draft.id }, file))}
+                    />
+                  </div>
+                ) : null}
               </section>
             ))}
           </div>

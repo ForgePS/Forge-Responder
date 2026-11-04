@@ -159,8 +159,16 @@ export const PROFILE_GROUPS = {
   },
 };
 
+/** Where each licensure's certificate copy is kept on the personnel record. */
+export const LICENSE_COPY_KEYS = Object.freeze({
+  nationalRegistry: "nrCertificate",
+  stateLicense: "stateLicenseCertificate",
+  agencyLicense: "agencyLicenseCertificate",
+});
+
 /** Keys a member may change on their own personnel record (firestore.rules matches this list). */
 export const SELF_EDIT_KEYS = Object.freeze([
+  "nrCertificate", "stateLicenseCertificate", "agencyLicenseCertificate",
   "address", "unitSuite", "city", "state", "zip", "country", "phones", "emails", "phone", "email", "languages",
   "emergency", "emergencyFirstName", "emergencyLastName", "emergencyPhone", "emergencyRelationship",
   "emergencyAddress", "emergencyCity", "emergencyState", "emergencyZip", "emergencySameAddress",
