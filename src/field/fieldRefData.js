@@ -24,6 +24,9 @@ import { listPreplanFiles, listPreplans } from "../lib/inspections/preplanServic
 import { fieldCapabilities } from "./fieldSession.js";
 import { listCheckoffLists, loadFieldAppConfig } from "./fieldAdminService.js";
 import { localDate } from "./fieldValidation.js";
+import { isObjectVisibleInActiveList } from "../lib/objectLifecycle.js";
+import { referenceKind } from "./fieldReference.js";
+
 
 const OPEN_INSPECTION_STATUSES = new Set(["draft", "scheduled", "in_progress", "overdue", "awaiting_approval"]);
 const PREPLAN_HIDDEN_STATUSES = new Set(["archived", "retired", "deleted"]);
@@ -70,6 +73,26 @@ function trimIncident(report = {}) {
 }
 
 const PART_LOADERS = {
+  // EMS protocols and HazMat documents from Documents, for the EMS and HazMat cards.
+  async referenceDocs({ departmentId, caps }) {
+    if (!caps.referenceDocs) return [];
+    const list = await readTenantList(getFirestoreDb(), departmentId, LIST_KEYS.documents);
+    return (list.items || [])
+      .filter((doc) => isObjectVisibleInActiveList(doc))
+      .map((doc) => ({ doc, kind: referenceKind(doc) }))
+      .filter(({ doc, kind }) => kind && doc.fileUrl && doc.fileUrl !== "#")
+      .map(({ doc, kind }) => ({
+        id: doc.id,
+        kind,
+        title: doc.title || doc.name || "Document",
+        description: doc.description || "",
+        fileUrl: doc.fileUrl,
+        fileName: doc.fileName || "",
+        updatedAt: doc.updatedAt || doc.uploadedAt || "",
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }));
+  },
+
   async checkoffLists({ departmentId, caps }) {
     if (!caps.emsCheckoff && !caps.supplyCheckoff) return [];
     return (await listCheckoffLists(departmentId)).filter((list) => list.active && list.items.length);
@@ -343,11 +366,11 @@ export async function refreshRefData({ departmentId, snapshot, actor }) {
   const current = await loadRefData(departmentId);
   const parts = { ...(current.parts || {}) };
   const failed = [];
-  // Department FORGE Field settings first: they decide what else is needed.
+  // Department FORGE FIELD settings first: they decide what else is needed.
   try {
     parts.config = { items: await loadFieldAppConfig(departmentId), fetchedAt: new Date().toISOString() };
   } catch (error) {
-    console.warn("FORGE Field settings could not be refreshed", error);
+    console.warn("FORGE FIELD settings could not be refreshed", error);
     failed.push("config");
   }
   const caps = fieldCapabilities(snapshot, parts.config?.items || null);
@@ -369,7 +392,7 @@ export function refItems(refData, name) {
   return refData?.parts?.[name]?.items || [];
 }
 
-/** Department FORGE Field settings from the last download (null if never downloaded). */
+/** Department FORGE FIELD settings from the last download (null if never downloaded). */
 export function refConfig(refData) {
   const config = refData?.parts?.config?.items;
   return config && !Array.isArray(config) ? config : null;

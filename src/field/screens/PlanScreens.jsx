@@ -10,7 +10,7 @@ import { getSavedPlanFile, isImageFile, openPlanFile, savePlanFileOffline } from
 import { Banner, ErrorSummary, Field, PhotoStrip, Screen, Section, Segmented, TextArea, TextInput, cx, formatWhen } from "../ui.jsx";
 import { STARTER_PREPLAN_TEMPLATE_SECTIONS } from "../../lib/inspections/preplanDefaults.js";
 
-/** Which FORGE Field setting controls a template section (by its title). */
+/** Which FORGE FIELD setting controls a template section (by its title). */
 export function sectionConfigKey(title = "") {
   const text = String(title).toLowerCase();
   if (/access|approach|knox/.test(text)) return "access";
@@ -285,7 +285,7 @@ export function PlanUpdateScreen({ params = {} }) {
         </>
       )}
     >
-      <Banner tone="info" icon={<MessageSquarePlus size={22} />}>A plan reviewer sees this in the RMS (Admin → FORGE Field → Plan updates) and updates the plan.</Banner>
+      <Banner tone="info" icon={<MessageSquarePlus size={22} />}>A plan reviewer sees this in the RMS (Admin → FORGE FIELD → Plan updates) and updates the plan.</Banner>
       <Field label="Which part?">
         <Segmented value={data.section} options={sections.slice(0, 8).map((value) => ({ value, label: value, clearable: true }))} onChange={(value) => update({ section: value })} columns={2} />
       </Field>

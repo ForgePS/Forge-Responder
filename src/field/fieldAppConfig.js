@@ -146,7 +146,52 @@ export const FIELD_MODES = ["show", "hide", "required"];
 const RANK = { hide: 1, show: 2, required: 3 };
 
 export function emptyFieldAppConfig() {
-  return { appName: "", logoUrl: "", logoStoragePath: "", workflows: {}, fields: {} };
+  return { appName: "", logoUrl: "", logoStoragePath: "", workflows: {}, fields: {}, contacts: [], drugDosages: [] };
+}
+
+const text = (value) => String(value ?? "");
+
+/** Important contacts (Admin → FORGE FIELD → Contacts): name, group, phone, notes. */
+export function normalizeContacts(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row, index) => ({
+      id: text(row?.id) || `contact-${index + 1}`,
+      name: text(row?.name),
+      group: text(row?.group),
+      phone: text(row?.phone),
+      notes: text(row?.notes),
+    }));
+}
+
+/** Contacts worth showing on a phone (a row being typed in the admin screen may be blank). */
+export function usableContacts(rows) {
+  return normalizeContacts(rows)
+    .map((row) => ({ ...row, name: row.name.trim(), group: row.group.trim(), phone: row.phone.trim(), notes: row.notes.trim() }))
+    .filter((row) => row.name && row.phone);
+}
+
+/**
+ * Drug dosages (Admin → FORGE FIELD → Drug dosages), entered by the department
+ * from its medical director's protocols. FORGE never supplies dosages.
+ */
+export function normalizeDrugDosages(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row, index) => ({
+      id: text(row?.id) || `dose-${index + 1}`,
+      drug: text(row?.drug),
+      indication: text(row?.indication),
+      adult: text(row?.adult),
+      pediatric: text(row?.pediatric),
+      route: text(row?.route),
+      notes: text(row?.notes),
+    }));
+}
+
+/** Dosage rows worth showing on a phone (needs a drug and at least one dose). */
+export function usableDrugDosages(rows) {
+  return normalizeDrugDosages(rows)
+    .map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, String(value).trim()])))
+    .filter((row) => row.drug && (row.adult || row.pediatric));
 }
 
 export function normalizeFieldAppConfig(raw) {
@@ -156,6 +201,8 @@ export function normalizeFieldAppConfig(raw) {
     ...data,
     workflows: data.workflows && typeof data.workflows === "object" ? data.workflows : {},
     fields: data.fields && typeof data.fields === "object" ? data.fields : {},
+    contacts: normalizeContacts(data.contacts),
+    drugDosages: normalizeDrugDosages(data.drugDosages),
   };
 }
 

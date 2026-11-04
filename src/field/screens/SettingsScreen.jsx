@@ -65,11 +65,11 @@ export default function SettingsScreen() {
         <Section title="Install on this phone">
           {installable ? (
             <button type="button" className="fa-btn fa-btn-primary fa-btn-block" onClick={() => promptInstall()}>
-              <Smartphone size={20} /> Add FORGE Field to home screen
+              <Smartphone size={20} /> Add FORGE FIELD to home screen
             </button>
           ) : isIos() ? (
             <Banner tone="info" icon={<Share size={22} />} title="Add to Home Screen">
-              In Safari, tap the Share button, then “Add to Home Screen”. FORGE Field then opens like an app, even offline.
+              In Safari, tap the Share button, then “Add to Home Screen”. FORGE FIELD then opens like an app, even offline.
             </Banner>
           ) : (
             <Banner tone="info" icon={<MonitorSmartphone size={22} />}>

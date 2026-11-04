@@ -2366,3 +2366,78 @@ a.fa-tile:visited {
   text-decoration: none;
   color: var(--fa-text);
 }
+
+/* ---- Reference screens (drug dosages, contacts) ---- */
+.fa-ref-list {
+  display: grid;
+  gap: 10px;
+}
+
+.fa-ref-card {
+  border: 1px solid var(--rms-border);
+  border-radius: var(--fa-radius);
+  background: var(--rms-bg-panel);
+  box-shadow: var(--rms-shadow-sm);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.fa-ref-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fa-ref-card header strong {
+  display: block;
+  font-size: 1.05rem;
+  color: var(--rms-text-strong);
+}
+
+.fa-ref-card header small {
+  color: var(--rms-text-muted);
+  font-size: 0.85rem;
+}
+
+.fa-ref-card .fa-tile-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  --fa-tile-color: var(--fa-tile-blue);
+}
+
+.fa-ref-card dl {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fa-ref-card dl > div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.fa-ref-card dt {
+  color: var(--rms-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.fa-ref-card dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--rms-text-strong);
+  white-space: pre-wrap;
+}
+
+.fa-ref-call {
+  flex: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--fa-primary);
+  color: var(--fa-primary-text);
+  font-weight: 700;
+  font-size: 0.9rem;
+}

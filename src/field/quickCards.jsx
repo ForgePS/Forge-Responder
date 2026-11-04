@@ -1,5 +1,5 @@
 /**
- * FORGE Field quick cards: the categories on the home screen and the tools in
+ * FORGE FIELD quick cards: the categories on the home screen and the tools in
  * each one. Daily log, incident reports and supply check-offs stay in the RMS.
  * A tool the person's role can't use is left out; "soon" marks tools not built
  * yet; "href" opens an outside site.
@@ -26,11 +26,17 @@ import { useField } from "./fieldContext.jsx";
 import { refItems } from "./fieldRefData.js";
 import { localDate } from "./fieldValidation.js";
 import { rmsPathFromFieldPath } from "./fieldPaths.js";
+import { usableContacts, usableDrugDosages } from "./fieldAppConfig.js";
+import { PILL_IDENTIFIER_URL } from "./fieldReference.js";
 
-const PILL_IDENTIFIER_URL = "https://www.drugs.com/imprints.php";
 
 export function useQuickCards() {
-  const { caps, refData, records, navigate, online } = useField();
+  const { caps, config, refData, records, navigate, online } = useField();
+  const referenceDocs = refItems(refData, "referenceDocs");
+  const emsDocs = referenceDocs.filter((doc) => doc.kind === "ems").length;
+  const hazmatDocs = referenceDocs.filter((doc) => doc.kind === "hazmat").length;
+  const doses = usableDrugDosages(config?.drugDosages).length;
+  const contactCount = usableContacts(config?.contacts).length;
   const today = localDate();
   const assets = refItems(refData, "assets");
 
@@ -108,8 +114,20 @@ export function useQuickCards() {
           detail: `${doneToday("ems")} of ${emsLists.length} done today`,
           onClick: () => navigate("checkoffs", { kind: "ems" }),
         },
-        { key: "protocols", icon: <BookOpen size={24} />, title: "EMS protocols", soon: true },
-        { key: "doses", icon: <Syringe size={24} />, title: "Drug dosages", detail: "Adult and pediatric", soon: true },
+        caps.referenceDocs && {
+          key: "protocols",
+          icon: <BookOpen size={24} />,
+          title: "EMS protocols",
+          detail: emsDocs ? `${emsDocs} protocol${emsDocs === 1 ? "" : "s"} · saved for offline` : "None uploaded yet",
+          onClick: () => navigate("emsProtocols"),
+        },
+        {
+          key: "doses",
+          icon: <Syringe size={24} />,
+          title: "Drug dosages",
+          detail: doses ? `Adult and pediatric · ${doses} drug${doses === 1 ? "" : "s"}` : "Not set up by your department yet",
+          onClick: () => navigate("drugDosages"),
+        },
         {
           key: "pills",
           icon: <Pill size={24} />,
@@ -175,14 +193,26 @@ export function useQuickCards() {
       icon: <Phone size={24} />,
       title: "Important contacts",
       tone: "teal",
-      items: [{ key: "contacts", icon: <Phone size={24} />, title: "Contacts", detail: "Utilities, mutual aid, hospitals", soon: true }],
+      items: [{
+        key: "contacts",
+        icon: <Phone size={24} />,
+        title: "Contacts",
+        detail: contactCount ? `${contactCount} contact${contactCount === 1 ? "" : "s"} · tap to call` : "Not set up by your department yet",
+        onClick: () => navigate("contacts"),
+      }],
     },
     {
       key: "hazmat",
       icon: <Biohazard size={24} />,
       title: "HazMat",
       tone: "amber",
-      items: [{ key: "hazmat", icon: <Biohazard size={24} />, title: "HazMat references", detail: "ERG · CAMEO Chemicals · NIOSH", soon: true }],
+      items: [{
+        key: "hazmat",
+        icon: <Biohazard size={24} />,
+        title: "HazMat references",
+        detail: hazmatDocs ? `ERG · CAMEO · NIOSH · ${hazmatDocs} department document${hazmatDocs === 1 ? "" : "s"}` : "ERG · CAMEO Chemicals · NIOSH",
+        onClick: () => navigate("hazmat"),
+      }],
     },
   ];
   return cards.map((card) => ({ ...card, items: card.items.filter(Boolean) }));
