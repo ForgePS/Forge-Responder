@@ -100,6 +100,16 @@ const PREPLANS = [
   }],
 ];
 
+/** Preplan type per building (the template default would label every plan multifamily). */
+const PREPLAN_TYPE_BY_OCCUPANCY = {
+  "OCC-101": "educational",
+  "OCC-102": "assembly",
+  "OCC-103": "warehouse",
+  "OCC-104": "multifamily",
+  "OCC-106": "healthcare",
+  "OCC-107": "healthcare",
+};
+
 /** Fire protection systems: [id, occupancyId, occupancyName, type, name, extra]. */
 const SYSTEMS = [
   ["FPS-DEMO-1", "OCC-101", "Riverside High School", "sprinkler", "Wet pipe sprinkler (full coverage)", { coverageArea: "Entire building", installDate: "2004-07-15" }],
@@ -152,15 +162,15 @@ export async function refreshDemoPreventionExtras(now = new Date()) {
     }, departmentId),
   )));
 
-  // Preplans, one at a time (each creates a revision, diagram and restricted answers).
-  let n = 0;
-  for (const [occupancyId, status, plan] of PREPLANS) {
-    n += 1;
+  // Preplans. The first one also sets up the preplan templates, so it goes alone;
+  // the rest are created side by side (each makes a revision, diagram and restricted answers).
+  async function buildPreplan([occupancyId, status, plan], n) {
     const id = `PP-DEMO-${n}`;
     await createPreplan(departmentId, {
       id,
       preplanNumber: `PP-${year}-${String(n).padStart(4, "0")}`,
       occupancyId,
+      preplanTypeId: PREPLAN_TYPE_BY_OCCUPANCY[occupancyId] || "commercial",
       responsibleStation: plan.responsibleStation,
       firstDueCompany: plan.firstDueCompany,
       riskLevel: plan.riskLevel,
@@ -178,4 +188,6 @@ export async function refreshDemoPreventionExtras(now = new Date()) {
       await updatePreplan(departmentId, id, { status }, audit);
     }
   }
+  await buildPreplan(PREPLANS[0], 1);
+  await Promise.all(PREPLANS.slice(1).map((entry, index) => buildPreplan(entry, index + 2)));
 }

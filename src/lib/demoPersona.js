@@ -49,9 +49,21 @@ export function setDemoPersona(id = "chief") {
   }
 }
 
+/**
+ * The shared demo account. The app's loaded membership keeps only some fields
+ * (isDemoUser is dropped), so also match on the demo department and its email.
+ * Platform creators viewing the demo are never switched.
+ */
+function isDemoMembership(membership) {
+  if (!membership || membership.isPlatformCreator) return false;
+  if (membership.isDemoUser) return true;
+  return membership.departmentId === "forge-demo"
+    && String(membership.email || "").trim().toLowerCase() === "demo@forge.demo";
+}
+
 /** The demo membership as the chosen persona (unchanged outside the demo or for the Fire Chief). */
 export function applyDemoPersona(membership) {
-  if (!membership?.isDemoUser) return membership;
+  if (!isDemoMembership(membership)) return membership;
   const persona = getDemoPersona();
   if (persona.id === "chief") return membership;
   return {

@@ -35,3 +35,13 @@ test("each persona maps to its role, member and permissions", () => {
   setDemoPersona("battalion");
   assert.equal(Boolean(mergeMembershipPermissions(applyDemoPersona(demo), {}).editSchedule), true);
 });
+
+test("the loaded demo membership (without isDemoUser) is recognised; creators are not switched", () => {
+  setDemoPersona("firefighter");
+  const loaded = { departmentId: "forge-demo", email: "demo@forge.demo", role: "department_admin", roleIds: ["fireChief"] };
+  assert.deepEqual(applyDemoPersona(loaded).roleIds, ["firefighter"]);
+  const creator = { ...loaded, isPlatformCreator: true };
+  assert.equal(applyDemoPersona(creator), creator);
+  const other = { departmentId: "forge-demo", email: "someone@dept.org", roleIds: ["fireChief"] };
+  assert.equal(applyDemoPersona(other), other);
+});

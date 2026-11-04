@@ -586,4 +586,4 @@ export const DEMO_LIST_KEYS = Object.keys(DEMO_LIST_SEEDS);
  * Bump whenever the demo seed data above changes: demo sign-ins reseed the
  * sandbox when this differs from the version last written (see demoService.js).
  */
-export const DEMO_SEED_VERSION = 9;
+export const DEMO_SEED_VERSION = 10;
