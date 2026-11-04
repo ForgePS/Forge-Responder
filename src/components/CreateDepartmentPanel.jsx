@@ -7,7 +7,7 @@ import {
   validateDepartmentId
 } from "../lib/departmentProvisioning.js";
 import { isValidUsZipCode } from "../lib/departmentBranchUtils.js";
-import { registerPlatformDepartment } from "../lib/platformService.js";
+import { provisionDepartmentSubscription, registerPlatformDepartment } from "../lib/platformService.js";
 import { createInvite, inviteErrorMessage } from "../lib/inviteService.js";
 import { describeDomainStatus, registerDepartmentDomain } from "../lib/departmentDomainService.js";
 import { defaultSubscriptionDates } from "../lib/subscriptionUtils.js";
@@ -43,6 +43,10 @@ export default function CreateDepartmentPanel({
   // Department ID whose web address registration failed (enables "Try again").
   const [domainRetryId, setDomainRetryId] = useState("");
   const [domainRetrying, setDomainRetrying] = useState(false);
+  // A department whose subscription record failed to save (enables "Try again").
+  const [subscriptionRetry, setSubscriptionRetry] = useState(null);
+  const [subscriptionNotice, setSubscriptionNotice] = useState("");
+  const [subscriptionRetrying, setSubscriptionRetrying] = useState(false);
 
   const existingIds = useMemo(
     () => departments.map((item) => item.id),
@@ -79,6 +83,22 @@ export default function CreateDepartmentPanel({
       );
     } finally {
       setDomainRetrying(false);
+    }
+  }
+
+  async function retrySubscriptionSetup() {
+    if (!subscriptionRetry) return;
+    setSubscriptionRetrying(true);
+    try {
+      await provisionDepartmentSubscription(subscriptionRetry.departmentId, user, subscriptionRetry.options);
+      setSubscriptionRetry(null);
+      setSubscriptionNotice("Subscription saved.");
+    } catch (retryError) {
+      setSubscriptionNotice(
+        `The subscription still could not be saved: ${retryError?.message || "unknown error"}`
+      );
+    } finally {
+      setSubscriptionRetrying(false);
     }
   }
 
@@ -133,6 +153,23 @@ export default function CreateDepartmentPanel({
           expirationDate: form.expirationDate,
         },
       }, { user, trial: Boolean(form.trial) });
+
+      // Without a subscription record the department can lose access, so say so.
+      setSubscriptionRetry(null);
+      setSubscriptionNotice("");
+      if (profile.subscriptionError) {
+        setSubscriptionRetry({
+          departmentId: idCheck.id,
+          options: {
+            billingContactEmail: form.contactEmail.trim(),
+            legacySubscription: { startDate: form.startDate, expirationDate: form.expirationDate },
+            trial: Boolean(form.trial),
+          },
+        });
+        setSubscriptionNotice(
+          `Department created, but its subscription could not be saved: ${profile.subscriptionError}`
+        );
+      }
 
       // Register <department>.forgeresponder.com (best effort; can be retried).
       setDomainNotice("");
@@ -310,6 +347,25 @@ export default function CreateDepartmentPanel({
       )}
 
       {error && <p className="create-department-error">{error}</p>}
+
+      {subscriptionNotice && (
+        <p className={subscriptionRetry ? "create-department-error" : "auth-help"} role="status">
+          {subscriptionNotice}
+          {subscriptionRetry && (
+            <>
+              {" "}
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={retrySubscriptionSetup}
+                disabled={subscriptionRetrying}
+              >
+                {subscriptionRetrying ? "Trying again..." : "Try again"}
+              </button>
+            </>
+          )}
+        </p>
+      )}
 
       {domainNotice && (
         <p className="auth-help" role="status">

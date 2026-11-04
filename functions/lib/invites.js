@@ -70,15 +70,40 @@ function safeAppOrigin(origin) {
 
 /**
  * Invite link for a department. From a forgeresponder.com page it points at the
- * department's own subdomain; elsewhere (web.app, localhost) at /<department>.
+ * department's own subdomain once that address is live, and at
+ * app.forgeresponder.com/<department> until then (a new department's address
+ * can take hours to start working). Elsewhere (web.app, localhost) /<department>.
  */
-function buildInviteUrl(origin, departmentId, token) {
+function buildInviteUrl(origin, departmentId, token, { addressLive = true } = {}) {
   const base = safeAppOrigin(origin);
   const invite = `invite=${encodeURIComponent(token)}`;
   if (isTenantDomainHost(new URL(base).hostname)) {
-    return `https://${encodeURIComponent(departmentId)}.${TENANT_ROOT_DOMAIN}/?${invite}`;
+    return addressLive
+      ? `https://${encodeURIComponent(departmentId)}.${TENANT_ROOT_DOMAIN}/?${invite}`
+      : `${DEFAULT_APP_ORIGIN}/${encodeURIComponent(departmentId)}?${invite}`;
   }
   return `${base}/${encodeURIComponent(departmentId)}?${invite}`;
+}
+
+/**
+ * Whether <department>.forgeresponder.com works yet. Remembered on the registry
+ * (domainLive) once it does, so later invites skip the Hosting check. Any
+ * failure counts as "not yet": the fallback link always works.
+ */
+async function departmentAddressLive(db, departmentId, checkAddress) {
+  const registryRef = db.doc(`platformDepartments/${departmentId}`);
+  try {
+    const registry = await registryRef.get();
+    if (registry.exists && registry.get("domainLive") === true) return true;
+    const subdomain = (registry.exists && registry.get("subdomain")) || departmentId;
+    const check = checkAddress || require("./departmentDomains").isDepartmentAddressLive;
+    const live = await check(subdomain);
+    if (live && registry.exists) await registryRef.set({ domainLive: true }, { merge: true });
+    return Boolean(live);
+  } catch (error) {
+    console.warn(`Couldn't check ${departmentId}'s web address; using the fallback link`, error?.message || error);
+    return false;
+  }
 }
 
 function isAdminMembership(data = {}) {
@@ -183,7 +208,8 @@ async function sendInviteEmail({ to, departmentName, inviteUrl, invitedByName, r
   });
 }
 
-async function createInvite(db, request) {
+/** @param {{ checkAddress?: (subdomain: string) => Promise<boolean> }} [options] for tests */
+async function createInvite(db, request, { checkAddress } = {}) {
   const data = request.data || {};
   const departmentId = String(data.departmentId || "").trim();
   await assertDepartmentAdmin(db, departmentId, request.auth);
@@ -230,7 +256,9 @@ async function createInvite(db, request) {
   batch.set(db.doc(`invites/${inviteId}`), invite);
   await batch.commit();
 
-  const inviteUrl = buildInviteUrl(data.appOrigin, departmentId, token);
+  const needsAddress = isTenantDomainHost(new URL(safeAppOrigin(data.appOrigin)).hostname);
+  const addressLive = needsAddress ? await departmentAddressLive(db, departmentId, checkAddress) : true;
+  const inviteUrl = buildInviteUrl(data.appOrigin, departmentId, token, { addressLive });
   // The demo sign-in is public: show the link in the app, never email it.
   const demoSkip = isDemoDepartment(departmentId) && data.sendEmail !== false;
   if (demoSkip) logDemoOutbound("invite email", { to: email, departmentId });

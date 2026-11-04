@@ -88,10 +88,12 @@ describe("createInvite", () => {
     assert.ok(!JSON.stringify(stored).includes(token), "raw token must not be stored");
   });
 
+  const LIVE = { checkAddress: async () => true };
+
   it("ignores untrusted app origins in invite links", async () => {
     const result = await invites.createInvite(db, req(ADMIN, {
       departmentId: A, email: "new@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://evil.example.com",
-    }));
+    }), LIVE);
     // Untrusted origin falls back to the platform host, i.e. the department subdomain.
     assert.match(result.inviteUrl, /^https:\/\/dept-a\.forgeresponder\.com\/\?invite=/);
   });
@@ -106,14 +108,39 @@ describe("createInvite", () => {
   it("uses the department's subdomain when created from forgeresponder.com", async () => {
     const fromPlatform = await invites.createInvite(db, req(ADMIN, {
       departmentId: A, email: "sub@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://app.forgeresponder.com",
-    }));
+    }), LIVE);
     assert.match(fromPlatform.inviteUrl, /^https:\/\/dept-a\.forgeresponder\.com\/\?invite=/);
     const lookAlike = await invites.createInvite(db, req(ADMIN, {
       departmentId: A, email: "sub2@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://forgeresponder.com.evil.com",
-    }));
+    }), LIVE);
     // A look-alike host is not trusted: the link goes to the real department subdomain.
     assert.match(lookAlike.inviteUrl, /^https:\/\/dept-a\.forgeresponder\.com\/\?invite=/);
     assert.doesNotMatch(lookAlike.inviteUrl, /evil/);
+  });
+
+  it("uses app.forgeresponder.com/<department> until the department's own address works", async () => {
+    let checks = 0;
+    const notYet = { checkAddress: async () => { checks += 1; return false; } };
+    const early = await invites.createInvite(db, req(ADMIN, {
+      departmentId: A, email: "early@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://app.forgeresponder.com",
+    }), notYet);
+    assert.match(early.inviteUrl, /^https:\/\/app\.forgeresponder\.com\/dept-a\?invite=/);
+    // A failed check also falls back.
+    const broken = await invites.createInvite(db, req(ADMIN, {
+      departmentId: A, email: "broken@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://app.forgeresponder.com",
+    }), { checkAddress: async () => { throw new Error("Hosting API down"); } });
+    assert.match(broken.inviteUrl, /^https:\/\/app\.forgeresponder\.com\/dept-a\?invite=/);
+    // Once live it's remembered, so no more checks.
+    await db.doc(`platformDepartments/${A}`).set({ name: "A" }, { merge: true });
+    await invites.createInvite(db, req(ADMIN, {
+      departmentId: A, email: "live@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://app.forgeresponder.com",
+    }), LIVE);
+    assert.equal((await db.doc(`platformDepartments/${A}`).get()).get("domainLive"), true);
+    const later = await invites.createInvite(db, req(ADMIN, {
+      departmentId: A, email: "later@a.gov", roleIds: ["firefighter"], sendEmail: false, appOrigin: "https://app.forgeresponder.com",
+    }), notYet);
+    assert.match(later.inviteUrl, /^https:\/\/dept-a\.forgeresponder\.com\/\?invite=/);
+    assert.equal(checks, 1, "not re-checked once known to be live");
   });
 
   it("refuses the creator role and unknown roles", async () => {
