@@ -1,5 +1,5 @@
 /**
- * Admin → FORGE Field: settings for the offline field app.
+ * Admin → FORGE FIELD: settings for the offline field app.
  *  - General: app name and logo
  *  - Workflows: on/off and which roles get each one
  *  - Form fields: show / hide / require each field, for everyone or per role
@@ -201,7 +201,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
       setUpdates(nextUpdates);
       setDirty(false);
     } catch (error) {
-      setLoadError(error?.message || "Couldn't load FORGE Field settings.");
+      setLoadError(error?.message || "Couldn't load FORGE FIELD settings.");
     }
   }
 
@@ -220,9 +220,9 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
       const saved = await saveFieldAppConfig(departmentId, config, actor);
       setConfig(normalizeFieldAppConfig(saved));
       setDirty(false);
-      onMessage?.("FORGE Field settings saved — phones pick them up on their next update");
+      onMessage?.("FORGE FIELD settings saved — phones pick them up on their next update");
     } catch (error) {
-      onMessage?.(error?.code === "permission-denied" ? "Only department administrators can change FORGE Field settings." : `Save failed: ${error?.message || error}`);
+      onMessage?.(error?.code === "permission-denied" ? "Only department administrators can change FORGE FIELD settings." : `Save failed: ${error?.message || error}`);
     } finally {
       setSaving(false);
     }
@@ -243,7 +243,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
   }
 
   if (!config) {
-    return <div className="fa-admin">{loadError ? <p className="auth-help">{loadError}</p> : <p className="hint-text">Loading FORGE Field settings…</p>}</div>;
+    return <div className="fa-admin">{loadError ? <p className="auth-help">{loadError}</p> : <p className="hint-text">Loading FORGE FIELD settings…</p>}</div>;
   }
 
   const formDef = FIELD_FORMS.find((row) => row.key === form) || FIELD_FORMS[0];
@@ -253,7 +253,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
 
   return (
     <div className="fa-admin">
-      <div className="department-config-nav" role="tablist" aria-label="FORGE Field settings">
+      <div className="department-config-nav" role="tablist" aria-label="FORGE FIELD settings">
         {TABS.map((item) => (
           <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={`admin-section-pill department-config-pill${tab === item.id ? " is-open" : ""}`} onClick={() => setTab(item.id)}>
             <span>
@@ -264,7 +264,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
           </button>
         ))}
         <span className="fa-admin-spacer" />
-        <a className="ghost-button" href={fieldAppUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open FORGE Field</a>
+        <a className="ghost-button" href={fieldAppUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open FORGE FIELD</a>
       </div>
 
       {!canConfigure && ["general", "workflows", "fields", "lists"].includes(tab) ? (
@@ -280,7 +280,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
 
       {tab === "general" ? (
         <div className="workflow-form">
-          <label><span>App name (shown under the department name)</span><input value={config.appName} disabled={!canConfigure} onChange={(e) => change({ ...config, appName: e.target.value })} placeholder="FORGE Field" /></label>
+          <label><span>App name (shown under the department name)</span><input value={config.appName} disabled={!canConfigure} onChange={(e) => change({ ...config, appName: e.target.value })} placeholder="FORGE FIELD" /></label>
           <div className="wide-field" style={{ display: "grid", gap: "10px" }}>
             <span>Field app logo</span>
             <ObjectUploadField
@@ -298,7 +298,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
             />
             {config.logoUrl ? <button type="button" className="ghost-button" disabled={!canConfigure} onClick={() => change({ ...config, logoUrl: "", logoStoragePath: "" })}>Use the department logo instead</button> : null}
           </div>
-          <p className="hint-text wide-field">Crews open FORGE Field at <strong>{fieldAppUrl}</strong> on their phone and can add it to the home screen. Settings reach phones the next time they update (on open with signal, every 20 minutes, or Update on the home screen).</p>
+          <p className="hint-text wide-field">Crews open FORGE FIELD at <strong>{fieldAppUrl}</strong> on their phone and can add it to the home screen. Settings reach phones the next time they update (on open with signal, every 20 minutes, or Update on the home screen).</p>
         </div>
       ) : null}
 

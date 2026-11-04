@@ -343,11 +343,11 @@ export async function refreshRefData({ departmentId, snapshot, actor }) {
   const current = await loadRefData(departmentId);
   const parts = { ...(current.parts || {}) };
   const failed = [];
-  // Department FORGE Field settings first: they decide what else is needed.
+  // Department FORGE FIELD settings first: they decide what else is needed.
   try {
     parts.config = { items: await loadFieldAppConfig(departmentId), fetchedAt: new Date().toISOString() };
   } catch (error) {
-    console.warn("FORGE Field settings could not be refreshed", error);
+    console.warn("FORGE FIELD settings could not be refreshed", error);
     failed.push("config");
   }
   const caps = fieldCapabilities(snapshot, parts.config?.items || null);
@@ -369,7 +369,7 @@ export function refItems(refData, name) {
   return refData?.parts?.[name]?.items || [];
 }
 
-/** Department FORGE Field settings from the last download (null if never downloaded). */
+/** Department FORGE FIELD settings from the last download (null if never downloaded). */
 export function refConfig(refData) {
   const config = refData?.parts?.config?.items;
   return config && !Array.isArray(config) ? config : null;

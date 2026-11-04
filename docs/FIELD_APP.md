@@ -1,10 +1,10 @@
-# FORGE Field (offline field app)
+# FORGE FIELD (offline field app)
 
 A phone-first app for Fire/EMS crews at `<department>.forgeresponder.com/field`
 (or `/<department>/field` on the shared domain). It opens and saves records with
 no connection and sends them automatically when the device is back online.
 Department administrators customize it in the RMS under **System Admin →
-FORGE Field (field app)**. The desktop RMS itself is unchanged.
+FORGE FIELD (field app)**. The desktop RMS itself is unchanged.
 
 Screenshots: [docs/field-app](field-app/).
 
@@ -27,7 +27,7 @@ Screenshots: [docs/field-app](field-app/).
 Every write still goes through Firestore rules, so a stale permission snapshot on
 a device can't grant anything on the server.
 
-## Customizing (System Admin → FORGE Field)
+## Customizing (System Admin → FORGE FIELD)
 
 - **General**: app name and logo shown in the field app's top bar.
 - **Workflows**: switch each workflow on or off and choose which roles get it
@@ -62,7 +62,7 @@ Admin, creators).
   their authenticator code). Each online start saves an access snapshot
   (department, roles, permissions, modules) in IndexedDB, so the app can open
   offline. One connected start per device is required.
-- **Reference data**: FORGE Field settings, apparatus, published checklists,
+- **Reference data**: FORGE FIELD settings, apparatus, published checklists,
   check-off lists, hydrants, today's hydrant activity, personnel, recent daily
   logs, NERIS drafts, assigned inspections and the violation code list, and
   pre-fire plans are downloaded to IndexedDB when online. If one part fails the
@@ -102,7 +102,7 @@ Admin, creators).
 
 ## Install and updates
 
-- Android/Chrome: "Add FORGE Field to home screen" on the Device tab; iPhone:
+- Android/Chrome: "Add FORGE FIELD to home screen" on the Device tab; iPhone:
   Share → Add to Home Screen (instructions shown in the app).
 - A new deploy installs in the background; a banner offers "Update" (disabled
   while a record is being sent). Records are in IndexedDB, so updating loses nothing.

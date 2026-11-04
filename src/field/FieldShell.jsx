@@ -317,7 +317,7 @@ export default function FieldShell({ snapshot, online, accessLive }) {
               : <span className="fa-brand-mark" aria-hidden="true"><Flame size={22} /></span>}
             <span className="fa-brand-text">
               <strong>{snapshot.departmentName}</strong>
-              <small>{config?.appName || "FORGE Field"}</small>
+              <small>{config?.appName || "FORGE FIELD"}</small>
             </span>
           </button>
           <SyncPill online={online} sync={sync} counts={counts} onClick={() => goTab("activity")} />
@@ -325,7 +325,7 @@ export default function FieldShell({ snapshot, online, accessLive }) {
         {updateReady ? (
           <div className="fa-update">
             <Download size={18} />
-            <span>A new version of FORGE Field is ready.</span>
+            <span>A new version of FORGE FIELD is ready.</span>
             <button
               type="button"
               className="fa-btn fa-btn-sm fa-btn-primary"

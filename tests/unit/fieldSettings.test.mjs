@@ -1,4 +1,4 @@
-// FORGE Field: per-role settings and EMS / supply check-off math.
+// FORGE FIELD: per-role settings and EMS / supply check-off math.
 // Run: npm run test:unit
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -21,7 +21,7 @@ import {
   validateCheckoffList,
 } from "../../src/field/checkoffModel.js";
 
-describe("FORGE Field settings", () => {
+describe("FORGE FIELD settings", () => {
   it("workflows are on for everyone until restricted", () => {
     let config = emptyFieldAppConfig();
     assert.ok(workflowAllowed(config, "inspections", ["firefighter"]));

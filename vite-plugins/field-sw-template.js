@@ -1,4 +1,4 @@
-/* FORGE Field service worker (generated at build time by vite-plugins/fieldServiceWorker.js).
+/* FORGE FIELD service worker (generated at build time by vite-plugins/fieldServiceWorker.js).
  * Keeps the app shell and the field app's code on the device so /field opens
  * with no connection. Data is not cached here: the field app keeps its own
  * records in IndexedDB, and Firestore traffic is never intercepted. */
@@ -88,7 +88,7 @@ async function handleNavigation(request) {
   } catch {
     const cached = await caches.match(SHELL_URL, { ignoreVary: true });
     if (cached) return cached;
-    return new Response("<h1>Offline</h1><p>Open FORGE Field once with a connection.</p>", {
+    return new Response("<h1>Offline</h1><p>Open FORGE FIELD once with a connection.</p>", {
       status: 503,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });

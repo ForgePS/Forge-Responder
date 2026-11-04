@@ -1,6 +1,6 @@
 /**
- * FORGE Field settings for a department (departments/{id}/settings/fieldApp),
- * edited in the RMS under Admin → FORGE Field. Pure functions, unit tested.
+ * FORGE FIELD settings for a department (departments/{id}/settings/fieldApp),
+ * edited in the RMS under Admin → FORGE FIELD. Pure functions, unit tested.
  *
  * {
  *   appName, logoUrl, logoStoragePath,

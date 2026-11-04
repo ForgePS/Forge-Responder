@@ -1,5 +1,5 @@
 /**
- * FORGE Field: the offline-first app for crews (opened at /field).
+ * FORGE FIELD: the offline-first app for crews (opened at /field).
  *
  * Startup: Firebase keeps the sign-in on the device, and the last access
  * snapshot is kept in IndexedDB, so the app opens straight away with no
@@ -38,11 +38,11 @@ function useOnline() {
   return online;
 }
 
-function Splash({ message = "Opening FORGE Field…" }) {
+function Splash({ message = "Opening FORGE FIELD…" }) {
   return (
     <div className="fa-splash">
       <div className="fa-splash-mark"><Flame size={40} /></div>
-      <strong>FORGE Field</strong>
+      <strong>FORGE FIELD</strong>
       <span><Loader2 size={18} className="fa-spin" /> {message}</span>
     </div>
   );
@@ -106,7 +106,7 @@ function SignIn() {
   return (
     <Gate
       icon={<Flame size={34} />}
-      title={resolver ? "Enter your code" : "Sign in to FORGE Field"}
+      title={resolver ? "Enter your code" : "Sign in to FORGE FIELD"}
       actions={<a className="fa-btn fa-btn-ghost fa-btn-block" href={rmsPathFromFieldPath()}>Use the full RMS sign-in</a>}
     >
       <p>
@@ -168,7 +168,7 @@ export default function FieldApp() {
 
   useEffect(() => {
     applyFieldTheme(readThemePref());
-    document.title = "FORGE Field";
+    document.title = "FORGE FIELD";
     requestPersistentStorage();
     // Store the app on the device on the very first visit (even before sign-in).
     registerFieldServiceWorker();
@@ -216,7 +216,7 @@ export default function FieldApp() {
     if (!online) {
       return (
         <Gate icon={<WifiOff size={34} />} title="No connection">
-          <p>Sign in once while you have signal. After that FORGE Field works offline.</p>
+          <p>Sign in once while you have signal. After that FORGE FIELD works offline.</p>
         </Gate>
       );
     }
@@ -230,7 +230,7 @@ export default function FieldApp() {
         title="Finish two-factor sign-in"
         actions={<a className="fa-btn fa-btn-primary fa-btn-block" href={rmsPathFromFieldPath()}>Open the RMS sign-in</a>}
       >
-        <p>Your account needs two-factor login. Complete it in the RMS, then come back to FORGE Field.</p>
+        <p>Your account needs two-factor login. Complete it in the RMS, then come back to FORGE FIELD.</p>
       </Gate>
     );
   }
@@ -244,7 +244,7 @@ export default function FieldApp() {
   if (!online) {
     return (
       <Gate icon={<WifiOff size={34} />} title="Connect once to finish setup">
-        <p>FORGE Field needs one connected start on this device to download your department's apparatus, hydrants and checklists. Then it works offline.</p>
+        <p>FORGE FIELD needs one connected start on this device to download your department's apparatus, hydrants and checklists. Then it works offline.</p>
       </Gate>
     );
   }

@@ -648,8 +648,8 @@ describe("storage", () => {
   });
 });
 
-describe("FORGE Field settings and records", () => {
-  it("only department admins change FORGE Field settings; members can read them", async () => {
+describe("FORGE FIELD settings and records", () => {
+  it("only department admins change FORGE FIELD settings; members can read them", async () => {
     await assertSucceeds(setDoc(doc(adminA().firestore(), `departments/${A}/settings/fieldApp`), { appName: "Field", workflows: {} }));
     await assertSucceeds(getDoc(doc(memberA().firestore(), `departments/${A}/settings/fieldApp`)));
     await assertFails(setDoc(doc(memberA().firestore(), `departments/${A}/settings/fieldApp`), { appName: "Hacked" }));

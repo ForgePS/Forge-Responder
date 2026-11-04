@@ -1,4 +1,4 @@
-// FORGE Field: conflict rules, validation, sync error handling, paths.
+// FORGE FIELD: conflict rules, validation, sync error handling, paths.
 // Run: npm run test:unit
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
