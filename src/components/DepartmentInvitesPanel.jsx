@@ -12,6 +12,7 @@ const EMAIL_STATUS_TEXT = {
   not_configured: "Email isn't set up for this platform yet — copy the link and send it yourself.",
   failed: "The email could not be sent — copy the link and send it yourself.",
   skipped: "Copy the link and send it yourself.",
+  logged: "This is the demo department, so no email was sent. Copy the link instead.",
 };
 
 function formatDate(value) {

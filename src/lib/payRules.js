@@ -154,14 +154,13 @@ export const defaultPayRules = {
   ],
 };
 
-/** Horn Lake: OT begins after 106 actual worked hours. Migrate legacy 96 default on read. */
+/** Hours worked in the pay period before overtime (default 106: the FLSA 7(k) limit for a 14-day period). */
 function resolveOvertimeThresholdHours(input = {}) {
   const raw = input.overtimeThresholdHours;
   if (raw === undefined || raw === null || String(raw).trim() === "") {
     return defaultPayRules.overtimeThresholdHours;
   }
   const parsed = clampNumber(raw, 0, 500, defaultPayRules.overtimeThresholdHours);
-  if (parsed === 96) return defaultPayRules.overtimeThresholdHours;
   return parsed;
 }
 

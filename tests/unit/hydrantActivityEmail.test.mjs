@@ -97,3 +97,13 @@ test("large CSV is replaced by a note; delivery failures throw", async () => {
     { code: "internal" }
   );
 });
+
+test("the public demo department never sends real email", async () => {
+  const h = harness();
+  const result = await sendDailyActivityEmail(fakeDb, {
+    auth,
+    data: { departmentId: "forge-demo", date: "2026-11-03", emails: ["someone@example.com"], csv: "a,b\n1,2" },
+  }, h.deps);
+  assert.equal(result.status, "logged");
+  assert.equal(h.sent.length, 0);
+});

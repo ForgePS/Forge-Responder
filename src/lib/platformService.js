@@ -478,7 +478,7 @@ export async function ensureCreatorDepartmentAccess(user, departmentId) {
 }
 
 export async function registerPlatformDepartment(departmentId, profile = {}, options = {}) {
-  const { user = null } = options;
+  const { user = null, trial = false } = options;
   const db = getFirestoreDb();
   if (!db || !departmentId) return null;
 
@@ -567,6 +567,7 @@ export async function registerPlatformDepartment(departmentId, profile = {}, opt
     await ensureCustomerSubscription(departmentId, user?.uid || "", {
       billingContactEmail: departmentProfile.contactEmail,
       legacySubscription: subscription,
+      trial,
     });
   } catch (error) {
     console.warn("Failed to provision department subscription", error);

@@ -318,6 +318,8 @@ footer i, .app-footer i { width: 9px; height: 9px; border-radius: 50%; backgroun
 .create-department-header strong { color: var(--rms-text-strong); font-size: 18px; }
 .create-department-header span { color: var(--rms-text-muted); font-size: 14px; }
 .create-department-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.create-department-form .create-department-trial { grid-column: 1 / -1; display: flex; flex-direction: row; align-items: flex-start; gap: 8px; }
+.create-department-form .create-department-trial input { width: 18px; height: 18px; margin-top: 2px; flex: none; }
 .create-department-wide { grid-column: 1 / -1; }
 .create-department-gateway-preview { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--rms-text-muted); font-size: 14px; }
 .create-department-error { margin: 0; color: #fca5a5; font-size: 14px; }
