@@ -152,7 +152,7 @@ export default function InternalEmailBoard({ compact = false, onMessage, personn
     setLoading(true);
     try {
       await seedInternalEmailsForScope(scopeId, user);
-      const items = await listInternalEmails(scopeId);
+      const items = await listInternalEmails(scopeId, { uid: user?.uid, canManage });
       setMessages(items);
       if (!selectedId && items.length) {
         setSelectedId(items[0].id);
@@ -167,7 +167,7 @@ export default function InternalEmailBoard({ compact = false, onMessage, personn
 
   useEffect(() => {
     reload();
-  }, [scopeId, departmentScoped]);
+  }, [scopeId, departmentScoped, user?.uid, canManage]);
 
   const visibleMessages = useMemo(() => {
     return messages.filter((message) => {

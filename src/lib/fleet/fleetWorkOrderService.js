@@ -2,6 +2,7 @@ import {
   createRecord,
   getRecord,
   listRecords,
+  subscribeCollection,
   updateRecord,
 } from "../firestoreService.js";
 import { loadTenantListFromFirestore } from "../tenantListLoader.js";
@@ -201,6 +202,28 @@ export async function listFleetWorkOrders(departmentId, filters = {}) {
     list = list.filter((row) => !["closed", "cancelled"].includes(row.status));
   }
   return list.sort((a, b) => String(b.updatedAt || b.openedAt).localeCompare(String(a.updatedAt || a.openedAt)));
+}
+
+/**
+ * Live fleet work orders (newest first): one full read, then only changes.
+ * Returns an unsubscribe function.
+ * @param {string} departmentId
+ * @param {(orders: object[]) => void} onData
+ * @param {(error: Error) => void} [onError]
+ */
+export function subscribeFleetWorkOrders(departmentId, onData, onError) {
+  if (!departmentId) {
+    onData([]);
+    return () => {};
+  }
+  return subscribeCollection(
+    departmentId,
+    FLEET_WORK_ORDERS_COLLECTION,
+    (rows) => onData(rows
+      .map((row) => normalizeFleetWorkOrder(row, departmentId))
+      .sort((a, b) => String(b.updatedAt || b.openedAt).localeCompare(String(a.updatedAt || a.openedAt)))),
+    onError
+  );
 }
 
 /**

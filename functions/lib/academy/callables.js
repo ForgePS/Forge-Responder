@@ -2,6 +2,7 @@
  * Callable handlers for Academy Integration Hub.
  */
 
+const { assertPublicHttpsUrl } = require("../safeOutboundUrl");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { assertDepartmentAccess } = require("../access");
 const {
@@ -78,6 +79,18 @@ async function handleUpsertAcademyConnection(db, request) {
   }
 
   const secrets = request.data?.secrets || {};
+  // The server calls these addresses with stored tokens: public HTTPS only.
+  for (const [label, value] of [
+    ["Hub base URL", secrets.hubBaseUrl || input.config?.hubBaseUrl],
+    ["Academy API base URL", secrets.apiBaseUrl || input.config?.apiBaseUrl],
+  ]) {
+    if (!String(value || "").trim()) continue;
+    try {
+      assertPublicHttpsUrl(value, label);
+    } catch (error) {
+      throw new HttpsError("invalid-argument", error.message);
+    }
+  }
   const connection = await upsertConnection(db, departmentId, {
     ...input,
     capabilities: input.capabilities || defaultCapabilitiesFor(providerType || "manual"),

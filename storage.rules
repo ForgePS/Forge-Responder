@@ -44,6 +44,18 @@ service firebase.storage {
                    "editHydrants", "editNerisReports", "editDigitalDashboard", "manageDigitalDashboard"]));
     }
 
+    // Who uploaded a file (customMetadata.uploadedBy, set by the app). A new
+    // upload may only name the uploader; replacing a file needs the person who
+    // uploaded it or an editing permission, so members can't overwrite others' files.
+    function namesUploader() {
+      return request.resource.metadata == null
+        || request.resource.metadata.get("uploadedBy", request.auth.uid) == request.auth.uid;
+    }
+    function canReplaceFile(departmentId) {
+      return canDeleteFiles(departmentId)
+        || (resource.metadata != null && resource.metadata.get("uploadedBy", "") == request.auth.uid);
+    }
+
     // The shared demo account can't host large files.
     function isAllowedDemoUpload(departmentId) {
       return departmentId != "forge-demo" || request.resource == null || request.resource.size < 10 * 1024 * 1024;
@@ -56,7 +68,11 @@ service firebase.storage {
 
     match /departments/{departmentId}/{allPaths=**} {
       allow read: if canAccessDepartment(departmentId);
-      allow create, update: if canAccessDepartment(departmentId) && isAllowedUpload() && isAllowedDemoUpload(departmentId);
+      // Uploading over an existing file can count as a create, so check for one here too.
+      allow create: if canAccessDepartment(departmentId) && isAllowedUpload() && isAllowedDemoUpload(departmentId)
+        && namesUploader() && (resource == null || canReplaceFile(departmentId));
+      allow update: if canAccessDepartment(departmentId) && isAllowedUpload() && isAllowedDemoUpload(departmentId)
+        && namesUploader() && canReplaceFile(departmentId);
       allow delete: if canDeleteFiles(departmentId);
     }
 

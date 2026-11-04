@@ -8,7 +8,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc, deleteDoc, where } from "firebase/firestore";
 import { ref, uploadString, getBytes } from "firebase/storage";
 
 const PROJECT_ID = "demo-forge-rms";
@@ -660,6 +660,18 @@ describe("storage", () => {
     await assertSucceeds(deleteObject(ref(editorA().storage(), `departments/${A}/personnel-photos/P1/photo.jpg`)));
   });
 
+  it("members can't replace someone else's file; uploaders and editors can", async () => {
+    const path = `departments/${A}/document-library/mine.txt`;
+    const mine = { customMetadata: { uploadedBy: "member-a" } };
+    await assertSucceeds(uploadString(ref(memberA().storage(), path), "v1", "raw", mine));
+    await assertSucceeds(uploadString(ref(memberA().storage(), path), "v2", "raw", mine));
+    await assertFails(uploadString(ref(ffA().storage(), path), "hijack", "raw", { customMetadata: { uploadedBy: "ff-a" } }));
+    await assertFails(uploadString(ref(ffA().storage(), `departments/${A}/personnel-photos/P1/photo.jpg`), "hijack"));
+    await assertSucceeds(uploadString(ref(editorA().storage(), path), "fixed", "raw", { customMetadata: { uploadedBy: "editor-a" } }));
+    // A new upload can't claim to be someone else's.
+    await assertFails(uploadString(ref(ffA().storage(), `departments/${A}/document-library/fake.txt`), "x", "raw", mine));
+  });
+
   it("legacy paths are closed to new reads and writes", async () => {
     const storage = memberA().storage();
     await assertFails(getBytes(ref(storage, "old-uploads/file.pdf")));
@@ -685,7 +697,9 @@ describe("role-aware rules", () => {
       }
       await setDoc(doc(db, `${lists}/hlfd-rms-leave-requests/items/L-OTHER`), { id: "L-OTHER", personnelId: "P-X", status: "Pending Officer Approval", _order: 1 });
       await setDoc(doc(db, `${lists}/hlfd-rms-leave-requests/items/L-MINE`), { id: "L-MINE", personnelId: "P-FF", status: "Pending Officer Approval", _order: 2 });
-      await setDoc(doc(db, `${lists}/hlfd-rms-leave-requests/items/L-TOAPPROVE`), { id: "L-TOAPPROVE", personnelId: "P-X", assignedOfficerId: "P-FF", status: "Pending Officer Approval", _order: 3 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-leave-requests/items/L-TOAPPROVE`), { id: "L-TOAPPROVE", personnelId: "P-X", assignedOfficerId: "P-FF", assignedBattalionChiefId: "P-BC", approvalStage: "officer", status: "Pending Officer Approval", _order: 3 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-leave-requests/items/L-ATBC`), { id: "L-ATBC", personnelId: "P-X", assignedOfficerId: "P-OFF", assignedBattalionChiefId: "P-FF", approvalStage: "battalionChief", status: "Pending Battalion Chief", _order: 4 });
+      await setDoc(doc(db, `${lists}/hlfd-rms-time-cards/items/P-FF-SIGNED`), { id: "P-FF-SIGNED", personnelId: "P-FF", employeeSignature: "Me", departmentHeadSignature: "Chief", _order: 3 });
       await setDoc(doc(db, `${lists}/hlfd-rms-shift-trades/items/TR-1`), { id: "TR-1", personnelId: "P-X", coveragePersonnelId: "P-Y", assignedBattalionChiefIds: ["P-FF"], status: "Pending Battalion Chief", _order: 1 });
       await setDoc(doc(db, `${lists}/hlfd-rms-time-cards/items/P-X-1`), { id: "P-X-1", personnelId: "P-X", employeeSignature: "", _order: 1 });
       await setDoc(doc(db, `${lists}/hlfd-rms-time-cards/items/P-FF-1`), { id: "P-FF-1", personnelId: "P-FF", employeeSignature: "", departmentHeadSignature: "", _order: 2 });
@@ -733,11 +747,32 @@ describe("role-aware rules", () => {
     await assertFails(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-NEW3`, { id: "L-NEW3", personnelId: "P-FF", status: "Approved", _order: 0 }));
     await assertFails(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-MINE`, { id: "L-MINE", personnelId: "P-FF", status: "Approved", _order: 2 }));
     await assertFails(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-OTHER`, { id: "L-OTHER", personnelId: "P-X", status: "Approved", _order: 1 }));
-    await assertSucceeds(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-TOAPPROVE`, { id: "L-TOAPPROVE", personnelId: "P-X", assignedOfficerId: "P-FF", status: "Approved", _order: 3 }));
+    await assertSucceeds(put(ff, `${lists}/hlfd-rms-leave-requests/items/L-TOAPPROVE`, { id: "L-TOAPPROVE", personnelId: "P-X", assignedOfficerId: "P-FF", assignedBattalionChiefId: "P-BC", approvalStage: "battalionChief", status: "Pending Battalion Chief", _order: 3 }));
     await assertFails(deleteDoc(doc(ff.firestore(), `${lists}/hlfd-rms-leave-requests/items/L-OTHER`)));
     await assertSucceeds(deleteDoc(doc(ff.firestore(), `${lists}/hlfd-rms-leave-requests/items/L-MINE`)));
     // Schedulers decide any request.
     await assertSucceeds(put(editorA(), `${lists}/hlfd-rms-leave-requests/items/L-OTHER`, { id: "L-OTHER", personnelId: "P-X", status: "Denied", _order: 1 }));
+  });
+
+  it("leave: each approver acts only at their own step", async () => {
+    const ff = ffA();
+    const leave = (id) => `${lists}/hlfd-rms-leave-requests/items/${id}`;
+    const atOfficer = { id: "L-TOAPPROVE", personnelId: "P-X", assignedOfficerId: "P-FF", assignedBattalionChiefId: "P-BC", _order: 3 };
+    // The officer can't skip the Battalion Chief or reroute the request.
+    await assertFails(put(ff, leave("L-TOAPPROVE"), { ...atOfficer, approvalStage: "complete", status: "Approved" }));
+    await assertFails(put(ff, leave("L-TOAPPROVE"), { ...atOfficer, assignedBattalionChiefId: "P-FF", approvalStage: "battalionChief", status: "Pending Battalion Chief" }));
+    await assertSucceeds(put(ff, leave("L-TOAPPROVE"), { ...atOfficer, approvalStage: "complete", status: "Denied" }));
+    // The Battalion Chief decides at their step, but can't act at the officer's step.
+    await assertSucceeds(put(ff, leave("L-ATBC"), { id: "L-ATBC", personnelId: "P-X", assignedOfficerId: "P-OFF", assignedBattalionChiefId: "P-FF", approvalStage: "complete", status: "Approved", _order: 4 }));
+    await env.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), leave("L-EARLY")),
+      { id: "L-EARLY", personnelId: "P-X", assignedOfficerId: "P-OFF", assignedBattalionChiefId: "P-FF", approvalStage: "officer", status: "Pending Officer Approval", _order: 5 }));
+    await assertFails(put(ff, leave("L-EARLY"), { id: "L-EARLY", personnelId: "P-X", assignedOfficerId: "P-OFF", assignedBattalionChiefId: "P-FF", approvalStage: "complete", status: "Approved", _order: 5 }));
+    // The requester can't move their own request along or pick their approver.
+    const mine = { id: "L-MINE2", personnelId: "P-FF", assignedOfficerId: "P-OFF", assignedBattalionChiefId: "P-BC", approvalStage: "officer", status: "Pending Officer Approval", _order: 6 };
+    await env.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), leave("L-MINE2")), mine));
+    await assertFails(put(ff, leave("L-MINE2"), { ...mine, approvalStage: "battalionChief", status: "Pending Battalion Chief" }));
+    await assertFails(put(ff, leave("L-MINE2"), { ...mine, assignedOfficerId: "P-FRIEND" }));
+    await assertSucceeds(put(ff, leave("L-MINE2"), { ...mine, notes: "Family trip" }));
   });
 
   it("leave: a member not linked to a personnel record can't file as someone else", async () => {
@@ -755,6 +790,11 @@ describe("role-aware rules", () => {
     await assertFails(put(ff, `${lists}/hlfd-rms-time-cards/items/P-FF-1`, { id: "P-FF-1", personnelId: "P-FF", employeeSignature: "Me", departmentHeadSignature: "Chief", _order: 2 }));
     await assertFails(put(ff, `${lists}/hlfd-rms-time-cards/items/P-X-1`, { id: "P-X-1", personnelId: "P-X", employeeSignature: "Forged", _order: 1 }));
     await assertSucceeds(put(editorA(), `${lists}/hlfd-rms-time-cards/items/P-X-1`, { id: "P-X-1", personnelId: "P-X", departmentHeadSignature: "Chief", _order: 1 }));
+  });
+
+  it("time cards: once the department head signs, only schedulers change it", async () => {
+    await assertFails(put(ffA(), `${lists}/hlfd-rms-time-cards/items/P-FF-SIGNED`, { id: "P-FF-SIGNED", personnelId: "P-FF", employeeSignature: "Me", departmentHeadSignature: "Chief", hours: 99, _order: 3 }));
+    await assertSucceeds(put(editorA(), `${lists}/hlfd-rms-time-cards/items/P-FF-SIGNED`, { id: "P-FF-SIGNED", personnelId: "P-FF", employeeSignature: "Me", departmentHeadSignature: "", _order: 3 }));
   });
 
   it("documents: members acknowledge but don't edit; call shifts: members reply", async () => {
@@ -811,6 +851,34 @@ describe("role-aware rules", () => {
     await assertFails(setDoc(doc(db, `departments/${A}/internalEmails/M1`), { subject: "Edited" }, { merge: true }));
     await assertFails(deleteDoc(doc(db, `departments/${A}/internalEmails/M1`)));
     await assertSucceeds(deleteDoc(doc(editorA().firestore(), `departments/${A}/internalEmails/M1`)));
+  });
+
+  it("messages: each member reads only what they sent or were sent", async () => {
+    const msgs = `departments/${A}/internalEmails`;
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `${msgs}/TO-ALL`), { fromUid: "editor-a", toAll: true, recipientUids: [], createdAt: "2026-01-03" });
+      await setDoc(doc(db, `${msgs}/TO-FF`), { fromUid: "editor-a", toAll: false, recipientUids: ["ff-a"], createdAt: "2026-01-02" });
+      await setDoc(doc(db, `${msgs}/TO-OTHER`), { fromUid: "editor-a", toAll: false, recipientUids: ["member-a"], createdAt: "2026-01-01" });
+      await setDoc(doc(db, `${msgs}/FROM-FF`), { fromUid: "ff-a", toAll: false, recipientUids: ["editor-a"], createdAt: "2026-01-04" });
+      await setDoc(doc(db, `${msgs}/UNRESOLVED`), { fromUid: "editor-a", recipients: ["person:P-X"], createdAt: "2026-01-05" });
+    });
+    const db = ffA().firestore();
+    await assertSucceeds(getDoc(doc(db, `${msgs}/TO-ALL`)));
+    await assertSucceeds(getDoc(doc(db, `${msgs}/TO-FF`)));
+    await assertSucceeds(getDoc(doc(db, `${msgs}/FROM-FF`)));
+    await assertFails(getDoc(doc(db, `${msgs}/TO-OTHER`)));
+    await assertFails(getDoc(doc(db, `${msgs}/UNRESOLVED`)));
+    // The inbox queries the app runs.
+    const recent = (...clauses) => getDocs(query(collection(db, msgs), ...clauses, orderBy("createdAt", "desc"), limit(500)));
+    const ids = async (promise) => (await assertSucceeds(promise)).docs.map((d) => d.id).sort();
+    assert.deepEqual(await ids(recent(where("fromUid", "==", "ff-a"))), ["FROM-FF"]);
+    assert.deepEqual(await ids(recent(where("toAll", "==", true))), ["TO-ALL"]);
+    assert.deepEqual(await ids(recent(where("recipientUids", "array-contains", "ff-a"))), ["TO-FF"]);
+    await assertFails(recent());
+    // Message managers (department admins here) read the whole board.
+    await assertSucceeds(getDocs(query(collection(adminA().firestore(), msgs), orderBy("createdAt", "desc"), limit(500))));
+    await assertSucceeds(getDoc(doc(adminA().firestore(), `${msgs}/TO-OTHER`)));
   });
 
   it("notifications are only marked read; department settings need admin permissions", async () => {

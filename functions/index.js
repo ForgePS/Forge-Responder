@@ -1268,3 +1268,11 @@ const { sendDailyActivityEmail } = require("./lib/hydrantActivityEmail");
 const { sendTextEmail } = require("./lib/mailer");
 exports.sendHydrantDailyActivityEmail = onCall({ secrets: EMAIL_SECRETS }, (request) =>
   sendDailyActivityEmail(admin.firestore(), request, { sendTextEmail }));
+
+// Internal messages carry toAll / recipientUids so the Firestore rules can give
+// each message only to its sender, its recipients and message managers.
+const messageRecipients = require("./lib/messageRecipients");
+
+exports.internalMessageAudience = onDocumentWritten("departments/{departmentId}/internalEmails/{messageId}", (event) =>
+  messageRecipients.handleMessageWritten(admin.firestore(), event)
+    .catch((error) => console.error(`Message audience failed for ${event.params.departmentId}/${event.params.messageId}`, error)));

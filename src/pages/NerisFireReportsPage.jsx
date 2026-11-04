@@ -4,6 +4,8 @@ import {
   ShieldQuestion, Sparkles, Wifi, WifiOff, X,
 } from "lucide-react";
 import NerisReportEditor from "../components/neris/NerisReportEditor.jsx";
+import { useShowMore } from "../hooks/useShowMore.js";
+import ShowMoreRows from "../components/ShowMoreRows.jsx";
 import NerisCadImportModal from "../components/neris/NerisCadImportModal.jsx";
 import { ProgressRing } from "../components/neris/NerisControls.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
@@ -142,6 +144,7 @@ export default function NerisFireReportsPage({
         .join(" ").toLowerCase().includes(term);
     });
   }, [sorted, group, search, query]);
+  const page = useShowMore(visible, 100, `${group}|${search}|${query}`);
 
   const selected = records.find((r) => r.id === selectedId) || null;
 
@@ -344,8 +347,9 @@ export default function NerisFireReportsPage({
         </div>
 
         {visible.length ? (
+          <>
           <ul className="nr-reports">
-            {visible.map((r) => {
+            {page.shown.map((r) => {
               const kind = kindOf(r);
               const Icon = KIND_ICONS[kind] || ClipboardList;
               const prog = checklistProgress(r);
@@ -373,6 +377,8 @@ export default function NerisFireReportsPage({
               );
             })}
           </ul>
+          <ShowMoreRows shown={page.shown.length} remaining={page.remaining} onMore={page.showMore} onAll={page.showAll} />
+          </>
         ) : (
           <div className="nr-empty-state">
             <span className="nr-empty-icon"><ClipboardList size={28} /></span>

@@ -2,6 +2,7 @@ const { AcademyConnector } = require("./base");
 const { loadHubSettings, resolvePersonIdentityViaHub } = require("../../forgeHubIdentity");
 const { upsertEnrollmentsForPerson } = require("../academyTrainingSync");
 const { upsertAcademyCache } = require("../academyPeopleStore");
+const { safeOutboundFetch } = require("../../safeOutboundUrl");
 
 /**
  * Native Forge Academy connector.
@@ -53,7 +54,7 @@ class ForgeAcademyConnector extends AcademyConnector {
     const headers = this.academyCommandHeaders(settings);
 
     if (academyBase) {
-      const response = await fetch(`${academyBase}/hubAcademyCommand`, {
+      const response = await safeOutboundFetch(`${academyBase}/hubAcademyCommand`, {
         method: "POST",
         headers,
         body: JSON.stringify(body),
@@ -66,7 +67,7 @@ class ForgeAcademyConnector extends AcademyConnector {
     }
 
     if (hubBase) {
-      const response = await fetch(`${hubBase}/api/integrations/v1/academy/command`, {
+      const response = await safeOutboundFetch(`${hubBase}/api/integrations/v1/academy/command`, {
         method: "POST",
         headers,
         body: JSON.stringify(body),
@@ -93,7 +94,7 @@ class ForgeAcademyConnector extends AcademyConnector {
 
     try {
       if (settings.apiBaseUrl) {
-        const response = await fetch(`${settings.apiBaseUrl}/hubAcademyCommand`, {
+        const response = await safeOutboundFetch(`${settings.apiBaseUrl}/hubAcademyCommand`, {
           method: "POST",
           headers: this.academyCommandHeaders(settings),
           body: JSON.stringify({ type: "list_enrollments", forgePersonId: "__connection_probe__" }),
@@ -127,7 +128,7 @@ class ForgeAcademyConnector extends AcademyConnector {
       if (settings.hubBearerToken) headers.Authorization = `Bearer ${settings.hubBearerToken}`;
       if (settings.hubSecret) headers["X-Integration-Secret"] = settings.hubSecret;
 
-      const response = await fetch(`${settings.hubBaseUrl}/api/integrations/v1/sync/status`, {
+      const response = await safeOutboundFetch(`${settings.hubBaseUrl}/api/integrations/v1/sync/status`, {
         method: "GET",
         headers,
       });

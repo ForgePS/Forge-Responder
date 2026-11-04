@@ -87,11 +87,9 @@ import {
 const InternalEmailBoardPage = lazyPage(() => import("./pages/InternalEmailBoardPage.jsx"));
 const DigitalDashboardPage = lazyPage(() => import("./pages/DigitalDashboardPage.jsx"));
 import { filterNavByEnabledModules, filterNavByCodeLibraryAccess } from "./lib/navFilter.js";
-import {
-  filterNavGroupsByPreplanFeatures,
-  getDepartmentPreplanFeatures,
-  resolveEffectivePreplanFeatures,
-} from "./lib/inspections/index.js";
+// Direct imports (not lib/inspections/index.js) so every inspection service isn't in the first download.
+import { getDepartmentPreplanFeatures } from "./lib/inspections/preplanFeatures.js";
+import { filterNavGroupsByPreplanFeatures, resolveEffectivePreplanFeatures } from "./lib/inspections/preplanNavFeatures.js";
 import { getDepartmentCodeLibraryAccess } from "./lib/codeLibrary/accessService.js";
 import {
   PREVENTION_NAV_TREE,
@@ -140,25 +138,20 @@ const HydrantDamageAnalyticsPage = lazyPage(() => import("./pages/HydrantDamageA
 const NerisFireReportsPage = lazyPage(() => import("./pages/NerisFireReportsPage.jsx"));
 const NerisAnalyticsPage = lazyPage(() => import("./pages/NerisAnalyticsPage.jsx"));
 import { resolveInitialHydrantTab, resolveInitialAppModule, shouldOpenHydrantsModule } from "./lib/hydrantAppRouting.js";
-import {
-  AnalyticsPage,
-  AssetsPageConnected,
-  DocumentsPage,
-  HoseTestingPage,
-  InspectionsPage,
-} from "./pages/SprintModulePages.jsx";
-import {
-  AllInspectionsPage,
-  InspectionsDashboardPage,
-  InspectionsWorkQueuePage,
-  MyInspectionsPage,
-} from "./pages/InspectionsModulePages.jsx";
-import {
-  AllPreplansPage,
-  NewPreplanPage,
-  PreplansPage,
-  PreplansWorkQueuePage,
-} from "./pages/PreplansModulePages.jsx";
+// Pages grouped in one file each still load only when opened.
+const AnalyticsPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.AnalyticsPage })));
+const AssetsPageConnected = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.AssetsPageConnected })));
+const DocumentsPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.DocumentsPage })));
+const HoseTestingPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.HoseTestingPage })));
+const InspectionsPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.InspectionsPage })));
+const AllInspectionsPage = lazyPage(() => import("./pages/InspectionsModulePages.jsx").then((m) => ({ default: m.AllInspectionsPage })));
+const InspectionsDashboardPage = lazyPage(() => import("./pages/InspectionsModulePages.jsx").then((m) => ({ default: m.InspectionsDashboardPage })));
+const InspectionsWorkQueuePage = lazyPage(() => import("./pages/InspectionsModulePages.jsx").then((m) => ({ default: m.InspectionsWorkQueuePage })));
+const MyInspectionsPage = lazyPage(() => import("./pages/InspectionsModulePages.jsx").then((m) => ({ default: m.MyInspectionsPage })));
+const AllPreplansPage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.AllPreplansPage })));
+const NewPreplanPage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.NewPreplanPage })));
+const PreplansPage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.PreplansPage })));
+const PreplansWorkQueuePage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.PreplansWorkQueuePage })));
 const PreplanOperationalPage = lazyPage(() => import("./pages/PreplanOperationalPage.jsx"));
 const OccupanciesMasterPage = lazyPage(() => import("./pages/OccupanciesMasterPage.jsx"));
 const InspectionConfigStudioPage = lazyPage(() => import("./pages/InspectionConfigStudioPage.jsx"));
@@ -171,13 +164,11 @@ const InspectionReportsPage = lazyPage(() => import("./pages/InspectionReportsPa
 const InspectionOfflinePage = lazyPage(() => import("./pages/InspectionOfflinePage.jsx"));
 const InspectionAutomationPage = lazyPage(() => import("./pages/InspectionAutomationPage.jsx"));
 const InspectionHardeningPage = lazyPage(() => import("./pages/InspectionHardeningPage.jsx"));
-import {
-  AdoptedCodesPage,
-  CodeAdministrationPage,
-  CodeLibraryBrowsePage,
-  CodeLibrarySavedPage,
-  LocalAmendmentsLibraryPage,
-} from "./pages/CodeLibraryPages.jsx";
+const AdoptedCodesPage = lazyPage(() => import("./pages/CodeLibraryPages.jsx").then((m) => ({ default: m.AdoptedCodesPage })));
+const CodeAdministrationPage = lazyPage(() => import("./pages/CodeLibraryPages.jsx").then((m) => ({ default: m.CodeAdministrationPage })));
+const CodeLibraryBrowsePage = lazyPage(() => import("./pages/CodeLibraryPages.jsx").then((m) => ({ default: m.CodeLibraryBrowsePage })));
+const CodeLibrarySavedPage = lazyPage(() => import("./pages/CodeLibraryPages.jsx").then((m) => ({ default: m.CodeLibrarySavedPage })));
+const LocalAmendmentsLibraryPage = lazyPage(() => import("./pages/CodeLibraryPages.jsx").then((m) => ({ default: m.LocalAmendmentsLibraryPage })));
 const FleetDashboardPage = lazyPage(() => import("./pages/FleetDashboardPage.jsx"));
 const FleetAssetsMasterPage = lazyPage(() => import("./pages/FleetAssetsMasterPage.jsx"));
 const FleetConfigStudioPage = lazyPage(() => import("./pages/FleetConfigStudioPage.jsx"));
@@ -196,7 +187,11 @@ const FleetCostReplacementPage = lazyPage(() => import("./pages/FleetCostReplace
 const FleetReportingPage = lazyPage(() => import("./pages/FleetReportingPage.jsx"));
 const FleetHardeningPage = lazyPage(() => import("./pages/FleetHardeningPage.jsx"));
 const FleetVendorPortalPage = lazyPage(() => import("./pages/FleetVendorPortalPage.jsx"));
-import { applyFleetStatusDecision, listFleetAssets, listFleetWorkOrders, loadFleetSettings, saveFleetAsset, syncFleetAssetsFromApparatus } from "./lib/fleet/index.js";
+// Direct imports (not lib/fleet/index.js) so every fleet service isn't in the first download.
+import { saveFleetAsset, subscribeFleetAssets, syncFleetAssetsFromApparatus } from "./lib/fleet/fleetAssetService.js";
+import { applyFleetStatusDecision } from "./lib/fleet/fleetStatusControlService.js";
+import { loadFleetSettings } from "./lib/fleet/fleetSettings.js";
+import { subscribeFleetWorkOrders } from "./lib/fleet/fleetWorkOrderService.js";
 import {
   applyFleetStatus,
   changedUnitStatuses,
@@ -1018,10 +1013,10 @@ function AppShell() {
   const [certifications, setCertifications] = useTenantPersistentState(departmentId, LIST_KEYS.certifications, getTenantListFallback(departmentId, LIST_KEYS.certifications));
   const [training, setTraining] = useTenantPersistentState(departmentId, LIST_KEYS.training, getTenantListFallback(departmentId, LIST_KEYS.training));
   const [apparatus, setApparatus] = useTenantPersistentState(departmentId, LIST_KEYS.apparatus, getTenantListFallback(departmentId, LIST_KEYS.apparatus));
-  // Unit status lives on the fleet record; reload it whenever the page changes so a
-  // failed check on the Readiness Board shows up on the Dashboard and Scheduling.
+  // Unit status lives on the fleet record. Watched live (one read, then only
+  // changes) so a failed check on the Readiness Board shows up on the Dashboard
+  // and Scheduling without re-reading the whole fleet on every page change.
   const [fleetStatusAssets, setFleetStatusAssets] = useState([]);
-  const [fleetStatusVersion, setFleetStatusVersion] = useState(0);
   const [fleetWorkOrdersForDashboard, setFleetWorkOrdersForDashboard] = useState(null);
   useEffect(() => {
     if (!departmentId || inPlatformScope) {
@@ -1029,23 +1024,22 @@ function AppShell() {
       setFleetWorkOrdersForDashboard(null);
       return undefined;
     }
-    let cancelled = false;
-    listFleetAssets(departmentId)
-      .then((list) => { if (!cancelled) setFleetStatusAssets(Array.isArray(list) ? list : []); })
-      .catch(() => {});
+    const stopAssets = subscribeFleetAssets(departmentId, (list) => setFleetStatusAssets(Array.isArray(list) ? list : []));
     // Work orders now live in Fleet; the dashboard counts those (shaped like the old list).
-    listFleetWorkOrders(departmentId)
-      .then((list) => {
-        if (cancelled) return;
-        setFleetWorkOrdersForDashboard((Array.isArray(list) ? list : []).map((order) => ({
-          id: order.workOrderNumber || order.id,
-          unit: order.unitDesignation || order.fleetNumber || "Unit",
-          status: ["completed", "closed", "cancelled", "canceled"].includes(order.status) ? "Complete" : "Open",
-        })));
-      })
-      .catch(() => { if (!cancelled) setFleetWorkOrdersForDashboard(null); });
-    return () => { cancelled = true; };
-  }, [departmentId, inPlatformScope, current, fleetStatusVersion]);
+    const stopOrders = subscribeFleetWorkOrders(
+      departmentId,
+      (list) => setFleetWorkOrdersForDashboard((Array.isArray(list) ? list : []).map((order) => ({
+        id: order.workOrderNumber || order.id,
+        unit: order.unitDesignation || order.fleetNumber || "Unit",
+        status: ["completed", "closed", "cancelled", "canceled"].includes(order.status) ? "Complete" : "Open",
+      }))),
+      () => setFleetWorkOrdersForDashboard(null)
+    );
+    return () => {
+      stopAssets();
+      stopOrders();
+    };
+  }, [departmentId, inPlatformScope]);
   const apparatusLive = useMemo(() => applyFleetStatus(apparatus, fleetStatusAssets), [apparatus, fleetStatusAssets]);
 
   // Status changed on the classic Apparatus page: record it on the fleet unit too.
@@ -1065,7 +1059,6 @@ function AppShell() {
         await saveFleetAsset(departmentId, { ...asset, status: change.status, readinessState: change.readinessState }, actor);
       }
     }
-    setFleetStatusVersion((value) => value + 1);
   }
 
   function setApparatusFromClassicPage(update) {
@@ -1078,7 +1071,6 @@ function AppShell() {
     // New units added here also become fleet units (checks, work orders, Readiness Board).
     if (Array.isArray(next) && next.length > apparatusLive.length) {
       syncFleetAssetsFromApparatus(departmentId, next, { actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "User" })
-        .then((added) => { if (added?.length) setFleetStatusVersion((value) => value + 1); })
         .catch(() => {});
     }
   }

@@ -8,7 +8,8 @@ import {
   onSnapshot,
   orderBy,
   query,
-  setDoc
+  setDoc,
+  where
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebaseClient.js";
 
@@ -31,11 +32,15 @@ export async function listRecords(departmentId, collectionName) {
   return snap.docs.map((item) => ({ id: item.id, ...item.data() }));
 }
 
-/** The newest records by a time field (records missing the field are left out). */
-export async function listRecentRecords(departmentId, collectionName, orderField = "createdAt", count = 500) {
+/**
+ * The newest records by a time field (records missing the field are left out).
+ * @param {[string, string, unknown][]} [filters] where clauses, e.g. [["fromUid", "==", uid]]
+ */
+export async function listRecentRecords(departmentId, collectionName, orderField = "createdAt", count = 500, filters = []) {
   const ref = departmentCollection(departmentId, collectionName);
   if (!ref) return [];
-  const snap = await getDocs(query(ref, orderBy(orderField, "desc"), limit(count)));
+  const clauses = filters.map(([field, op, value]) => where(field, op, value));
+  const snap = await getDocs(query(ref, ...clauses, orderBy(orderField, "desc"), limit(count)));
   return snap.docs.map((item) => ({ id: item.id, ...item.data() }));
 }
 

@@ -127,6 +127,30 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "occurredAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "internalEmails",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fromUid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "internalEmails",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "toAll", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "internalEmails",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recipientUids", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

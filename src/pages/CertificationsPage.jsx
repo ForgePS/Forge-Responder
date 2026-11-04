@@ -11,6 +11,8 @@ import { toDateInputValue } from "../lib/certificationRecords.js";
 
 import { Badge, Panel, Modal } from "../components/shell/ui.jsx";
 import { exportCsv } from "../utils/dashboardMetrics.js";
+import { useShowMore } from "../hooks/useShowMore.js";
+import ShowMoreRows from "../components/ShowMoreRows.jsx";
 
 // The 30/60/90-day tiles filter to certifications expiring in that window.
 const DUE_WINDOWS = { "Due in 30 Days": [0, 30], "Due in 60 Days": [31, 60], "Due in 90 Days": [61, 90] };
@@ -39,6 +41,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
     (filter === "All" || record.status === filter || record.category === filter || inDueWindow(record, filter))
     && Object.values(record).join(" ").toLowerCase().includes(query.toLowerCase())
   ));
+  const page = useShowMore(filtered, 100, `${filter}|${lifecycleView}|${query}`);
   const activeRecords = records.filter((record) => isObjectVisibleInActiveList(record));
   const archivedCount = records.filter((record) => isObjectArchived(record)).length;
 
@@ -212,7 +215,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
                 : "No certifications match this filter or search."}
             </p>
           ) : null}
-          {filtered.map((record) => (
+          {page.shown.map((record) => (
             <div className="cert-row" key={record.id}>
               <button className="link-button" onClick={() => setSelected(record)}>{record.person}</button>
               <span>{record.type}</span>
@@ -246,6 +249,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
               </div>
             </div>
           ))}
+          <ShowMoreRows shown={page.shown.length} remaining={page.remaining} onMore={page.showMore} onAll={page.showAll} />
         </div>
       </Panel>
       {selected ? (

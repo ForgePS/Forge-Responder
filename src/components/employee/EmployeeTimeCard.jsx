@@ -84,8 +84,11 @@ export default function EmployeeTimeCard({
 
   const recordId = buildTimeCardRecordId(personnelId, model.payPeriodStart);
 
+  // Signed by the department head: locked (only schedulers change it now).
+  const signedOff = Boolean(savedEntry?.departmentHeadSignature);
+
   function persistEntry(patch = {}) {
-    if (!setTimeCards || !personnelId) return;
+    if (!setTimeCards || !personnelId || signedOff) return;
 
     const current = savedEntry || {
       id: recordId,
@@ -158,13 +161,14 @@ export default function EmployeeTimeCard({
   return (
     <div className="time-card-portal-wrap">
       {savedMessage ? <p className="time-card-save-note">{savedMessage}</p> : null}
+      {signedOff ? <p className="time-card-save-note">Signed by the department head. Ask a scheduler if something needs changing.</p> : null}
       <TimeCardSheet
         model={model}
         totals={totals}
         savedEntry={savedEntry}
         departmentTitle={departmentTitle}
         departmentLogoUrl={departmentLogoUrl}
-        interactive
+        interactive={!signedOff}
         showPayPeriodNav
         onPayPeriodPrevious={() => movePayPeriod(-1)}
         onPayPeriodNext={() => movePayPeriod(1)}
