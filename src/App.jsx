@@ -1117,7 +1117,7 @@ function AppShell() {
   const [dailyLogs, setDailyLogs] = useTenantPersistentState(departmentId, LIST_KEYS.dailyLogs, getTenantListFallback(departmentId, LIST_KEYS.dailyLogs));
   const [timeCards, setTimeCards] = useTenantPersistentState(departmentId, LIST_KEYS.timeCards, getTenantListFallback(departmentId, LIST_KEYS.timeCards));
   const [nerisFireReports, setNerisFireReports] = useTenantPersistentState(departmentId, LIST_KEYS.nerisFireReports, getTenantListFallback(departmentId, LIST_KEYS.nerisFireReports));
-  const isHydrantsView = current === "Hydrants" || current === "Hydrant Overview";
+  const isHydrantsView = current === "Hydrants" || current === "Hydrant Overview" || current === "Field App";
   const showPlatformBrand = inPlatformScope || current === "Creator Console";
   const headerProfile = showPlatformBrand
     ? {
@@ -1882,6 +1882,10 @@ function AppShell() {
     ) : <AccessDeniedModule name={current} />
   ) : current === "Hydrants" || current === "Hydrant Overview" ? (
     <HydrantTestingPage embedded initialTab={resolveInitialHydrantTab({ embedded: true })} departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
+  ) : current === "Field App" ? (
+    hasPermission(permissions, "viewHydrants") || isCreator
+      ? <HydrantTestingPage mode="fieldApp" departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
   ) : current === "Damage Reports"
     || current === "Open Damage Reports"
     || current === "Awaiting Water Company"

@@ -62,6 +62,7 @@ export const NAV_MODULE_MAP = {
   "Code Administration": "inspections",
   Hydrants: "hydrants",
   "Hydrant Overview": "hydrants",
+  "Field App": "hydrants",
   "Damage Reports": "hydrants",
   "Open Damage Reports": "hydrants",
   "Awaiting Water Company": "hydrants",

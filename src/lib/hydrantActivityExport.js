@@ -1,3 +1,4 @@
+import { hydrantReportPrefixFor } from "./hostTenants.js";
 /**
  * Customizable hydrant inspection + flow-test export.
  * Joins activity records to hydrant master fields for water dept / district filters.
@@ -53,15 +54,17 @@ function clean(value) {
   return String(value).trim();
 }
 
-/** Ensure Horn Lake hydrant IDs show the HL prefix in exports/PDF. */
-export function formatHydrantIdForReport(raw = "") {
+/**
+ * Hydrant ID for exports/PDF. Departments whose hydrants carry a printed prefix
+ * (e.g. "HL 123") pass it; everyone else gets the ID as stored.
+ */
+export function formatHydrantIdForReport(raw = "", prefix = "") {
   const value = clean(raw);
-  if (!value) return "";
-  if (/^HL[\s-]*/i.test(value)) {
-    const rest = value.replace(/^HL[\s-]*/i, "").trim();
-    return rest ? `HL ${rest}` : "HL";
-  }
-  return `HL ${value}`;
+  if (!value || !prefix) return value;
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped}[\\s-]*`, "i");
+  const rest = value.replace(pattern, "").trim();
+  return rest ? `${prefix} ${rest}` : prefix;
 }
 
 function formatGpsLocation(hydrant = {}, row = {}) {
@@ -202,7 +205,7 @@ function repairNeededFromChecklist(checklist = []) {
   return flagged.length ? flagged.join("; ") : "No";
 }
 
-function normalizeActivityRecord(row = {}, hydrant = null) {
+function normalizeActivityRecord(row = {}, hydrant = null, idPrefix = "") {
   const recordType = detectRecordType(row);
   const checklist = Array.isArray(row.checklist) ? row.checklist : [];
   const flowMeta = resolveFlowClassAndColor(row, hydrant);
@@ -210,7 +213,7 @@ function normalizeActivityRecord(row = {}, hydrant = null) {
   return {
     id: clean(row.id),
     record_type: recordType,
-    hydrant_id: formatHydrantIdForReport(rawHydrantId),
+    hydrant_id: formatHydrantIdForReport(rawHydrantId, idPrefix),
     location_id: clean(row.location_id || hydrant?.location_id),
     gps_location: formatGpsLocation(hydrant || {}, row),
     district: clean(row.district || hydrant?.district || "Unassigned") || "Unassigned",
@@ -288,7 +291,7 @@ export async function loadHydrantDetailExportRows({
 
   const index = buildHydrantIndex(hydrants);
   const combined = [...inspections, ...flowTests, ...extraActivity]
-    .map((row) => normalizeActivityRecord(row, resolveHydrant(row, index)))
+    .map((row) => normalizeActivityRecord(row, resolveHydrant(row, index), hydrantReportPrefixFor(departmentId)))
     .sort((a, b) => String(b._stamp).localeCompare(String(a._stamp)));
 
   return combined;
