@@ -270,6 +270,23 @@ service cloud.firestore {
       return listKey != "hlfd-rms-personnel"
         || !request.resource.data.keys().hasAny(personnelPrivateKeys());
     }
+    // What a member may change on their own personnel record (My Profile):
+    // contact details and emergency contacts. Matches SELF_EDIT_KEYS in
+    // src/lib/personnelProfile.js.
+    function selfProfileKeys() {
+      return ["address", "unitSuite", "city", "state", "zip", "country", "phones", "emails", "phone", "email",
+        "languages", "emergency", "emergencyFirstName", "emergencyLastName", "emergencyPhone",
+        "emergencyRelationship", "emergencyAddress", "emergencyCity", "emergencyState", "emergencyZip",
+        "emergencySameAddress", "emergency2FirstName", "emergency2LastName", "emergency2Phone",
+        "emergency2Relationship", "emergency2Address", "emergency2City", "emergency2State", "emergency2Zip",
+        "emergency2SameAddress", "updatedAt", "_order"];
+    }
+    function isOwnProfileEdit(departmentId, listKey) {
+      return listKey == "hlfd-rms-personnel"
+        && myPersonnelId(departmentId) != ""
+        && resource.data.get("id", "") == myPersonnelId(departmentId)
+        && changedKeys().hasOnly(selfProfileKeys());
+    }
     function isDecided(data) {
       return data.get("status", "") in ["Approved", "Denied"];
     }
@@ -791,7 +808,8 @@ service cloud.firestore {
             && noPrivatePersonnelFields(listKey)
             && (isListManager(departmentId, listKey)
                 || changedKeys().hasOnly(["_order"])
-                || memberItemUpdate(departmentId, listKey));
+                || memberItemUpdate(departmentId, listKey)
+                || isOwnProfileEdit(departmentId, listKey));
           allow delete: if canWriteModule(departmentId, listModule(listKey))
             && (isListManager(departmentId, listKey) || memberItemDelete(departmentId, listKey));
         }

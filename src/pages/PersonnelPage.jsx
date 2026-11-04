@@ -23,6 +23,7 @@ import { limitCheck, limitMessage } from "../lib/moduleAccess.js";
 import { usePersonnelPrivate } from "../hooks/usePersonnelPrivate.js";
 import { savePersonnelPrivate } from "../lib/personnelPrivateService.js";
 import { friendlyError } from "../lib/friendlyError.js";
+import { usableEquipment } from "../lib/personnelProfile.js";
 import {
   hasPrivateValue,
   mergePersonnelPrivate,
@@ -176,6 +177,7 @@ export default function PersonnelPage({
         // record alone; the list store moves it once someone allowed saves.
         ...(privateReady ? stripPersonnelPrivateKeys(draft) : draft),
         forgePersonId,
+        ...(Array.isArray(draft.issuedEquipment) ? { issuedEquipment: usableEquipment(draft.issuedEquipment) } : {}),
         activityLog: selected?.activityLog || [],
         updated_at: new Date().toISOString(),
       });

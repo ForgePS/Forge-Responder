@@ -12,12 +12,16 @@ import {
   Syringe,
   TrendingUp,
   GraduationCap,
+  BadgeCheck,
+  HardHat,
 } from "lucide-react";
 
 export const PERSONNEL_SECTIONS = [
   { id: "personalDetails", label: "Personal Details", icon: ClipboardList },
   { id: "emergencyContact", label: "Emergency Contact", icon: Contact },
+  { id: "credentials", label: "Licensure & Education", icon: BadgeCheck },
   { id: "certifications", label: "Certifications", icon: Award },
+  { id: "equipment", label: "Issued Equipment", icon: HardHat },
   { id: "trainingEvents", label: "Training & Events", icon: CalendarCheck },
   { id: "academy", label: "Academy", icon: GraduationCap },
   { id: "accruals", label: "Accruals", icon: BarChart3 },
