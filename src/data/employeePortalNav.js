@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Home,
   Mail,
+  Tablet,
   Truck,
   UserRound,
   UserPlus,
@@ -47,6 +48,12 @@ export const employeePortalNavGroups = [
     ],
   },
   {
+    label: "Field tools",
+    items: [
+      ["Field App", Tablet],
+    ],
+  },
+  {
     label: "Communications",
     items: [
       ["Messages", Mail],
@@ -66,11 +73,18 @@ const PORTAL_ITEM_MODULES = {
   "Apparatus Checks": "apparatus",
   "Maintenance Issues": "maintenance",
   Messages: "internalEmail",
+  "Field App": "hydrants",
 };
 
 export function filterEmployeePortalNav(
   groups = employeePortalNavGroups,
-  { canViewInternalEmail = true, canViewDailyLog = true, isModuleEnabled = () => true, academyConnected = false } = {}
+  {
+    canViewInternalEmail = true,
+    canViewDailyLog = true,
+    canViewFieldApp = true,
+    isModuleEnabled = () => true,
+    academyConnected = false,
+  } = {}
 ) {
   return groups
     .map((group) => ({
@@ -78,6 +92,7 @@ export function filterEmployeePortalNav(
       items: group.items.filter(([name]) => {
         if (name === "Messages" && !canViewInternalEmail) return false;
         if (name === "Daily Log" && !canViewDailyLog) return false;
+        if (name === "Field App" && !canViewFieldApp) return false;
         // Nothing to open until the department connects an Academy.
         if (name === "Academy Class Schedule" && !academyConnected) return false;
         const moduleKey = PORTAL_ITEM_MODULES[name];
