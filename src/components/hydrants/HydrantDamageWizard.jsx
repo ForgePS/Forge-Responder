@@ -67,8 +67,9 @@ export default function HydrantDamageWizard({
   onSend,
   onAssignHydrant,
   onClose,
+  startStep,
 } = {}) {
-  const [step, setStep] = useState(Math.min(8, Math.max(1, Number(draft?.wizardStep) || 1)));
+  const [step, setStep] = useState(Math.min(8, Math.max(1, Number(startStep || draft?.wizardStep) || 1)));
   const [hydrantSource, setHydrantSource] = useState("oos");
   const categories = getDamageCategoryOptions();
   const severities = getDamageSeverityOptions();
