@@ -23,6 +23,7 @@ import { getSyncState, startSync, stopSync, subscribeSync, syncNow } from "./fie
 import { activateUpdate, subscribeUpdateReady } from "./registerFieldSW.js";
 import { cx } from "./ui.jsx";
 import HomeScreen from "./screens/HomeScreen.jsx";
+import QuickCardScreen from "./screens/QuickCardScreen.jsx";
 import ActivityScreen from "./screens/ActivityScreen.jsx";
 import SettingsScreen from "./screens/SettingsScreen.jsx";
 import RecordScreen from "./screens/RecordScreen.jsx";
@@ -44,6 +45,7 @@ import HydrantEditScreen from "./screens/HydrantEditScreen.jsx";
 
 const SCREENS = {
   home: HomeScreen,
+  quickCard: QuickCardScreen,
   activity: ActivityScreen,
   settings: SettingsScreen,
   record: RecordScreen,

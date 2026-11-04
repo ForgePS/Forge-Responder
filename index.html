@@ -29,17 +29,22 @@
         title.name = "apple-mobile-web-app-title";
         title.content = "FORGE Field";
         head.appendChild(title);
+        // Same light/dark as the desktop app (see src/field/fieldTheme.js).
+        window.__FORGE_FIELD__ = true;
+        var theme = "light";
         try {
           var pref = localStorage.getItem("forge-field-theme");
-          var dark = pref === "dark" || (pref !== "light" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
-          document.documentElement.setAttribute("data-field-theme", dark ? "dark" : "light");
+          var account = localStorage.getItem("forge-field-account-theme");
+          theme = pref === "dark" || pref === "light" ? pref : (account === "dark" ? "dark" : "light");
         } catch (e) {
-          document.documentElement.setAttribute("data-field-theme", "light");
+          theme = "light";
         }
+        document.documentElement.setAttribute("data-field-theme", theme);
+        document.documentElement.setAttribute("data-theme", theme);
       })();
     </script>
     <script>
-      document.documentElement.setAttribute("data-theme", "dark");
+      if (!window.__FORGE_FIELD__) document.documentElement.setAttribute("data-theme", "dark");
       (function () {
         var path = location.pathname.replace(/\/$/, "") || "/";
         var isAlert = path === "/alerts" || path.endsWith("/alerts");

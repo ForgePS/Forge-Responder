@@ -112,6 +112,8 @@ export function fieldCapabilities(snapshot, config = null) {
     dailyLogEdit: allowed("dailyLog") && on("dailyLog") && (isCreator || hasPermission(permissions, "editDailyLog") || hasPermission(permissions, "editSchedule")),
     incidents: allowed("incident") && on("nerisFireReports") && canEditNerisReports(permissions, isCreator),
     inspections: allowed("inspections") && on("inspections") && canEditInspectionsModule(permissions, isCreator),
+    // Fire codes: the desktop Code Library (opened in the browser).
+    fireCodes: isCreator || nav("Browse Codes"),
     preFirePlans,
     preFirePlanEdit: preFirePlans && (isCreator || (editRoles
       ? editRoles.some((roleId) => roleIds.includes(roleId))

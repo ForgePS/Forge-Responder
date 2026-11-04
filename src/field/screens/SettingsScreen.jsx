@@ -82,14 +82,14 @@ export default function SettingsScreen() {
       <Section title="Display">
         <Segmented
           value={theme}
-          options={[{ value: "auto", label: "Auto" }, { value: "light", label: "Sunlight" }, { value: "dark", label: "Dark" }]}
+          options={[{ value: "auto", label: "Auto" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]}
           onChange={(value) => {
             setTheme(value);
             saveThemePref(value);
           }}
           columns={3}
         />
-        <p className="fa-hint">Sunlight uses maximum contrast for outdoor use. Auto follows your phone.</p>
+        <p className="fa-hint">Auto uses the same light or dark setting as your FORGE Responder account.</p>
       </Section>
 
       <Section title="Account">

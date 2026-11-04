@@ -18,7 +18,7 @@ import { buildAccessSnapshot, loadAccessSnapshot, saveAccessSnapshot } from "./f
 import { requestPersistentStorage } from "./fieldDb.js";
 import { rmsPathFromFieldPath } from "./fieldPaths.js";
 import { forgeResponderLogo } from "../lib/brandAssets.js";
-import { readThemePref, applyFieldTheme } from "./fieldTheme.js";
+import { readThemePref, applyFieldTheme, rememberAccountTheme } from "./fieldTheme.js";
 import { registerFieldServiceWorker } from "./registerFieldSW.js";
 import "./fieldInstall.js";
 import FieldShell from "./FieldShell.jsx";
@@ -176,6 +176,11 @@ export default function FieldApp() {
     // Store the app on the device on the very first visit (even before sign-in).
     registerFieldServiceWorker();
   }, []);
+
+  // Same light/dark as this person uses in the desktop app.
+  useEffect(() => {
+    rememberAccountTheme(membership?.preferences?.theme);
+  }, [membership?.preferences?.theme]);
 
   // Last saved access for this person (lets the app open offline).
   useEffect(() => {
