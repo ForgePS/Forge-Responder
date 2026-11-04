@@ -1,7 +1,7 @@
 /**
  * Hydrant crew session (like the desktop hydrant app): who is testing, which
- * shift, date and district. Set once, used by every inspection and flow test
- * for 8 hours. Kept in IndexedDB per department.
+ * shift and date. Set once, used by every inspection and flow test for 8 hours.
+ * Kept in IndexedDB per department. (District comes from each hydrant.)
  */
 import { kvGet, kvSet } from "./fieldDb.js";
 
@@ -21,7 +21,6 @@ export async function saveCrewSession(departmentId, session) {
     testedBy: session.testedBy || "",
     shift: session.shift || "",
     date: session.date || "",
-    district: session.district || "",
     expiresAt: new Date(Date.now() + CREW_SESSION_HOURS * 3_600_000).toISOString(),
   };
   await kvSet(key(departmentId), next);

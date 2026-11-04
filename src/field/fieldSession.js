@@ -103,6 +103,8 @@ export function fieldCapabilities(snapshot, config = null) {
     supplyCheckoff: allowed("supplyCheckoff"),
     hoseTests: allowed("hoseTest") && (on("hoseTesting") || on("hydrants")) && (isCreator || nav("Hose Testing")),
     hydrants: allowed("hydrants") && on("hydrants") && (isCreator || nav("Hydrant Overview")),
+    // Changing a hydrant's details needs editHydrants, as on the desktop Hydrants page.
+    hydrantEdit: allowed("hydrants") && on("hydrants") && (isCreator || hasPermission(permissions, "editHydrants")),
     hydrantDamage: allowed("hydrants") && on("hydrants") && canEditHydrantDamageDraft(permissions, isCreator),
     damageForm: allowed("damageForm") && (on("maintenance") || on("hydrants"))
       && (isCreator || hasPermission(permissions, "submitMaintenanceIssues") || hasPermission(permissions, "editApparatus")),
