@@ -841,6 +841,12 @@ function AppShell() {
   const canViewInternalEmail = hasPermission(permissions, "viewInternalEmail");
   const canViewDailyLog = hasPermission(permissions, "viewDailyLog");
   const canViewFieldApp = hasPermission(permissions, "viewHydrants") || isCreator;
+  const canEditHydrants = hasPermission(permissions, "editHydrants") || isCreator;
+  const canCreateHydrantDamage = hasPermission(permissions, "createHydrantDamageReports") || isCreator;
+  const hydrantActor = useMemo(
+    () => ({ actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "" }),
+    [user?.uid, user?.email, membership?.displayName]
+  );
   const visibleEmployeeNavGroups = useMemo(
     () => filterEmployeePortalNav(employeePortalNavGroups, {
       canViewInternalEmail,
@@ -1327,7 +1333,7 @@ function AppShell() {
       setTimeCards={setTimeCards}
       previewPerson={employeePreviewPerson}
       fieldApp={canViewFieldApp && isModuleEnabled("hydrants") ? (
-        <HydrantTestingPage mode="fieldApp" canReportDamage={false} departmentId={departmentId} profile={profile} personnel={personnel} />
+        <HydrantTestingPage mode="fieldApp" canReportDamage={canCreateHydrantDamage} damageReportMode="inline" actor={hydrantActor} canEditHydrants={canEditHydrants} departmentId={departmentId} profile={profile} personnel={personnel} />
       ) : null}
       onPreviewPerson={showEmployeeToggle ? (personnelId) => setEmployeePreviewPersonId(personnelId) : undefined}
       onClearPreviewPerson={() => {
@@ -1886,10 +1892,10 @@ function AppShell() {
       />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Hydrants" || current === "Hydrant Overview" ? (
-    <HydrantTestingPage embedded initialTab={resolveInitialHydrantTab({ embedded: true })} departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
+    <HydrantTestingPage embedded initialTab={resolveInitialHydrantTab({ embedded: true })} canEditHydrants={canEditHydrants} departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
   ) : current === "Field App" ? (
     hasPermission(permissions, "viewHydrants") || isCreator
-      ? <HydrantTestingPage mode="fieldApp" departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
+      ? <HydrantTestingPage mode="fieldApp" canEditHydrants={canEditHydrants} departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
   ) : current === "Damage Reports"
     || current === "Open Damage Reports"

@@ -301,7 +301,8 @@
     "submitMaintenanceIssues": true,
     "viewInternalEmail": true,
     "sendInternalEmail": true,
-    "viewHydrants": true
+    "viewHydrants": true,
+    "createHydrantDamageReports": true
   },
   "companyOfficer": {
     "viewPersonnel": true,

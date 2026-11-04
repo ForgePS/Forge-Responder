@@ -315,7 +315,8 @@ export const defaultRoles = [
       submitMaintenanceIssues: true,
       viewInternalEmail: true,
       sendInternalEmail: true,
-      viewHydrants: true
+      viewHydrants: true,
+      createHydrantDamageReports: true
     }
   },
   {

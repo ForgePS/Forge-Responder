@@ -184,6 +184,8 @@ export function TenantProvider({ children }) {
     async function loadPlatform() {
       const firestoreDb = getFirestoreDb();
       if (!firebaseEnabled || !firestoreDb) return;
+      // Signed-out reads are refused by the rules; the defaults cover sign-in.
+      if (!authUid) return;
 
       try {
         const remotePlatform = await loadPlatformConfig();

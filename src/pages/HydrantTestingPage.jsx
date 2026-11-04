@@ -63,6 +63,12 @@ import { parseRecipientList, sendHydrantDailyActivityEmail } from "../lib/hydran
 import HydrantImportTemplatesPanel from "../components/hydrants/HydrantImportTemplatesPanel.jsx";
 import { HYDRANT_DAMAGE_PRESELECT_KEY } from "../lib/hydrantDamage/paths.js";
 import {
+  createHydrantDamageReport,
+  getDamageCategoryOptions,
+  getDamageOperationalStatusOptions,
+  getDamageSeverityOptions,
+} from "../lib/hydrantDamage/damageReportService.js";
+import {
 
   hydrantPathForTab,
   resolveInitialHydrantTab,
@@ -1284,6 +1290,102 @@ function HydrantEditorModal({ hydrant, crew, onClose, onSaved }) {
   );
 }
 
+/**
+ * Short damage report for crews (Employee Portal Field App). Saves a draft that
+ * officers review and send to the water company from Damage Reports.
+ */
+function QuickDamageReportModal({ hydrant, departmentId, actor, onClose, onDone }) {
+  const [form, setForm] = useState({
+    severity: "moderate",
+    operationalStatus: isOutOfServiceHydrant(hydrant) ? "out_of_service" : "unknown",
+    damageCategoryIds: [],
+    description: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const categories = getDamageCategoryOptions();
+
+  function toggleCategory(id) {
+    setForm((current) => ({
+      ...current,
+      damageCategoryIds: current.damageCategoryIds.includes(id)
+        ? current.damageCategoryIds.filter((value) => value !== id)
+        : [...current.damageCategoryIds, id],
+    }));
+  }
+
+  async function submit() {
+    if (!form.description.trim() && !form.damageCategoryIds.length) {
+      setError("Pick the damage type or describe what you found.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const report = await createHydrantDamageReport(departmentId, {
+        hydrant,
+        sourceType: "field_app",
+        severity: form.severity,
+        operationalStatus: form.operationalStatus,
+        damageCategoryIds: form.damageCategoryIds,
+        description: form.description.trim(),
+      }, actor);
+      onDone(`Damage report ${report.reportNumber} sent to your officers for review.`);
+    } catch (saveError) {
+      console.error("Damage report failed", saveError);
+      setError("The report didn't save. Check your connection and try again.");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <HydrantOverlay>
+    <div className="modal-backdrop hydrant-overlay-backdrop" role="dialog" aria-modal="true" aria-label="Report hydrant damage">
+      <section className="hydrant-modal quick-damage-modal">
+        <div className="modal-header">
+          <div>
+            <AlertTriangle size={20} />
+            <div>
+              <strong>Report damage: {hydrant.hydrant_id || hydrant.location_id}</strong>
+              <span>{hydrant.address || hydrant.location || "Hydrant"}</span>
+            </div>
+          </div>
+          <button className="secondary small" onClick={onClose}><ArrowLeft size={16} /> Back</button>
+        </div>
+        <div className="editor-grid">
+          <Field label="Severity">
+            <select value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>
+              {getDamageSeverityOptions().map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Hydrant condition">
+            <select value={form.operationalStatus} onChange={(e) => setForm({ ...form, operationalStatus: e.target.value })}>
+              {getDamageOperationalStatusOptions().map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+            </select>
+          </Field>
+        </div>
+        <fieldset className="quick-damage-types">
+          <legend>Damage type</legend>
+          {categories.map((row) => (
+            <label key={row.id}>
+              <input type="checkbox" checked={form.damageCategoryIds.includes(row.id)} onChange={() => toggleCategory(row.id)} />
+              <span>{row.name}</span>
+            </label>
+          ))}
+        </fieldset>
+        <Field label="What did you find?">
+          <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        </Field>
+        {error ? <div className="private-banner compact-banner">{error}</div> : null}
+        <div className="modal-actions">
+          <button className="primary" disabled={saving} onClick={submit}><Save size={16} /> {saving ? "Sending" : "Send report"}</button>
+        </div>
+      </section>
+    </div>
+    </HydrantOverlay>
+  );
+}
+
 function HydrantInfoModal({ hydrant, sessionReady, onClose, onEdit, onFlowTest, onInspection, onReportDamage }) {
   if (!hydrant) return null;
   const details = [
@@ -1326,7 +1428,7 @@ function HydrantInfoModal({ hydrant, sessionReady, onClose, onEdit, onFlowTest, 
           ) : null}
           <button className="secondary" disabled={!sessionReady} onClick={onInspection}><ClipboardCheck size={16} /> Inspection</button>
           <button className="secondary" disabled={!sessionReady} onClick={onFlowTest}><Gauge size={16} /> Flow Test</button>
-          <button className="primary" disabled={!sessionReady} onClick={onEdit}><Edit3 size={16} /> Edit</button>
+          {onEdit ? <button className="primary" disabled={!sessionReady} onClick={onEdit}><Edit3 size={16} /> Edit</button> : null}
         </div>
       </section>
     </div>
@@ -3905,12 +4007,23 @@ export default function HydrantTestingPage({
   onNavigate = null,
   // Off in the Employee Portal, which has no Damage Reports page to open.
   canReportDamage = true,
+  // "inline": Report Damage opens a short form here instead of the Damage Reports page.
+  damageReportMode = "navigate",
+  // Who files inline damage reports: { actorUid, actorName }.
+  actor = null,
+  // Edit hydrant details and import hydrant data (editHydrants).
+  canEditHydrants = true,
 } = {}) {
   syncHydrantTenant(departmentId, profile, personnel);
 
   function handleReportDamage(hydrant) {
     const key = hydrant?.location_id || hydrant?.hydrant_id || hydrant?.id || "";
     if (!key) return;
+    if (damageReportMode === "inline") {
+      setDetailHydrant(null);
+      setDamageHydrant(hydrant);
+      return;
+    }
     try {
       sessionStorage.setItem(HYDRANT_DAMAGE_PRESELECT_KEY, key);
     } catch {
@@ -3934,6 +4047,7 @@ export default function HydrantTestingPage({
   const [selected, setSelected] = useState(null);
   const [detailHydrant, setDetailHydrant] = useState(null);
   const [editorHydrant, setEditorHydrant] = useState(null);
+  const [damageHydrant, setDamageHydrant] = useState(null);
   const fieldAppMode = mode === "fieldApp";
   const [tab, setTab] = useState(() => (fieldAppMode ? "app" : initialTab || resolveInitialHydrantTab({ embedded, preferDashboard: !embedded })));
   const [fireFormsView, setFireFormsView] = useState(() => window.location.pathname.toLowerCase().startsWith("/pre-fire-plans") ? "plans" : "forms");
@@ -4043,7 +4157,7 @@ export default function HydrantTestingPage({
     ["flow", "Flow Test", Gauge],
     ["inspection", "Inspections", ClipboardCheck],
     ["reports", "Reports", FileText],
-    ["sync", "Sync / Import", UploadCloud]
+    ...(canEditHydrants ? [["sync", "Sync / Import", UploadCloud]] : [])
   ];
   const sessionReady = hasActiveShiftSession(crew);
   const isHydrantToolTab = hydrantTabs.some(([id]) => id === tab);
@@ -4062,7 +4176,7 @@ export default function HydrantTestingPage({
           districtOptions={districtOptions}
         />
       )}
-      {tab === "sync" && (
+      {tab === "sync" && canEditHydrants && (
         <SyncImportPage
           departmentId={effectiveDepartmentId}
           departmentName={departmentName}
@@ -4084,8 +4198,9 @@ export default function HydrantTestingPage({
           ))}
         </nav>
         <section className="page-body">{hydrantPageBody}</section>
-        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={canReportDamage ? handleReportDamage : undefined} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
+        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={canReportDamage ? handleReportDamage : undefined} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={canEditHydrants ? () => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); } : undefined} />}
         {editorHydrant && <HydrantEditorModal hydrant={editorHydrant} crew={crew} onClose={() => setEditorHydrant(null)} onSaved={saved} />}
+        {damageHydrant && <QuickDamageReportModal hydrant={damageHydrant} departmentId={effectiveDepartmentId} actor={actor || {}} onClose={() => setDamageHydrant(null)} onDone={(msg) => { setDamageHydrant(null); setToast(msg); }} />}
       </div>
     );
   }
@@ -4134,8 +4249,9 @@ export default function HydrantTestingPage({
             {tab === "fireCodes" && <FireCodesPage />}
           </section>
         )}
-        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={canReportDamage ? handleReportDamage : undefined} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
+        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={canReportDamage ? handleReportDamage : undefined} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={canEditHydrants ? () => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); } : undefined} />}
         {editorHydrant && <HydrantEditorModal hydrant={editorHydrant} crew={crew} onClose={() => setEditorHydrant(null)} onSaved={saved} />}
+        {damageHydrant && <QuickDamageReportModal hydrant={damageHydrant} departmentId={effectiveDepartmentId} actor={actor || {}} onClose={() => setDamageHydrant(null)} onDone={(msg) => { setDamageHydrant(null); setToast(msg); }} />}
       </div>
     );
   }
@@ -4157,7 +4273,7 @@ export default function HydrantTestingPage({
         <nav>
           <button className={tab === "app" ? "active" : ""} onClick={() => setTab("app")}><Home size={16} /> Home</button>
           <button className={isHydrantToolTab ? "active" : ""} onClick={() => selectHydrantTab("dashboard")}><Droplets size={16} /> Hydrants</button>
-          <button className={tab === "sync" ? "active" : ""} onClick={() => selectHydrantTab("sync")}><UploadCloud size={16} /> Import</button>
+          {canEditHydrants ? <button className={tab === "sync" ? "active" : ""} onClick={() => selectHydrantTab("sync")}><UploadCloud size={16} /> Import</button> : null}
           <button className={tab === "ems" ? "active" : ""} onClick={() => setTab("ems")}><Activity size={16} /> EMS</button>
           <button className={tab === "fireForms" ? "active" : ""} onClick={() => setTab("fireForms")}><Flame size={16} /> Fire</button>
           <button className={tab === "inspectionDivision" ? "active" : ""} onClick={() => setTab("inspectionDivision")}><ClipboardCheck size={16} /> Inspection Division</button>
@@ -4191,8 +4307,9 @@ export default function HydrantTestingPage({
         )}
         <section className="page-body">{hydrantPageBody}{tab === "ems" && <EmsProtocolsPage />}{tab === "fireForms" && <FireFormsPage requestedView={fireFormsView} setTab={setTab} setFireFormsView={setFireFormsView} />}{tab === "inspectionDivision" && <InspectionDivisionPage setTab={setTab} />}{tab === "investigations" && <InvestigationsPage />}{tab === "importantNumbers" && <ImportantNumbersPage />}{tab === "fireCodes" && <FireCodesPage />}{tab === "settings" && <SettingsPage />}</section>
       </section>
-      {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={canReportDamage ? handleReportDamage : undefined} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
+      {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={canReportDamage ? handleReportDamage : undefined} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={canEditHydrants ? () => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); } : undefined} />}
       {editorHydrant && <HydrantEditorModal hydrant={editorHydrant} crew={crew} onClose={() => setEditorHydrant(null)} onSaved={saved} />}
+        {damageHydrant && <QuickDamageReportModal hydrant={damageHydrant} departmentId={effectiveDepartmentId} actor={actor || {}} onClose={() => setDamageHydrant(null)} onDone={(msg) => { setDamageHydrant(null); setToast(msg); }} />}
     </main>
   );
 }

@@ -1108,3 +1108,32 @@ html[data-theme="dark"] .hydrant-module-root .session-pill.active {
   border-top: 1px solid var(--rms-border-divider);
   margin: 1.25rem 0;
 }
+
+/* Quick damage report (Employee Portal Field App) */
+.hydrant-portal-scope .quick-damage-types {
+  border: 1px solid var(--rms-border-divider);
+  border-radius: 10px;
+  margin: 12px 0;
+  padding: 10px 12px 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px 14px;
+}
+.hydrant-portal-scope .quick-damage-types legend {
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0 4px;
+}
+.hydrant-portal-scope .quick-damage-types label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.hydrant-portal-scope .quick-damage-types input {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin: 0;
+}
