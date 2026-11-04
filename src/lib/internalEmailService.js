@@ -34,12 +34,39 @@ export function isMessageUnread(message = {}, userId = "") {
   return !readBy[userId];
 }
 
-export async function listInternalEmails(departmentId) {
+/**
+ * Newest 500 messages this member may read (every message carries createdAt).
+ * Message managers read the whole board; everyone else asks only for messages
+ * they sent, messages to everyone, and messages addressed to them, which is
+ * all the Firestore rules let them read.
+ */
+export async function listInternalEmails(departmentId, { uid = "", canManage = false } = {}) {
   const scopeId = resolveEmailBoardScopeId(departmentId);
   if (!scopeId) return [];
-  // Newest 500 messages (every message carries createdAt from createRecord).
-  const items = await listRecentRecords(scopeId, INTERNAL_EMAIL_COLLECTION, "createdAt", 500);
-  return items.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  const recent = (filters) => listRecentRecords(scopeId, INTERNAL_EMAIL_COLLECTION, "createdAt", 500, filters);
+  let items;
+  if (canManage || !uid) {
+    items = await recent([]);
+  } else {
+    const results = await Promise.allSettled([
+      recent([["fromUid", "==", uid]]),
+      recent([["toAll", "==", true]]),
+      recent([["recipientUids", "array-contains", uid]]),
+    ]);
+    if (results.every((result) => result.status === "rejected")) throw results[0].reason;
+    const byId = new Map();
+    for (const result of results) {
+      if (result.status !== "fulfilled") {
+        console.warn("Some messages could not be loaded", result.reason);
+        continue;
+      }
+      for (const item of result.value) byId.set(item.id, item);
+    }
+    items = [...byId.values()];
+  }
+  return items
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .slice(0, 500);
 }
 
 export async function sendInternalEmail(departmentId, payload = {}) {

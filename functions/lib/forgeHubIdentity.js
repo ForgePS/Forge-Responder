@@ -4,6 +4,7 @@
  * Prefers credentials from department academyIntegrations (forge_academy) when present.
  */
 
+const { safeOutboundFetch } = require("./safeOutboundUrl");
 const { getPrimaryConnection, listConnections } = require("./academy/academyIntegrationsStore");
 const { loadConnectionSecrets } = require("./academy/academySecrets");
 
@@ -113,7 +114,7 @@ async function resolvePersonIdentityViaHub(db, departmentId, person = {}) {
     email: person.email ? normalizeEmail(person.email) : undefined,
   };
 
-  const response = await fetch(`${settings.hubBaseUrl}/api/integrations/v1/identity/resolve`, {
+  const response = await safeOutboundFetch(`${settings.hubBaseUrl}/api/integrations/v1/identity/resolve`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),

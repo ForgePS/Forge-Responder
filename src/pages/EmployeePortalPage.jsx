@@ -969,7 +969,7 @@ export default function EmployeePortalPage({
         <div>
           <span className="module-icon"><UserRound size={22} /></span>
           <div>
-            <h1>Employee Portal</h1>
+            <h1>{current || "My Dashboard"}</h1>
             <p>
               {myPerson?.name || membership?.displayName || "Member"}
               {myPerson?.rank ? ` · ${myPerson.rank}` : ""}
@@ -986,7 +986,7 @@ export default function EmployeePortalPage({
           </span>
           {onClearPreviewPerson ? (
             <button type="button" className="secondary-button" onClick={onClearPreviewPerson}>
-              Back to admin
+              Back to System Admin
             </button>
           ) : null}
         </div>

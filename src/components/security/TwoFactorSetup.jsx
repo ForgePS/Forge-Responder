@@ -1,5 +1,4 @@
 import { useState } from "react";
-import QRCode from "qrcode";
 import { ShieldCheck } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import {
@@ -48,6 +47,8 @@ export default function TwoFactorSetup({ onCancel }) {
     try {
       const next = await startAuthenticatorSetup(user);
       setSetup(next);
+      // Loaded only here, so the QR library isn't part of every page load.
+      const { default: QRCode } = await import("qrcode");
       setQr(await QRCode.toDataURL(next.url, { margin: 1, width: 220 }));
       setStep("scan");
     } catch (beginError) {

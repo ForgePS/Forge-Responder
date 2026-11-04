@@ -5,6 +5,7 @@ import {
   deleteRecord,
   getRecord,
   listRecords,
+  subscribeCollection,
   updateRecord,
 } from "../firestoreService.js";
 import { listDepartmentApparatus } from "../apparatusService.js";
@@ -200,6 +201,30 @@ export async function listFleetAssets(departmentId) {
     console.warn("Unable to list fleet assets", error);
     return [];
   }
+}
+
+function sortFleetAssets(rows, departmentId) {
+  return rows
+    .map((row) => normalizeFleetAssetRecord(row, departmentId))
+    .sort((a, b) => String(a.fleetNumber || a.name).localeCompare(String(b.fleetNumber || b.name), undefined, { numeric: true }));
+}
+
+/**
+ * Live fleet units: one full read, then only changes. Returns an unsubscribe function.
+ * @param {string} departmentId
+ * @param {(assets: object[]) => void} onData
+ */
+export function subscribeFleetAssets(departmentId, onData) {
+  if (!departmentId) {
+    onData([]);
+    return () => {};
+  }
+  return subscribeCollection(
+    departmentId,
+    FLEET_ASSETS_COLLECTION,
+    (rows) => onData(sortFleetAssets(rows, departmentId)),
+    (error) => console.warn("Unable to watch fleet assets", error)
+  );
 }
 
 /**

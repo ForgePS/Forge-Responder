@@ -1,5 +1,9 @@
 import { getPersonDisplayName } from "./personnelSchema.js";
-import { resolvePersonnelRecordId } from "./personnelService.js";
+
+// Same as personnelService.resolvePersonnelRecordId (kept here so this file has no Firebase imports).
+function resolvePersonnelRecordId(person = {}) {
+  return String(person.id || person.agencyPersonnelId || "").trim();
+}
 
 const COMMAND_PATTERN = /chief|captain|battalion|deputy|admin|creator|officer/i;
 
@@ -155,15 +159,7 @@ export function resolvePersonContext(user = {}, membership = {}, personnel = [])
   return { user, membership, person };
 }
 
-function expandCustomGroupMembers(token, customGroups = []) {
-  if (!token.startsWith("group:")) return [token];
-  const groupId = token.slice(6);
-  const group = customGroups.find((item) => item.id === groupId);
-  if (!group?.members?.length) return [token];
-  return group.members.map(String);
-}
-
-function tokenMatchesRecipient(token, context = {}, customGroups = []) {
+function tokenMatchesRecipient(token, context = {}, customGroups = [], depth = 0) {
   const { user, membership, person } = context;
   const normalized = String(token || "");
 
@@ -201,8 +197,10 @@ function tokenMatchesRecipient(token, context = {}, customGroups = []) {
   }
 
   if (normalized.startsWith("group:")) {
-    const members = expandCustomGroupMembers(normalized, customGroups);
-    return members.some((memberToken) => tokenMatchesRecipient(memberToken, context, customGroups));
+    // A missing or empty group matches nobody (and groups can't loop forever).
+    const group = customGroups.find((item) => item.id === normalized.slice(6));
+    if (!group?.members?.length || depth > 5) return false;
+    return group.members.map(String).some((memberToken) => tokenMatchesRecipient(memberToken, context, customGroups, depth + 1));
   }
 
   if (normalized.includes("@")) {

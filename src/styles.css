@@ -3909,3 +3909,14 @@ html[data-theme="light"] .apparatus-check-card { background: #fff; border-color:
 .btn-primary:disabled, .btn-secondary:disabled, .button-secondary:disabled { opacity: .55; cursor: default; }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
 .btn-secondary:hover:not(:disabled), .button-secondary:hover:not(:disabled) { border-color: var(--rms-primary-solid); }
+
+.show-more-rows {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 8px;
+  color: var(--muted, #64748b);
+  font-size: 0.9rem;
+}

@@ -136,44 +136,68 @@ function toJson(value) {
   return value;
 }
 
-/** Walk a document and all its subcollections into { [path]: data }. */
-async function collectTree(docRef, out, stats) {
-  const snap = await docRef.get();
-  if (snap.exists) {
-    out[docRef.path] = toJson(snap.data());
-    stats.documents += 1;
-  }
-  for (const col of await docRef.listCollections()) {
-    if (EXCLUDED_FROM_EXPORT.has(col.id)) {
-      stats.excluded.push(col.path);
-      continue;
+// How many documents' subcollections are looked up at once.
+const EXPORT_CONCURRENCY = 16;
+
+async function mapLimit(items, limit, fn) {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const item = items[next];
+      next += 1;
+      await fn(item);
     }
-    for (const child of await col.listDocuments()) await collectTree(child, out, stats);
-  }
+  });
+  await Promise.all(workers);
 }
 
-async function buildDepartmentExport(db, bucket, departmentId) {
-  const documents = {};
+/**
+ * Walk a collection and everything under it. Each collection's documents come
+ * back in one query (not one read per document), and subcollections are looked
+ * up a few documents at a time. emit() is called once per document.
+ */
+async function walkCollection(col, emit, stats) {
+  if (EXCLUDED_FROM_EXPORT.has(col.id)) {
+    stats.excluded.push(col.path);
+    return;
+  }
+  // Streamed, so even a very large collection is never held in memory at once.
+  for await (const doc of col.stream()) await emit(doc.ref.path, toJson(doc.data()));
+  // listDocuments also finds "empty" parents that only hold subcollections.
+  const refs = await col.listDocuments();
+  await mapLimit(refs, EXPORT_CONCURRENCY, async (ref) => {
+    for (const sub of await ref.listCollections()) await walkCollection(sub, emit, stats);
+  });
+}
+
+/**
+ * Every document for a department, passed to emit(path, data) as it is read,
+ * so a large department never has to fit in memory at once.
+ */
+async function streamDepartmentDocuments(db, departmentId, emit) {
   const stats = { documents: 0, excluded: [] };
-  await collectTree(db.doc(`departments/${departmentId}`), documents, stats);
+  const counted = async (path, data) => {
+    stats.documents += 1;
+    await emit(path, data);
+  };
+  const root = db.doc(`departments/${departmentId}`);
+  const rootSnap = await root.get();
+  if (rootSnap.exists) await counted(root.path, toJson(rootSnap.data()));
+  for (const col of await root.listCollections()) await walkCollection(col, counted, stats);
 
   for (const path of [`platformDepartments/${departmentId}`, `platformSubscriptions/${departmentId}`]) {
     const snap = await db.doc(path).get();
-    if (snap.exists) {
-      documents[path] = toJson(snap.data());
-      stats.documents += 1;
-    }
+    if (snap.exists) await counted(path, toJson(snap.data()));
   }
   const gateways = await db.collection("rmsGateways").where("departmentId", "==", departmentId).get();
-  gateways.docs.forEach((doc) => {
-    documents[doc.ref.path] = toJson(doc.data());
-    stats.documents += 1;
-  });
+  for (const doc of gateways.docs) await counted(doc.ref.path, toJson(doc.data()));
+  return stats;
+}
 
-  let files = [];
+async function listDepartmentFiles(bucket, departmentId) {
   try {
     const [list] = await bucket.getFiles({ prefix: `departments/${departmentId}/` });
-    files = list.map((file) => ({
+    return list.map((file) => ({
       path: file.name,
       size: Number(file.metadata?.size || 0),
       contentType: file.metadata?.contentType || "",
@@ -181,22 +205,67 @@ async function buildDepartmentExport(db, bucket, departmentId) {
     }));
   } catch (error) {
     console.warn("Export: listing files failed", error.message);
+    return [];
   }
+}
 
+const EXPORT_NOTES = [
+  "documents: every Firestore document for the department, keyed by path.",
+  `Not included: ${[...EXCLUDED_FROM_EXPORT].join(", ")} (integration credentials) and invite tokens.`,
+  "files: list of uploaded files (contents stay in Cloud Storage).",
+];
+
+/** The whole export as one object (small departments and tests). */
+async function buildDepartmentExport(db, bucket, departmentId) {
+  const documents = {};
+  const stats = await streamDepartmentDocuments(db, departmentId, (path, data) => { documents[path] = data; });
+  const files = await listDepartmentFiles(bucket, departmentId);
   return {
     format: "forge-responder-department-export",
     version: 1,
     departmentId,
     exportedAt: new Date().toISOString(),
-    notes: [
-      "documents: every Firestore document for the department, keyed by path.",
-      `Not included: ${[...EXCLUDED_FROM_EXPORT].join(", ")} (integration credentials) and invite tokens.`,
-      "files: list of uploaded files (contents stay in Cloud Storage).",
-    ],
+    notes: EXPORT_NOTES,
     counts: { documents: stats.documents, files: files.length, excludedCollections: stats.excluded },
     documents,
     files,
   };
+}
+
+/**
+ * Write the export straight to a Storage file, one document at a time.
+ * Same JSON shape as buildDepartmentExport (counts come last in the file).
+ */
+async function writeDepartmentExport(db, bucket, departmentId, path, metadata) {
+  const exportedAt = new Date().toISOString();
+  const out = bucket.file(path).createWriteStream({ contentType: "application/json", resumable: false, metadata });
+  const finished = new Promise((resolve, reject) => {
+    out.on("finish", resolve);
+    out.on("error", reject);
+  });
+  const write = async (text) => {
+    if (!out.write(text)) await new Promise((resolve) => out.once("drain", resolve));
+  };
+
+  try {
+    await write(`{"format":"forge-responder-department-export","version":1,"departmentId":${JSON.stringify(departmentId)},`
+      + `"exportedAt":${JSON.stringify(exportedAt)},"notes":${JSON.stringify(EXPORT_NOTES)},"documents":{`);
+    let first = true;
+    const stats = await streamDepartmentDocuments(db, departmentId, async (docPath, data) => {
+      const entry = `${first ? "" : ","}\n${JSON.stringify(docPath)}:${JSON.stringify(data)}`;
+      first = false;
+      await write(entry);
+    });
+    const files = await listDepartmentFiles(bucket, departmentId);
+    const counts = { documents: stats.documents, files: files.length, excludedCollections: stats.excluded };
+    await write(`\n},"files":${JSON.stringify(files)},"counts":${JSON.stringify(counts)}}\n`);
+    out.end();
+    await finished;
+    return { exportedAt, counts };
+  } catch (error) {
+    out.destroy(error);
+    throw error;
+  }
 }
 
 /** Creator-only: write a JSON export to Storage and return a private download link. */
@@ -208,21 +277,18 @@ async function exportDepartmentData(db, bucket, request) {
     || (await db.doc(`departments/${departmentId}`).listCollections()).length > 0;
   if (!exists) throw new HttpsError("not-found", "Department not found.");
 
-  const data = await buildDepartmentExport(db, bucket, departmentId);
-  const stamp = data.exportedAt.replace(/[:.]/g, "-");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const path = `exports/${departmentId}/${departmentId}-${stamp}.json`;
   const token = crypto.randomUUID();
-  await bucket.file(path).save(JSON.stringify(data, null, 2), {
-    contentType: "application/json",
-    resumable: false,
-    metadata: { metadata: { firebaseStorageDownloadTokens: token, exportedBy: request.auth.uid } },
+  const { counts } = await writeDepartmentExport(db, bucket, departmentId, path, {
+    metadata: { firebaseStorageDownloadTokens: token, exportedBy: request.auth.uid },
   });
 
   await db.collection("platformAuditLogs").add({
     action: "department.exported",
     module: "Creator Console",
     recordId: departmentId,
-    summary: `Exported ${data.counts.documents} documents and ${data.counts.files} file references for ${departmentId}`,
+    summary: `Exported ${counts.documents} documents and ${counts.files} file references for ${departmentId}`,
     actorUid: request.auth.uid,
     actorName: request.auth.token?.email || "",
     created_at: new Date().toISOString(),
@@ -234,7 +300,7 @@ async function exportDepartmentData(db, bucket, request) {
   return {
     path,
     url: `${host}/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`,
-    counts: data.counts,
+    counts,
   };
 }
 

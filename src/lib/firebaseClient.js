@@ -168,8 +168,11 @@ export async function uploadFirebaseFile(storagePath, file) {
   }
   try {
     const fileRef = ref(services.storage, storagePath);
+    // uploadedBy lets the uploader replace their own file (storage.rules).
+    const uploadedBy = services.auth.currentUser?.uid || "";
     const snapshot = await uploadBytes(fileRef, file, {
       contentType: file.type || "application/octet-stream",
+      ...(uploadedBy ? { customMetadata: { uploadedBy } } : {}),
     });
     const url = await getDownloadURL(snapshot.ref);
     return { storagePath, downloadUrl: url, contentType: file.type || "application/octet-stream" };

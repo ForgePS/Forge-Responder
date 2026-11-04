@@ -87,11 +87,9 @@ import {
 const InternalEmailBoardPage = lazyPage(() => import("./pages/InternalEmailBoardPage.jsx"));
 const DigitalDashboardPage = lazyPage(() => import("./pages/DigitalDashboardPage.jsx"));
 import { filterNavByEnabledModules, filterNavByCodeLibraryAccess } from "./lib/navFilter.js";
-import {
-  filterNavGroupsByPreplanFeatures,
-  getDepartmentPreplanFeatures,
-  resolveEffectivePreplanFeatures,
-} from "./lib/inspections/index.js";
+// Direct imports (not lib/inspections/index.js) so every inspection service isn't in the first download.
+import { getDepartmentPreplanFeatures } from "./lib/inspections/preplanFeatures.js";
+import { filterNavGroupsByPreplanFeatures, resolveEffectivePreplanFeatures } from "./lib/inspections/preplanNavFeatures.js";
 import { getDepartmentCodeLibraryAccess } from "./lib/codeLibrary/accessService.js";
 import {
   PREVENTION_NAV_TREE,
@@ -140,25 +138,20 @@ const HydrantDamageAnalyticsPage = lazyPage(() => import("./pages/HydrantDamageA
 const NerisFireReportsPage = lazyPage(() => import("./pages/NerisFireReportsPage.jsx"));
 const NerisAnalyticsPage = lazyPage(() => import("./pages/NerisAnalyticsPage.jsx"));
 import { resolveInitialHydrantTab, resolveInitialAppModule, shouldOpenHydrantsModule } from "./lib/hydrantAppRouting.js";
-import {
-  AnalyticsPage,
-  AssetsPageConnected,
-  DocumentsPage,
-  HoseTestingPage,
-  InspectionsPage,
-} from "./pages/SprintModulePages.jsx";
-import {
-  AllInspectionsPage,
-  InspectionsDashboardPage,
-  InspectionsWorkQueuePage,
-  MyInspectionsPage,
-} from "./pages/InspectionsModulePages.jsx";
-import {
-  AllPreplansPage,
-  NewPreplanPage,
-  PreplansPage,
-  PreplansWorkQueuePage,
-} from "./pages/PreplansModulePages.jsx";
+// Pages grouped in one file each still load only when opened.
+const AnalyticsPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.AnalyticsPage })));
+const AssetsPageConnected = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.AssetsPageConnected })));
+const DocumentsPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.DocumentsPage })));
+const HoseTestingPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.HoseTestingPage })));
+const InspectionsPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.InspectionsPage })));
+const AllInspectionsPage = lazyPage(() => import("./pages/InspectionsModulePages.jsx").then((m) => ({ default: m.AllInspectionsPage })));
+const InspectionsDashboardPage = lazyPage(() => import("./pages/InspectionsModulePages.jsx").then((m) => ({ default: m.InspectionsDashboardPage })));
+const InspectionsWorkQueuePage = lazyPage(() => import("./pages/InspectionsModulePages.jsx").then((m) => ({ default: m.InspectionsWorkQueuePage })));
+const MyInspectionsPage = lazyPage(() => import("./pages/InspectionsModulePages.jsx").then((m) => ({ default: m.MyInspectionsPage })));
+const AllPreplansPage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.AllPreplansPage })));
+const NewPreplanPage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.NewPreplanPage })));
+const PreplansPage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.PreplansPage })));
+const PreplansWorkQueuePage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.PreplansWorkQueuePage })));
 const PreplanOperationalPage = lazyPage(() => import("./pages/PreplanOperationalPage.jsx"));
 const OccupanciesMasterPage = lazyPage(() => import("./pages/OccupanciesMasterPage.jsx"));
 const InspectionConfigStudioPage = lazyPage(() => import("./pages/InspectionConfigStudioPage.jsx"));
@@ -171,13 +164,11 @@ const InspectionReportsPage = lazyPage(() => import("./pages/InspectionReportsPa
 const InspectionOfflinePage = lazyPage(() => import("./pages/InspectionOfflinePage.jsx"));
 const InspectionAutomationPage = lazyPage(() => import("./pages/InspectionAutomationPage.jsx"));
 const InspectionHardeningPage = lazyPage(() => import("./pages/InspectionHardeningPage.jsx"));
-import {
-  AdoptedCodesPage,
-  CodeAdministrationPage,
-  CodeLibraryBrowsePage,
-  CodeLibrarySavedPage,
-  LocalAmendmentsLibraryPage,
-} from "./pages/CodeLibraryPages.jsx";
+const AdoptedCodesPage = lazyPage(() => import("./pages/CodeLibraryPages.jsx").then((m) => ({ default: m.AdoptedCodesPage })));
+const CodeAdministrationPage = lazyPage(() => import("./pages/CodeLibraryPages.jsx").then((m) => ({ default: m.CodeAdministrationPage })));
+const CodeLibraryBrowsePage = lazyPage(() => import("./pages/CodeLibraryPages.jsx").then((m) => ({ default: m.CodeLibraryBrowsePage })));
+const CodeLibrarySavedPage = lazyPage(() => import("./pages/CodeLibraryPages.jsx").then((m) => ({ default: m.CodeLibrarySavedPage })));
+const LocalAmendmentsLibraryPage = lazyPage(() => import("./pages/CodeLibraryPages.jsx").then((m) => ({ default: m.LocalAmendmentsLibraryPage })));
 const FleetDashboardPage = lazyPage(() => import("./pages/FleetDashboardPage.jsx"));
 const FleetAssetsMasterPage = lazyPage(() => import("./pages/FleetAssetsMasterPage.jsx"));
 const FleetConfigStudioPage = lazyPage(() => import("./pages/FleetConfigStudioPage.jsx"));
@@ -196,7 +187,11 @@ const FleetCostReplacementPage = lazyPage(() => import("./pages/FleetCostReplace
 const FleetReportingPage = lazyPage(() => import("./pages/FleetReportingPage.jsx"));
 const FleetHardeningPage = lazyPage(() => import("./pages/FleetHardeningPage.jsx"));
 const FleetVendorPortalPage = lazyPage(() => import("./pages/FleetVendorPortalPage.jsx"));
-import { applyFleetStatusDecision, listFleetAssets, listFleetWorkOrders, loadFleetSettings, saveFleetAsset, syncFleetAssetsFromApparatus } from "./lib/fleet/index.js";
+// Direct imports (not lib/fleet/index.js) so every fleet service isn't in the first download.
+import { saveFleetAsset, subscribeFleetAssets, syncFleetAssetsFromApparatus } from "./lib/fleet/fleetAssetService.js";
+import { applyFleetStatusDecision } from "./lib/fleet/fleetStatusControlService.js";
+import { loadFleetSettings } from "./lib/fleet/fleetSettings.js";
+import { subscribeFleetWorkOrders } from "./lib/fleet/fleetWorkOrderService.js";
 import {
   applyFleetStatus,
   changedUnitStatuses,
@@ -243,13 +238,22 @@ const navGroups = [
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
 ];
 
-// Every in-app page reachable from the menu, keyed by its URL slug (?page=...).
-const PAGE_INDEX = buildPageIndex(
+// Department pages (need Admin RMS access) and personal pages (My Work).
+const DEPARTMENT_PAGE_NAMES = new Set(
   navGroups
     .flatMap((group) => groupNavLeavesAsItems(group))
     .filter(([, , externalUrl]) => !externalUrl)
     .map(([name]) => name)
 );
+// "Leave Requests" and "Shift Trades" are opened from My Schedule.
+const PERSONAL_PAGE_NAMES = new Set([
+  ...employeePortalNavGroups.flatMap((group) => group.items).filter(([, , externalUrl]) => !externalUrl).map(([name]) => name),
+  "Leave Requests",
+  "Shift Trades",
+]);
+
+// Every in-app page, keyed by its URL slug (?page=...).
+const PAGE_INDEX = buildPageIndex([...new Set([...DEPARTMENT_PAGE_NAMES, ...PERSONAL_PAGE_NAMES])]);
 
 
 const NAV_SECTIONS_STORAGE_KEY = "rms-nav-sections-collapsed";
@@ -605,11 +609,6 @@ function TopBar({
   membership,
   user,
   onSignOut,
-  appView,
-  onSelectAdminView,
-  onSelectEmployeeView,
-  showAdminToggle,
-  showEmployeeToggle,
   departmentId,
   isCreator,
   wideBrandLogo = false,
@@ -639,30 +638,6 @@ function TopBar({
           )}
         </div>
         <DepartmentSwitcher isCreator={isCreator} />
-        {(showAdminToggle || showEmployeeToggle) && (
-          <div className="segmented-control view-toggle">
-            {showAdminToggle && (
-              <button
-                type="button"
-                className={appView === "admin" ? "active" : ""}
-                title="Open command center with sidebar modules"
-                onClick={onSelectAdminView}
-              >
-                Admin RMS
-              </button>
-            )}
-            {showEmployeeToggle && (
-              <button
-                type="button"
-                className={appView === "employee" ? "active" : ""}
-                title="Open self-service member portal"
-                onClick={onSelectEmployeeView}
-              >
-                Employee Portal
-              </button>
-            )}
-          </div>
-        )}
       </div>
       {tagline && <p className="top-bar-tagline">{tagline}</p>}
     </div>
@@ -716,28 +691,7 @@ function markDeepLinkApplied() {
   }
 }
 
-const APP_VIEW_PREF_KEY = "rms-app-view-pref";
 const EMPTY_SHIFTS = [];
-
-function persistAppViewPref(view) {
-  try {
-    window.sessionStorage.setItem(APP_VIEW_PREF_KEY, view);
-    window.localStorage.removeItem("rms-app-view");
-  } catch {
-    // ignore
-  }
-}
-
-function readAppViewPref(hasAdminAccess) {
-  if (!hasAdminAccess) return "employee";
-  try {
-    const sessionPref = window.sessionStorage.getItem(APP_VIEW_PREF_KEY);
-    if (sessionPref === "employee") return "employee";
-  } catch {
-    // ignore
-  }
-  return "admin";
-}
 
 function AppShell() {
   const { departmentId, profile, platformConfig, isPlatformScope: inPlatformScope, settings, isModuleEnabled, setDepartmentId, refreshDepartment } = useTenant();
@@ -763,8 +717,6 @@ function AppShell() {
   }, [isCreator, departmentId, switchCreatorDepartment]);
   const initialDeepLink = typeof window !== "undefined" ? parseAppDeepLink(window.location) : null;
   const initialModule = typeof window !== "undefined" ? resolveInitialAppModule(window.location) : "Dashboard";
-  const [appView, setAppView] = useState(initialDeepLink?.module ? "admin" : "admin");
-  const [employeeSection, setEmployeeSection] = useState("My Dashboard");
   const [personnelNavigateId, setPersonnelNavigateId] = useState("");
   const [employeePreviewPersonId, setEmployeePreviewPersonId] = useState("");
   const [current, setCurrent] = useState(
@@ -857,9 +809,25 @@ function AppShell() {
     }),
     [canViewInternalEmail, canViewDailyLog, canViewFieldApp, isModuleEnabled, academyConnected]
   );
+  // One app: department pages for people with Admin RMS access, personal pages
+  // (My Work) for members of the portal. Each menu shows only what the role allows.
   const showAdminToggle = canAccessAdminRms(permissions, isCreator);
   const showEmployeeToggle = canAccessEmployeePortal(permissions);
-  const effectiveAppView = showAdminToggle ? appView : "employee";
+  // Personal pages render in the Employee Portal page; everything else is a department page.
+  const onPersonalPage = !showAdminToggle || (PERSONAL_PAGE_NAMES.has(current) && !DEPARTMENT_PAGE_NAMES.has(current));
+  const effectiveAppView = onPersonalPage ? "employee" : "admin";
+  const homePage = showAdminToggle ? "Dashboard" : "My Dashboard";
+  const menuGroups = useMemo(() => {
+    if (!showAdminToggle) return visibleEmployeeNavGroups;
+    if (!showEmployeeToggle) return visibleNavGroups;
+    // Items both menus have (Daily Log, Messages, Field App, Academy) appear once.
+    const departmentNames = new Set(visibleNavGroups.flatMap((group) => groupNavLeavesAsItems(group)).map(([name]) => name));
+    const mine = visibleEmployeeNavGroups.flatMap((group) => group.items).filter(([name]) => !departmentNames.has(name));
+    if (!mine.length) return visibleNavGroups;
+    const myWork = { label: "My Work", items: mine };
+    const [first, ...rest] = visibleNavGroups;
+    return first && !first.label ? [first, myWork, ...rest] : [myWork, ...visibleNavGroups];
+  }, [showAdminToggle, showEmployeeToggle, visibleNavGroups, visibleEmployeeNavGroups]);
 
   // Keep the open page in the address (?page=...) so it can be bookmarked,
   // shared and reached with back/forward. The first sync replaces the current
@@ -871,7 +839,7 @@ function AppShell() {
     typeof window !== "undefined" && depthFromHistoryState(window.history.state) > 0
   ));
   useEffect(() => {
-    if (typeof window === "undefined" || effectiveAppView !== "admin") return;
+    if (typeof window === "undefined") return;
     if (current === CREATOR_CONSOLE_MODULE || isCreatorConsolePath()) return; // has its own /creator-console path
     const slug = current === "Dashboard" ? "" : pageSlug(current);
     const sameUrl = (new URLSearchParams(window.location.search).get("page") || "") === slug;
@@ -888,14 +856,16 @@ function AppShell() {
       window.history.pushState(pageHistoryState(slug, depth + 1), "", nextUrl);
       setCanGoBack(true);
     }
-  }, [current, effectiveAppView]);
+  }, [current]);
 
+  const homePageRef = useRef(homePage);
+  homePageRef.current = homePage;
   useEffect(() => {
     function handlePageHistory() {
       // Only react to entries this app created (other code also fires popstate).
       const slug = slugFromHistoryState(window.history.state);
       if (slug === null) return;
-      const name = slug ? PAGE_INDEX.get(slug) : "Dashboard";
+      const name = slug ? PAGE_INDEX.get(slug) : homePageRef.current;
       if (!name) return;
       pageFromHistoryRef.current = true;
       setCanGoBack(depthFromHistoryState(window.history.state) > 0);
@@ -913,11 +883,7 @@ function AppShell() {
     (async () => {
       const restored = await recoverAccess();
       adminRecoveryAttemptedRef.current = true;
-      if (!cancelled && restored) {
-        persistAppViewPref("admin");
-        setAppView("admin");
-        setCurrent("Dashboard");
-      }
+      if (!cancelled && restored) setCurrent("Dashboard");
     })();
     return () => { cancelled = true; };
   }, [showAdminToggle, user?.uid, recoverAccess, membershipLoading]);
@@ -926,27 +892,20 @@ function AppShell() {
     if (membershipLoading) return;
     if (parseAppDeepLink(window.location)?.module) return;
     // A ?page= address picks the page; don't reset it to the dashboard.
-    if (pageFromLocation(PAGE_INDEX, window.location)) {
-      persistAppViewPref("admin");
-      setAppView("admin");
-      return;
-    }
-    if (shouldOpenHydrantsModule(window.location)) {
-      persistAppViewPref("admin");
-      setAppView("admin");
+    if (pageFromLocation(PAGE_INDEX, window.location)) return;
+    if (showAdminToggle && shouldOpenHydrantsModule(window.location)) {
       setCurrent("Hydrants");
       return;
     }
-    if (!showAdminToggle && showEmployeeToggle) {
-      setAppView("employee");
-      return;
-    }
-    const nextView = readAppViewPref(showAdminToggle);
-    setAppView(nextView);
-    if (nextView === "admin" && showAdminToggle && !shouldOpenHydrantsModule(window.location)) {
-      setCurrent("Dashboard");
-    }
+    setCurrent(showAdminToggle ? "Dashboard" : "My Dashboard");
   }, [showAdminToggle, showEmployeeToggle, membershipLoading]);
+
+  // Members without Admin RMS access only have personal pages (an old link to a
+  // department page lands on My Dashboard instead).
+  useEffect(() => {
+    if (membershipLoading || showAdminToggle) return;
+    if (!PERSONAL_PAGE_NAMES.has(current)) setCurrent("My Dashboard");
+  }, [membershipLoading, showAdminToggle, current]);
 
   useEffect(() => {
     if (membershipLoading || deepLinkAppliedRef.current || wasDeepLinkApplied()) return undefined;
@@ -965,8 +924,6 @@ function AppShell() {
     }
 
     if (deepLink.module === CREATOR_CONSOLE_MODULE) {
-      persistAppViewPref("admin");
-      setAppView("admin");
       setCurrent(CREATOR_CONSOLE_MODULE);
       setMobileNav(false);
     }
@@ -1003,8 +960,7 @@ function AppShell() {
   }, [departmentId]);
   // Lists only some pages use load when one of those pages first opens (then stay
   // loaded), so a department's whole history isn't downloaded on every visit.
-  const inPortal = effectiveAppView === "employee";
-  const onPage = (...pages) => !inPortal && pages.includes(current);
+  const onPage = (...pages) => pages.includes(current);
   const lazyLists = {
     nerisFireReports: { enabled: onPage("NERIS Fire Reports", "NERIS Analytics") },
     preplans: { enabled: onPage("NERIS Fire Reports") },
@@ -1012,16 +968,16 @@ function AppShell() {
     digitalDashboard: { enabled: onPage("Digital Dashboard") },
     hoseTests: { enabled: onPage("Fleet Tests", "Hose Testing") },
     overtimeOffers: { enabled: onPage("Scheduling") },
-    dailyLogs: { enabled: onPage("Daily Log") || (inPortal && employeeSection === "Daily Log") },
-    timeCards: { enabled: onPage("Time Sheets") || (inPortal && employeeSection === "Time Card") },
+    dailyLogs: { enabled: onPage("Daily Log") },
+    timeCards: { enabled: onPage("Time Sheets", "Time Card") },
   };
   const [certifications, setCertifications] = useTenantPersistentState(departmentId, LIST_KEYS.certifications, getTenantListFallback(departmentId, LIST_KEYS.certifications));
   const [training, setTraining] = useTenantPersistentState(departmentId, LIST_KEYS.training, getTenantListFallback(departmentId, LIST_KEYS.training));
   const [apparatus, setApparatus] = useTenantPersistentState(departmentId, LIST_KEYS.apparatus, getTenantListFallback(departmentId, LIST_KEYS.apparatus));
-  // Unit status lives on the fleet record; reload it whenever the page changes so a
-  // failed check on the Readiness Board shows up on the Dashboard and Scheduling.
+  // Unit status lives on the fleet record. Watched live (one read, then only
+  // changes) so a failed check on the Readiness Board shows up on the Dashboard
+  // and Scheduling without re-reading the whole fleet on every page change.
   const [fleetStatusAssets, setFleetStatusAssets] = useState([]);
-  const [fleetStatusVersion, setFleetStatusVersion] = useState(0);
   const [fleetWorkOrdersForDashboard, setFleetWorkOrdersForDashboard] = useState(null);
   useEffect(() => {
     if (!departmentId || inPlatformScope) {
@@ -1029,23 +985,22 @@ function AppShell() {
       setFleetWorkOrdersForDashboard(null);
       return undefined;
     }
-    let cancelled = false;
-    listFleetAssets(departmentId)
-      .then((list) => { if (!cancelled) setFleetStatusAssets(Array.isArray(list) ? list : []); })
-      .catch(() => {});
+    const stopAssets = subscribeFleetAssets(departmentId, (list) => setFleetStatusAssets(Array.isArray(list) ? list : []));
     // Work orders now live in Fleet; the dashboard counts those (shaped like the old list).
-    listFleetWorkOrders(departmentId)
-      .then((list) => {
-        if (cancelled) return;
-        setFleetWorkOrdersForDashboard((Array.isArray(list) ? list : []).map((order) => ({
-          id: order.workOrderNumber || order.id,
-          unit: order.unitDesignation || order.fleetNumber || "Unit",
-          status: ["completed", "closed", "cancelled", "canceled"].includes(order.status) ? "Complete" : "Open",
-        })));
-      })
-      .catch(() => { if (!cancelled) setFleetWorkOrdersForDashboard(null); });
-    return () => { cancelled = true; };
-  }, [departmentId, inPlatformScope, current, fleetStatusVersion]);
+    const stopOrders = subscribeFleetWorkOrders(
+      departmentId,
+      (list) => setFleetWorkOrdersForDashboard((Array.isArray(list) ? list : []).map((order) => ({
+        id: order.workOrderNumber || order.id,
+        unit: order.unitDesignation || order.fleetNumber || "Unit",
+        status: ["completed", "closed", "cancelled", "canceled"].includes(order.status) ? "Complete" : "Open",
+      }))),
+      () => setFleetWorkOrdersForDashboard(null)
+    );
+    return () => {
+      stopAssets();
+      stopOrders();
+    };
+  }, [departmentId, inPlatformScope]);
   const apparatusLive = useMemo(() => applyFleetStatus(apparatus, fleetStatusAssets), [apparatus, fleetStatusAssets]);
 
   // Status changed on the classic Apparatus page: record it on the fleet unit too.
@@ -1065,7 +1020,6 @@ function AppShell() {
         await saveFleetAsset(departmentId, { ...asset, status: change.status, readinessState: change.readinessState }, actor);
       }
     }
-    setFleetStatusVersion((value) => value + 1);
   }
 
   function setApparatusFromClassicPage(update) {
@@ -1078,7 +1032,6 @@ function AppShell() {
     // New units added here also become fleet units (checks, work orders, Readiness Board).
     if (Array.isArray(next) && next.length > apparatusLive.length) {
       syncFleetAssetsFromApparatus(departmentId, next, { actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "User" })
-        .then((added) => { if (added?.length) setFleetStatusVersion((value) => value + 1); })
         .catch(() => {});
     }
   }
@@ -1242,8 +1195,6 @@ function AppShell() {
   function openPersonnelProfile(personnelId = "") {
     if (!personnelId) return;
     setPersonnelNavigateId(personnelId);
-    persistAppViewPref("admin");
-    setAppView("admin");
     setCurrent("Personnel");
     setQuery("");
     setMobileNav(false);
@@ -1252,14 +1203,14 @@ function AppShell() {
   function openEmployeeProfileForPerson(personnelId = "") {
     if (!personnelId) return;
     setEmployeePreviewPersonId(personnelId);
-    persistAppViewPref("employee");
-    setAppView("employee");
-    setEmployeeSection("My Profile");
+    setCurrent("My Profile");
     setMobileNav(false);
   }
 
   function navigate(name, options = {}) {
-    if (!showAdminToggle) return;
+    // Members without Admin RMS access only open personal pages.
+    if (!showAdminToggle && !PERSONAL_PAGE_NAMES.has(name)) return;
+    setEmployeePreviewPersonId("");
     const moduleName = name === "Platform Admin" ? CREATOR_CONSOLE_MODULE : name;
     if (moduleName === "Scheduling" && options.schedulingTab) {
       setSchedulingTab(options.schedulingTab);
@@ -1269,7 +1220,6 @@ function AppShell() {
     setCurrent(moduleName);
     setQuery("");
     setMobileNav(false);
-    if (appView !== "admin") setAppView("admin");
     if (moduleName === CREATOR_CONSOLE_MODULE && typeof window !== "undefined") {
       const nextUrl = inPlatformScope
         ? `${CREATOR_CONSOLE_PATH}?scope=platform`
@@ -1280,33 +1230,13 @@ function AppShell() {
     }
   }
 
-  function handleSelectAdminView() {
-    persistAppViewPref("admin");
-    setAppView("admin");
-    setCurrent("Dashboard");
-    setQuery("");
-    setMobileNav(false);
-  }
-
-  function handleSelectEmployeeView() {
-    setEmployeePreviewPersonId("");
-    persistAppViewPref("employee");
-    setAppView("employee");
-    setEmployeeSection("My Dashboard");
-    setMobileNav(false);
-  }
-
-  function navigateEmployee(name) {
-    setEmployeeSection(name);
-    setMobileNav(false);
-  }
   // A page whose module is switched off (reachable by a saved ?page= link) is not shown.
   const blockedModuleKey = effectiveAppView === "employee" ? "" : NAV_MODULE_MAP[current] || "";
   const moduleBlocked = Boolean(!inPlatformScope && blockedModuleKey && !isModuleEnabled(blockedModuleKey));
   const pageContent = effectiveAppView === "employee" ? (
     <EmployeePortalPage
-      current={employeeSection}
-      onNavigate={setEmployeeSection}
+      current={current}
+      onNavigate={navigate}
       membership={membership}
       user={user}
       permissions={permissions}
@@ -1352,8 +1282,6 @@ function AppShell() {
       onPreviewPerson={showEmployeeToggle ? (personnelId) => setEmployeePreviewPersonId(personnelId) : undefined}
       onClearPreviewPerson={() => {
         setEmployeePreviewPersonId("");
-        persistAppViewPref("admin");
-        setAppView("admin");
         setCurrent("System Admin");
         setMobileNav(false);
       }}
@@ -1909,7 +1837,7 @@ function AppShell() {
     <HydrantTestingPage embedded initialTab={resolveInitialHydrantTab({ embedded: true })} canEditHydrants={canEditHydrants} departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
   ) : current === "Field App" ? (
     hasPermission(permissions, "viewHydrants") || isCreator
-      ? <HydrantTestingPage mode="fieldApp" canEditHydrants={canEditHydrants} departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
+      ? <HydrantTestingPage mode="fieldApp" canReportDamage={canCreateHydrantDamage} actor={hydrantActor} canEditHydrants={canEditHydrants} departmentId={departmentId} profile={profile} personnel={personnel} onNavigate={setCurrent} />
       : <AccessDeniedModule name={current} />
   ) : current === "Damage Reports"
     || current === "Open Damage Reports"
@@ -1976,37 +1904,22 @@ function AppShell() {
           membership={membership}
           user={user}
           onSignOut={signOut}
-          appView={effectiveAppView}
-          onSelectAdminView={handleSelectAdminView}
-          onSelectEmployeeView={handleSelectEmployeeView}
-          showAdminToggle={showAdminToggle}
-          showEmployeeToggle={showEmployeeToggle}
           hideSearch={effectiveAppView === "employee"}
           departmentId={departmentId}
           isCreator={isCreator}
           wideBrandLogo={showPlatformBrand}
           tagline={headerTagline}
         />
-        {effectiveAppView === "admin" ? (
-          <SideNav
-            current={current}
-            collapsed={collapsed}
-            setCollapsed={setCollapsed}
-            onNavigate={navigate}
-            groups={visibleNavGroups}
-          />
-        ) : (
-          <SideNav
-            current={employeeSection}
-            collapsed={collapsed}
-            setCollapsed={setCollapsed}
-            onNavigate={navigateEmployee}
-            groups={visibleEmployeeNavGroups}
-          />
-        )}
+        <SideNav
+          current={current}
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+          onNavigate={navigate}
+          groups={menuGroups}
+        />
         {mobileNav && <button className="mobile-scrim" type="button" aria-label="Close menu" onClick={() => setMobileNav(false)}><X size={24} /></button>}
     <section className={`workspace ${isHydrantsView ? "workspace-hydrants" : ""}`}>
-      {canGoBack && effectiveAppView === "admin" && (
+      {canGoBack && (
         <div className="page-back-bar">
           <button type="button" className="page-back-button" onClick={() => window.history.back()} title="Go back to the previous page">
             <ChevronLeft size={16} aria-hidden="true" /> Back
