@@ -1,3 +1,4 @@
+import { resolveDepartmentLogoUrl as resolveBrandLogoUrl } from "./brandAssets.js";
 import { collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore";
 import { getFirestoreDb } from "./firebaseClient.js";
 import { sanitizeForFirestore } from "./firestoreSanitize.js";
@@ -200,7 +201,7 @@ export function resolveDepartmentDisplayName(profile = {}) {
 }
 
 export function resolveDepartmentLogoUrl(profile = {}) {
-  return profile.logoUrl || "/forge-logo.png";
+  return resolveBrandLogoUrl(profile.logoUrl);
 }
 
 export function mergeHydrantRecord(base = {}, patch = {}) {
