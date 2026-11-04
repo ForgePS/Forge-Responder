@@ -346,5 +346,51 @@ export const defaultDropdowns = [
       { id: "yes", label: "Yes", active: true, sortOrder: 1 },
       { id: "no", label: "No", active: true, sortOrder: 2 }
     ]
+  },
+  {
+    id: "hoseSections",
+    label: "Hose sections",
+    module: "Apparatus",
+    options: [
+      { id: "crosslay1", label: "Crosslay 1", active: true, sortOrder: 1 },
+      { id: "crosslay2", label: "Crosslay 2", active: true, sortOrder: 2 },
+      { id: "frontBumper", label: "Front bumper", active: true, sortOrder: 3 },
+      { id: "bed1", label: "Bed 1", active: true, sortOrder: 4 },
+      { id: "bed2", label: "Bed 2", active: true, sortOrder: 5 },
+      { id: "supplyBed", label: "Supply bed", active: true, sortOrder: 6 },
+      { id: "highRisePack", label: "High-rise pack", active: true, sortOrder: 7 },
+      { id: "trashLine", label: "Trash line", active: true, sortOrder: 8 },
+      { id: "reelLine", label: "Reel line", active: true, sortOrder: 9 },
+      { id: "spare", label: "Spare", active: true, sortOrder: 10 }
+    ]
+  },
+  {
+    id: "hoseLengths",
+    label: "Hose lengths",
+    module: "Apparatus",
+    options: [
+      { id: "l25", label: "25 ft", active: true, sortOrder: 1 },
+      { id: "l50", label: "50 ft", active: true, sortOrder: 2 },
+      { id: "l100", label: "100 ft", active: true, sortOrder: 3 },
+      { id: "l150", label: "150 ft", active: true, sortOrder: 4 },
+      { id: "l200", label: "200 ft", active: true, sortOrder: 5 },
+      { id: "l250", label: "250 ft", active: true, sortOrder: 6 },
+      { id: "l300", label: "300 ft", active: true, sortOrder: 7 }
+    ]
+  },
+  {
+    id: "hoseDiameters",
+    label: "Hose diameters",
+    module: "Apparatus",
+    options: [
+      { id: "d1", label: "1\"", active: true, sortOrder: 1 },
+      { id: "d15", label: "1½\"", active: true, sortOrder: 2 },
+      { id: "d175", label: "1¾\"", active: true, sortOrder: 3 },
+      { id: "d2", label: "2\"", active: true, sortOrder: 4 },
+      { id: "d25", label: "2½\"", active: true, sortOrder: 5 },
+      { id: "d3", label: "3\"", active: true, sortOrder: 6 },
+      { id: "d4", label: "4\"", active: true, sortOrder: 7 },
+      { id: "d5", label: "5\"", active: true, sortOrder: 8 }
+    ]
   }
 ];

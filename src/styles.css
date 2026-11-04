@@ -3980,3 +3980,72 @@ html[data-theme="light"] .apparatus-check-card { background: #fff; border-color:
   /* Room for the department name beside a wide logo. */
   .top-brand:not(.top-brand-wide) { width: auto; max-width: 560px; }
 }
+
+/* Pick-or-type dropdown (ComboField) */
+.combo-field {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.combo-field > input {
+  width: 100%;
+  padding-right: 34px;
+}
+
+.combo-field-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rms-text-muted, #64748b);
+  cursor: pointer;
+}
+
+.combo-field.is-open .combo-field-toggle svg {
+  transform: rotate(180deg);
+}
+
+.combo-field-list {
+  position: absolute;
+  z-index: 2000;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--rms-border, #d8e0ea);
+  border-radius: 8px;
+  background: var(--rms-bg-surface, #fff);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+}
+
+.combo-field-list li {
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--rms-text-body, #172033);
+  font-size: 0.92rem;
+}
+
+.combo-field-list li:hover,
+.combo-field-list li.is-highlighted {
+  background: var(--rms-nav-active-bg, rgba(20, 184, 166, 0.12));
+}
+
+.combo-field-list li.is-selected {
+  font-weight: 700;
+}
