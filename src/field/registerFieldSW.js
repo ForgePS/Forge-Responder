@@ -1,3 +1,5 @@
+import { isFieldHost } from "./fieldPaths.js";
+
 /**
  * Install the service worker that keeps the field app working offline.
  * A new version installs in the background and waits; the crew taps
@@ -13,6 +15,8 @@ let waitingWorker = null;
  * the field app work offline.
  */
 export function fieldScope() {
+  // On its own address (field.forgeresponder.com) the field app is the whole site.
+  if (isFieldHost()) return "/";
   return window.location.pathname.replace(/\/+$/, "") || "/field";
 }
 
@@ -36,7 +40,8 @@ async function register() {
   const onUpdateReady = () => updateListeners.forEach((listener) => listener());
   try {
     // Early test builds registered for the whole site; remove those.
-    const existing = await navigator.serviceWorker.getRegistrations();
+    // (Not on the field app's own address, where covering the whole site is right.)
+    const existing = isFieldHost() ? [] : await navigator.serviceWorker.getRegistrations();
     await Promise.all(existing
       .filter((reg) => new URL(reg.scope).pathname === "/")
       .map((reg) => reg.unregister().catch(() => false)));
