@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PlayCircle, ShieldCheck } from "lucide-react";
 import { resolvePlatformLogoUrl } from "../lib/brandAssets.js";
 import { activateDemoMode, getDemoCredentials, getDemoGatewayPath } from "../lib/demoMode.js";
@@ -14,18 +14,32 @@ import ThemeToggle from "../components/ThemeToggle.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { DEMO_PERSONAS, getDemoPersona, setDemoPersona } from "../lib/demoPersona.js";
 
+/**
+ * Persona from a direct link: /demo?start=chief (or battalion, captain,
+ * firefighter; ?start=1 means Fire Chief). Empty when the link has none.
+ */
+function startPersonaFromLink() {
+  if (typeof window === "undefined") return "";
+  const value = String(new URLSearchParams(window.location.search).get("start") || "").trim().toLowerCase();
+  if (!value) return "";
+  if (["1", "true", "yes"].includes(value)) return "chief";
+  return DEMO_PERSONAS.some((persona) => persona.id === value) ? value : "";
+}
+
 export default function DemoEntryPage() {
   const { signIn, signOut, user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const { email, password } = getDemoCredentials();
-  const [personaId, setPersonaId] = useState(() => getDemoPersona().id);
+  const linkPersona = startPersonaFromLink();
+  const [personaId, setPersonaId] = useState(() => linkPersona || getDemoPersona().id);
+  const autoStartedRef = useRef(false);
 
-  async function launchDemo() {
+  async function launchDemo(chosenPersona = personaId) {
     setSubmitting(true);
     setError("");
     activateDemoMode();
-    setDemoPersona(personaId);
+    setDemoPersona(chosenPersona);
 
     try {
       const usingDemoAccount = user?.email?.toLowerCase() === email.toLowerCase();
@@ -48,6 +62,29 @@ export default function DemoEntryPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // A direct link (/demo?start=chief) opens the demo straight away, with no
+  // button to press. Someone signed in to a real department still sees this
+  // page first, so a link never signs them out without asking.
+  const usingOtherAccount = Boolean(user) && user.email?.toLowerCase() !== email.toLowerCase();
+  useEffect(() => {
+    if (!linkPersona || usingOtherAccount || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    launchDemo(linkPersona);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkPersona, usingOtherAccount]);
+
+  if (linkPersona && !usingOtherAccount && !error) {
+    return (
+      <div className="auth-screen demo-entry-screen">
+        <section className="demo-entry-card" role="status" aria-live="polite">
+          <p className="demo-entry-eyebrow">FORGE RMS Training</p>
+          <h1>Opening the demo…</h1>
+          <p className="auth-help">{demoDepartmentProfile.name}</p>
+        </section>
+      </div>
+    );
   }
 
   return (
@@ -77,6 +114,7 @@ export default function DemoEntryPage() {
           <li>Safe sandbox — separate from real department data</li>
           <li>Full RMS modules enabled for walkthroughs and classes</li>
           <li>Share this link: <code>{resolvePublicDemoUrl()}</code></li>
+          <li>Or open it straight away as a role: <code>{resolvePublicDemoUrl()}?start=chief</code> (also battalion, captain, firefighter)</li>
         </ul>
 
         <fieldset className="demo-persona-picker">
@@ -101,7 +139,7 @@ export default function DemoEntryPage() {
 
         {error && <div className="auth-error">{error}</div>}
 
-        <button className="primary-button demo-entry-launch" type="button" onClick={launchDemo} disabled={submitting}>
+        <button className="primary-button demo-entry-launch" type="button" onClick={() => launchDemo()} disabled={submitting}>
           <PlayCircle size={16} /> {submitting ? "Launching…" : "Launch Demo RMS"}
         </button>
 
