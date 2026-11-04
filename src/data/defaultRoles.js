@@ -314,7 +314,8 @@ export const defaultRoles = [
       submitVacancyPickups: true,
       submitMaintenanceIssues: true,
       viewInternalEmail: true,
-      sendInternalEmail: true
+      sendInternalEmail: true,
+      viewHydrants: true
     }
   },
   {

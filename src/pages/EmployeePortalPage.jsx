@@ -252,6 +252,8 @@ export default function EmployeePortalPage({
   previewPerson = null,
   onClearPreviewPerson,
   onPreviewPerson,
+  // The Field App, built by App.jsx (null when this member can't open it).
+  fieldApp = null,
 }) {
   const { departmentId } = useTenant();
   const { patchMembership } = useAuth();
@@ -1402,6 +1404,8 @@ export default function EmployeePortalPage({
           />
         </Panel>
       )}
+
+      {current === "Field App" && fieldApp}
 
       {current === "Messages" && canViewInternalEmail && (
         <Panel title="Messages" icon={Mail}>

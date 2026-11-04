@@ -840,14 +840,16 @@ function AppShell() {
   }, [permissions, isCreator, isModuleEnabled, inPlatformScope, membership?.isPlatformCreator, codeLibraryAccess, preplanFeatures, academyConnected]);
   const canViewInternalEmail = hasPermission(permissions, "viewInternalEmail");
   const canViewDailyLog = hasPermission(permissions, "viewDailyLog");
+  const canViewFieldApp = hasPermission(permissions, "viewHydrants") || isCreator;
   const visibleEmployeeNavGroups = useMemo(
     () => filterEmployeePortalNav(employeePortalNavGroups, {
       canViewInternalEmail,
       canViewDailyLog,
+      canViewFieldApp,
       isModuleEnabled,
       academyConnected,
     }),
-    [canViewInternalEmail, canViewDailyLog, isModuleEnabled, academyConnected]
+    [canViewInternalEmail, canViewDailyLog, canViewFieldApp, isModuleEnabled, academyConnected]
   );
   const showAdminToggle = canAccessAdminRms(permissions, isCreator);
   const showEmployeeToggle = canAccessEmployeePortal(permissions);
@@ -1324,6 +1326,9 @@ function AppShell() {
       timeCards={timeCards}
       setTimeCards={setTimeCards}
       previewPerson={employeePreviewPerson}
+      fieldApp={canViewFieldApp && isModuleEnabled("hydrants") ? (
+        <HydrantTestingPage mode="fieldApp" canReportDamage={false} departmentId={departmentId} profile={profile} personnel={personnel} />
+      ) : null}
       onPreviewPerson={showEmployeeToggle ? (personnelId) => setEmployeePreviewPersonId(personnelId) : undefined}
       onClearPreviewPerson={() => {
         setEmployeePreviewPersonId("");

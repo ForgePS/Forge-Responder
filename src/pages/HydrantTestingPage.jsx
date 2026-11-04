@@ -3903,6 +3903,8 @@ export default function HydrantTestingPage({
   profile = {},
   personnel = [],
   onNavigate = null,
+  // Off in the Employee Portal, which has no Damage Reports page to open.
+  canReportDamage = true,
 } = {}) {
   syncHydrantTenant(departmentId, profile, personnel);
 
@@ -4082,7 +4084,7 @@ export default function HydrantTestingPage({
           ))}
         </nav>
         <section className="page-body">{hydrantPageBody}</section>
-        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={handleReportDamage} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
+        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={canReportDamage ? handleReportDamage : undefined} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
         {editorHydrant && <HydrantEditorModal hydrant={editorHydrant} crew={crew} onClose={() => setEditorHydrant(null)} onSaved={saved} />}
       </div>
     );
@@ -4132,7 +4134,7 @@ export default function HydrantTestingPage({
             {tab === "fireCodes" && <FireCodesPage />}
           </section>
         )}
-        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={handleReportDamage} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
+        {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={canReportDamage ? handleReportDamage : undefined} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
         {editorHydrant && <HydrantEditorModal hydrant={editorHydrant} crew={crew} onClose={() => setEditorHydrant(null)} onSaved={saved} />}
       </div>
     );
@@ -4189,7 +4191,7 @@ export default function HydrantTestingPage({
         )}
         <section className="page-body">{hydrantPageBody}{tab === "ems" && <EmsProtocolsPage />}{tab === "fireForms" && <FireFormsPage requestedView={fireFormsView} setTab={setTab} setFireFormsView={setFireFormsView} />}{tab === "inspectionDivision" && <InspectionDivisionPage setTab={setTab} />}{tab === "investigations" && <InvestigationsPage />}{tab === "importantNumbers" && <ImportantNumbersPage />}{tab === "fireCodes" && <FireCodesPage />}{tab === "settings" && <SettingsPage />}</section>
       </section>
-      {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={handleReportDamage} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
+      {detailHydrant && <HydrantInfoModal hydrant={detailHydrant} sessionReady={sessionReady} onClose={() => setDetailHydrant(null)} onReportDamage={canReportDamage ? handleReportDamage : undefined} onInspection={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("inspection"); }} onFlowTest={() => { if (!sessionReady) return; setSelected(detailHydrant); setDetailHydrant(null); selectHydrantTab("flow"); }} onEdit={() => { if (!sessionReady) return; setEditorHydrant(detailHydrant); setDetailHydrant(null); }} />}
       {editorHydrant && <HydrantEditorModal hydrant={editorHydrant} crew={crew} onClose={() => setEditorHydrant(null)} onSaved={saved} />}
     </main>
   );
