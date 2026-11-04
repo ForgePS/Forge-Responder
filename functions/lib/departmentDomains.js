@@ -65,6 +65,17 @@ function summarize(domain, resource = {}) {
   };
 }
 
+/**
+ * True once https://<subdomain>.<root> actually works: Firebase serves it and its
+ * certificate is issued (both can take minutes to hours after registering).
+ */
+async function isDepartmentAddressLive(subdomain) {
+  const resource = await getDomainStatus(`${subdomain}.${TENANT_ROOT_DOMAIN}`);
+  if (!resource) return false;
+  const summary = summarize(`${subdomain}.${TENANT_ROOT_DOMAIN}`, resource);
+  return summary.live && summary.certState === "CERT_ACTIVE";
+}
+
 async function assertCreator(db, auth) {
   if (!auth?.uid) throw new HttpsError("unauthenticated", "Sign in first.");
   if (!(await isPlatformCreator(db, auth))) {
@@ -152,6 +163,7 @@ async function departmentDomainStatus(db, request) {
 
 module.exports = {
   departmentDomainStatus,
+  isDepartmentAddressLive,
   isValidSubdomain,
   registerDepartmentDomain,
   summarize,

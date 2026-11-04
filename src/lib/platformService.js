@@ -562,17 +562,29 @@ export async function registerPlatformDepartment(departmentId, profile = {}, opt
     await ensureCreatorDepartmentAccess(user, departmentId);
   }
 
+  // The department exists either way; a failed subscription is reported back
+  // (subscriptionError) so the creator sees it and can try again.
+  let subscriptionError = "";
   try {
-    const { ensureCustomerSubscription } = await import("./platformSubscriptionService.js");
-    await ensureCustomerSubscription(departmentId, user?.uid || "", {
+    await provisionDepartmentSubscription(departmentId, user, {
       billingContactEmail: departmentProfile.contactEmail,
       legacySubscription: subscription,
       trial,
     });
   } catch (error) {
-    console.warn("Failed to provision department subscription", error);
+    console.error("Failed to provision department subscription", error);
+    subscriptionError = error?.message || "unknown error";
   }
 
   notifyDepartmentsChanged();
-  return departmentProfile;
+  return subscriptionError ? { ...departmentProfile, subscriptionError } : departmentProfile;
+}
+
+/**
+ * Create the department's platform subscription record (also used to retry after
+ * a failure). Throws when it can't be saved.
+ */
+export async function provisionDepartmentSubscription(departmentId, user = null, options = {}) {
+  const { ensureCustomerSubscription } = await import("./platformSubscriptionService.js");
+  return ensureCustomerSubscription(departmentId, user?.uid || "", options);
 }
