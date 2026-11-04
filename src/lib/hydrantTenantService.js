@@ -2,6 +2,7 @@ import { collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore"
 import { getFirestoreDb } from "./firebaseClient.js";
 import { sanitizeForFirestore } from "./firestoreSanitize.js";
 import { reconcileHydrantStatus } from "./hydrantStatusSync.js";
+import { applyHydrantUpdates } from "./hydrantMerge.js";
 
 export function hydrantLocalKeys(departmentId = "") {
   const prefix = departmentId || "unknown";
@@ -324,7 +325,10 @@ export async function loadDepartmentHydrants(departmentId) {
     loadTenantHydrantRecords(departmentId),
   ]);
 
-  return tenantHydrants.reduce((list, hydrant) => updateHydrantList(list, hydrant), staticHydrants);
+  return applyHydrantUpdates(staticHydrants, tenantHydrants, {
+    finalize: finalizeHydrantRecord,
+    docId: hydrantFirebaseDocId,
+  });
 }
 
 export function updateHydrantList(list, saved) {

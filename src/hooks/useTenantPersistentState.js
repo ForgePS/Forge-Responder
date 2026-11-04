@@ -43,11 +43,21 @@ function readInitialItems(cacheKey, listKey, fallback) {
  * Lists stored per item (header { storage: "items" }) save only the items that
  * changed; older lists stored as one array record keep working as before until
  * they are migrated. A list that doesn't exist yet is created per item.
+ *
+ * options.enabled (default true): a list only some pages use can wait until one
+ * of them opens. Once turned on it stays loaded for the session. Until it has
+ * loaded, saves are refused (as for any list still loading), so nothing partial
+ * is ever written.
  */
-export function useTenantPersistentState(departmentId, listKey, fallback) {
+export function useTenantPersistentState(departmentId, listKey, fallback, { enabled = true } = {}) {
   const { user } = useAuth();
   const storageDepartmentId = isPlatformScope(departmentId) ? null : departmentId;
   const cacheKey = localCacheKey(departmentId, listKey);
+  const [activatedKey, setActivatedKey] = useState(enabled ? cacheKey : "");
+  const active = enabled || activatedKey === cacheKey;
+  useEffect(() => {
+    if (enabled && activatedKey !== cacheKey) setActivatedKey(cacheKey);
+  }, [enabled, cacheKey, activatedKey]);
   const loadedRef = useRef(false);
   const fallbackRef = useRef(fallback);
   const itemsRef = useRef([]);
@@ -223,6 +233,8 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
 
     setLoaded(false);
     loadedRef.current = false;
+    // Not needed yet: no listener, and saves stay refused until it loads.
+    if (!active) return () => {};
 
     unsubscribeHeader = onSnapshot(listHeaderRef(firestoreDb, storageDepartmentId, listKey), async (headerSnap) => {
       if (cancelled) return;
@@ -264,9 +276,11 @@ export function useTenantPersistentState(departmentId, listKey, fallback) {
       unsubscribeHeader();
       stopItemsListener();
     };
-  }, [departmentId, storageDepartmentId, listKey, cacheKey, user?.uid]);
+  }, [departmentId, storageDepartmentId, listKey, cacheKey, user?.uid, active]);
 
   const setPersistentItems = (updater) => {
+    // A page changing a list that hasn't been turned on yet: start loading it.
+    if (!active) setActivatedKey(cacheKey);
     setItems((current) => {
       let nextItems;
       try {

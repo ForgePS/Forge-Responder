@@ -4,7 +4,10 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
+  orderBy,
+  query,
   setDoc
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebaseClient.js";
@@ -25,6 +28,14 @@ export async function listRecords(departmentId, collectionName) {
   const ref = departmentCollection(departmentId, collectionName);
   if (!ref) return [];
   const snap = await getDocs(ref);
+  return snap.docs.map((item) => ({ id: item.id, ...item.data() }));
+}
+
+/** The newest records by a time field (records missing the field are left out). */
+export async function listRecentRecords(departmentId, collectionName, orderField = "createdAt", count = 500) {
+  const ref = departmentCollection(departmentId, collectionName);
+  if (!ref) return [];
+  const snap = await getDocs(query(ref, orderBy(orderField, "desc"), limit(count)));
   return snap.docs.map((item) => ({ id: item.id, ...item.data() }));
 }
 

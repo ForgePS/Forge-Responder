@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, limit as limitTo, orderBy, query, setDoc } from "firebase/firestore";
 import { getFirestoreDb } from "./firebaseClient.js";
-import { createRecord, listRecords } from "./firestoreService.js";
+import { createRecord } from "./firestoreService.js";
 import { isPlatformScope } from "./tenantPaths.js";
 
 // Platform-level entries (creator console) live in their own top-level
@@ -43,7 +43,19 @@ export async function listAuditLogs(departmentId, filters = {}) {
     const snap = await getDocs(query(collection(db, PLATFORM_AUDIT_COLLECTION), orderBy("created_at", "desc"), limitTo(500)));
     logs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   } else {
-    logs = await listRecords(departmentId, "auditLogs");
+    // Newest 500 only (the log grows with every save). Entries carry created_at,
+    // createdAt or both, so read the newest by each and merge.
+    const db = getFirestoreDb();
+    if (!db) return [];
+    const auditCollection = collection(db, "departments", departmentId, "auditLogs");
+    const snaps = await Promise.all(["createdAt", "created_at"].map((field) => (
+      getDocs(query(auditCollection, orderBy(field, "desc"), limitTo(500))).catch(() => null)
+    )));
+    const byId = new Map();
+    for (const snap of snaps) {
+      for (const d of snap?.docs || []) byId.set(d.id, { id: d.id, ...d.data() });
+    }
+    logs = [...byId.values()];
   }
   // Older entries use created_at; some server-written ones use createdAt.
   const when = (log) => String(log.created_at || log.createdAt || "");
