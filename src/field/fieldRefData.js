@@ -48,30 +48,6 @@ function unitLabel(asset = {}) {
   return String(asset.unitDesignation || asset.fleetNumber || asset.name || asset.id || "").trim();
 }
 
-function trimIncident(report = {}) {
-  const workspace = report.workspace || {};
-  return {
-    id: report.id,
-    reportNumber: report.reportNumber || "",
-    incidentDate: report.incidentDate || "",
-    incidentAddress: report.incidentAddress || "",
-    incidentTypeSummary: report.incidentTypeSummary || "",
-    status: report.status || "",
-    locked: Boolean(report.locked),
-    disciplines: report.disciplines || [],
-    updatedAt: report.updatedAt || "",
-    createdAt: report.createdAt || "",
-    fieldOrigin: report.fieldOrigin || null,
-    workspace: {
-      cad: workspace.cad || {},
-      units: workspace.units || [],
-      personnel: workspace.personnel || [],
-      ems: workspace.ems || {},
-      narrative: workspace.narrative || {},
-    },
-  };
-}
-
 const PART_LOADERS = {
   // EMS protocols and HazMat documents from Documents, for the EMS and HazMat cards.
   async referenceDocs({ departmentId, caps }) {
@@ -329,7 +305,7 @@ const PART_LOADERS = {
     return (list.items || [])
       .map((item) => restoreFromFirestore(item))
       .filter((report) => !report.locked && (String(report.incidentDate) >= since || /draft/i.test(String(report.status || ""))))
-      .map(trimIncident)
+      // The whole report: FORGE FIELD edits it with the same editor as the RMS.
       .sort((a, b) => String(b.incidentDate || b.createdAt).localeCompare(String(a.incidentDate || a.createdAt)))
       .slice(0, 60);
   },

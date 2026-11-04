@@ -7,6 +7,8 @@ import NerisReportEditor from "../components/neris/NerisReportEditor.jsx";
 import { useShowMore } from "../hooks/useShowMore.js";
 import ShowMoreRows from "../components/ShowMoreRows.jsx";
 import NerisCadImportModal from "../components/neris/NerisCadImportModal.jsx";
+import { DEMO_DEPARTMENT_ID } from "../lib/tenantPaths.js";
+import { buildDemoCadRuns } from "../data/demoCadRuns.js";
 import { ProgressRing } from "../components/neris/NerisControls.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -20,7 +22,7 @@ import { queueOfflineReport, syncOfflineQueue } from "../lib/neris/offlineSync.j
 import {
   INCIDENT_KINDS, STATUS_GROUPS, applicability, checklistProgress, primaryTypeLabel, statusTone,
 } from "../lib/neris/reportModel.js";
-import { uniqueRecordId } from "../lib/recordIds.js";
+import { buildNewNerisReport } from "../lib/neris/newReport.js";
 import { allocateRecordNumber } from "../lib/recordCounters.js";
 import { nerisReportNumberFormat } from "../lib/recordNumbering.js";
 
@@ -45,29 +47,8 @@ async function nextReportNumber(departmentId, records = []) {
   return number;
 }
 
-function buildNewReport(reportNumber, { disciplines = [], incidentDate, incidentAddress }) {
-  const now = new Date().toISOString();
-  return {
-    id: uniqueRecordId("NERIS"),
-    reportNumber,
-    incidentDate: incidentDate || todayIso(),
-    incidentAddress: incidentAddress || "",
-    incidentTypeSummary: "",
-    status: "Draft",
-    disciplines,
-    reviewStage: "author",
-    locked: false,
-    createdAt: now,
-    updatedAt: now,
-    workspace: {
-      cad: {}, location: {}, units: [], personnel: [], weather: {}, ems: {}, rescue: {}, wildland: {},
-      casualties: {}, propertyLoss: {}, actions: [], narrative: {}, attachments: [], approvals: [], auditLog: [], investigations: {}, disciplines,
-    },
-    autoPopulateSources: {},
-    fieldOverrides: {},
-    fieldInputOverrides: {},
-    modules: Object.fromEntries(NERIS_FORM_MODULES.map((module) => [module.id, module.id === "core_mod_incident" ? { incident_internal_id: reportNumber } : {}])),
-  };
+function buildNewReport(reportNumber, details) {
+  return buildNewNerisReport(reportNumber, details);
 }
 
 function kindOf(report) {
@@ -108,8 +89,10 @@ export default function NerisFireReportsPage({
   const creatingRef = useRef(false);
   const reviewerName = membership?.displayName || user?.displayName || user?.email || "";
 
-  const sources = useMemo(() => ({ personnel, apparatus, occupancies, preplans, inspections, scheduleDays, hydrants }),
-    [personnel, apparatus, occupancies, preplans, inspections, scheduleDays, hydrants]);
+  // CAD records to reseed reports from (the demo department's sample CAD feed; none elsewhere yet).
+  const cadRuns = useMemo(() => (departmentId === DEMO_DEPARTMENT_ID ? buildDemoCadRuns() : []), [departmentId]);
+  const sources = useMemo(() => ({ personnel, apparatus, occupancies, preplans, inspections, scheduleDays, hydrants, cadRuns }),
+    [personnel, apparatus, occupancies, preplans, inspections, scheduleDays, hydrants, cadRuns]);
 
   useEffect(() => {
     function handleOnline() {

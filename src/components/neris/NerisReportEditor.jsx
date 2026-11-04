@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import {
   ArrowLeft, ArrowRight, Building2, Check, CheckCircle2, ClipboardCheck, Clock, Download, Flame, HeartPulse,
   Info, Link2, Loader2, LifeBuoy, Lock, MapPin, Paperclip, Plus, Radio, Search, Send, ShieldAlert, Trash2, Trees, Truck,
-  Unlock, Users, Wrench, Zap, Biohazard, DollarSign, Sparkles, WifiOff,
+  Unlock, Users, Wrench, Zap, Biohazard, DollarSign, Sparkles, WifiOff, RefreshCw,
 } from "lucide-react";
 import { Field, Picker, ProgressRing, Section, TextArea, TextInput, YesNo } from "./NerisControls.jsx";
 import NerisAiNarrative from "./NerisAiNarrative.jsx";
@@ -14,12 +14,16 @@ import {
 import { EMS_CHIEF_COMPLAINTS, EMS_DISPOSITIONS, EMS_TREATMENTS, WILDLAND_FUEL_TYPES } from "../../lib/neris/picklists.js";
 import { REVIEW_STAGES, adminUnlockReport, applyReviewAction } from "../../lib/neris/workflow.js";
 import { getOccupancyIncidentHistory } from "../../lib/neris/autoPopulation.js";
+import {
+  ALARM_LEVEL_OPTIONS, PRIORITY_OPTIONS, cadUpdates, findCadPayloadForReport, reportCadNumber, reseedFromCad, withCurrentOption,
+} from "../../lib/neris/cadReseed.js";
 import { uploadFirebaseFile, deleteFirebaseFile } from "../../lib/firebaseClient.js";
 import { buildNerisAttachmentPath } from "../../lib/storagePaths.js";
 import { isObjectDeleted, softDeleteObject, withActiveLifecycle } from "../../lib/objectLifecycle.js";
 import "../../styles/neris-analytics.css";
 
 const STEP_ICONS = { basics: Info, response: Radio, scene: Building2, details: Flame, narrative: Sparkles, review: ClipboardCheck };
+const AID_DIRECTION_LABELS = { GIVEN: "Given (we helped another department)", RECEIVED: "Received (another department helped us)" };
 const CATEGORY_LABELS = { FIRE: "Fire", MEDICAL: "Medical", RESCUE: "Rescue", HAZSIT: "Hazardous condition", PUBSERV: "Public service", NOEMERG: "No emergency", LAWENFORCE: "Law enforcement" };
 
 function formatWhen(value) {
@@ -57,6 +61,9 @@ export default function NerisReportEditor({
   const checklist = useMemo(() => reportChecklist(report), [report]);
   const progress = useMemo(() => checklistProgress(report), [report]);
   const stepIndex = STEPS.findIndex((s) => s.id === stepId);
+  // Newer information for this incident in the department's CAD records.
+  const cadPayload = useMemo(() => findCadPayloadForReport(report, sources.cadRuns || []), [report, sources.cadRuns]);
+  const cadChanges = useMemo(() => cadUpdates(report, cadPayload), [report, cadPayload]);
 
   function updateWorkspace(key, patch) {
     onUpdate({ workspace: { ...ws, [key]: { ...(ws[key] || {}), ...patch } } });
@@ -116,6 +123,17 @@ export default function NerisReportEditor({
 
       <div className="nr-body">
         <main className="nr-main">
+          {editable && cadChanges.length ? (
+            <div className="nr-cad-update" role="status">
+              <RefreshCw size={18} />
+              <div>
+                <strong>Updated CAD information is available{reportCadNumber(report) ? ` for CAD #${reportCadNumber(report)}` : ""}</strong>
+                <small>{cadChanges.slice(0, 4).map((change) => change.label).join(" · ")}{cadChanges.length > 4 ? ` · and ${cadChanges.length - 4} more` : ""}. Anything typed by hand is kept.</small>
+              </div>
+              <button type="button" className="nr-btn nr-btn-primary" onClick={() => onUpdate(reseedFromCad(report, cadPayload))}><RefreshCw size={15} /> Reseed from CAD</button>
+            </div>
+          ) : null}
+
           <div className="nr-step-head">
             <h2>{STEPS[stepIndex].label}</h2>
             <p>{STEPS[stepIndex].description}</p>
@@ -191,10 +209,10 @@ export default function NerisReportEditor({
                   <TextInput value={ws.cad?.cadCallNumber} disabled={!editable} onChange={(v) => updateWorkspace("cad", { cadCallNumber: v })} />
                 </Field>
                 <Field label="Priority">
-                  <TextInput value={ws.cad?.priority} disabled={!editable} placeholder="e.g. Emergent" onChange={(v) => updateWorkspace("cad", { priority: v })} />
+                  <Picker value={ws.cad?.priority} options={withCurrentOption(PRIORITY_OPTIONS, ws.cad?.priority)} disabled={!editable} placeholder="Choose priority" onChange={(v) => updateWorkspace("cad", { priority: v })} />
                 </Field>
                 <Field label="Alarm level">
-                  <TextInput value={ws.cad?.alarmLevel} disabled={!editable} placeholder="1" onChange={(v) => updateWorkspace("cad", { alarmLevel: v })} />
+                  <Picker value={ws.cad?.alarmLevel} options={withCurrentOption(ALARM_LEVEL_OPTIONS, ws.cad?.alarmLevel)} disabled={!editable} placeholder="Choose alarm level" onChange={(v) => updateWorkspace("cad", { alarmLevel: v })} />
                 </Field>
                 <Field label="Dispatch notes" wide>
                   <TextArea rows={2} value={ws.cad?.initialComments} disabled={!editable} onChange={(v) => updateWorkspace("cad", { initialComments: v })} />
@@ -205,9 +223,20 @@ export default function NerisReportEditor({
               </Section>
               <UnitsSection report={report} editable={editable} apparatus={sources.apparatus || []} missing={missingFor("units")} onChange={(units) => setWorkspaceValue("units", units)} />
               <CrewSection report={report} editable={editable} personnel={sources.personnel || []} onChange={(crew) => setWorkspaceValue("personnel", crew)} />
-              <Section title="Mutual aid" icon={Link2} description="Leave blank if no aid was given or received.">
+              <Section title="Mutual aid" icon={Link2} description="Choose None if no aid was given or received.">
                 <Field label="Aid given or received?">
-                  <Picker value={c.incident_aid_direction} options={options("type_aid_direction")} disabled={!editable} placeholder="No mutual aid" onChange={setCore("incident_aid_direction")} />
+                  <Picker
+                    value={isBlank(c.incident_aid_direction) ? (ws.mutualAid === "none" ? "NONE" : "") : c.incident_aid_direction}
+                    options={[{ value: "NONE", label: "None" }, ...options("type_aid_direction").map((o) => ({ ...o, label: AID_DIRECTION_LABELS[o.value] || o.label }))]}
+                    disabled={!editable}
+                    placeholder="Choose…"
+                    onChange={(v) => {
+                      // "None" isn't a NERIS code: the aid fields stay empty and the choice is remembered on the report.
+                      const none = v === "NONE";
+                      onUpdateModule("core_mod_incident", "incident_aid_direction", none ? "" : v);
+                      onUpdate({ workspace: { ...ws, mutualAid: none ? "none" : v ? "given-or-received" : "" } });
+                    }}
+                  />
                 </Field>
                 {!isBlank(c.incident_aid_direction) ? (
                   <>
@@ -259,7 +288,7 @@ export default function NerisReportEditor({
           {stepId === "details" ? (
             <>
               <Section title="What did crews do?" icon={Zap}>
-                <Field label="Actions taken" required={isBlank(c.incident_noaction)} missing={missingFor("actions")} wide help="Search and pick everything crews did on scene.">
+                <Field label="Actions taken" emphasis required={isBlank(c.incident_noaction)} missing={missingFor("actions")} wide help="Search and pick everything crews did on scene.">
                   <Picker
                     multiple
                     value={c.incident_actions_taken}

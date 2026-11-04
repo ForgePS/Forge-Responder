@@ -95,19 +95,7 @@ export const FIELD_FORMS = [
       { key: "notes", label: "Notes" },
     ],
   },
-  {
-    key: "incident",
-    label: "Incident report",
-    fields: [
-      { key: "cadNumber", label: "CAD / incident #" },
-      { key: "disciplines", label: "Disciplines" },
-      { key: "times", label: "Dispatch / on scene / cleared times" },
-      { key: "units", label: "Units" },
-      { key: "crew", label: "Crew" },
-      { key: "patients", label: "Patients (EMS calls)" },
-      { key: "narrative", label: "Narrative" },
-    ],
-  },
+  // The incident report is the RMS NERIS report (its required fields come from NERIS), so it has no field settings here.
   {
     key: "checkoff",
     label: "EMS & supply check-offs",

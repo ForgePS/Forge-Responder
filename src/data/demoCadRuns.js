@@ -55,10 +55,27 @@ function run({ seq, daysAgo, received, type, address, priority, alarm = "1", com
   };
 }
 
-export function buildDemoCadRuns() {
+/**
+ * stage "latest" (default): every call as CAD has it now.
+ * stage "initial": today's call as it looked when first dispatched (still
+ * active: 1st alarm, no clear times, the last unit not yet assigned). Import
+ * from CAD uses this, so a demo report can then be reseeded from "latest".
+ */
+export function buildDemoCadRuns({ stage = "latest" } = {}) {
+  const runs = buildRuns();
+  if (stage !== "initial") return runs;
+  return runs.map((record, index) => (index > 0 ? record : {
+    ...record,
+    alarm_level: "1",
+    clear_time: "",
+    units: record.units.slice(0, -1).map((u) => ({ ...u, clear_time: "" })),
+  }));
+}
+
+function buildRuns() {
   return [
     run({
-      seq: 4187, daysAgo: 0, received: "06:42", type: "Structure fire - residential", address: "412 Oak St",
+      seq: 4187, daysAgo: 0, received: "06:42", type: "Structure fire - residential", address: "412 Oak St", alarm: "2",
       priority: "Emergency", comments: "Caller reports smoke from the attic of a single-story home. All occupants out. Second caller reports flames through the roof.",
       clearAfter: 148,
       units: [

@@ -155,7 +155,7 @@ export function useQuickCards() {
           key: "incident-new",
           icon: <Plus size={24} />,
           title: "New incident report",
-          detail: "Address, type, times, units and crew · works offline",
+          detail: "The full NERIS report, same as the RMS · works offline",
           onClick: () => navigate("incidentForm"),
         },
         caps.incidents && {
@@ -163,8 +163,8 @@ export function useQuickCards() {
           icon: <Siren size={24} />,
           title: "Incident reports",
           detail: incidentIds.size
-            ? `${incidentIds.size} draft${incidentIds.size === 1 ? "" : "s"}${unsentIncidents ? ` · ${unsentIncidents} not sent yet` : ""} · finish in the RMS`
-            : "Drafts you started · finish in the RMS",
+            ? `${incidentIds.size} draft${incidentIds.size === 1 ? "" : "s"}${unsentIncidents ? ` · ${unsentIncidents} not sent yet` : ""}`
+            : "Reports in progress",
           onClick: () => navigate("incidents"),
         },
       ],

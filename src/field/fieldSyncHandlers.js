@@ -6,6 +6,8 @@
  * Record shapes match what the desktop RMS pages write.
  */
 import { doc, getDoc } from "firebase/firestore";
+import { combineIncidentBookkeeping, incidentMergePaths } from "../lib/neris/reportMerge.js";
+import { checklistProgress } from "../lib/neris/reportModel.js";
 import { getFirestoreDb, uploadFirebaseFile } from "../lib/firebaseClient.js";
 import { createRecord, getRecord, updateRecord } from "../lib/firestoreService.js";
 import { readTenantListItem, upsertTenantListItem } from "../lib/tenantListStore.js";
@@ -546,7 +548,9 @@ async function syncIncident(record, ctx) {
   }
   const now = nowIso();
   const start = server || emptyNerisReport(data.id, data.reportNumber, record.createdAt);
-  const { merged, conflicts } = threeWayMerge(record.base, data, server ? start : null, INCIDENT_PATHS);
+  // The whole report: FORGE FIELD uses the same editor as the RMS.
+  const paths = incidentMergePaths(record.base, data, server);
+  const { merged, conflicts } = threeWayMerge(record.base, data, server ? start : null, paths);
   if (conflicts.length) {
     throw new FieldConflictError("Someone else changed this report after you started editing.", {
       conflicts,
@@ -554,7 +558,8 @@ async function syncIncident(record, ctx) {
       merged,
     });
   }
-  const base = server ? merged : { ...start, ...merged, workspace: { ...start.workspace, ...(merged.workspace || {}) } };
+  const combined = server ? combineIncidentBookkeeping(merged, data, server) : merged;
+  const base = server ? combined : { ...start, ...combined, workspace: { ...start.workspace, ...(combined.workspace || {}) } };
   const narrative = base.workspace?.narrative?.body || "";
   const saved = {
     ...base,
@@ -562,6 +567,7 @@ async function syncIncident(record, ctx) {
     reportNumber: server?.reportNumber || data.reportNumber,
     updatedAt: now,
     updatedBy: ctx.actor.actorName,
+    completionPercentage: checklistProgress(base).percent,
     fieldOrigin: server?.fieldOrigin || { createdBy: ctx.actor.actorName, createdAt: record.createdAt, app: "field" },
     modules: {
       ...(base.modules || {}),
@@ -573,7 +579,7 @@ async function syncIncident(record, ctx) {
   };
   await upsertTenantListItem(db, ctx.departmentId, LIST_KEYS.nerisFireReports, saved, { userId: ctx.uid });
   const snapshotBase = {};
-  for (const path of INCIDENT_PATHS) {
+  for (const path of incidentMergePaths(saved)) {
     const keys = path.split(".");
     let cursor = snapshotBase;
     let source = saved;
