@@ -32,6 +32,21 @@ for next time (also saved every 5 minutes).
 
 Start over with fresh sample data: `npm run demo:offline -- --reset`.
 
+## Another computer (jump drive)
+
+Stop the demo, plug in the drive, then:
+
+```bash
+npm run demo:usb -- D:\
+```
+
+This writes `D:\FORGE-Demo.zip` (about 500 MB) and a read-me. The zip holds the
+app, its packages, the saved demo data, the Firebase emulator files and portable
+Node and Java, so the other Windows computer needs no installs and no internet.
+On that computer: copy the zip to the Desktop, Extract All, and double-click
+**Start FORGE Demo.cmd**. Run `demo:usb` again after code changes or new demo
+data.
+
 ## What needs internet
 
 Everything else works offline. These need a connection:
