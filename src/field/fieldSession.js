@@ -85,7 +85,7 @@ export async function clearAccessSnapshot(uid) {
 
 /**
  * What this person may do in the field app: the same permission and module
- * gates as the desktop pages, then the department's FORGE Field settings
+ * gates as the desktop pages, then the department's FORGE FIELD settings
  * (workflow on/off and which roles get it).
  */
 export function fieldCapabilities(snapshot, config = null) {

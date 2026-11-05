@@ -1,4 +1,4 @@
-// FORGE Field v2 end-to-end test on the production build (demo department):
+// FORGE FIELD v2 end-to-end test on the production build (demo department):
 // admin settings (field rules) -> EMS check-off, assigned inspection, new
 // pre-fire plan, hydrant crew session / inspection with item photo / flow test
 // with NFPA override / hydrant info edit, incident with an admin-required
@@ -7,7 +7,7 @@
 //   npm run build && npx vite preview --port 4180
 //   node scripts/field-e2e/field-v2.mjs http://localhost:4180 <screenshotDir>
 //
-// Needs an EMS check-off list in the demo department (Admin → FORGE Field).
+// Needs an EMS check-off list in the demo department (Admin → FORGE FIELD).
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -59,8 +59,8 @@ async function main() {
     pass("demo sign-in");
 
     await page.goto(`${BASE}/forge-demo?page=system-admin`);
-    await page.waitFor(`document.body.innerText.includes("FORGE Field (field app)")`, { timeout: 60000 });
-    await desk(`__d.click("FORGE Field (field app)")`, 1500);
+    await page.waitFor(`document.body.innerText.includes("FORGE FIELD (field app)")`, { timeout: 60000 });
+    await desk(`__d.click("FORGE FIELD (field app)")`, 1500);
     await desk(`__d.click("Form fields")`, 500);
     await desk(`__d.select(document.querySelector(".fa-admin-fields select"), "hydrantInspection")`, 400);
     await desk(`__d.radio("General notes: Hide")`);
@@ -259,8 +259,8 @@ async function main() {
     // ---------------- Desktop checks ----------------
     await page.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
     await page.goto(`${BASE}/forge-demo?page=system-admin`);
-    await page.waitFor(`document.body.innerText.includes("FORGE Field (field app)")`, { timeout: 60000 });
-    await desk(`__d.click("FORGE Field (field app)")`, 1500);
+    await page.waitFor(`document.body.innerText.includes("FORGE FIELD (field app)")`, { timeout: 60000 });
+    await desk(`__d.click("FORGE FIELD (field app)")`, 1500);
     await desk(`__d.click("Check-off results")`, 1500);
     await page.waitFor(`document.body.innerText.includes("Needs restock") && document.body.innerText.includes("Bag valve")`, { timeout: 30000, label: "check-off results" });
     await snap("desktop-checkoff-results");
@@ -286,8 +286,8 @@ async function main() {
 
     // Put the demo department's field rules back to the defaults.
     await page.goto(`${BASE}/forge-demo?page=system-admin`);
-    await page.waitFor(`document.body.innerText.includes("FORGE Field (field app)")`, { timeout: 60000 });
-    await desk(`__d.click("FORGE Field (field app)")`, 1500);
+    await page.waitFor(`document.body.innerText.includes("FORGE FIELD (field app)")`, { timeout: 60000 });
+    await desk(`__d.click("FORGE FIELD (field app)")`, 1500);
     await desk(`__d.click("Form fields")`, 500);
     await desk(`__d.select(document.querySelector(".fa-admin-fields select"), "hydrantInspection")`, 400);
     await desk(`__d.radio("General notes: Default")`);

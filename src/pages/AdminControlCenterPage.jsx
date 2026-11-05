@@ -298,7 +298,7 @@ export default function AdminControlCenterPage({
 
         <AdminSectionPill
           id="field-app"
-          label="FORGE Field (field app)"
+          label="FORGE FIELD (field app)"
           description="What crews see in the offline field app: workflows, form fields, check-off lists, and plan updates."
           icon={Smartphone}
           isOpen={isOpen("field-app")}

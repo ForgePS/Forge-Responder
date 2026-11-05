@@ -19,7 +19,7 @@ const HOSTING_API = "https://firebasehosting.googleapis.com/v1beta1";
 const RESERVED_SUBDOMAINS = new Set([
   "app", "www", "admin", "api", "auth", "console", "creator", "creator-console",
   "demo", "docs", "help", "login", "mail", "status", "support", "staging", "dev", "test",
-  "field", // field.forgeresponder.com is the FORGE Field app
+  "field", // field.forgeresponder.com is the FORGE FIELD app
 ]);
 
 let authClient;

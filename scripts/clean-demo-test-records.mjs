@@ -1,5 +1,5 @@
 /**
- * Remove records that the FORGE Field end-to-end tests (scripts/field-e2e)
+ * Remove records that the FORGE FIELD end-to-end tests (scripts/field-e2e)
  * left in the demo department (forge-demo), so the demo shows only sample data.
  *
  * A record is a test record when its contents include one of the phrases the

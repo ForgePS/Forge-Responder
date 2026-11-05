@@ -1,5 +1,5 @@
 /**
- * Build step for the FORGE Field service worker: writes dist/sw.js with the
+ * Build step for the FORGE FIELD service worker: writes dist/sw.js with the
  * list of files the field app needs offline (the app entry, the field app's
  * code and their CSS/images), plus a version so phones pick up new deploys.
  */
@@ -44,7 +44,7 @@ export default function fieldServiceWorker() {
       const entry = chunks.find((chunk) => chunk.isEntry);
       const field = chunks.find((chunk) => FIELD_ENTRY.test(chunk.facadeModuleId || ""));
       if (!entry || !field) {
-        this.warn("FORGE Field: entry or field chunk not found; service worker not written.");
+        this.warn("FORGE FIELD: entry or field chunk not found; service worker not written.");
         return;
       }
       visit(entry.fileName, { followDynamic: false });
