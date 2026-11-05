@@ -19,7 +19,7 @@ import { documentDisplayName, documentDownloadUrl } from "../../lib/storagePaths
 import { isObjectVisibleInActiveList } from "../../lib/objectLifecycle.js";
 import { requestPasswordReset } from "../../lib/accountService.js";
 import {
-  LICENSE_COPY_KEYS, PROFILE_GROUPS, SELF_EDIT_KEYS, contactPatch, isEquipmentInHand, lengthOfService, normalizeEquipment,
+  LICENSE_COPY_KEYS, PROFILE_GROUPS, SELF_EDIT_KEYS, contactPatch, degreeMigrationPatch, isEquipmentInHand, lengthOfService, normalizeEquipment,
   profileAttention, profileEmails, profilePhones, usableEquipment,
 } from "../../lib/personnelProfile.js";
 import { ContactList, EmergencyContacts, FieldGroup, HistoryTable, IssuedEquipment, RowsEditor } from "./ProfileParts.jsx";
@@ -125,6 +125,7 @@ export default function MyProfile({
     else if (card === "equipment") patch = { issuedEquipment: usableEquipment(draft.equipmentDraft) };
     else if (card === "immunizations") patch = { immunizations: (draft.immunizationsDraft || []).filter((row) => Object.entries(row).some(([key, value]) => key !== "id" && String(value || "").trim())) };
     else keys.forEach((key) => { patch[key] = draft[key] ?? ""; });
+    if (keys.includes("educationDegrees")) Object.assign(patch, degreeMigrationPatch(draft));
     if (card === "emergency") patch.emergency = formatEmergencyContactSummaryAll({ ...values, ...patch });
 
     const privatePart = {};

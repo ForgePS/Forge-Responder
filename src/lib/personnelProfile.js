@@ -127,7 +127,7 @@ export const PROFILE_GROUPS = {
   education: {
     title: "Education",
     fields: [
-      { key: "educationDegree", label: "Highest degree", type: "select", options: EDUCATION_OPTIONS },
+      { key: "educationDegrees", label: "Degree", type: "list", options: EDUCATION_OPTIONS, legacyKey: "educationDegree", addLabel: "Add degree", wide: true },
       { key: "educationField", label: "Subject / field of study", wide: true },
     ],
   },
@@ -179,6 +179,31 @@ export const SELF_EDIT_KEYS = Object.freeze([
 
 const text = (value) => String(value ?? "").trim();
 const newId = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+/**
+ * A list field's entries (type "list"). A record saved before the field became
+ * a list keeps its single value under field.legacyKey; that is read as the
+ * first entry. keepBlank keeps empty rows (while editing).
+ */
+export function listFieldValue(values, field, { keepBlank = false } = {}) {
+  const raw = values?.[field.key];
+  const list = Array.isArray(raw) ? raw.map((item) => String(item ?? "")) : [];
+  const legacy = field.legacyKey ? text(values?.[field.legacyKey]) : "";
+  if (!list.length && legacy) return [legacy];
+  return keepBlank ? list : list.map(text).filter(Boolean);
+}
+
+const DEGREES_FIELD = PROFILE_GROUPS.education.fields.find((field) => field.key === "educationDegrees");
+
+/** A person's degrees; an old single `educationDegree` reads as the first. */
+export function personDegrees(person = {}) {
+  return listFieldValue(person, DEGREES_FIELD);
+}
+
+/** Moves an old single degree into the list and drops blank rows; applied when a record is saved. */
+export function degreeMigrationPatch(person = {}) {
+  return { educationDegrees: personDegrees(person), educationDegree: "" };
+}
 
 /** "•••-••-1234" for display; the full number only when revealed. */
 export function maskSecret(value, { keep = 4, ssn = false } = {}) {
