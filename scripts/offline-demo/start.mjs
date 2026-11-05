@@ -77,7 +77,9 @@ async function main() {
   }
 
   // Quiet the CLI's online checks so nothing waits on the network.
-  const quiet = { ...process.env, NO_UPDATE_NOTIFIER: "1", FIREBASE_CLI_EXPERIMENTS: process.env.FIREBASE_CLI_EXPERIMENTS || "" };
+  // A freshly copied folder (another computer, virus scan) can take longer than the
+  // default 10 seconds to load the functions, so allow up to 2 minutes.
+  const quiet = { ...process.env, NO_UPDATE_NOTIFIER: "1", FIREBASE_CLI_EXPERIMENTS: process.env.FIREBASE_CLI_EXPERIMENTS || "", FUNCTIONS_DISCOVERY_TIMEOUT: process.env.FUNCTIONS_DISCOVERY_TIMEOUT || "120" };
   const imported = existsSync(join(DATA_DIR, "firebase-export-metadata.json"));
   log(imported ? "Starting local Firebase with your saved demo data..." : "Starting local Firebase...");
   const emulators = run("npx", [

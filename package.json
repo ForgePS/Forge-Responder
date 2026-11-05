@@ -36,6 +36,7 @@
     "lint": "eslint src",
     "dev:emulator": "vite --mode emulator",
     "demo:offline": "node scripts/offline-demo/start.mjs",
+    "demo:usb": "node scripts/offline-demo/make-usb.mjs",
     "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-forge-rms",
     "deploy:staging": "firebase deploy --only hosting,functions,firestore:rules,firestore:indexes,storage --project staging",
     "seed:staging": "node scripts/seed-staging.mjs"
