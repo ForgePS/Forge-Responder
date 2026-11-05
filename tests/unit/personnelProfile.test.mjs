@@ -2,8 +2,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  PROFILE_GROUPS, SELF_EDIT_KEYS, contactPatch, equipmentExpiration, expiryState, lengthOfService, maskSecret,
-  profileAttention, profileEmails, profilePhones, suggestedRetirement, usableEquipment,
+  PROFILE_GROUPS, SELF_EDIT_KEYS, contactPatch, degreeMigrationPatch, equipmentExpiration, expiryState, lengthOfService,
+  listFieldValue, maskSecret, personDegrees, profileAttention, profileEmails, profilePhones, suggestedRetirement, usableEquipment,
 } from "../../src/lib/personnelProfile.js";
 import { PERSONNEL_PRIVATE_KEYS } from "../../src/lib/personnelPrivateFields.js";
 
@@ -84,6 +84,26 @@ describe("personnel profile", () => {
     // Private profile fields are exactly the stored private keys.
     Object.values(PROFILE_GROUPS).flatMap((group) => group.fields).filter((field) => field.private)
       .forEach((field) => assert.ok(privateKeys.has(field.key), field.key));
+  });
+});
+
+describe("personnel degrees", () => {
+  it("reads an old single highest degree as the first entry", () => {
+    assert.deepEqual(personDegrees({ educationDegree: "Bachelor's degree" }), ["Bachelor's degree"]);
+    assert.deepEqual(personDegrees({ educationDegree: "  " }), []);
+    assert.deepEqual(personDegrees({}), []);
+  });
+
+  it("prefers the list once there is one, dropping blank rows", () => {
+    assert.deepEqual(personDegrees({ educationDegree: "Doctorate", educationDegrees: ["Associate degree", " ", "Master's degree"] }), ["Associate degree", "Master's degree"]);
+    const field = PROFILE_GROUPS.education.fields.find((row) => row.key === "educationDegrees");
+    assert.equal(field.label, "Degree");
+    assert.deepEqual(listFieldValue({ educationDegrees: ["Doctorate", ""] }, field, { keepBlank: true }), ["Doctorate", ""]);
+  });
+
+  it("moves the old value into the list on save", () => {
+    assert.deepEqual(degreeMigrationPatch({ educationDegree: "Some college" }), { educationDegrees: ["Some college"], educationDegree: "" });
+    assert.deepEqual(degreeMigrationPatch({ educationDegrees: ["Doctorate", ""] }), { educationDegrees: ["Doctorate"], educationDegree: "" });
   });
 });
 

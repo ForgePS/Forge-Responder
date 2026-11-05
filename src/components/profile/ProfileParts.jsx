@@ -10,7 +10,7 @@ import { useDropdowns } from "../../context/DropdownContext.jsx";
 import { formatPersonnelDateForDisplay, formatPersonnelDateForInput } from "../../lib/personnelDates.js";
 import {
   EMAIL_TYPES, EQUIPMENT_CATEGORIES, EQUIPMENT_STATUSES, PHONE_TYPES, emptyEquipment, equipmentExpiration,
-  expiryState, isEquipmentInHand, maskSecret, suggestedRetirement,
+  expiryState, isEquipmentInHand, listFieldValue, maskSecret, suggestedRetirement,
 } from "../../lib/personnelProfile.js";
 
 const asList = (value) => (Array.isArray(value) ? value : String(value || "").split(/\s*[,;]\s*/)).map((item) => String(item || "").trim()).filter(Boolean);
@@ -64,6 +64,26 @@ function MultiValue({ value, options = [], editing, onChange, label }) {
   );
 }
 
+/** An ordered list of entries (e.g. degrees), each picked from the options; add and remove rows. */
+function ListValue({ items, options = [], editing, onChange, label, addLabel }) {
+  if (!editing) {
+    return items.length ? <span className="profile-chips">{items.map((item, index) => <span key={`${item}-${index}`} className="profile-chip">{item}</span>)}</span> : <span className="profile-empty">—</span>;
+  }
+  return (
+    <div className="profile-rows">
+      {items.map((item, index) => (
+        <div key={index} className="profile-row-edit is-single">
+          <ComboField value={item} options={options} onChange={(next) => onChange(items.map((other, i) => (i === index ? next : other)))} ariaLabel={`${label} ${index + 1}`} />
+          <button type="button" className="profile-icon-btn" onClick={() => onChange(items.filter((_, i) => i !== index))} title="Remove" aria-label={`Remove ${label.toLowerCase()} ${index + 1}`}><Trash2 size={15} /></button>
+        </div>
+      ))}
+      <button type="button" className="secondary-button profile-add" onClick={() => onChange([...items, ""])}>
+        <Plus size={14} /> {addLabel || `Add ${label.toLowerCase()}`}
+      </button>
+    </div>
+  );
+}
+
 /**
  * One group of fields as a grid. canEdit(field) decides per field; private
  * fields show "Hidden" when the private record isn't available.
@@ -78,7 +98,22 @@ export function FieldGroup({ group, values, editing, onChange, canEdit = () => f
         const hidden = field.private && !privateReady;
         let content;
         if (hidden) content = <span className="profile-empty">Private</span>;
-        else if (field.type === "multi") content = <MultiValue value={value} options={field.options} editing={editable} label={field.label} onChange={(next) => onChange(field.key, next)} />;
+        else if (field.type === "list") {
+          content = (
+            <ListValue
+              items={listFieldValue(values, field, { keepBlank: editable })}
+              options={field.options}
+              editing={editable}
+              label={field.label}
+              addLabel={field.addLabel}
+              onChange={(next) => {
+                onChange(field.key, next);
+                // The list replaces the old single value, so it can't come back as a fallback.
+                if (field.legacyKey) onChange(field.legacyKey, "");
+              }}
+            />
+          );
+        } else if (field.type === "multi") content = <MultiValue value={value} options={field.options} editing={editable} label={field.label} onChange={(next) => onChange(field.key, next)} />;
         else if (editable && field.type === "date") content = <input type="date" value={formatPersonnelDateForInput(value)} onChange={(event) => onChange(field.key, event.target.value)} aria-label={field.label} />;
         else if (editable && field.type === "select") {
           const options = field.dropdown ? getOptions(field.dropdown, value) : field.options || [];

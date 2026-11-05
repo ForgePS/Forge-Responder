@@ -54,7 +54,6 @@ function PersonalDetailsSection({
   canViewPrivateInfo,
   privateStatus = "off",
   updateDraftField,
-  setEmergencySameAddress,
   showFormActions = false,
   onSave,
   onCancel,
@@ -116,16 +115,7 @@ function PersonalDetailsSection({
           <ProfileField flow label="Citizenship" value={privateValue(draft.citizenship)} editing={canEditPrivateDetails} dropdownId="citizenshipOptions" onChange={(value) => updateDraftField("citizenship", value)} />
         </FormRow>
 
-        <EmergencyContactSection
-          draft={draft}
-          editing={canEdit}
-          onFieldChange={updateDraftField}
-          onSameAddressChange={setEmergencySameAddress}
-          flow
-          flowMode={canEdit ? "editing" : "viewing"}
-          showHeading
-        />
-
+        {/* Emergency contacts are edited on their own Emergency Contact section. */}
         <FormRow columns={4}>
           <ProfileField flow label="Driver's Lic. Number" value={privateValue(draft.driversLicenseNumber)} editing={canEditPrivateDetails} onChange={(value) => updateDraftField("driversLicenseNumber", value)} />
           <ProfileField flow label="Driver's Lic. State" value={draft.driversLicenseState || ""} editing={canEdit} dropdownId="usStates" onChange={(value) => updateDraftField("driversLicenseState", value)} />
@@ -315,7 +305,6 @@ export default function PersonnelProfileForm({
           canViewPrivateInfo={canViewPrivateInfo}
           privateStatus={privateStatus}
           updateDraftField={updateDraftField}
-          setEmergencySameAddress={setEmergencySameAddress}
           showFormActions={canEdit}
           onSave={onSave}
           onCancel={onCancel}
