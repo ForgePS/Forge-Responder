@@ -33,6 +33,10 @@ demo-rename*.txt
 # Fake emulator settings are safe to commit
 !.env.emulator
 !functions/.env.forge-rms-staging
+!functions/.env.demo-forge-rms
+# Offline demo build and saved local data
+dist-offline/
+.offline-demo/
 # Staging seed output (contains test login passwords)
 staging-seed.txt
 

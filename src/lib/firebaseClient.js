@@ -7,7 +7,7 @@ import {
 } from "firebase/app-check";
 import { connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, setDoc, collection } from "firebase/firestore";
 import { connectStorageEmulator, deleteObject as deleteStorageObject, getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
-import { getFunctions } from "firebase/functions";
+import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -72,6 +72,7 @@ function firebaseServices() {
       connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
       connectFirestoreEmulator(db, "127.0.0.1", 8080);
       connectStorageEmulator(storage, "127.0.0.1", 9199);
+      connectFunctionsEmulator(functions, "127.0.0.1", 5001);
     } else {
       initAppCheck(app);
     }
