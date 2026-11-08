@@ -138,14 +138,69 @@ function stationProblems(values) {
   return missing.length ? `Add the station's ${missing.join(", ")} under System Admin → Department → Stations.` : "";
 }
 
-function findNerisStation(nerisStations, forgeStation, linkedId) {
+const STREET_WORDS = {
+  street: "st", avenue: "ave", av: "ave", road: "rd", drive: "dr", parkway: "pkwy", boulevard: "blvd",
+  lane: "ln", court: "ct", place: "pl", highway: "hwy", circle: "cir", terrace: "ter", trail: "trl",
+  north: "n", south: "s", east: "e", west: "w",
+};
+
+/** "1200 Riverfront Parkway." -> "1200 riverfront pkwy", so the same street written two ways still matches. */
+function streetKey(value) {
+  return text(value).toLowerCase().replace(/[.,#]/g, " ").split(/\s+/).filter(Boolean)
+    .map((word) => STREET_WORDS[word] || word).join(" ");
+}
+
+/** Same street, and the same ZIP (or the same city when either side has no ZIP). */
+function sameAddress(nerisStation, forgeStation) {
+  const street = streetKey(forgeStation.address);
+  if (!street || street !== streetKey(nerisStation.address_line_1)) return false;
+  const forgeZip = text(forgeStation.zip).slice(0, 5);
+  const nerisZip = text(nerisStation.zip_code).slice(0, 5);
+  if (forgeZip && nerisZip) return forgeZip === nerisZip;
+  return Boolean(text(forgeStation.city)) && same(forgeStation.city, nerisStation.city);
+}
+
+/**
+ * Finds the NERIS station for a FORGE station: the saved link, then FORGE's ID,
+ * then the name, then the address. NERIS won't accept two stations at one
+ * address, so an address match means it's the same station under another name.
+ * `claimed` holds NERIS stations already matched to another FORGE station.
+ */
+function findNerisStation(nerisStations, forgeStation, linkedId, claimed = new Set(), { byAddress = true } = {}) {
   if (linkedId) {
     const linked = nerisStations.find((s) => s.neris_id === linkedId);
-    if (linked) return linked;
+    if (linked) return { station: linked, by: "link" };
   }
-  return nerisStations.find((s) => text(s.internal_id) && s.internal_id === forgeStation.id)
-    || nerisStations.find((s) => same(s.station_id, forgeStation.name))
-    || null;
+  const open = nerisStations.filter((s) => !claimed.has(s.neris_id));
+  const idMatch = open.find((s) => text(s.internal_id) && s.internal_id === forgeStation.id);
+  if (idMatch) return { station: idMatch, by: "id" };
+  const nameMatch = open.find((s) => same(s.station_id, forgeStation.name));
+  if (nameMatch) return { station: nameMatch, by: "name" };
+  const addressMatch = byAddress ? open.find((s) => sameAddress(s, forgeStation)) : null;
+  if (addressMatch) return { station: addressMatch, by: "address" };
+  return { station: null, by: "" };
+}
+
+/** Matches every FORGE station: links, IDs and names first, then addresses for the rest. */
+function matchStations(forgeStations, nerisStations, stationLinks) {
+  const claimed = new Set();
+  const matches = new Map();
+  for (const station of forgeStations) {
+    const found = findNerisStation(nerisStations, station, stationLinks[station.id], claimed, { byAddress: false });
+    if (found.station) {
+      matches.set(station.id, found);
+      claimed.add(found.station.neris_id);
+    }
+  }
+  for (const station of forgeStations) {
+    if (matches.has(station.id)) continue;
+    const found = findNerisStation(nerisStations, station, "", claimed);
+    if (found.station) {
+      matches.set(station.id, found);
+      claimed.add(found.station.neris_id);
+    }
+  }
+  return matches;
 }
 
 function allNerisUnits(nerisStations) {
@@ -177,9 +232,10 @@ function buildSyncPlan({ profile = {}, apparatus = [], entity = {}, connection =
     .filter((station) => text(station?.name))
     .map((station, index) => ({ ...station, id: text(station.id) || `station-${index + 1}`, name: text(station.name) }));
   const stationByName = new Map();
+  const stationMatches = matchStations(forgeStations, nerisStations, stationLinks);
   const stations = forgeStations.map((station) => {
     const values = stationValues(station);
-    const match = findNerisStation(nerisStations, station, stationLinks[station.id]);
+    const { station: match = null, by: matchedBy = "" } = stationMatches.get(station.id) || {};
     const problem = stationProblems(values);
     let action;
     let changes = [];
@@ -195,6 +251,7 @@ function buildSyncPlan({ profile = {}, apparatus = [], entity = {}, connection =
       name: station.name,
       action,
       nerisStationId: match?.neris_id || "",
+      matchedBy,
       changes,
       reason: action === "skip" ? problem : "",
     };

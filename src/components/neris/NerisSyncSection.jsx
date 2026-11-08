@@ -191,6 +191,7 @@ export default function NerisSyncSection({ departmentId = "" }) {
                         <td>{s.name}</td>
                         <td><ActionPill action={s.action} /></td>
                         <td className="neris-sync-muted">
+                          {s.matchedBy === "address" && !s.reason ? `Same address as NERIS station ${s.nerisStationId}. ` : ""}
                           {s.reason || (s.changes.length ? `Changes: ${s.changes.join(", ").replace(/_/g, " ")}` : "")}
                         </td>
                       </tr>

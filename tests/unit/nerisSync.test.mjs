@@ -83,6 +83,31 @@ test("plan: stations are created, matched by name, or skipped with a reason", ()
   assert.match(byName["Station 3"].reason, /street address, city, state, ZIP code/);
 });
 
+test("plan: a station with a new name links to the NERIS station at the same address", () => {
+  const headquarters = { neris_id: "FD24021886S000", station_id: "HQ", address_line_1: "16825 S. Seton Avenue", city: "Emmitsburg", state: "MD", zip_code: "21727-1234", units: [] };
+  const named = { neris_id: "FD24021886S001", station_id: "Station 1", address_line_1: "1 Other Rd", city: "Emmitsburg", state: "MD", zip_code: "21727", units: [] };
+  const forge = {
+    ...profile,
+    stationDetails: [
+      { id: "st-2", name: "Station 2", address: "16825 South Seton Ave", city: "Emmitsburg", state: "MD", zip: "21727" },
+      // Same address as HQ too, but Station 1 matches by name first, so HQ stays free for Station 2.
+      { id: "st-1", name: "Station 1", address: "16825 S Seton Ave", city: "Emmitsburg", state: "MD", zip: "21727" },
+      { id: "st-4", name: "Station 4", address: "16825 S Seton Ave", city: "Emmitsburg", state: "MD", zip: "21727" },
+      { id: "st-5", name: "Station 5", address: "1 Other Rd", city: "Emmitsburg", state: "MD", zip: "99999" },
+    ],
+  };
+  const plan = sync.buildSyncPlan({ profile: forge, apparatus: [], entity: { ...entity, stations: [headquarters, named] }, connection: {} });
+  const s = Object.fromEntries(plan.stations.map((x) => [x.name, x]));
+  assert.equal(s["Station 2"].nerisStationId, "FD24021886S000");
+  assert.equal(s["Station 2"].matchedBy, "address");
+  assert.equal(s["Station 2"].action, "update");
+  assert.ok(s["Station 2"].changes.includes("station_id"), "renames HQ to Station 2 in NERIS");
+  assert.equal(s["Station 1"].nerisStationId, "FD24021886S001");
+  assert.equal(s["Station 1"].matchedBy, "name");
+  assert.equal(s["Station 4"].action, "create", "HQ is already taken by Station 2");
+  assert.equal(s["Station 5"].action, "create", "same street, different ZIP");
+});
+
 test("plan: units", () => {
   const plan = sync.buildSyncPlan({ profile, apparatus, entity, connection: {} });
   const u = Object.fromEntries(plan.units.map((x) => [x.name, x]));
