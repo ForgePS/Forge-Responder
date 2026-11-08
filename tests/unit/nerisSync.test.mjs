@@ -239,3 +239,12 @@ test("apply: an existing station linked to another FORGE station is not taken ov
   assert.deepEqual(calls, ["POST /entity/FD24021886/station"]);
   assert.match(results[0].message, /linked to Station 2/);
 });
+
+test("plan: shows how NERIS has each station on file, and stations only in NERIS", () => {
+  const extra = { neris_id: "FD24021886S009", station_id: "Old HQ", address_line_1: "1 Elm St", city: "Springfield", state: "MS", zip_code: "38654", units: [{}] };
+  const plan = sync.buildSyncPlan({ profile, apparatus: [], entity: { ...entity, stations: [...entity.stations, extra] }, connection: {} });
+  const s2 = plan.stations.find((s) => s.name === "Station 2");
+  assert.equal(s2.nerisRecord, "station 2 at 200 Oak Ave, Springfield, MS 38654");
+  assert.equal(plan.stations.find((s) => s.name === "Station 1").nerisRecord, "");
+  assert.deepEqual(plan.nerisOnlyStations, [{ nerisStationId: "FD24021886S009", nerisRecord: "Old HQ at 1 Elm St, Springfield, MS 38654", units: 1 }]);
+});
