@@ -42,3 +42,6 @@ staging-seed.txt
 
 # Local Claude Code settings
 .claude/
+
+# Firebase local secrets for the emulator (never commit)
+*.secret.local

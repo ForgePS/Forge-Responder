@@ -7,6 +7,8 @@ import GoogleApisIntegrationPanel from "../components/digitalDashboard/GoogleApi
 import Active911IntegrationPanel from "../components/digitalDashboard/Active911IntegrationPanel.jsx";
 import DamageFormJotformIntegrationPanel from "../components/digitalDashboard/DamageFormJotformIntegrationPanel.jsx";
 import TrainingAcademiesPanel from "../components/academy/TrainingAcademiesPanel.jsx";
+import NerisConnectionPanel from "../components/neris/NerisConnectionPanel.jsx";
+import { isAdminMembershipRoles } from "../lib/adminGuards.js";
 import RecordCollectionEditor from "../components/RecordCollectionEditor.jsx";
 import RolePermissionsEditor from "../components/RolePermissionsEditor.jsx";
 import SubscriptionExpiryBanner from "../components/SubscriptionExpiryBanner.jsx";
@@ -14,7 +16,7 @@ import UserPermissionsEditor from "../components/UserPermissionsEditor.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import AuditLogPanel from "../components/AuditLogPanel.jsx";
-import { isPlatformScope } from "../lib/tenantPaths.js";
+import { isDemoDepartment, isPlatformScope } from "../lib/tenantPaths.js";
 import { listRecords } from "../lib/firestoreService.js";
 import { canManagePlatformSecrets, hasPermission } from "../lib/permissions.js";
 import { ensureDefaultRoles } from "../lib/roleService.js";
@@ -63,12 +65,14 @@ export default function AdminControlCenterPage({
   onOpenPersonnelProfile,
   onOpenEmployeeProfile,
 }) {
-  const { departmentId, profile, settings } = useTenant();
+  const { departmentId, profile, settings, isModuleEnabled } = useTenant();
   const { isCreator, membership, permissions } = useAuth();
   const canConfigureApiKeys = canManagePlatformSecrets(permissions, isCreator, membership);
   const canConfigureDamageForm = isCreator
     || hasPermission(permissions, "manageSystemSettings")
     || hasPermission(permissions, "accessAdminRms");
+  // Matches the server check: department admin or creator; the public demo is creator-only.
+  const canConfigureNeris = isCreator || (isAdminMembershipRoles(membership) && !isDemoDepartment(departmentId));
   const canViewAcademyIntegrations = isCreator
     || hasPermission(permissions, "academyIntegrationsView");
   const canManageAcademyIntegrations = isCreator
@@ -267,12 +271,19 @@ export default function AdminControlCenterPage({
         <AdminSectionPill
           id="integrations"
           label="Connected Services"
-          description="Google Maps, Active911, the JotForm damage form, and FORGE Academy."
+          description="NERIS reporting, Google Maps, Active911, the JotForm damage form, and FORGE Academy."
           icon={KeyRound}
           isOpen={isOpen("integrations")}
           onToggle={toggleSection}
         >
           <div className="admin-integrations-stack">
+            {inPlatformScope || !isModuleEnabled?.("nerisFireReports") ? null : (
+              <NerisConnectionPanel
+                departmentId={departmentId}
+                canConfigure={canConfigureNeris}
+                readOnlyNote={isDemoDepartment(departmentId) ? "FORGE Public Safety manages the demo department's NERIS connection (test sandbox only)." : ""}
+              />
+            )}
             <GoogleApisIntegrationPanel
               departmentId={departmentId}
               canConfigure={canConfigureApiKeys}

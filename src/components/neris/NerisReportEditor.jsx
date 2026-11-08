@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Field, Picker, ProgressRing, Section, TextArea, TextInput, YesNo } from "./NerisControls.jsx";
 import NerisAiNarrative from "./NerisAiNarrative.jsx";
+import NerisSubmitSection from "./NerisSubmitSection.jsx";
 import NerisCadImportModal from "./NerisCadImportModal.jsx";
 import {
   INCIDENT_KINDS, STEPS, applicability, asList, checklistProgress, codeLabel, core, incidentTypes, isBlank,
@@ -48,6 +49,7 @@ export default function NerisReportEditor({
   onUpdateModule,
   onAutoPopulate,
   onRecordSubmission,
+  onNerisSubmitted,
   onClose,
   onOpenReport,
   onDelete,
@@ -243,7 +245,7 @@ export default function NerisReportEditor({
                     <Field label="Type of aid" required missing={missingFor("aid-type")}>
                       <Picker value={c.incident_aid_type} options={options("type_aid")} disabled={!editable} onChange={setCore("incident_aid_type")} />
                     </Field>
-                    <Field label="Fire department(s)" required missing={missingFor("aid-dept")} help="Separate several with commas.">
+                    <Field label="Fire department(s)" required missing={missingFor("aid-dept")} help="Separate several with commas. Use each department's NERIS ID (FD followed by 8 digits) so the aid is sent to NERIS.">
                       <TextInput value={asList(c.incident_aid_department_name).join(", ")} disabled={!editable} onChange={(v) => setCore("incident_aid_department_name")(v.split(",").map((s) => s.trim()).filter(Boolean))} />
                     </Field>
                     <Field label="Other agencies that helped">
@@ -307,6 +309,7 @@ export default function NerisReportEditor({
               </Section>
 
               {a.fire ? <ModuleSection title="Fire" icon={Flame} moduleId="mod_fire" report={report} editable={editable} onUpdateModule={onUpdateModule} checklist={checklist} /> : null}
+              {a.alarms ? <ModuleSection title="Alarms and sprinklers" icon={Flame} moduleId="mod_alarms" report={report} editable={editable} onUpdateModule={onUpdateModule} checklist={checklist} /> : null}
               {a.wildland ? (
                 <Section title="Wildland" icon={Trees}>
                   <Field label="Fire name"><TextInput value={ws.wildland?.fireName} disabled={!editable} onChange={(v) => updateWorkspace("wildland", { fireName: v })} /></Field>
@@ -375,6 +378,7 @@ export default function NerisReportEditor({
               onUpdate={onUpdate}
               onUpdateModule={onUpdateModule}
               onRecordSubmission={onRecordSubmission}
+              onNerisSubmitted={onNerisSubmitted}
               onOpenReport={onOpenReport}
               goTo={goTo}
             />
@@ -453,8 +457,9 @@ function ModuleFields({ moduleId, report, editable, onUpdateModule, checklist })
     const missing = checklist.some((i) => i.id === `${moduleId}.${f.name}` && !i.done);
     const set = (v) => onUpdateModule(moduleId, f.name, v);
     let control;
-    if (f.kind === "select") control = <Picker value={data[f.name]} options={options(f.valueSet)} disabled={!editable} onChange={set} />;
-    else if (f.kind === "multi") control = <Picker multiple value={data[f.name]} options={options(f.valueSet)} disabled={!editable} onChange={set} />;
+    const choices = f.options || options(f.valueSet);
+    if (f.kind === "select") control = <Picker value={data[f.name]} options={choices} disabled={!editable} onChange={set} />;
+    else if (f.kind === "multi") control = <Picker multiple value={data[f.name]} options={choices} disabled={!editable} onChange={set} />;
     else if (f.kind === "yesno") control = <YesNo value={Array.isArray(data[f.name]) ? data[f.name][0] : data[f.name]} disabled={!editable} onChange={set} />;
     else if (f.kind === "number") control = <TextInput type="number" value={data[f.name]} disabled={!editable} onChange={set} />;
     else control = <TextInput value={Array.isArray(data[f.name]) ? data[f.name].join(", ") : data[f.name]} disabled={!editable} onChange={set} />;
@@ -566,7 +571,7 @@ function CrewSection({ report, editable, personnel, onChange }) {
   );
 }
 
-function ReviewStep({ report, allReports, canEdit, editable, departmentId, progress, reviewerName, onUpdate, onUpdateModule, onRecordSubmission, onOpenReport, goTo }) {
+function ReviewStep({ report, allReports, canEdit, editable, departmentId, progress, reviewerName, onUpdate, onUpdateModule, onRecordSubmission, onNerisSubmitted, onOpenReport, goTo }) {
   const ws = report.workspace || {};
   const [comment, setComment] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -662,19 +667,16 @@ function ReviewStep({ report, allReports, canEdit, editable, departmentId, progr
         ) : null}
       </Section>
 
-      <Section title="Submit to NERIS" icon={Send}>
-        <p className="nr-wide nr-muted">FORGE doesn't send reports to NERIS automatically yet. Once the report is approved, enter it in the NERIS portal, then record the submission here.</p>
-        <Field label="NERIS incident ID (from the portal)">
-          <TextInput value={report.modules?.core_mod_incident?.incident_neris_id} disabled={!canEdit || report.status === "Submitted"} placeholder="Shown after you submit in NERIS" onChange={(v) => onUpdateModule("core_mod_incident", "incident_neris_id", v)} />
-        </Field>
-        <div className="nr-actions nr-wide">
-          {report.status === "Submitted" ? (
-            <span className="nr-pill nr-pill-ok"><CheckCircle2 size={13} /> Submitted {formatWhen(report.submittedAt)}</span>
-          ) : canEdit ? (
-            <button type="button" className="nr-btn nr-btn-primary" disabled={!approvedForSubmit || !ready} title={approvedForSubmit ? "" : "The report must be approved first"} onClick={onRecordSubmission}><Send size={15} /> Record NERIS submission</button>
-          ) : null}
-        </div>
-      </Section>
+      <NerisSubmitSection
+        report={report}
+        departmentId={departmentId}
+        canEdit={canEdit}
+        ready={ready}
+        approvedForSubmit={approvedForSubmit}
+        onSubmitted={onNerisSubmitted}
+        onRecordSubmission={onRecordSubmission}
+        onUpdateModule={onUpdateModule}
+      />
 
       <Section title="Photos and files" icon={Paperclip}>
         <div className="nr-wide nr-files">
