@@ -351,6 +351,13 @@ function nerisErrorMessage(result) {
  * links to store. Keeps going after a failure so one bad station doesn't block
  * the rest.
  */
+/** The NERIS station ID named in a "station already exists" error, if any. */
+function existingStationId(result) {
+  const message = typeof result?.data === "string" ? result.data : JSON.stringify(result?.data ?? "");
+  if (!/matches|exists|already/i.test(message)) return "";
+  return message.match(/FD[0-9]{8}S[0-9]{3}/)?.[0] || "";
+}
+
 async function applySyncPlan({ plan, profile = {}, nerisId, selection = {}, request }) {
   const results = [];
   const stationLinks = {};
@@ -374,16 +381,37 @@ async function applySyncPlan({ plan, profile = {}, nerisId, selection = {}, requ
   for (const row of plan.stations) {
     if (!stationIds.has(row.forgeId) || !["create", "update"].includes(row.action)) continue;
     const values = stationValues({ ...forgeStations.get(row.forgeId), id: row.forgeId });
+    const patchBody = Object.fromEntries(["station_id", "internal_id", "address_line_1", "city", "state", "zip_code"].map((f) => [f, values[f]]));
     if (row.action === "create") {
       const result = await request(`${base}/station`, { method: "POST", body: { ...values, in_service: true } });
       const newId = result.ok ? text(result.data?.neris_id) : "";
       if (newId) {
         stationNerisIds.set(row.forgeId, newId);
         stationLinks[row.forgeId] = newId;
+        results.push({ kind: "station", label: row.name, ok: true, message: `Created in NERIS (${newId})` });
+        continue;
       }
-      results.push({ kind: "station", label: row.name, ok: Boolean(newId), message: newId ? `Created in NERIS (${newId})` : nerisErrorMessage(result) });
+      // NERIS refuses a second station at the same address and names the one it
+      // already has. NERIS may judge addresses differently from FORGE, so take
+      // its word: update that station, unless another FORGE station owns it.
+      const existingId = result.ok ? "" : existingStationId(result);
+      if (!existingId) {
+        results.push({ kind: "station", label: row.name, ok: false, message: nerisErrorMessage(result) });
+        continue;
+      }
+      const owner = plan.stations.find((s) => s.forgeId !== row.forgeId && (s.nerisStationId === existingId || stationLinks[s.forgeId] === existingId));
+      if (owner) {
+        results.push({ kind: "station", label: row.name, ok: false, message: `NERIS already has a station at this address (${existingId}), and it's linked to ${owner.name}. NERIS allows one station per address. Check the addresses of ${row.name} and ${owner.name} in FORGE.` });
+        continue;
+      }
+      const retry = await request(`${base}/station/${encodeURIComponent(existingId)}`, { method: "PATCH", body: patchBody });
+      if (retry.ok) {
+        stationNerisIds.set(row.forgeId, existingId);
+        stationLinks[row.forgeId] = existingId;
+      }
+      results.push({ kind: "station", label: row.name, ok: retry.ok, message: retry.ok ? `NERIS already had this station (${existingId}), so FORGE linked it and updated it` : nerisErrorMessage(retry) });
     } else {
-      const body = Object.fromEntries(["station_id", "internal_id", "address_line_1", "city", "state", "zip_code"].map((f) => [f, values[f]]));
+      const body = patchBody;
       const result = await request(`${base}/station/${encodeURIComponent(row.nerisStationId)}`, { method: "PATCH", body });
       if (result.ok) stationLinks[row.forgeId] = row.nerisStationId;
       results.push({ kind: "station", label: row.name, ok: result.ok, message: result.ok ? "Updated in NERIS" : nerisErrorMessage(result) });

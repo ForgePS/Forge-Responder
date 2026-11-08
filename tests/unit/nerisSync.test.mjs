@@ -199,3 +199,43 @@ test("apply: a unit whose new station failed is reported, not sent", async () =>
   assert.match(results[0].message, /zip_code invalid/);
   assert.match(results[1].message, /Send the station first/);
 });
+
+test("apply: when NERIS says the new station already exists, FORGE updates that station and sends its units there", async () => {
+  const plan = sync.buildSyncPlan({ profile, apparatus, entity, connection: {} });
+  const calls = [];
+  const request = async (path, { method, body }) => {
+    calls.push({ path, method, body });
+    if (method === "POST" && path.endsWith("/station")) {
+      return { ok: false, status: 409, data: { detail: "Submitted station matches either an existing station_id or address of station FD24021886S000" } };
+    }
+    if (method === "POST" && path.endsWith("/unit")) return { ok: true, status: 201, data: { neris_id: "FD24021886S000U001" } };
+    return { ok: true, status: 200, data: {} };
+  };
+  const { results, stationLinks, unitLinks } = await sync.applySyncPlan({
+    plan, profile, nerisId: "FD24021886", selection: { stationIds: ["station-station-1"], unitIds: ["APP-1"] }, request,
+  });
+  assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), [
+    "POST /entity/FD24021886/station",
+    "PATCH /entity/FD24021886/station/FD24021886S000",
+    "POST /entity/FD24021886/station/FD24021886S000/unit",
+  ]);
+  assert.equal(calls[1].body.station_id, "Station 1");
+  assert.ok(results.every((r) => r.ok));
+  assert.match(results[0].message, /already had this station \(FD24021886S000\)/);
+  assert.equal(stationLinks["station-station-1"], "FD24021886S000");
+  assert.equal(unitLinks["APP-1"], "FD24021886S000U001");
+});
+
+test("apply: an existing station linked to another FORGE station is not taken over", async () => {
+  const plan = sync.buildSyncPlan({ profile, apparatus, entity, connection: {} });
+  const calls = [];
+  const request = async (path, { method }) => {
+    calls.push(`${method} ${path}`);
+    return { ok: false, status: 409, data: { detail: "Submitted station matches either an existing station_id or address of station FD24021886S001" } };
+  };
+  const { results } = await sync.applySyncPlan({
+    plan, profile, nerisId: "FD24021886", selection: { stationIds: ["station-station-1"] }, request,
+  });
+  assert.deepEqual(calls, ["POST /entity/FD24021886/station"]);
+  assert.match(results[0].message, /linked to Station 2/);
+});
