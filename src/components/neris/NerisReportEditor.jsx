@@ -245,7 +245,7 @@ export default function NerisReportEditor({
                     <Field label="Type of aid" required missing={missingFor("aid-type")}>
                       <Picker value={c.incident_aid_type} options={options("type_aid")} disabled={!editable} onChange={setCore("incident_aid_type")} />
                     </Field>
-                    <Field label="Fire department(s)" required missing={missingFor("aid-dept")} help="Separate several with commas.">
+                    <Field label="Fire department(s)" required missing={missingFor("aid-dept")} help="Separate several with commas. Use each department's NERIS ID (FD followed by 8 digits) so the aid is sent to NERIS.">
                       <TextInput value={asList(c.incident_aid_department_name).join(", ")} disabled={!editable} onChange={(v) => setCore("incident_aid_department_name")(v.split(",").map((s) => s.trim()).filter(Boolean))} />
                     </Field>
                     <Field label="Other agencies that helped">
@@ -309,6 +309,7 @@ export default function NerisReportEditor({
               </Section>
 
               {a.fire ? <ModuleSection title="Fire" icon={Flame} moduleId="mod_fire" report={report} editable={editable} onUpdateModule={onUpdateModule} checklist={checklist} /> : null}
+              {a.alarms ? <ModuleSection title="Alarms and sprinklers" icon={Flame} moduleId="mod_alarms" report={report} editable={editable} onUpdateModule={onUpdateModule} checklist={checklist} /> : null}
               {a.wildland ? (
                 <Section title="Wildland" icon={Trees}>
                   <Field label="Fire name"><TextInput value={ws.wildland?.fireName} disabled={!editable} onChange={(v) => updateWorkspace("wildland", { fireName: v })} /></Field>
@@ -456,8 +457,9 @@ function ModuleFields({ moduleId, report, editable, onUpdateModule, checklist })
     const missing = checklist.some((i) => i.id === `${moduleId}.${f.name}` && !i.done);
     const set = (v) => onUpdateModule(moduleId, f.name, v);
     let control;
-    if (f.kind === "select") control = <Picker value={data[f.name]} options={options(f.valueSet)} disabled={!editable} onChange={set} />;
-    else if (f.kind === "multi") control = <Picker multiple value={data[f.name]} options={options(f.valueSet)} disabled={!editable} onChange={set} />;
+    const choices = f.options || options(f.valueSet);
+    if (f.kind === "select") control = <Picker value={data[f.name]} options={choices} disabled={!editable} onChange={set} />;
+    else if (f.kind === "multi") control = <Picker multiple value={data[f.name]} options={choices} disabled={!editable} onChange={set} />;
     else if (f.kind === "yesno") control = <YesNo value={Array.isArray(data[f.name]) ? data[f.name][0] : data[f.name]} disabled={!editable} onChange={set} />;
     else if (f.kind === "number") control = <TextInput type="number" value={data[f.name]} disabled={!editable} onChange={set} />;
     else control = <TextInput value={Array.isArray(data[f.name]) ? data[f.name].join(", ") : data[f.name]} disabled={!editable} onChange={set} />;

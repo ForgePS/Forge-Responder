@@ -20,8 +20,19 @@ export const INCIDENT_KINDS = [
 
 // ---------- Option lists ----------
 
+const KEEP_UPPER = new Set(["EMS", "CO", "DOT", "FF", "RIT", "PPE", "PV", "US", "AHJ", "CAD", "LP", "ESS", "MCI", "IV", "RV", "ATV", "UTV", "HVAC", "LPG", "CNG"]);
+
+/** Many synced NERIS labels are all caps ("OPERATED ALERTED OCCUPANT"); show them in sentence case. */
+export function friendlyLabel(label = "") {
+  const raw = String(label);
+  if (!/[A-Z]/.test(raw) || raw !== raw.toUpperCase()) return raw;
+  const words = raw.split(/\s+/).map((w) => (KEEP_UPPER.has(w) ? w : w.toLowerCase()));
+  const text = words.join(" ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function options(valueSet) {
-  return getNerisValueSet(valueSet);
+  return getNerisValueSet(valueSet).map((o) => ({ ...o, label: friendlyLabel(o.label) }));
 }
 
 export const YES_NO = [
@@ -63,13 +74,19 @@ export function applicability(report = {}) {
   const c = core(report);
   const fire = typeIncludes(report, /^FIRE/) || hasDiscipline(report, "fire") || c.fire === "True";
   const structureFire = typeIncludes(report, /STRUCTURE_FIRE/);
+  const cookingFire = typeIncludes(report, /CONFINED_COOKING_APPLIANCE_FIRE/);
   const outsideFire = typeIncludes(report, /OUTSIDE_FIRE/);
+  // NERIS reports every non-structure fire (outside, vehicle, special) with the outside-fire questions.
+  const nonStructureFire = fire && !structureFire;
   const ems = typeIncludes(report, /^MEDICAL/) || hasDiscipline(report, "ems");
   const rescue = typeIncludes(report, /^RESCUE/) || hasDiscipline(report, "rescue") || hasDiscipline(report, "mva") || hasDiscipline(report, "technical_rescue");
   const hazmat = typeIncludes(report, /^HAZSIT/) || hasDiscipline(report, "hazmat");
   const wildland = outsideFire || hasDiscipline(report, "wildland") || Boolean(report.workspace?.wildland?.acresBurned);
   const casualties = fire || ems || rescue || c.incident_people_present === "True";
-  return { fire, structureFire, outsideFire, ems, rescue, hazmat, wildland, casualties };
+  // NERIS needs alarm and sprinkler details for structure fires, unless the only aid was support given to another department.
+  const supportGivenOnly = asList(c.incident_aid_direction).includes("GIVEN") && asList(c.incident_aid_type).includes("SUPPORT_AID");
+  const alarms = structureFire && !supportGivenOnly;
+  return { fire, structureFire, cookingFire, outsideFire, nonStructureFire, alarms, ems, rescue, hazmat, wildland, casualties };
 }
 
 export function noAction(report = {}) {
@@ -84,14 +101,38 @@ export function aidInvolved(report = {}) {
 
 /**
  * @typedef {{ name: string, label: string, help?: string, kind: 'select'|'multi'|'yesno'|'number'|'text'|'textarea',
- *   valueSet?: string, required?: boolean, when?: (report: object) => boolean }} FieldDef
+ *   valueSet?: string, options?: Array<{ value: string, label: string }>, required?: boolean, when?: (report: object) => boolean }} FieldDef
  */
+
+function codeList(values) {
+  return values.map((value) => ({ value, label: value.replace(/_/g, " ").toLowerCase().replace(/^\w/, (ch) => ch.toUpperCase()) }));
+}
+
+const PRESENCE = [
+  { value: "PRESENT", label: "Present" },
+  { value: "NOT_PRESENT", label: "Not present" },
+  { value: "NOT_APPLICABLE", label: "Not applicable" },
+];
+
+// Not in FORGE's synced value sets; copied from the NERIS API (TypeSuppressApplianceValue, TypeSuppressNoOperationValue).
+export const SUPPRESSION_APPLIANCES = codeList([
+  "SMALL_DIAMETER_FIRE_HOSE", "MEDIUM_DIAMETER_FIRE_HOSE", "BOOSTER_FIRE_HOSE", "MASTER_STREAM", "AERIAL_MASTER_STREAM",
+  "ELEVATED_MASTER_STREAM_STANDPIPE", "GROUND_MONITOR", "BUILDING_STANDPIPE", "BUILDING_FDC", "FIRE_EXTINGUISHER",
+  "AIRATTACK_HELITACK", "OTHER", "NONE",
+]);
+const SPRINKLER_FAILURES = codeList([
+  "INSUFFICIENT_SOURCE", "INSUFFICIENT_WATER_SUPPLY", "SYSTEM_DAMAGED_COMPROMISED", "SYSTEM_INOPERABLE", "SYSTEM_NOT_SUITABLE",
+  "SYSTEM_SHUTOFF_DURING_INCIDENT", "SYSTEM_SHUTOFF_PRIOR_TO_INCIDENT", "UNABLE_TO_DETERMINE",
+]);
+
+const alarmValue = (r, name) => r.modules?.mod_alarms?.[name];
+const present = (name) => (r) => alarmValue(r, name) === "PRESENT";
 
 /** @type {Record<string, FieldDef[]>} */
 export const MODULE_FIELDS = {
   mod_fire: [
     { name: "fire_water_supply", label: "Water supply", kind: "select", valueSet: "type_water_supply", required: true },
-    { name: "fire_suppression_appliance", label: "Suppression equipment used", kind: "text", help: "For example: 1¾\" handline, deck gun, extinguisher." },
+    { name: "fire_suppression_appliance", label: "Suppression equipment used", kind: "multi", options: SUPPRESSION_APPLIANCES },
     { name: "fire_investigation_need", label: "Does this fire need an investigation?", kind: "select", valueSet: "type_fire_invest_need", required: true },
     { name: "fire_investigation_type", label: "Investigation completed", kind: "multi", valueSet: "type_fire_invest" },
     { name: "structure_arrival_conditions", label: "Fire conditions on arrival", kind: "select", valueSet: "type_fire_condition_arrival", required: true, when: (r) => applicability(r).structureFire },
@@ -100,26 +141,49 @@ export const MODULE_FIELDS = {
     { name: "structure_floor_of_origin", label: "Floor of origin", kind: "number", help: "Use negative numbers for basements (-1).", required: true, when: (r) => applicability(r).structureFire },
     { name: "structure_room_of_origin", label: "Room of origin", kind: "select", valueSet: "type_room", required: true, when: (r) => applicability(r).structureFire },
     { name: "structure_fire_cause", label: "Cause (or likely cause)", kind: "select", valueSet: "type_fire_cause_in", required: true, when: (r) => applicability(r).structureFire },
-    { name: "outside_fire_cause", label: "Cause (or likely cause)", kind: "select", valueSet: "type_fire_cause_out", when: (r) => applicability(r).outsideFire },
+    { name: "outside_fire_cause", label: "Cause (or likely cause)", kind: "select", valueSet: "type_fire_cause_out", required: true, when: (r) => applicability(r).nonStructureFire },
     { name: "outside_fire_acres_burned", label: "Acres burned", kind: "number", required: true, when: (r) => applicability(r).outsideFire },
   ],
   mod_hazard: [
     { name: "hazsit_disposition", label: "Outcome", kind: "select", valueSet: "type_hazard_disposition", required: true },
     { name: "hazsit_evacuated", label: "Occupants or businesses evacuated", kind: "number", required: true },
     { name: "chemical_name", label: "Chemical or material", kind: "text" },
-    { name: "chemical_dot_class", label: "DOT hazard class", kind: "multi", valueSet: "type_hazard_dot" },
-    { name: "chemical_release_occurred", label: "Was it released?", kind: "yesno" },
+    { name: "chemical_dot_class", label: "DOT hazard class", kind: "select", valueSet: "type_hazard_dot", required: true, when: (r) => !isBlank(r.modules?.mod_hazard?.chemical_name) },
+    { name: "chemical_release_occurred", label: "Was it released?", kind: "yesno", required: true, when: (r) => !isBlank(r.modules?.mod_hazard?.chemical_name) },
     { name: "chemical_amount_est", label: "Estimated amount released", kind: "number", when: (r) => r.modules?.mod_hazard?.chemical_release_occurred === "True" },
     { name: "chemical_amount_est_units", label: "Unit", kind: "select", valueSet: "type_hazard_unit", when: (r) => r.modules?.mod_hazard?.chemical_release_occurred === "True" },
     { name: "chemical_physical_state", label: "Physical state", kind: "select", valueSet: "type_hazard_physical_state", when: (r) => r.modules?.mod_hazard?.chemical_release_occurred === "True" },
-    { name: "chemical_release_into", label: "Released into", kind: "multi", valueSet: "type_hazard_released_into", when: (r) => r.modules?.mod_hazard?.chemical_release_occurred === "True" },
+    { name: "chemical_release_into", label: "Released into", kind: "select", valueSet: "type_hazard_released_into", when: (r) => r.modules?.mod_hazard?.chemical_release_occurred === "True" },
     { name: "chemical_release_cause", label: "Cause of release", kind: "select", valueSet: "type_hazard_cause", when: (r) => r.modules?.mod_hazard?.chemical_release_occurred === "True" },
   ],
   mod_medical: [
-    { name: "patient_evaluation_care", label: "Patient care", kind: "select", valueSet: "type_medical_patient_care" },
+    { name: "patient_evaluation_care", label: "Patient care", kind: "select", valueSet: "type_medical_patient_care", required: true },
     { name: "patient_improved_status", label: "Patient status after our care", kind: "select", valueSet: "type_medical_patient_status" },
     { name: "medical_disposition", label: "Transport", kind: "select", valueSet: "type_medical_transport" },
     { name: "patient_care_report", label: "Patient care report (PCR) number", kind: "text" },
+  ],
+  // Structure fires only. nerisIncident.js turns these into NERIS's alarm and suppression modules.
+  mod_alarms: [
+    { name: "smoke_alarm_presence", label: "Smoke alarms", kind: "select", options: PRESENCE, required: true },
+    { name: "smoke_alarm_types", label: "Smoke alarm type", kind: "multi", valueSet: "type_alarm_smoke", when: present("smoke_alarm_presence") },
+    { name: "smoke_alarm_working", label: "Were the smoke alarms working?", kind: "yesno", when: present("smoke_alarm_presence") },
+    { name: "smoke_alarm_operation", label: "What did the smoke alarms do?", kind: "select", valueSet: "type_alarm_operation", when: present("smoke_alarm_presence") },
+    { name: "smoke_alarm_occupant_action", label: "What did occupants do?", kind: "select", valueSet: "type_occupant_response", when: (r) => present("smoke_alarm_presence")(r) && alarmValue(r, "smoke_alarm_operation") === "OPERATED_ALERTED_OCCUPANT" },
+    { name: "smoke_alarm_failure", label: "Why didn't they work?", kind: "select", valueSet: "type_alarm_failure", when: (r) => present("smoke_alarm_presence")(r) && alarmValue(r, "smoke_alarm_operation") === "FAILED_TO_OPERATE" },
+    { name: "fire_alarm_presence", label: "Fire alarm system", kind: "select", options: PRESENCE, required: true },
+    { name: "fire_alarm_type", label: "Fire alarm type", kind: "select", valueSet: "type_alarm_fire", when: present("fire_alarm_presence") },
+    { name: "fire_alarm_operation", label: "What did the fire alarm do?", kind: "select", valueSet: "type_alarm_operation", when: present("fire_alarm_presence") },
+    { name: "other_alarm_presence", label: "Other alarms (CO, heat, gas)", kind: "select", options: PRESENCE, required: true },
+    { name: "other_alarm_types", label: "Other alarm types", kind: "multi", valueSet: "type_alarm_other", when: present("other_alarm_presence") },
+    { name: "sprinkler_presence", label: "Sprinklers or suppression system", kind: "select", options: PRESENCE, required: true },
+    { name: "sprinkler_types", label: "System type", kind: "multi", valueSet: "type_suppress_fire", when: present("sprinkler_presence") },
+    { name: "sprinkler_coverage", label: "Coverage", kind: "select", valueSet: "type_full_partial", when: present("sprinkler_presence") },
+    { name: "sprinkler_operation", label: "Did it work?", kind: "select", valueSet: "type_suppress_operation", when: present("sprinkler_presence") },
+    { name: "sprinklers_activated", label: "Sprinkler heads activated", kind: "number", when: (r) => present("sprinkler_presence")(r) && /^OPERATED/.test(alarmValue(r, "sprinkler_operation") || "") },
+    { name: "sprinkler_failure", label: "Why not?", kind: "select", options: SPRINKLER_FAILURES, when: (r) => present("sprinkler_presence")(r) && ["OPERATED_NOT_EFFECTIVE", "NO_OPERATION"].includes(alarmValue(r, "sprinkler_operation")) },
+    { name: "cooking_presence", label: "Cooking suppression (hood system, auto shutoff)", kind: "select", options: PRESENCE, required: true, when: (r) => applicability(r).cookingFire },
+    { name: "cooking_types", label: "Cooking suppression type", kind: "multi", valueSet: "type_suppress_cooking", when: (r) => applicability(r).cookingFire && present("cooking_presence")(r) },
+    { name: "cooking_operation", label: "Did it work?", kind: "select", valueSet: "type_suppress_operation", when: (r) => applicability(r).cookingFire && present("cooking_presence")(r) },
   ],
 };
 
@@ -197,7 +261,7 @@ export function reportChecklist(report = {}) {
   }
 
   add("actions", "details", "Actions taken (or why no action)", !isBlank(c.incident_actions_taken) || (ws.actions || []).length > 0 || cancelled);
-  for (const [moduleId, applies, title] of [["mod_fire", a.fire, "Fire"], ["mod_hazard", a.hazmat, "Hazardous condition"]]) {
+  for (const [moduleId, applies, title] of [["mod_fire", a.fire, "Fire"], ["mod_alarms", a.alarms, "Alarms"], ["mod_hazard", a.hazmat, "Hazardous condition"], ["mod_medical", a.ems, "Medical"]]) {
     if (!applies || cancelled) continue;
     for (const f of visibleFields(moduleId, report).filter((x) => x.required)) {
       add(`${moduleId}.${f.name}`, "details", `${title}: ${f.label}`, !isBlank(report.modules?.[moduleId]?.[f.name]));

@@ -3,8 +3,9 @@
  *
  * NERIS requires: base (department, incident number, location),
  * incident_types (at least one), and dispatch (incident number, call times,
- * location, unit responses). This maps what FORGE collects today; detail
- * modules (fire, hazsit, medical, actions/tactics) are not sent yet.
+ * location, unit responses). Detail
+ * sections (actions, aid, fire, alarms, hazsit, medical) are added when the
+ * report has the matching incident type, as NERIS requires.
  *
  * Pure functions: no Firestore, no network. See nerisSubmit in index.js.
  */
@@ -19,11 +20,20 @@ const NERIS_INCIDENT_NUMBER = /^[\w\-:]+$/;
 
 const text = (value) => String(value ?? "").trim();
 
-/** "FIRE: STRUCTURE_FIRE: ROOM_AND_CONTENTS_FIRE" -> "FIRE||STRUCTURE_FIRE||ROOM_AND_CONTENTS_FIRE" */
-function toNerisIncidentType(value) {
+/**
+ * FORGE stores NERIS codes with ": " between levels; the API uses "||".
+ * "SUPPRESSION: OUTSIDE_FIRE_SUPPRESSION: ESTABLISH FIRE LINES" -> "SUPPRESSION||OUTSIDE_FIRE_SUPPRESSION||ESTABLISH_FIRE_LINES"
+ */
+function toNerisCode(value) {
   const raw = text(value);
   if (!raw) return "";
-  const converted = raw.includes("||") ? raw : raw.split(":").map((p) => p.trim()).filter(Boolean).join("||");
+  const parts = raw.includes("||") ? raw.split("||") : raw.split(":");
+  return parts.map((p) => p.trim().replace(/\s+/g, "_")).filter(Boolean).join("||");
+}
+
+/** "FIRE: STRUCTURE_FIRE: ROOM_AND_CONTENTS_FIRE" -> "FIRE||STRUCTURE_FIRE||ROOM_AND_CONTENTS_FIRE" */
+function toNerisIncidentType(value) {
+  const converted = toNerisCode(value);
   return INCIDENT_TYPE_FIXES[converted] || converted;
 }
 
@@ -112,6 +122,219 @@ function parseAddress(address = "", fallbackState = "") {
   return Object.fromEntries(Object.entries(location).filter(([, v]) => v !== undefined && v !== ""));
 }
 
+// ---------- Detail sections ----------
+// Field names match MODULE_FIELDS in src/lib/neris/reportModel.js.
+
+const first = (value) => toNerisCode(asList(value)[0]);
+const codes = (value) => [...new Set(asList(value).map(toNerisCode).filter(Boolean))];
+
+function integer(value) {
+  const n = Number(asList(value)[0]);
+  return Number.isFinite(n) && String(asList(value)[0]).trim() !== "" ? Math.round(n) : null;
+}
+
+function decimal(value) {
+  const n = Number(asList(value)[0]);
+  return Number.isFinite(n) && String(asList(value)[0]).trim() !== "" ? n : null;
+}
+
+/** Drop null/undefined/empty values so optional NERIS fields are left out. `keep` names required arrays that may be empty. */
+function compact(object, keep = []) {
+  return Object.fromEntries(Object.entries(object).filter(([k, v]) => {
+    if (v === null || v === undefined || v === "") return false;
+    return !(Array.isArray(v) && !v.length) || keep.includes(k);
+  }));
+}
+
+const SUPPRESSION_APPLIANCES = new Set([
+  "AERIAL_MASTER_STREAM", "AIRATTACK_HELITACK", "BOOSTER_FIRE_HOSE", "BUILDING_FDC", "BUILDING_STANDPIPE", "ELEVATED_MASTER_STREAM_STANDPIPE",
+  "FIRE_EXTINGUISHER", "GROUND_MONITOR", "MASTER_STREAM", "MEDIUM_DIAMETER_FIRE_HOSE", "NONE", "OTHER", "SMALL_DIAMETER_FIRE_HOSE",
+]);
+
+/** NERIS: if NONE is picked it must be the only item. */
+function noneAlone(list) {
+  return list.includes("NONE") && list.length > 1 ? list.filter((v) => v !== "NONE") : list;
+}
+
+function buildFireDetail(report, types, need, warnings) {
+  const fire = report.modules?.mod_fire || {};
+  const structure = types.some((t) => t.startsWith("FIRE||STRUCTURE_FIRE"));
+  const label = "Fire";
+  const waterSupply = first(fire.fire_water_supply);
+  const investigationNeeded = first(fire.fire_investigation_need);
+  need(waterSupply, `${label}: choose the water supply.`);
+  need(investigationNeeded, `${label}: say whether the fire needs an investigation.`);
+
+  let locationDetail;
+  if (structure) {
+    const floor = integer(fire.structure_floor_of_origin);
+    const arrival = first(fire.structure_arrival_conditions);
+    const damage = first(fire.structure_damage);
+    const room = first(fire.structure_room_of_origin);
+    const cause = first(fire.structure_fire_cause);
+    need(arrival, `${label}: choose the fire conditions on arrival.`);
+    need(damage, `${label}: choose the damage to the building.`);
+    need(floor !== null, `${label}: enter the floor of origin.`);
+    need(room, `${label}: choose the room of origin.`);
+    need(cause, `${label}: choose the cause.`);
+    locationDetail = compact({
+      type: "STRUCTURE",
+      floor_of_origin: floor,
+      arrival_condition: arrival,
+      damage_type: damage,
+      room_of_origin_type: room,
+      cause,
+      progression_evident: yesNo(asList(fire.structure_progression_conditions)[0]),
+    });
+  } else {
+    const cause = first(fire.outside_fire_cause);
+    need(cause, `${label}: choose the cause.`);
+    locationDetail = compact({ type: "OUTSIDE", cause, acres_burned: decimal(fire.outside_fire_acres_burned) });
+  }
+
+  const applianceInput = asList(fire.fire_suppression_appliance);
+  const appliances = noneAlone(codes(applianceInput).filter((v) => SUPPRESSION_APPLIANCES.has(v)));
+  if (applianceInput.length && appliances.length < applianceInput.length) {
+    warnings.push("Some suppression equipment was typed in and isn't sent. Pick it from the list instead.");
+  }
+
+  return compact({
+    location_detail: locationDetail,
+    water_supply: waterSupply,
+    investigation_needed: investigationNeeded,
+    investigation_types: noneAlone(codes(fire.fire_investigation_type)),
+    suppression_appliances: appliances,
+  }, ["investigation_types"]);
+}
+
+const NOT_PRESENT = new Set(["NOT_PRESENT", "NOT_APPLICABLE"]);
+
+/** One NERIS alarm/suppression module from a presence answer and the details when present. */
+function presenceModule(presence, details) {
+  if (NOT_PRESENT.has(presence)) return { presence: { type: presence } };
+  if (presence === "PRESENT") return { presence: { type: "PRESENT", ...compact(details) } };
+  return null;
+}
+
+function buildAlarmModules(report, { cooking }, need) {
+  const m = report.modules?.mod_alarms || {};
+  const presence = (name) => first(m[name]);
+  const label = "Alarms";
+
+  const smokeOperation = first(m.smoke_alarm_operation);
+  let operation = null;
+  if (smokeOperation === "OPERATED_ALERTED_OCCUPANT") operation = { alerted_failed_other: compact({ type: smokeOperation, occupant_action: first(m.smoke_alarm_occupant_action) }) };
+  else if (smokeOperation === "FAILED_TO_OPERATE") operation = { alerted_failed_other: compact({ type: smokeOperation, failure_reason: first(m.smoke_alarm_failure) }) };
+  else if (smokeOperation) operation = { alerted_failed_other: { type: smokeOperation } };
+
+  const sprinklerOperation = first(m.sprinkler_operation);
+  let effectiveness = null;
+  if (sprinklerOperation) {
+    effectiveness = compact({
+      type: sprinklerOperation,
+      sprinklers_activated: sprinklerOperation === "NO_OPERATION" ? null : integer(m.sprinklers_activated),
+      failure_reason: sprinklerOperation === "OPERATED_EFFECTIVE" ? null : first(m.sprinkler_failure),
+    });
+  }
+  const coverage = first(m.sprinkler_coverage);
+
+  const modules = {
+    smoke_alarm: presenceModule(presence("smoke_alarm_presence"), {
+      working: yesNo(asList(m.smoke_alarm_working)[0]),
+      alarm_types: codes(m.smoke_alarm_types),
+      operation,
+    }),
+    fire_alarm: presenceModule(presence("fire_alarm_presence"), {
+      alarm_types: codes(m.fire_alarm_type),
+      operation_type: first(m.fire_alarm_operation),
+    }),
+    other_alarm: presenceModule(presence("other_alarm_presence"), { alarm_types: codes(m.other_alarm_types) }),
+    fire_suppression: presenceModule(presence("sprinkler_presence"), {
+      suppression_types: codes(m.sprinkler_types).map((type) => compact({ type, full_partial: coverage })),
+      operation_type: effectiveness ? { effectiveness } : null,
+    }),
+  };
+  need(modules.smoke_alarm, `${label}: say whether there were smoke alarms.`);
+  need(modules.fire_alarm, `${label}: say whether there was a fire alarm system.`);
+  need(modules.other_alarm, `${label}: say whether there were other alarms (CO, heat, gas).`);
+  need(modules.fire_suppression, `${label}: say whether there were sprinklers or a suppression system.`);
+  if (cooking) {
+    modules.cooking_fire_suppression = presenceModule(presence("cooking_presence"), {
+      suppression_types: codes(m.cooking_types),
+      operation_type: first(m.cooking_operation),
+    });
+    need(modules.cooking_fire_suppression, `${label}: say whether there was cooking suppression.`);
+  }
+  return compact(modules);
+}
+
+function buildHazsitDetail(report, need, warnings) {
+  const h = report.modules?.mod_hazard || {};
+  const disposition = first(h.hazsit_disposition);
+  const evacuated = integer(h.hazsit_evacuated);
+  need(disposition, "Hazardous condition: choose the outcome.");
+  need(evacuated !== null, "Hazardous condition: enter how many were evacuated (0 if none).");
+
+  const chemicals = [];
+  const name = text(asList(h.chemical_name)[0]);
+  if (name) {
+    const dotClass = first(h.chemical_dot_class);
+    const released = yesNo(asList(h.chemical_release_occurred)[0]);
+    need(dotClass, "Hazardous condition: choose the DOT hazard class.");
+    need(released !== null, "Hazardous condition: say whether the material was released.");
+    if (asList(h.chemical_dot_class).length > 1 || asList(h.chemical_release_into).length > 1) {
+      warnings.push("NERIS takes one DOT class and one release area per material, so only the first is sent.");
+    }
+    const release = released ? compact({
+      estimated_amount: decimal(h.chemical_amount_est),
+      unit_of_measurement: first(h.chemical_amount_est_units),
+      physical_state: first(h.chemical_physical_state),
+      released_into: first(h.chemical_release_into),
+      cause: first(h.chemical_release_cause),
+    }) : null;
+    chemicals.push(compact({ name: name.slice(0, 255), release_occurred: released, dot_class: dotClass, release: release && Object.keys(release).length ? release : null }));
+  }
+  return compact({ evacuated, disposition, chemicals });
+}
+
+function buildMedicalDetails(report, need) {
+  const m = report.modules?.mod_medical || {};
+  const care = first(m.patient_evaluation_care);
+  need(care, "Medical: choose the patient care.");
+  return [compact({
+    patient_care_evaluation: care,
+    patient_status: first(m.patient_improved_status),
+    transport_disposition: first(m.medical_disposition),
+    patient_care_report_id: text(asList(m.patient_care_report)[0]).slice(0, 255),
+  })];
+}
+
+function buildActions(core) {
+  const noAction = first(core.incident_noaction);
+  if (noAction) return { action_noaction: { type: "NOACTION", noaction_type: noAction } };
+  const actions = codes(core.incident_actions_taken);
+  return actions.length ? { action_noaction: { type: "ACTION", actions } } : null;
+}
+
+const AID_DEPT_ID = /^F[DM]\d{8}$/;
+
+function buildAids(core, nerisId, warnings) {
+  const direction = first(core.incident_aid_direction);
+  const aidType = first(core.incident_aid_type);
+  const departments = asList(core.incident_aid_department_name).map(text).filter(Boolean);
+  if (!direction || direction === "NONE" || !departments.length) return [];
+  if (!aidType) {
+    warnings.push("Mutual aid isn't sent: choose the type of aid.");
+    return [];
+  }
+  const ids = [...new Set(departments.map((d) => d.toUpperCase()).filter((d) => AID_DEPT_ID.test(d) && d !== nerisId))];
+  const names = departments.filter((d) => !AID_DEPT_ID.test(d.toUpperCase()));
+  if (names.length) {
+    warnings.push(`Mutual aid not sent for ${names.join(", ")}: NERIS needs each department's NERIS ID (FD followed by 8 digits).`);
+  }
+  return ids.map((id) => ({ department_neris_id: id, aid_type: aidType, aid_direction: direction }));
+}
+
 function narrativeText(report = {}) {
   return text(report.workspace?.narrative?.body || report.modules?.core_mod_incident?.incident_narrative_outcome);
 }
@@ -183,9 +406,32 @@ function buildIncidentPayload({ report = {}, nerisId = "", profile = {}, apparat
     warnings.push(`Not in NERIS yet, sent by name only: ${notInNeris.join(", ")}. Send units from System Admin → Connected Services.`);
   }
 
+  // Detail sections. NERIS only accepts each one when a matching incident type is on the report.
+  const need = (ok, message) => { if (!ok) problems.push(message); };
+  const hasType = (prefix) => types.some((t) => t.startsWith(prefix));
+  const details = {};
+  const actions = buildActions(core);
+  if (actions) details.actions_tactics = actions;
+  const aids = buildAids(core, text(nerisId), warnings);
+  if (aids.length) details.aids = aids;
+  const nonfdAids = codes(core.incident_aid_nonfd);
+  if (nonfdAids.length) details.nonfd_aids = nonfdAids;
+  if (hasType("FIRE||")) details.fire_detail = buildFireDetail(report, types, need, warnings);
+  if (hasType("FIRE||STRUCTURE_FIRE")) {
+    // Not required when every aid was support given to another department.
+    const supportGivenOnly = aids.length > 0 && aids.every((a) => a.aid_type === "SUPPORT_AID" && a.aid_direction === "GIVEN");
+    const optional = () => {};
+    Object.assign(details, buildAlarmModules(report, { cooking: hasType("FIRE||STRUCTURE_FIRE||CONFINED_COOKING_APPLIANCE_FIRE") }, supportGivenOnly ? optional : need));
+  }
+  if (hasType("HAZSIT||")) details.hazsit_detail = buildHazsitDetail(report, need, warnings);
+  if (hasType("MEDICAL||")) details.medical_details = buildMedicalDetails(report, need);
+
   if (problems.length) return { payload: null, problems, warnings };
 
   const peoplePresent = yesNo(core.incident_people_present);
+  const animalsRescued = integer(core.incident_rescue_animal);
+  const displacementCauses = ws.location?.displaced === "True" ? codes(core.incident_displaced_cause) : [];
+  const answered = ts(cad.psapAnswerTime);
   const narrative = narrativeText(report);
   const dispatchNumber = NERIS_INCIDENT_NUMBER.test(text(cad.cadCallNumber)) ? text(cad.cadCallNumber) : incidentNumber;
 
@@ -195,12 +441,14 @@ function buildIncidentPayload({ report = {}, nerisId = "", profile = {}, apparat
     location,
     ...(peoplePresent === null ? {} : { people_present: peoplePresent }),
     ...(narrative ? { outcome_narrative: narrative.slice(0, 100000) } : {}),
+    ...(animalsRescued !== null ? { animals_rescued: Math.max(0, animalsRescued) } : {}),
+    ...(displacementCauses.length ? { displacement_causes: displacementCauses } : {}),
   };
 
   const dispatch = {
     incident_number: dispatchNumber,
     call_arrival: callTime,
-    call_answered: callTime,
+    call_answered: answered || callTime,
     call_create: callTime,
     location,
     unit_responses: unitResponses,
@@ -213,6 +461,7 @@ function buildIncidentPayload({ report = {}, nerisId = "", profile = {}, apparat
       incident_types: incidentTypes,
       dispatch,
       unit_responses: unitResponses,
+      ...details,
     },
     problems,
     warnings,
@@ -237,6 +486,7 @@ function validationMessages(result) {
 module.exports = {
   buildIncidentPayload,
   parseAddress,
+  toNerisCode,
   toNerisIncidentType,
   toNerisTimestamp,
   validationMessages,
