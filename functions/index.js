@@ -1625,3 +1625,4 @@ exports.heatZoneDeleteZone = heatZoneCall(heatZone.deleteZone, { timeoutSeconds:
 exports.heatZoneSaveSettings = heatZoneCall(heatZone.saveSettings, { memory: "256MiB", timeoutSeconds: 30 });
 exports.heatZoneSetDistrictAccess = heatZoneCall(heatZone.setDistrictAccess, { memory: "256MiB", timeoutSeconds: 30 });
 exports.heatZoneRebuild = heatZoneCall(heatZone.rebuild, { timeoutSeconds: 540 });
+exports.heatZoneSaveGeocoding = heatZoneCall(heatZone.saveGeocoding, { timeoutSeconds: 540 });

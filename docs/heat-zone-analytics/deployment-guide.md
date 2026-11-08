@@ -39,7 +39,7 @@ in this order never breaks the running app.
 
 2. **Functions** (triggers + callables)
    ```bash
-   firebase deploy --only functions:heatZoneOnReportItem,functions:heatZoneOnReportList,functions:heatZoneDashboard,functions:heatZoneMarkers,functions:heatZoneIncident,functions:heatZoneBoundaries,functions:heatZoneReport,functions:heatZoneGetSettings,functions:heatZoneSaveZones,functions:heatZoneDeleteZone,functions:heatZoneSaveSettings,functions:heatZoneSetDistrictAccess,functions:heatZoneRebuild --project staging
+   firebase deploy --only functions:heatZoneOnReportItem,functions:heatZoneOnReportList,functions:heatZoneDashboard,functions:heatZoneMarkers,functions:heatZoneIncident,functions:heatZoneBoundaries,functions:heatZoneReport,functions:heatZoneGetSettings,functions:heatZoneSaveZones,functions:heatZoneDeleteZone,functions:heatZoneSaveSettings,functions:heatZoneSetDistrictAccess,functions:heatZoneRebuild,functions:heatZoneSaveGeocoding --project staging
    ```
    (Or `npm run deploy:staging`, which deploys everything.)
 

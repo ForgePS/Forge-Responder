@@ -8,6 +8,8 @@
  *   heatZoneSettings/main    priority weights, high-priority list
  *   heatZoneAccess/{uid}     assigned districts for members without "all districts"
  *   heatZoneEvents/{eventId} processed-event ledger (dedupe; expireAt for TTL)
+ *   heatZoneSettings/geocoding  { enabled } — address geocoding switch
+ *   heatZoneGeocodes/{key}   geocoded report addresses (see geocode.js)
  *
  * Every entry point derives the department from the request path (triggers) or
  * verifies the caller's membership + permissions server-side (callables).
@@ -19,9 +21,11 @@ const { itemDocId, isItemsStorage } = require("../listItemsPlan");
 const { readList } = require("../listStore");
 const analytics = require("./analytics");
 const { featuresFromGeoJson, validateGeometry } = require("./geo");
-const { SOURCE_LIST_KEY, UNASSIGNED, projectReport } = require("./projection");
+const { SOURCE_LIST_KEY, UNASSIGNED, coordinates, projectReport } = require("./projection");
 const { addDays, localDayStartMs, localParts, safeTimeZone } = require("./time");
 const { createCache } = require("./cache");
+const geocode = require("./geocode");
+const { loadIntegration: loadGoogleApisIntegration } = require("../googleApisStore");
 
 const PERMISSIONS = Object.freeze({
   view: "viewHeatZoneAnalytics",
@@ -37,6 +41,7 @@ const MODULE_KEY = "analytics";
 const MAX_ROWS = 50_000;
 const EVENT_TTL_DAYS = 7;
 const ZONE_KINDS = ["district", "zone"];
+const GEOCODE_REBUILD_LIMIT = 300;
 const REPORT_TYPES = ["geographic", "district", "hourly", "daily", "classification", "comparison"];
 
 const cache = createCache();
@@ -49,6 +54,8 @@ const paths = {
   settings: (d) => `departments/${d}/heatZoneSettings/main`,
   access: (d, uid) => `departments/${d}/heatZoneAccess/${uid}`,
   events: (d) => `departments/${d}/heatZoneEvents`,
+  geocodingSettings: (d) => `departments/${d}/heatZoneSettings/geocoding`,
+  geocodes: (d) => `departments/${d}/heatZoneGeocodes`,
   sourceHeader: (d) => `departments/${d}/lists/${SOURCE_LIST_KEY}`,
   sourceItem: (d, docId) => `departments/${d}/lists/${SOURCE_LIST_KEY}/items/${docId}`,
 };
@@ -133,14 +140,18 @@ async function audit(db, departmentId, caller, action, summary, details = {}) {
 // ---------------------------------------------------------------- context
 
 async function loadContext(db, departmentId) {
-  const [profile, zonesSnap, meta, settingsSnap] = await Promise.all([
+  const [profile, zonesSnap, meta, settingsSnap, geocodingSnap] = await Promise.all([
     db.doc(`departments/${departmentId}/profile/main`).get(),
     db.collection(paths.zones(departmentId)).get(),
     db.doc(paths.meta(departmentId)).get(),
     db.doc(paths.settings(departmentId)).get(),
+    db.doc(paths.geocodingSettings(departmentId)).get(),
   ]);
   const zones = zonesSnap.docs.map((doc) => zoneFromDoc(doc)).filter(Boolean);
+  const p = profile.data() || {};
   return {
+    place: { city: text(p.city), state: text(p.stateId || p.state), zip: text(p.zip) },
+    geocoding: { enabled: geocodingSnap.data()?.enabled === true },
     departmentId,
     departmentName: text(profile.data()?.name) || departmentId,
     timeZone: safeTimeZone(profile.data()?.timezone),
@@ -182,6 +193,82 @@ function normalizeSettings(raw = {}) {
   return { priorityWeights: weights, highPriorities: high };
 }
 
+// ---------------------------------------------------------------- geocoding
+
+/** Key of the stored geocode a report would use, or "" when it needs none. */
+function reportGeocodeKey(report, ctx) {
+  if (!report || !ctx.geocoding?.enabled || report.voided === true) return "";
+  if (coordinates(report)) return "";
+  return geocode.geocodeKey(geocode.geocodeQuery(report.incidentAddress, ctx.place));
+}
+
+/** Context whose projections use stored geocodes (entries: Map key -> stored entry). */
+function withGeocodes(ctx, entries) {
+  return { ...ctx, geocodePoint: (report) => geocode.entryPoint(entries.get(reportGeocodeKey(report, ctx))) };
+}
+
+async function hasGoogleKey(db, departmentId) {
+  const integration = await loadGoogleApisIntegration(db, departmentId).catch(() => null);
+  return Boolean(integration?.geocodingApiKey || integration?.mapsJsApiKey);
+}
+
+/**
+ * Make sure the stored geocodes cover these reports: reads what is stored and,
+ * unless dryRun, looks up at most `limit` new addresses with the department's
+ * Google key. Lookup errors are logged and retried on a later write or rebuild.
+ */
+async function ensureGeocodes(db, ctx, reports, { geocoder = geocode.googleGeocoder, limit = GEOCODE_REBUILD_LIMIT, dryRun = false } = {}) {
+  const counts = { enabled: ctx.geocoding.enabled, googleConfigured: false, addresses: 0, stored: 0, lookedUp: 0, found: 0, notFound: 0, imprecise: 0, failed: 0, waiting: 0 };
+  const entries = new Map();
+  if (!ctx.geocoding.enabled) return { entries, counts };
+  const queries = new Map();
+  for (const report of reports) {
+    const key = reportGeocodeKey(report, ctx);
+    if (key && !queries.has(key)) queries.set(key, geocode.geocodeQuery(report.incidentAddress, ctx.place));
+  }
+  counts.addresses = queries.size;
+  if (!queries.size) return { entries, counts };
+  const col = db.collection(paths.geocodes(ctx.departmentId));
+  const keys = [...queries.keys()];
+  for (let i = 0; i < keys.length; i += 300) {
+    const snaps = await db.getAll(...keys.slice(i, i + 300).map((k) => col.doc(k)));
+    for (const snap of snaps) if (snap.exists) entries.set(snap.id, snap.data());
+  }
+  counts.stored = entries.size;
+  const todo = keys.filter((k) => geocode.needsLookup(entries.get(k), Date.now()));
+  counts.googleConfigured = await hasGoogleKey(db, ctx.departmentId);
+  if (dryRun || !counts.googleConfigured) {
+    counts.waiting = todo.length;
+    return { entries, counts };
+  }
+  const now = todo.slice(0, limit);
+  counts.waiting = todo.length - now.length;
+  const results = await geocode.mapLimit(now, 5, async (key) => {
+    try {
+      return [key, geocode.entryFromResult(queries.get(key), await geocoder(db, ctx.departmentId, queries.get(key)))];
+    } catch (error) {
+      console.warn("heat zone geocode failed", ctx.departmentId, error?.status || error?.message);
+      return [key, null];
+    }
+  });
+  const writes = [];
+  for (const [key, entry] of results) {
+    if (!entry) { counts.failed += 1; counts.waiting += 1; continue; }
+    counts.lookedUp += 1;
+    if (entry.status === geocode.STATUS.ok) counts.found += 1;
+    else if (entry.status === geocode.STATUS.imprecise) counts.imprecise += 1;
+    else counts.notFound += 1;
+    entries.set(key, entry);
+    writes.push([key, { ...entry, departmentId: ctx.departmentId }]);
+  }
+  for (let i = 0; i < writes.length; i += 400) {
+    const batch = db.batch();
+    for (const [key, data] of writes.slice(i, i + 400)) batch.set(col.doc(key), data);
+    await batch.commit();
+  }
+  return { entries, counts };
+}
+
 // ---------------------------------------------------------------- event processing
 
 /** Current state of one report in the source list (either storage format). */
@@ -204,8 +291,16 @@ async function readSourceReport(tx, db, departmentId, docId) {
  * converge on the same result. Returns "created" | "updated" | "deleted" |
  * "unchanged" | "duplicate" | "skipped" | "rejected".
  */
-async function syncReport(db, departmentId, docId, { eventId = "", reason = "write" } = {}) {
+async function syncReport(db, departmentId, docId, { eventId = "", reason = "write", geocoder } = {}) {
   const ctx = await loadContext(db, departmentId);
+  if (ctx.geocoding.enabled) {
+    // Look the address up before the transaction (network call); the
+    // transaction then reads the stored result for whatever the report holds.
+    const current = await readSourceReport({ get: (ref) => ref.get() }, db, departmentId, docId);
+    if (current && !(text(current.departmentId) && text(current.departmentId) !== departmentId)) {
+      await ensureGeocodes(db, ctx, [current], { geocoder, limit: 1 });
+    }
+  }
   const projectionRef = db.doc(`${paths.calls(departmentId)}/${docId}`);
   const metaRef = db.doc(paths.meta(departmentId));
   const ledgerRef = eventId ? db.doc(`${paths.events(departmentId)}/${eventId.replace(/\//g, "_").slice(0, 200)}`) : null;
@@ -226,7 +321,10 @@ async function syncReport(db, departmentId, docId, { eventId = "", reason = "wri
       outcome = "rejected";
       if (existing.exists) tx.delete(projectionRef);
     } else {
-      const projection = report ? projectReport(report, ctx) : null;
+      const key = reportGeocodeKey(report, ctx);
+      const stored = key ? await tx.get(db.doc(`${paths.geocodes(departmentId)}/${key}`)) : null;
+      const entries = new Map(stored?.exists ? [[key, stored.data()]] : []);
+      const projection = report ? projectReport(report, withGeocodes(ctx, entries)) : null;
       if (!projection) {
         outcome = existing.exists ? "deleted" : "skipped";
         if (existing.exists) tx.delete(projectionRef);
@@ -256,17 +354,17 @@ async function syncReport(db, departmentId, docId, { eventId = "", reason = "wri
 }
 
 /** Trigger: departments/{departmentId}/lists/{listKey}/items/{itemId} */
-async function handleItemWritten(db, event) {
+async function handleItemWritten(db, event, options = {}) {
   const { departmentId, itemId, listKey = SOURCE_LIST_KEY } = event.params || {};
   if (listKey !== SOURCE_LIST_KEY) return "ignored";
-  return syncReport(db, departmentId, itemId, { eventId: event.id || "", reason: "report-write" });
+  return syncReport(db, departmentId, itemId, { ...options, eventId: event.id || "", reason: "report-write" });
 }
 
 /**
  * Trigger: departments/{departmentId}/lists/{listKey} (legacy array storage).
  * Items-storage lists are handled per item, so the header is ignored then.
  */
-async function handleListWritten(db, event) {
+async function handleListWritten(db, event, options = {}) {
   const { departmentId, listKey = SOURCE_LIST_KEY } = event.params || {};
   if (listKey !== SOURCE_LIST_KEY) return [];
   const before = event.data?.before?.exists ? event.data.before.data() || {} : null;
@@ -282,6 +380,7 @@ async function handleListWritten(db, event) {
   const results = [];
   for (const docId of touched) {
     results.push(await syncReport(db, departmentId, docId, {
+      ...options,
       eventId: event.id ? `${event.id}-${docId}` : "",
       reason: "report-write",
     }));
@@ -293,15 +392,21 @@ async function handleListWritten(db, event) {
  * Recalculate every projection for one department from the source list
  * (historical recalculation after zone/time-zone changes, or a backfill).
  */
-async function rebuildDepartment(db, departmentId, { reason = "rebuild", dryRun = false } = {}) {
-  const ctx = await loadContext(db, departmentId);
+async function rebuildDepartment(db, departmentId, { reason = "rebuild", dryRun = false, geocoder, geocodeLimit = GEOCODE_REBUILD_LIMIT } = {}) {
+  const baseCtx = await loadContext(db, departmentId);
   const source = await readList(db, departmentId, SOURCE_LIST_KEY);
   const wanted = new Map();
   let skipped = 0;
   let rejected = 0;
+  const own = [];
   for (const report of source.items) {
     if (!report || !text(report.id)) { skipped += 1; continue; }
     if (text(report.departmentId) && text(report.departmentId) !== departmentId) { rejected += 1; continue; }
+    own.push(report);
+  }
+  const { entries, counts: geocoding } = await ensureGeocodes(db, baseCtx, own, { geocoder, limit: geocodeLimit, dryRun });
+  const ctx = withGeocodes(baseCtx, entries);
+  for (const report of own) {
     const docId = itemDocId(report.id);
     if (wanted.has(docId)) continue;
     const projection = projectReport(report, ctx);
@@ -314,7 +419,7 @@ async function rebuildDepartment(db, departmentId, { reason = "rebuild", dryRun 
     if (have.get(docId) !== projection.contentHash) writes.push(["set", docId, projection]);
   }
   for (const docId of have.keys()) if (!wanted.has(docId)) writes.push(["delete", docId]);
-  const counts = { projected: wanted.size, written: writes.filter((w) => w[0] === "set").length, removed: writes.filter((w) => w[0] === "delete").length, skipped, rejected };
+  const counts = { projected: wanted.size, written: writes.filter((w) => w[0] === "set").length, removed: writes.filter((w) => w[0] === "delete").length, skipped, rejected, geocoding };
   if (dryRun) return counts;
   const col = db.collection(paths.calls(departmentId));
   for (let i = 0; i < writes.length; i += 400) {
@@ -618,13 +723,16 @@ function zoneId(name) {
 async function getSettings(db, request) {
   const caller = await resolveCaller(db, request, [PERMISSIONS.view, PERMISSIONS.manage]);
   const ctx = await loadContext(db, caller.departmentId);
-  const [users, access] = await Promise.all([
+  const [users, access, googleConfigured, geocodedCount] = await Promise.all([
     db.collection(`departments/${caller.departmentId}/users`).get(),
     db.collection(`departments/${caller.departmentId}/heatZoneAccess`).get(),
+    hasGoogleKey(db, caller.departmentId),
+    db.collection(paths.geocodes(caller.departmentId)).where("status", "==", geocode.STATUS.ok).count().get().then((snap) => snap.data().count).catch(() => null),
   ]);
   const byUid = new Map(access.docs.map((d) => [d.id, d.data()?.districtIds || []]));
   return {
     settings: ctx.settings,
+    geocoding: { enabled: ctx.geocoding.enabled, googleConfigured, geocodedAddresses: geocodedCount },
     timeZone: ctx.timeZone,
     zones: ctx.zones.map(({ id, name, kind, color, priority, active, bbox }) => ({ id, name, kind, color, priority, active, bbox })),
     members: users.docs
@@ -717,6 +825,21 @@ async function saveSettings(db, request) {
   return { settings };
 }
 
+/** heatZoneSaveGeocoding: turn address geocoding on or off, then recalculate. */
+async function saveGeocoding(db, request, { geocoder } = {}) {
+  const caller = await resolveCaller(db, request, [PERMISSIONS.view, PERMISSIONS.manage]);
+  if (typeof request.data?.enabled !== "boolean") throw new HttpsError("invalid-argument", "enabled must be true or false.");
+  const enabled = request.data.enabled;
+  if (enabled && !(await hasGoogleKey(db, caller.departmentId))) {
+    throw new HttpsError("failed-precondition", "Add a Google Geocoding API key in System Admin → Google APIs first.");
+  }
+  await db.doc(paths.geocodingSettings(caller.departmentId)).set({ enabled, departmentId: caller.departmentId, updatedAt: Date.now(), updatedBy: caller.uid });
+  const rebuild = await rebuildDepartment(db, caller.departmentId, { reason: enabled ? "geocoding-on" : "geocoding-off", geocoder });
+  await audit(db, caller.departmentId, caller, "heat_zone_geocoding_changed",
+    `Turned Heat Zone address geocoding ${enabled ? "on" : "off"}`, { recordId: "geocoding", enabled, geocoding: rebuild.geocoding });
+  return { enabled, rebuild };
+}
+
 async function setDistrictAccess(db, request) {
   const caller = await resolveCaller(db, request, [PERMISSIONS.view, PERMISSIONS.manage]);
   const uid = text(request.data?.uid);
@@ -757,6 +880,7 @@ module.exports = {
   rebuildDepartment,
   report,
   resolveCaller,
+  saveGeocoding,
   saveSettings,
   saveZones,
   setDistrictAccess,

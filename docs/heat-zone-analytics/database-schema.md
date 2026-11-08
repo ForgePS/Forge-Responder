@@ -65,6 +65,27 @@ The only Heat Zone document browsers may read (live-update signal; contains no c
 `{ docId, outcome, reason, processedAt, expireAt }`. Firestore **TTL policy on `expireAt`** (7 days)
 is declared in `firestore.indexes.json`.
 
+### `heatZoneSettings/geocoding` — address geocoding switch
+
+`{ enabled, departmentId, updatedAt, updatedBy }`. Off unless a Heat Zone manager turns it on. Kept
+apart from `heatZoneSettings/main` so saving priority weights can never change it.
+
+### `heatZoneGeocodes/{key}` — geocoded report addresses (server-only)
+
+One entry per normalised address query; `key` is a SHA-256 of the lower-cased query (32 hex chars).
+`{ query, status: "ok" | "not_found" | "imprecise", lat?, lng?, locationType?, formattedAddress?,
+geocodedAt, retryAfter? (not_found only, +30 days), departmentId }`.
+
+* The query is `incidentAddress`, completed with the profile's `city`, `stateId` and `zip` when it has no comma.
+* Only Google `ROOFTOP`, `RANGE_INTERPOLATED` and `GEOMETRIC_CENTER` results are used. `APPROXIMATE`
+  (town or postcode level) and partial matches are stored as `imprecise` and never mapped.
+* Network, quota and key errors are **not** stored, so the address is retried on the next write or
+  recalculation.
+* Geocodes are **never written into the NERIS report**. The report stays the authoritative record that
+  members edit and that is submitted to NERIS.
+* Projections gain `locationSource`: `"report"` (coordinates on the report, which always win),
+  `"geocoded"` or `""` (not mapped).
+
 ## "Migrations"
 
 Firestore has no DDL. The equivalent artefacts in this sprint:

@@ -43,6 +43,8 @@ export const setHeatZoneDistrictAccess = (departmentId, uid, districtIds) =>
 
 export const rebuildHeatZone = (departmentId) => call("heatZoneRebuild", { departmentId });
 
+export const saveHeatZoneGeocoding = (departmentId, enabled) => call("heatZoneSaveGeocoding", { departmentId, enabled });
+
 /**
  * Listen to the department's analytics change counter. Firestore rules only
  * allow this for members with Heat Zone access in that department.

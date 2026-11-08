@@ -403,3 +403,157 @@ describe("reports", () => {
     assert.match(r.meta.districtScope, /Assigned districts/);
   });
 });
+
+describe("address geocoding", () => {
+  // Stand-in for Google: records every lookup. Nothing leaves the machine in tests.
+  function fakeGeocoder(answers = {}) {
+    const calls = [];
+    const fn = async (_db, departmentId, query) => {
+      calls.push({ departmentId, query });
+      const answer = answers[query];
+      if (answer instanceof Error) throw answer;
+      if (answer === undefined) return { latitude: NORTH.latitude, longitude: NORTH.longitude, locationType: "ROOFTOP", formattedAddress: query };
+      return answer;
+    };
+    fn.calls = calls;
+    return fn;
+  }
+  const noCoords = (id, address, extra = {}) => report(id, "10", { loc: null, address, ...extra });
+  const googleKey = (departmentId) => db.doc(`departments/${departmentId}/integrations/googleApis`).set({ geocodingApiKey: "test-key-not-real" });
+  const call = (departmentId, id) => db.doc(`departments/${departmentId}/heatZoneCalls/${itemDocId(id)}`).get().then((s) => s.data());
+  const turnOn = (geocoder, departmentId = A, uid = "chief-a") =>
+    heatZone.saveGeocoding(db, req(uid, { departmentId, enabled: true }), { geocoder });
+
+  beforeEach(async () => {
+    await db.doc(`departments/${A}/profile/main`).set({ city: "Forest", stateId: "MS", zip: "39074" }, { merge: true });
+  });
+
+  it("is off by default: calls without coordinates are counted but not mapped, and nothing is looked up", async () => {
+    const geocoder = fakeGeocoder();
+    await googleKey(A);
+    await writeReport(A, noCoords("A-10", "12 Oak St"));
+    await heatZone.handleItemWritten(db, itemEvent(A, "A-10"), { geocoder });
+    const row = await call(A, "A-10");
+    assert.equal(row.mapped, false);
+    assert.equal(geocoder.calls.length, 0);
+  });
+
+  it("only managers can turn it on, and only with a Google key", async () => {
+    const geocoder = fakeGeocoder();
+    await expectCode(heatZone.saveGeocoding(db, req("officer-a", { departmentId: A, enabled: true }), { geocoder }), "permission-denied");
+    await expectCode(turnOn(geocoder), "failed-precondition");
+    await expectCode(heatZone.saveGeocoding(db, req("chief-a", { departmentId: A, enabled: "yes" }), { geocoder }), "invalid-argument");
+    await googleKey(A);
+    const res = await turnOn(geocoder);
+    assert.equal(res.enabled, true);
+    const settings = await heatZone.getSettings(db, req("chief-a", { departmentId: A }));
+    assert.equal(settings.geocoding.enabled, true);
+    assert.equal(settings.geocoding.googleConfigured, true);
+    const audit = await db.collection(`departments/${A}/auditLogs`).where("action", "==", "heat_zone_geocoding_changed").get();
+    assert.equal(audit.size, 1);
+  });
+
+  it("places a report on the map from its address, completed with the department city, and reuses the result", async () => {
+    const geocoder = fakeGeocoder();
+    await googleKey(A);
+    await turnOn(geocoder);
+    await writeReport(A, noCoords("A-10", "12 Oak St"));
+    assert.equal(await heatZone.handleItemWritten(db, itemEvent(A, "A-10"), { geocoder }), "created");
+    const row = await call(A, "A-10");
+    assert.equal(row.mapped, true);
+    assert.equal(row.locationSource, "geocoded");
+    assert.equal(row.districtId, districtsA.North);
+    assert.deepEqual(geocoder.calls, [{ departmentId: A, query: "12 Oak St, Forest, MS 39074" }]);
+
+    // Same address (different case/spacing) on another report: no second lookup.
+    await writeReport(A, noCoords("A-11", "12  oak st"));
+    await heatZone.handleItemWritten(db, itemEvent(A, "A-11"), { geocoder });
+    assert.equal((await call(A, "A-11")).mapped, true);
+    assert.equal(geocoder.calls.length, 1);
+
+    // The NERIS report itself is never modified.
+    const source = await db.doc(`departments/${A}/lists/${LIST}/items/${itemDocId("A-10")}`).get();
+    assert.equal(source.data().workspace.location, null);
+  });
+
+  it("coordinates on the report always win and are never looked up", async () => {
+    const geocoder = fakeGeocoder();
+    await googleKey(A);
+    await turnOn(geocoder);
+    assert.equal(geocoder.calls.length, 0); // seeded reports all have CAD coordinates
+    assert.equal((await call(A, "A-4")).locationSource, "report");
+    assert.equal((await call(A, "A-4")).districtId, districtsA.South);
+  });
+
+  it("vague, unknown and failed lookups are not mapped; failures are retried later", async () => {
+    const geocoder = fakeGeocoder({
+      "Somewhere, Forest, MS 39074": { latitude: 32.36, longitude: -89.47, locationType: "APPROXIMATE" },
+      "99 Nowhere Ln, Forest, MS 39074": null,
+      "5 Flaky Rd, Forest, MS 39074": Object.assign(new Error("quota"), { status: "OVER_QUERY_LIMIT" }),
+    });
+    await googleKey(A);
+    await writeReport(A, noCoords("A-20", "Somewhere"));
+    await writeReport(A, noCoords("A-21", "99 Nowhere Ln"));
+    await writeReport(A, noCoords("A-22", "5 Flaky Rd"));
+    const res = await turnOn(geocoder);
+    assert.equal(res.rebuild.geocoding.imprecise, 1);
+    assert.equal(res.rebuild.geocoding.notFound, 1);
+    assert.equal(res.rebuild.geocoding.failed, 1);
+    for (const id of ["A-20", "A-21", "A-22"]) assert.equal((await call(A, id)).mapped, false, id);
+
+    // The next recalculation retries only the failure.
+    const retry = fakeGeocoder();
+    const again = await heatZone.rebuildDepartment(db, A, { geocoder: retry });
+    assert.deepEqual(retry.calls.map((c) => c.query), ["5 Flaky Rd, Forest, MS 39074"]);
+    assert.equal(again.geocoding.found, 1);
+    assert.equal((await call(A, "A-22")).mapped, true);
+  });
+
+  it("limits lookups per recalculation and reports what is still waiting", async () => {
+    const geocoder = fakeGeocoder();
+    await googleKey(A);
+    await db.doc(`departments/${A}/heatZoneSettings/geocoding`).set({ enabled: true });
+    for (let i = 0; i < 4; i += 1) await writeReport(A, noCoords(`A-3${i}`, `${i + 1} Elm St`));
+    const first = await heatZone.rebuildDepartment(db, A, { geocoder, geocodeLimit: 3 });
+    assert.equal(first.geocoding.lookedUp, 3);
+    assert.equal(first.geocoding.waiting, 1);
+    const dry = await heatZone.rebuildDepartment(db, A, { geocoder, dryRun: true });
+    assert.equal(dry.geocoding.waiting, 1);
+    assert.equal(geocoder.calls.length, 3); // dry runs never call Google
+  });
+
+  it("geocodes stay inside their department", async () => {
+    const geocoder = fakeGeocoder();
+    await googleKey(A);
+    await turnOn(geocoder);
+    await writeReport(A, noCoords("A-10", "12 Oak St"));
+    await heatZone.handleItemWritten(db, itemEvent(A, "A-10"), { geocoder });
+
+    // B has the same address and geocoding on, but no Google key: A's stored result is not used.
+    await db.doc(`departments/${B}/profile/main`).set({ city: "Forest", stateId: "MS", zip: "39074" }, { merge: true });
+    await db.doc(`departments/${B}/heatZoneSettings/geocoding`).set({ enabled: true });
+    await writeReport(B, noCoords("B-10", "12 Oak St"));
+    await heatZone.handleItemWritten(db, itemEvent(B, "B-10"), { geocoder });
+    assert.equal((await call(B, "B-10")).mapped, false);
+    assert.ok(geocoder.calls.every((c) => c.departmentId === A));
+    assert.equal((await db.collection(`departments/${B}/heatZoneGeocodes`).get()).size, 0);
+    const storedA = await db.collection(`departments/${A}/heatZoneGeocodes`).get();
+    assert.ok(storedA.size > 0 && storedA.docs.every((d) => d.data().departmentId === A));
+
+    // A record claiming another department is never sent to Google.
+    await writeReport(A, noCoords("A-x", "77 Spoof St", { departmentId: B }));
+    assert.equal(await heatZone.handleItemWritten(db, itemEvent(A, "A-x"), { geocoder }), "rejected");
+    assert.ok(!geocoder.calls.some((c) => c.query.startsWith("77 Spoof")));
+  });
+
+  it("turning it off takes address-only calls off the map", async () => {
+    const geocoder = fakeGeocoder();
+    await googleKey(A);
+    await writeReport(A, noCoords("A-10", "12 Oak St"));
+    await turnOn(geocoder);
+    assert.equal((await call(A, "A-10")).mapped, true);
+    await heatZone.saveGeocoding(db, req("chief-a", { departmentId: A, enabled: false }), { geocoder });
+    assert.equal((await call(A, "A-10")).mapped, false);
+    assert.equal((await call(A, "A-1")).mapped, true);
+  });
+});

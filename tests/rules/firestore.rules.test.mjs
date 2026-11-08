@@ -1028,7 +1028,7 @@ describe("public platform look", () => {
 describe("heat zone analytics data", () => {
   const analystA = () => as("analyst-a", { email: "analyst@a.gov", email_verified: true });
   const analystB = () => as("analyst-b", { email: "analyst@b.gov", email_verified: true });
-  const HZ = ["heatZoneCalls/c1", "heatZoneZones/z1", "heatZoneSettings/main", "heatZoneAccess/analyst-a", "heatZoneEvents/e1"];
+  const HZ = ["heatZoneCalls/c1", "heatZoneZones/z1", "heatZoneSettings/main", "heatZoneAccess/analyst-a", "heatZoneEvents/e1", "heatZoneGeocodes/g1", "heatZoneSettings/geocoding"];
 
   beforeEach(async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {

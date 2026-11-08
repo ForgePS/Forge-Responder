@@ -154,7 +154,10 @@ function projectReport(report, ctx) {
   const occurredAt = occurredAtMs(report, timeZone);
   if (occurredAt === null) return null;
   const local = localParts(occurredAt, timeZone);
-  const point = coordinates(report);
+  const reported = coordinates(report);
+  // Coordinates on the report always win; a geocoded address is the fallback.
+  const geocoded = reported ? null : (ctx.geocodePoint ? ctx.geocodePoint(report) : null);
+  const point = reported || geocoded;
   const { districtId, zoneIds } = assignZones(point, ctx.zones);
   const unitList = units(report);
   const cad = report.workspace?.cad || {};
@@ -173,6 +176,7 @@ function projectReport(report, ctx) {
     lat: point ? point.lat : null,
     lng: point ? point.lng : null,
     mapped: Boolean(point),
+    locationSource: reported ? "report" : geocoded ? "geocoded" : "",
     address: text(report.incidentAddress).slice(0, 200),
     locationKey: locationKey(report.incidentAddress, point),
     ...classify(report),
@@ -198,6 +202,7 @@ module.exports = {
   UNASSIGNED,
   assignZones,
   classify,
+  coordinates,
   codeSegments,
   disposition,
   locationKey,

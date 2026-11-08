@@ -39,6 +39,10 @@ async function main() {
     const counts = await rebuildDepartment(db, dept.id, { reason: "backfill", dryRun: !APPLY });
     if (!counts.projected && !counts.removed) continue;
     console.log(`${dept.id}: ${counts.projected} incidents, ${APPLY ? "wrote" : "would write"} ${counts.written}, ${APPLY ? "removed" : "would remove"} ${counts.removed}, skipped ${counts.skipped} (no usable time), rejected ${counts.rejected} (other department id)`);
+    const g = counts.geocoding;
+    if (g?.enabled && g.addresses) {
+      console.log(`  addresses: ${g.addresses} without coordinates, ${g.found} located now, ${g.notFound + g.imprecise} not mappable, ${g.failed} failed, ${g.waiting} waiting${g.googleConfigured ? "" : " (no Google key)"}`);
+    }
     for (const key of Object.keys(total)) total[key] += counts[key];
   }
   console.log(`\nTotal: ${total.projected} incidents, ${total.written} to write, ${total.removed} to remove, ${total.skipped} skipped, ${total.rejected} rejected.`);

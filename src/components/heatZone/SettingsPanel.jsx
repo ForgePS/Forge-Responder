@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, Scale } from "lucide-react";
+import { MapPin, RefreshCw, Scale } from "lucide-react";
 import { Panel } from "../shell/ui.jsx";
-import { loadHeatZoneSettings, rebuildHeatZone, saveHeatZoneSettings } from "../../lib/heatZone/heatZoneService.js";
+import { loadHeatZoneSettings, rebuildHeatZone, saveHeatZoneGeocoding, saveHeatZoneSettings } from "../../lib/heatZone/heatZoneService.js";
 import { formatInZone } from "../../lib/heatZone/heatZoneFilters.js";
 import { describeError, rebuildSummary } from "../../lib/heatZone/heatZoneUi.js";
 import AccessSettings from "./AccessSettings.jsx";
@@ -62,6 +62,52 @@ function PriorityWeights({ settings, priorityOptions = [], status, run, onSaved,
       {invalid.length > 0 && <p className="hz-panel-note is-error">Weights must be greater than 0 and at most 100.</p>}
       <div className="hz-section-actions">
         <button type="button" className="primary-button hz-button" disabled={busy || invalid.length > 0 || !priorities.length} onClick={save}>Save priority settings</button>
+      </div>
+    </Panel>
+  );
+}
+
+function AddressGeocoding({ departmentId, geocoding = {}, status, run, onSaved }) {
+  const busy = Boolean(status?.busy);
+  const enabled = geocoding.enabled === true;
+  const canTurnOn = geocoding.googleConfigured === true;
+
+  const toggle = () => {
+    const next = !enabled;
+    const question = next
+      ? "Look up incident addresses that have no coordinates with your department's Google Geocoding key? Addresses are sent to Google and each new address counts toward your Google usage."
+      : "Stop locating incident addresses? Calls placed on the map only by address will be removed from the map.";
+    if (!window.confirm(question)) return;
+    run(async () => {
+      const res = await saveHeatZoneGeocoding(departmentId, next);
+      onSaved(res.enabled);
+      return `Address geocoding turned ${next ? "on" : "off"}. ${rebuildSummary(res.rebuild)}`;
+    });
+  };
+
+  return (
+    <Panel title="Address geocoding" icon={MapPin}>
+      <p className="hz-panel-note">
+        Reports entered without coordinates can be placed on the map from their incident address. Coordinates from CAD always take priority.
+        Addresses without a city get your department&apos;s city and state added. Results that only match a town or ZIP code are not mapped.
+      </p>
+      <p className="hz-panel-note">
+        {!canTurnOn && !enabled
+          ? "A Google Geocoding API key is needed first (System Admin → Google APIs)."
+          : enabled
+            ? `On.${Number.isFinite(geocoding.geocodedAddresses) ? ` ${geocoding.geocodedAddresses.toLocaleString()} addresses located so far.` : ""}`
+            : "Off. Calls without coordinates are counted but not mapped."}
+      </p>
+      <SectionStatus status={status} />
+      <div className="hz-section-actions">
+        <button
+          type="button"
+          className={`${enabled ? "secondary-button" : "primary-button"} hz-button`}
+          disabled={busy || (!enabled && !canTurnOn)}
+          onClick={toggle}
+        >
+          <MapPin size={14} /> {enabled ? "Turn off address geocoding" : "Turn on address geocoding"}
+        </button>
       </div>
     </Panel>
   );
@@ -148,6 +194,13 @@ export default function SettingsPanel({ departmentId, timeZone, priorityOptions,
         status={status.weights}
         run={(fn) => (anyBusy ? Promise.resolve() : run("weights", fn))}
         onSaved={(settings) => { setData((prev) => ({ ...prev, settings })); onChanged({ zones: false }); }}
+      />
+      <AddressGeocoding
+        departmentId={departmentId}
+        geocoding={data.geocoding || {}}
+        status={status.geocoding}
+        run={(fn) => (anyBusy ? Promise.resolve() : run("geocoding", fn, "Locating addresses and recalculating…"))}
+        onSaved={() => { onChanged({ zones: false }); setReloadKey((k) => k + 1); }}
       />
       <AccessSettings
         departmentId={departmentId}

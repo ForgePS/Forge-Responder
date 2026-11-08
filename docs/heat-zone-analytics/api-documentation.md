@@ -51,6 +51,7 @@ Ranges are limited to 3 years. The server returns the normalised filters it actu
 | `heatZoneSaveSettings` | + `manageHeatZoneSettings` | Priority weights, high-priority list |
 | `heatZoneSetDistrictAccess` | + `manageHeatZoneSettings` | Assign districts to a member |
 | `heatZoneRebuild` | + `manageHeatZoneSettings` | Recalculate every projection from the source reports |
+| `heatZoneSaveGeocoding` | + `manageHeatZoneSettings` | Turn address geocoding on or off; recalculates |
 
 ### heatZoneDashboard
 
@@ -138,7 +139,13 @@ Each call writes `departments/{d}/auditLogs` (`action: "heat_zone_report_exporte
 * `heatZoneDeleteZone { departmentId, zoneId }` → `{ deleted, rebuild }`
 * `heatZoneSaveSettings { departmentId, settings: { priorityWeights: {Emergency: 3, …}, highPriorities: ["Emergency"] } }`
 * `heatZoneSetDistrictAccess { departmentId, uid, districtIds: [] }` (ids must be existing districts or `"unassigned"`)
-* `heatZoneRebuild { departmentId }` → `{ projected, written, removed, skipped, rejected }`
+* `heatZoneRebuild { departmentId }` → `{ projected, written, removed, skipped, rejected, geocoding }`.
+  `geocoding` = `{ enabled, googleConfigured, addresses, stored, lookedUp, found, notFound, imprecise, failed, waiting }`.
+  At most 300 new addresses are looked up per recalculation; `waiting` says how many are left.
+* `heatZoneSaveGeocoding { departmentId, enabled: boolean }` → `{ enabled, rebuild }`. Turning it on
+  needs a Google Geocoding (or Maps JS) key in the department's Google APIs integration
+  (`failed-precondition` otherwise). Audited as `heat_zone_geocoding_changed`.
+* `heatZoneGetSettings` also returns `geocoding: { enabled, googleConfigured, geocodedAddresses }`.
 
 ## Live updates
 

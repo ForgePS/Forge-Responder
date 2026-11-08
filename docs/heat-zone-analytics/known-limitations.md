@@ -5,11 +5,17 @@
 1. **No CAD calls-for-service archive.** The module analyses NERIS incident reports, the only
    authoritative incident records. Calls that never become a NERIS report are not counted.
    Active911 alerts keep no history (rolling 25 alerts) and are not used.
-2. **Coordinates.** Reports created in the editor have no latitude/longitude input; only CAD imports
-   (mapping added this sprint) and demo data carry coordinates. Unmapped calls are counted in every
-   statistic and chart, shown as "N not mapped", and excluded from the map and geographic bounds.
-   *Next step:* geocode `incidentAddress` server-side with the existing `googleGeocode` integration
-   when a department has Google APIs configured, or add lat/lng fields to the report editor.
+2. **Coordinates.** Reports created in the editor have no latitude/longitude input; CAD imports and
+   demo data carry coordinates. With **Settings → Address geocoding** turned on (needs the department's
+   Google Geocoding key), reports without coordinates are placed from their incident address. Calls that
+   are still unmapped are counted in every statistic and chart, shown as "N not mapped", and excluded
+   from the map and geographic bounds.
+   * Addresses that only match a town or ZIP code are deliberately not mapped.
+   * Each recalculation looks up at most 300 new addresses; run it again for larger backlogs. New
+     reports are looked up as they are saved.
+   * Geocoding uses the department's Google quota and sends incident addresses to Google, so it is off
+     by default.
+   * There is no manual pin placement for addresses Google can't find.
 3. **No incident disposition or call status fields.** Disposition is derived (see database-schema.md);
    "status" is the NERIS report workflow status.
 4. **No districts / beats existed.** Boundaries must be uploaded per department (GeoJSON). Until then,

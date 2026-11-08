@@ -47,6 +47,25 @@ filters, boundaries, comparisons and exports.
 * Boundary changes recalculate past calls, and invalid GeoJSON is rejected.
 * Reports carry agency, range, filters and generated time, and are audited in the correct department.
 
+## Address geocoding (added after the sprint)
+
+* 8 function tests:
+  * off by default;
+  * managers only, with a key required;
+  * short addresses are completed with the department's city, state and ZIP;
+  * one lookup per address;
+  * report coordinates win;
+  * vague, missing and failed lookups are not mapped, and failures are retried;
+  * per-run limit, and dry runs never call Google;
+  * geocodes are isolated between departments;
+  * turning geocoding off takes address-only calls off the map.
+* 6 unit tests cover the helpers and Google precision handling.
+* The rules tests confirm `heatZoneGeocodes` and `heatZoneSettings/geocoding` can't be read or written
+  from the browser.
+* After the change: unit 426/426, rules 104/104, functions 113/113, lint and build pass.
+* In the browser, the Settings panel shows the "key needed" state and turns on and off. All demo
+  reports have CAD coordinates, so no lookups ran. No real Google call was made in any test.
+
 ## Browser checks (emulator, demo department, 130 demo reports)
 
 * Live update appeared without a reload.

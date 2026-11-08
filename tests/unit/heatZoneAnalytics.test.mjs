@@ -324,3 +324,76 @@ describe("CAD import coordinates", () => {
     assert.equal(parseCadPayload(JSON.stringify({ incident_number: "26-2", address: "1 Main St" }), "run.json").payload.location, undefined);
   });
 });
+
+describe("address geocoding helpers", () => {
+  const geocode = require("../../functions/lib/heatZone/geocode.js");
+  const { geocodeAddress } = require("../../functions/lib/googleMapsService.js");
+  const place = { city: "Forest", state: "MS", zip: "39074" };
+
+  it("completes short addresses with the department city, state and ZIP", () => {
+    assert.equal(geocode.geocodeQuery("12 Oak St", place), "12 Oak St, Forest, MS 39074");
+    assert.equal(geocode.geocodeQuery("12 Oak St, Morton, MS", place), "12 Oak St, Morton, MS");
+    assert.equal(geocode.geocodeQuery("12 Oak St", {}), "12 Oak St");
+    assert.equal(geocode.geocodeQuery("", place), "");
+    assert.equal(geocode.geocodeQuery("123", place), "");
+  });
+
+  it("keys ignore case, spacing and punctuation, and differ by address", () => {
+    const a = geocode.geocodeKey("12 Oak St, Forest, MS 39074");
+    assert.equal(a, geocode.geocodeKey("12  oak st. ,forest, ms 39074"));
+    assert.notEqual(a, geocode.geocodeKey("14 Oak St, Forest, MS 39074"));
+    assert.equal(geocode.geocodeKey(""), "");
+    assert.match(a, /^[0-9a-f]{32}$/);
+  });
+
+  it("keeps precise matches and rejects town-level, partial and missing ones", () => {
+    const ok = geocode.entryFromResult("q", { latitude: 32.36, longitude: -89.47, locationType: "ROOFTOP" }, 1000);
+    assert.equal(ok.status, "ok");
+    assert.deepEqual(geocode.entryPoint(ok), { lat: 32.36, lng: -89.47 });
+    assert.equal(geocode.entryFromResult("q", { latitude: 32.36, longitude: -89.47, locationType: "APPROXIMATE" }).status, "imprecise");
+    assert.equal(geocode.entryFromResult("q", { latitude: 32.36, longitude: -89.47, locationType: "ROOFTOP", partialMatch: true }).status, "imprecise");
+    const missing = geocode.entryFromResult("q", null, 1000);
+    assert.equal(missing.status, "not_found");
+    assert.equal(geocode.entryPoint(missing), null);
+    assert.equal(geocode.entryFromResult("q", { latitude: 0, longitude: 0, locationType: "ROOFTOP" }).status, "not_found");
+  });
+
+  it("looks up again only new addresses and old misses", () => {
+    assert.equal(geocode.needsLookup(undefined), true);
+    assert.equal(geocode.needsLookup({ status: "ok" }), false);
+    assert.equal(geocode.needsLookup({ status: "imprecise" }), false);
+    assert.equal(geocode.needsLookup({ status: "not_found", retryAfter: 2000 }, 1000), false);
+    assert.equal(geocode.needsLookup({ status: "not_found", retryAfter: 2000 }, 3000), true);
+  });
+
+  it("projections prefer report coordinates over a geocoded address", () => {
+    const point = { lat: 32.3, lng: -89.4 };
+    const ctx = { departmentId: "d", timeZone: TZ, zones: [], geocodePoint: () => point };
+    const withCoords = projectReport(report("r1"), ctx);
+    assert.equal(withCoords.locationSource, "report");
+    const bare = report("r2");
+    bare.workspace.location = {};
+    const geocoded = projectReport(bare, ctx);
+    assert.equal(geocoded.locationSource, "geocoded");
+    assert.equal(geocoded.lat, 32.3);
+    const unmapped = projectReport(bare, { ...ctx, geocodePoint: () => null });
+    assert.equal(unmapped.mapped, false);
+    assert.equal(unmapped.locationSource, "");
+    assert.notEqual(geocoded.contentHash, unmapped.contentHash);
+  });
+
+  it("Google answers carry precision, and errors carry Google's status", async () => {
+    const realFetch = globalThis.fetch;
+    const db = { doc: () => ({ get: async () => ({ exists: true, data: () => ({ geocodingApiKey: "k" }) }) }) };
+    try {
+      globalThis.fetch = async () => ({ json: async () => ({ status: "OK", results: [{ formatted_address: "x", geometry: { location: { lat: 1, lng: 2 }, location_type: "ROOFTOP" }, partial_match: true }] }) });
+      const res = await geocodeAddress(db, "d", "12 Oak St");
+      assert.equal(res.locationType, "ROOFTOP");
+      assert.equal(res.partialMatch, true);
+      globalThis.fetch = async () => ({ json: async () => ({ status: "ZERO_RESULTS", results: [] }) });
+      await assert.rejects(geocodeAddress(db, "d", "nowhere"), (e) => e.status === "ZERO_RESULTS");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+});

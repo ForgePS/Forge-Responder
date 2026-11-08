@@ -701,7 +701,7 @@ service cloud.firestore {
         "waterCompanyContacts", "waterDistricts",
         "fieldCheckoffLists", "fieldCheckoffs", "fieldPlanUpdates",
         "hydrants", "hydrantInspections", "hydrantFlowTests", "dailyActivity",
-        "heatZoneAccess", "heatZoneCalls", "heatZoneEvents", "heatZoneMeta", "heatZoneSettings", "heatZoneZones"
+        "heatZoneAccess", "heatZoneCalls", "heatZoneEvents", "heatZoneGeocodes", "heatZoneMeta", "heatZoneSettings", "heatZoneZones"
       ];
     }
 
@@ -917,6 +917,9 @@ service cloud.firestore {
         allow read, write: if false;
       }
       match /heatZoneEvents/{document} {
+        allow read, write: if false;
+      }
+      match /heatZoneGeocodes/{document} {
         allow read, write: if false;
       }
       match /auditLogs/{logId} {

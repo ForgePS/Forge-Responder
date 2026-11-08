@@ -33,9 +33,9 @@ cross-department access.
 | Collection | Browser read | Browser write |
 |---|---|---|
 | `heatZoneMeta/state` | members of **that** department with `viewHeatZoneAnalytics` (`memberCanAny`) | never |
-| `heatZoneCalls`, `heatZoneZones`, `heatZoneSettings`, `heatZoneAccess`, `heatZoneEvents` | never | never |
+| `heatZoneCalls`, `heatZoneZones`, `heatZoneSettings`, `heatZoneAccess`, `heatZoneEvents`, `heatZoneGeocodes` | never | never |
 
-All six are listed in `hasExplicitTenantRule()` so the tenant catch-all rule cannot widen them.
+All seven are listed in `hasExplicitTenantRule()` so the tenant catch-all rule cannot widen them.
 Analytics are only reachable through the callables, which apply district scope — something rules
 alone could not express for aggregates.
 
@@ -52,6 +52,15 @@ alone could not express for aggregates.
 * **Reports/exports**: generated server-side under the same `resolveCaller()` checks plus
   `exportHeatZoneReports`; contents respect district scope; each export is written to that
   department's `auditLogs`.
+
+## Address geocoding
+
+* Each department's addresses are looked up only with **its own** Google key, read on the server from
+  `departments/{d}/integrations/googleApis`. The key never reaches the browser.
+* Results are stored under that department (`heatZoneGeocodes`) and are never read for another
+  department, even for the same address. This is tested with two departments sharing an address.
+* A report claiming another department's id is rejected before any lookup, so it is never sent to Google.
+* Geocoding is off by default. Only `manageHeatZoneSettings` can turn it on, and the change is audited.
 
 ## Permissions (existing role system)
 

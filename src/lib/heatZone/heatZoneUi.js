@@ -145,7 +145,19 @@ export function rebuildSummary(rebuild) {
   if (rebuild.removed) extra.push(`${formatCount(rebuild.removed)} removed`);
   if (rebuild.skipped) extra.push(`${formatCount(rebuild.skipped)} skipped`);
   if (rebuild.rejected) extra.push(`${formatCount(rebuild.rejected)} rejected`);
-  return `${parts[0]}${extra.length ? ` (${extra.join(", ")})` : ""}.`;
+  return `${parts[0]}${extra.length ? ` (${extra.join(", ")})` : ""}.${geocodeSummary(rebuild.geocoding)}`;
+}
+
+/** " Addresses: …" sentence for a rebuild result, or "" when geocoding is off. */
+export function geocodeSummary(geocoding) {
+  if (!geocoding?.enabled || !geocoding.addresses) return "";
+  if (!geocoding.googleConfigured) return " Addresses are not being located: no Google Geocoding key is configured.";
+  const found = [];
+  if (geocoding.lookedUp) found.push(`${formatCount(geocoding.found)} of ${formatCount(geocoding.lookedUp)} new addresses located`);
+  if (geocoding.imprecise) found.push(`${formatCount(geocoding.imprecise)} too vague to map`);
+  if (geocoding.notFound) found.push(`${formatCount(geocoding.notFound)} not found`);
+  if (geocoding.waiting) found.push(`${formatCount(geocoding.waiting)} still waiting (run Recalculate again)`);
+  return found.length ? ` Addresses: ${found.join(", ")}.` : "";
 }
 
 const TAB_KEY = "forge-heat-zone-tab";

@@ -94,7 +94,8 @@ Tenant time zone: `departments/{d}/profile/main.timezone` (IANA, default `Americ
 
 * **Live coordinates:** reports created in the editor without CAD coordinates have no lat/lng.
   They are counted in every statistic and chart but cannot appear on the map ("unmapped" count is shown).
-  Geocoding addresses would need the Google Geocoding callable (`googleGeocode`) to be configured per
-  department and is out of scope for this sprint — see known-limitations.md.
+  Follow-up: an optional per-department **Address geocoding** setting now places them from their
+  incident address with the department's own Google key (`googleMapsService.geocodeAddress`), stored
+  server-side in `heatZoneGeocodes` — see database-schema.md and known-limitations.md.
 * **True CAD feed:** there is no CAD webhook or call archive; when one is added, it should write into
   the same projection via `functions/lib/heatZone/projection.js`.
