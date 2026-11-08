@@ -193,12 +193,19 @@ export default function NerisSyncSection({ departmentId = "" }) {
                         <td className="neris-sync-muted">
                           {s.matchedBy === "address" && !s.reason ? `Same address as NERIS station ${s.nerisStationId}. ` : ""}
                           {s.reason || (s.changes.length ? `Changes: ${s.changes.join(", ").replace(/_/g, " ")}` : "")}
+                          {s.nerisRecord ? <div>In NERIS: {s.nerisStationId}, {s.nerisRecord}</div> : null}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {plan.nerisOnlyStations?.length ? (
+                <p className="dd-google-api-hint">
+                  Only in NERIS (not linked to a FORGE station):{" "}
+                  {plan.nerisOnlyStations.map((s) => `${s.nerisStationId}, ${s.nerisRecord}${s.units ? ` (${s.units} unit${s.units === 1 ? "" : "s"})` : ""}`).join("; ")}
+                </p>
+              ) : null}
             </div>
           ) : (
             <p className="dd-empty-detail">No stations in FORGE yet. Add them under System Admin → Department → Stations.</p>
