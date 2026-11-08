@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, CirclePlus, ClipboardCheck, RotateCcw, Save, Trash2, Truck } from "lucide-react";
+import { ArrowDown, ArrowUp, CirclePlus, ClipboardCheck, Eye, RotateCcw, Save, Trash2, Truck } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
+import FleetCheckConductPanel from "../components/fleet/FleetCheckConductPanel.jsx";
 import {
   archiveChecklistTemplate,
   ensureChecklistTemplatesSeeded,
@@ -256,6 +257,23 @@ function UnitsTab({ departmentId, actor, stations, legacyApparatus, onMessage })
 
 /* ---------------------------- Checklists ---------------------------- */
 
+/** The checklist as members will see it, including unsaved edits. Nothing is saved. */
+function ChecklistPreviewDialog({ departmentId, template, onClose }) {
+  useEffect(() => {
+    const onKey = (event) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop check-preview-backdrop" role="presentation" onClick={onClose}>
+      <div className="check-preview-dialog" role="dialog" aria-modal="true" aria-label={`Preview of ${template.name || "checklist"}`} onClick={(event) => event.stopPropagation()}>
+        <FleetCheckConductPanel departmentId={departmentId} asset={{}} previewTemplate={template} onClose={onClose} />
+      </div>
+    </div>
+  );
+}
+
 function ChecklistsTab({ departmentId, actor, onMessage }) {
   const [templates, setTemplates] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -263,6 +281,7 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
   const [savedJson, setSavedJson] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(null);
 
   async function load(keepId = selectedId) {
     setLoading(true);
@@ -540,6 +559,14 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
                 Undo changes
               </button>
             ) : null}
+            <button
+              className="secondary-button"
+              type="button"
+              title="See this checklist the way members will, including unsaved changes"
+              onClick={() => setPreviewing(structuredClone(draft))}
+            >
+              <Eye size={14} /> Preview
+            </button>
             <button className="primary-button" type="button" onClick={save} disabled={saving || !dirty}>
               <Save size={14} /> {saving ? "Saving…" : "Save checklist"}
             </button>
@@ -548,6 +575,10 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
       ) : (
         <p className="empty-table">No checklist yet. Start a new one.</p>
       )}
+
+      {previewing ? (
+        <ChecklistPreviewDialog departmentId={departmentId} template={previewing} onClose={() => setPreviewing(null)} />
+      ) : null}
     </div>
   );
 }

@@ -3860,6 +3860,14 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
 .check-setup-item-options label { display: inline-flex; align-items: center; gap: 6px; }
 .check-setup-help { font-size: 13px; }
 .check-setup-save { position: sticky; bottom: 0; padding: 10px 0; background: var(--rms-bg-surface, #0f1c2b); }
+/* Checklist preview: the member check screen in a dialog. */
+.check-preview-backdrop { place-items: start center; overflow-y: auto; }
+.check-preview-dialog { width: min(760px, 100%); margin: auto 0; }
+.check-preview-dialog .fleet-check-conduct { margin: 0; box-shadow: 0 22px 60px rgba(0,0,0,.45); }
+.check-preview-dialog .fleet-check-conduct > .panel-body { padding: 12px 16px 16px; }
+.check-preview-dialog .fleet-check-conduct > header { position: sticky; top: -20px; z-index: 1; background: var(--rms-bg-surface-3, #16283a); }
+.check-preview-note { margin: 0 0 12px; padding: 10px 12px; border: 1px dashed var(--rms-border, rgba(148,163,184,.4)); border-radius: 8px; color: var(--rms-text-muted); font-size: 14px; }
+.check-preview-result { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--rms-bg-surface-2, rgba(15,23,42,.25)); color: var(--rms-text-strong); font-size: 14px; }
 .apparatus-check-setup .icon-button { display: inline-grid; place-items: center; width: 30px; height: 30px; min-width: 30px; padding: 0; border: 1px solid var(--rms-border, rgba(148,163,184,.3)); border-radius: 6px; background: transparent; color: var(--rms-text-body); cursor: pointer; }
 .apparatus-check-setup .icon-button:disabled { opacity: .35; cursor: default; }
 .apparatus-check-setup .icon-button.danger { color: #f87171; }
