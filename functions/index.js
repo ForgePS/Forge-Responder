@@ -1305,6 +1305,10 @@ async function assertNerisDemoGuard(db, departmentId, auth) {
 async function assertNerisAdmin(db, departmentId, auth) {
   await invites.assertDepartmentAdmin(db, departmentId, auth);
   await assertNerisDemoGuard(db, departmentId, auth);
+  await assertNerisPlan(db, departmentId);
+}
+
+async function assertNerisPlan(db, departmentId) {
   const ent = await db.doc(`platformEntitlements/${departmentId}`).get();
   const modules = ent.data()?.modules;
   if (Array.isArray(modules) && !modules.includes("nerisFireReports")) {
@@ -1465,6 +1469,118 @@ exports.nerisSyncApply = onCall({ secrets: NERIS_SECRETS, timeoutSeconds: 300 },
   // Fresh preview so the screen shows NERIS's state after the run.
   const after = await loadNerisSyncInputs(db, departmentId).catch(() => null);
   return { results: outcome.results, plan: after?.plan || plan, unitTypes: nerisSync.NERIS_UNIT_TYPES };
+});
+
+// ---- Incident submission (FORGE report → NERIS incident).
+const nerisIncident = require("./lib/nerisIncident");
+const NERIS_REPORTS_LIST = "hlfd-rms-neris-fire-reports";
+const NERIS_SUBMITTABLE = ["Approved", "Ready for Submission"];
+
+/**
+ * Report editors: check an approved report with NERIS ("validate"), or send it
+ * ("submit"). The first submit creates the incident; after that the same
+ * report updates it (PUT), so corrections never create duplicates.
+ * The report is read from Firestore, not from the browser.
+ * Returns what the browser should record on the report.
+ */
+exports.nerisSubmitIncident = onCall({ secrets: NERIS_SECRETS, timeoutSeconds: 60 }, async (request) => {
+  const db = admin.firestore();
+  const departmentId = String(request.data?.departmentId || "").trim();
+  const reportId = String(request.data?.reportId || "").trim();
+  const mode = request.data?.mode === "submit" ? "submit" : "validate";
+  await assertMemberPermission(db, departmentId, request.auth, ["editNerisReports"],
+    "You need permission to edit NERIS reports.");
+  await assertNerisDemoGuard(db, departmentId, request.auth);
+  await assertNerisPlan(db, departmentId);
+  if (!reportId) throw new HttpsError("invalid-argument", "Open a report first.");
+
+  const connection = await nerisStore.loadConnection(db, departmentId);
+  if (!connection?.nerisId) {
+    throw new HttpsError("failed-precondition", "This department isn't connected to NERIS yet. An administrator can set it up under System Admin → Connected Services.");
+  }
+
+  const [reports, profileSnap, apparatus] = await Promise.all([
+    readListItems(db, departmentId, NERIS_REPORTS_LIST),
+    db.doc(`departments/${departmentId}/profile/main`).get(),
+    readListItems(db, departmentId, "hlfd-rms-apparatus"),
+  ]);
+  const report = reports.find((r) => String(r?.id || "") === reportId);
+  if (!report) throw new HttpsError("not-found", "FORGE hasn't saved this report yet. Wait a moment and try again.");
+  // The browser autosaves; refuse if it has changes the server hasn't seen.
+  const expected = String(request.data?.updatedAt || "");
+  if (expected && report.updatedAt && expected !== String(report.updatedAt)) {
+    throw new HttpsError("failed-precondition", "Your latest changes are still saving. Wait a moment and try again.");
+  }
+  if (!NERIS_SUBMITTABLE.includes(report.status)) {
+    throw new HttpsError("failed-precondition", "The report must be approved before it goes to NERIS.");
+  }
+
+  const { payload, problems, warnings } = nerisIncident.buildIncidentPayload({
+    report,
+    nerisId: connection.nerisId,
+    profile: profileSnap.data() || {},
+    apparatus,
+    unitLinks: connection.unitLinks || {},
+  });
+  if (!payload) return { ok: false, stage: "forge", problems, warnings };
+
+  const credentials = nerisCredentials();
+  const entityPath = `/incident/${encodeURIComponent(connection.nerisId)}`;
+  const call = (path, method, body) => nerisRequest(path, { credentials, method, body })
+    .catch((error) => { throw nerisHttpsError(error); });
+
+  const validation = await call(`${entityPath}/validate`, "POST", payload);
+  if (!validation.ok) {
+    return { ok: false, stage: "neris", problems: nerisIncident.validationMessages(validation), warnings };
+  }
+  if (mode === "validate") return { ok: true, validated: true, warnings };
+
+  const existing = connection.incidentLinks?.[reportId];
+  const at = new Date().toISOString();
+  let nerisIncidentId = existing?.nerisIncidentId || "";
+  let incidentStatus = existing?.status || "";
+  let action;
+  if (nerisIncidentId) {
+    action = "update";
+    const result = await call(`${entityPath}/${encodeURIComponent(nerisIncidentId)}`, "PUT", payload);
+    if (!result.ok) return { ok: false, stage: "neris", problems: nerisIncident.validationMessages(result), warnings };
+  } else {
+    action = "create";
+    const result = await call(entityPath, "POST", payload);
+    if (!result.ok || !result.data?.neris_id) {
+      return { ok: false, stage: "neris", problems: nerisIncident.validationMessages(result), warnings };
+    }
+    nerisIncidentId = String(result.data.neris_id);
+    incidentStatus = String(result.data.incident_status?.status || "");
+  }
+
+  const environment = credentials.environment === "production" ? "production" : "test";
+  await nerisStore.saveIncidentLink(db, departmentId, reportId, {
+    nerisIncidentId,
+    reportNumber: String(report.reportNumber || ""),
+    status: incidentStatus,
+    environment,
+    firstSubmittedAt: existing?.firstSubmittedAt || at,
+    lastSubmittedAt: at,
+    lastAction: action,
+    submissions: (existing?.submissions || 0) + 1,
+  });
+  await nerisAudit(db, departmentId, request.auth, action === "create" ? "neris.incident-created" : "neris.incident-updated",
+    `${action === "create" ? "Submitted" : "Sent correction for"} ${report.reportNumber || reportId} to NERIS (${nerisIncidentId})`);
+
+  return {
+    ok: true,
+    action,
+    warnings,
+    submission: {
+      nerisIncidentId,
+      incidentStatus,
+      environment,
+      submittedAt: at,
+      submittedBy: request.auth.token?.email || request.auth.uid,
+      action,
+    },
+  };
 });
 
 // Hydrant app: email the daily activity CSV built in the browser.

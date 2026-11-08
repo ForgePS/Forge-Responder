@@ -71,3 +71,11 @@ export const NERIS_UNIT_TYPE_LABELS = {
 export function nerisUnitTypeLabel(type = "") {
   return NERIS_UNIT_TYPE_LABELS[type] || type.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 }
+
+/**
+ * Checks ("validate") or sends ("submit") an approved report to NERIS.
+ * The server reads the saved report; updatedAt guards against unsaved edits.
+ */
+export function submitNerisIncident(departmentId = "", report = {}, mode = "validate") {
+  return callNeris("nerisSubmitIncident", { departmentId, reportId: report.id, updatedAt: report.updatedAt || "", mode });
+}

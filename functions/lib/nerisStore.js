@@ -134,6 +134,18 @@ async function saveSyncResult(db, departmentId, { stationLinks = {}, unitLinks =
   }, { merge: true });
 }
 
+/**
+ * Remembers which NERIS incident a FORGE report became, so corrections update
+ * that incident instead of creating a new one. Server-side only.
+ */
+async function saveIncidentLink(db, departmentId, reportId, link, { now = () => new Date() } = {}) {
+  const at = now().toISOString();
+  await connectionRef(db, departmentId).set({
+    incidentLinks: { [String(reportId)]: { ...link, updatedAt: at } },
+    updatedAt: at,
+  }, { merge: true });
+}
+
 async function removeConnection(db, departmentId) {
   await connectionRef(db, departmentId).delete();
 }
@@ -145,6 +157,7 @@ module.exports = {
   loadConnection,
   publicStatus,
   removeConnection,
+  saveIncidentLink,
   saveSyncResult,
   saveNerisId,
 };

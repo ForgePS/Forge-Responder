@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Field, Picker, ProgressRing, Section, TextArea, TextInput, YesNo } from "./NerisControls.jsx";
 import NerisAiNarrative from "./NerisAiNarrative.jsx";
+import NerisSubmitSection from "./NerisSubmitSection.jsx";
 import NerisCadImportModal from "./NerisCadImportModal.jsx";
 import {
   INCIDENT_KINDS, STEPS, applicability, asList, checklistProgress, codeLabel, core, incidentTypes, isBlank,
@@ -48,6 +49,7 @@ export default function NerisReportEditor({
   onUpdateModule,
   onAutoPopulate,
   onRecordSubmission,
+  onNerisSubmitted,
   onClose,
   onOpenReport,
   onDelete,
@@ -375,6 +377,7 @@ export default function NerisReportEditor({
               onUpdate={onUpdate}
               onUpdateModule={onUpdateModule}
               onRecordSubmission={onRecordSubmission}
+              onNerisSubmitted={onNerisSubmitted}
               onOpenReport={onOpenReport}
               goTo={goTo}
             />
@@ -566,7 +569,7 @@ function CrewSection({ report, editable, personnel, onChange }) {
   );
 }
 
-function ReviewStep({ report, allReports, canEdit, editable, departmentId, progress, reviewerName, onUpdate, onUpdateModule, onRecordSubmission, onOpenReport, goTo }) {
+function ReviewStep({ report, allReports, canEdit, editable, departmentId, progress, reviewerName, onUpdate, onUpdateModule, onRecordSubmission, onNerisSubmitted, onOpenReport, goTo }) {
   const ws = report.workspace || {};
   const [comment, setComment] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -662,19 +665,16 @@ function ReviewStep({ report, allReports, canEdit, editable, departmentId, progr
         ) : null}
       </Section>
 
-      <Section title="Submit to NERIS" icon={Send}>
-        <p className="nr-wide nr-muted">FORGE doesn't send reports to NERIS automatically yet. Once the report is approved, enter it in the NERIS portal, then record the submission here.</p>
-        <Field label="NERIS incident ID (from the portal)">
-          <TextInput value={report.modules?.core_mod_incident?.incident_neris_id} disabled={!canEdit || report.status === "Submitted"} placeholder="Shown after you submit in NERIS" onChange={(v) => onUpdateModule("core_mod_incident", "incident_neris_id", v)} />
-        </Field>
-        <div className="nr-actions nr-wide">
-          {report.status === "Submitted" ? (
-            <span className="nr-pill nr-pill-ok"><CheckCircle2 size={13} /> Submitted {formatWhen(report.submittedAt)}</span>
-          ) : canEdit ? (
-            <button type="button" className="nr-btn nr-btn-primary" disabled={!approvedForSubmit || !ready} title={approvedForSubmit ? "" : "The report must be approved first"} onClick={onRecordSubmission}><Send size={15} /> Record NERIS submission</button>
-          ) : null}
-        </div>
-      </Section>
+      <NerisSubmitSection
+        report={report}
+        departmentId={departmentId}
+        canEdit={canEdit}
+        ready={ready}
+        approvedForSubmit={approvedForSubmit}
+        onSubmitted={onNerisSubmitted}
+        onRecordSubmission={onRecordSubmission}
+        onUpdateModule={onUpdateModule}
+      />
 
       <Section title="Photos and files" icon={Paperclip}>
         <div className="nr-wide nr-files">

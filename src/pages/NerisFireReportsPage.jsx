@@ -255,6 +255,35 @@ export default function NerisFireReportsPage({
     setMessage(`${selected.reportNumber} recorded as submitted.`);
   }
 
+  // FORGE sent the report to NERIS (nerisSubmitIncident). Record it and lock the report.
+  function recordNerisApiSubmission(submission) {
+    if (!selected || !submission?.nerisIncidentId) return;
+    const previous = selected.nerisSubmission || {};
+    const history = [...(previous.history || []), {
+      action: submission.action,
+      at: submission.submittedAt,
+      by: submission.submittedBy,
+    }].slice(-20);
+    applyToSelected((current) => ({
+      status: "Submitted",
+      submittedAt: submission.submittedAt,
+      submissionMethod: "neris-api",
+      locked: true,
+      nerisSubmission: {
+        nerisIncidentId: submission.nerisIncidentId,
+        incidentStatus: submission.incidentStatus || "",
+        environment: submission.environment,
+        lastSubmittedAt: submission.submittedAt,
+        history,
+      },
+      modules: {
+        ...(current.modules || {}),
+        core_mod_incident: { ...(current.modules?.core_mod_incident || {}), incident_neris_id: submission.nerisIncidentId },
+      },
+    }));
+    setMessage(`${selected.reportNumber} ${submission.action === "update" ? "correction sent to" : "submitted to"} NERIS.`);
+  }
+
   const banner = message ? (
     <div className="nr-banner" role="status">
       <span>{message}</span>
@@ -279,6 +308,7 @@ export default function NerisFireReportsPage({
           onUpdateModule={updateModuleField}
           onAutoPopulate={autoFill}
           onRecordSubmission={recordSubmission}
+          onNerisSubmitted={recordNerisApiSubmission}
           onOpenReport={setSelectedId}
           onDelete={deleteDraft}
           onClose={() => { setSelectedId(""); setMessage(""); }}
