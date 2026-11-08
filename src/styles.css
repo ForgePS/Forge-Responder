@@ -3854,7 +3854,8 @@ html[data-theme="light"] .code-violations-config .config-inline-search::placehol
 .check-setup-section-title { flex: 1; font-weight: 600; font-size: 15px; }
 .check-setup-item { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--rms-border-divider, rgba(148,163,184,.15)); }
 .check-setup-item-main { display: grid; grid-template-columns: minmax(180px, 2fr) minmax(150px, 1fr) auto; gap: 8px; align-items: center; }
-.check-setup-item-buttons { display: flex; gap: 4px; }
+.check-setup-item-buttons { display: flex; gap: 4px; align-items: center; }
+.check-setup-move { width: auto; max-width: 160px; height: 30px; font-size: 13px; }
 .check-setup-item-options { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 13px; color: var(--rms-text-muted); }
 .check-setup-item-options label { display: inline-flex; align-items: center; gap: 6px; }
 .check-setup-help { font-size: 13px; }
