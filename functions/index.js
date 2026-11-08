@@ -1263,6 +1263,210 @@ exports.draftNerisNarrative = onCall(
   }
 );
 
+// ---- NERIS API connection. FORGE has one NERIS integration account; each
+// department enrolls FORGE's client ID in the NERIS portal, then saves its
+// NERIS ID here. Set the credentials with:
+//   firebase functions:secrets:set NERIS_CLIENT_ID
+//   firebase functions:secrets:set NERIS_CLIENT_SECRET
+// NERIS_ENVIRONMENT is "test" (sandbox, default) or "production"; set it in
+// functions/.env. (A plain env var, not defineString, so deploys never stop to ask.)
+const nerisClientId = defineSecret("NERIS_CLIENT_ID");
+const nerisClientSecret = defineSecret("NERIS_CLIENT_SECRET");
+const nerisStore = require("./lib/nerisStore");
+const { NerisError } = require("./lib/nerisClient");
+const NERIS_SECRETS = [nerisClientId, nerisClientSecret];
+
+function nerisCredentials() {
+  return {
+    clientId: nerisClientId.value(),
+    clientSecret: nerisClientSecret.value(),
+    environment: process.env.NERIS_ENVIRONMENT || "test",
+  };
+}
+
+function nerisStatusResponse(connection) {
+  const credentials = nerisCredentials();
+  return nerisStore.publicStatus(connection, credentials);
+}
+
+// The demo department's sign-in is public (and that user is a department admin),
+// so only platform creators may change its NERIS connection, and only against
+// the NERIS test sandbox.
+async function assertNerisDemoGuard(db, departmentId, auth) {
+  if (!isDemoDepartment(departmentId)) return;
+  if (!(await isPlatformCreator(db, auth))) {
+    throw new HttpsError("permission-denied", "Only FORGE Public Safety can change the demo department's NERIS connection.");
+  }
+  if (nerisCredentials().environment !== "test") {
+    throw new HttpsError("failed-precondition", "The demo department can only connect to the NERIS test sandbox.");
+  }
+}
+
+async function assertNerisAdmin(db, departmentId, auth) {
+  await invites.assertDepartmentAdmin(db, departmentId, auth);
+  await assertNerisDemoGuard(db, departmentId, auth);
+  const ent = await db.doc(`platformEntitlements/${departmentId}`).get();
+  const modules = ent.data()?.modules;
+  if (Array.isArray(modules) && !modules.includes("nerisFireReports")) {
+    throw new HttpsError("permission-denied", "NERIS reports aren't included in your department's plan.");
+  }
+}
+
+function nerisAudit(db, departmentId, auth, action, summary) {
+  return db.collection(`departments/${departmentId}/auditLogs`).add({
+    action,
+    module: "NERIS",
+    recordId: "neris-connection",
+    summary,
+    actorUid: auth?.uid || "",
+    actorName: auth?.token?.email || "",
+    created_at: new Date().toISOString(),
+  }).catch(() => undefined);
+}
+
+function nerisHttpsError(error) {
+  if (error instanceof HttpsError) return error;
+  if (error instanceof NerisError && error.code === "invalid") return new HttpsError("invalid-argument", error.message);
+  if (error instanceof NerisError) return new HttpsError("failed-precondition", error.message);
+  console.error("NERIS connection failed", error);
+  return new HttpsError("internal", "Couldn't update the NERIS connection. Try again.");
+}
+
+/** Any member: connection status plus FORGE's client ID for the enrollment steps. */
+exports.nerisGetConnection = onCall({ secrets: NERIS_SECRETS }, async (request) => {
+  const db = admin.firestore();
+  const departmentId = String(request.data?.departmentId || "").trim();
+  await assertDepartmentAccess(db, departmentId, request.auth);
+  return nerisStatusResponse(await nerisStore.loadConnection(db, departmentId));
+});
+
+/** Department admins: save the department's NERIS ID and test it right away. */
+exports.nerisSaveConnection = onCall({ secrets: NERIS_SECRETS, timeoutSeconds: 60 }, async (request) => {
+  const db = admin.firestore();
+  const departmentId = String(request.data?.departmentId || "").trim();
+  await assertNerisAdmin(db, departmentId, request.auth);
+  try {
+    const connection = await nerisStore.saveNerisId(db, departmentId, request.data?.nerisId, {
+      savedBy: request.auth.uid,
+      credentials: nerisCredentials(),
+    });
+    await nerisAudit(db, departmentId, request.auth, "neris.connection-saved",
+      `Saved NERIS ID ${connection.nerisId} (${connection.status})`);
+    return nerisStatusResponse(connection);
+  } catch (error) {
+    throw nerisHttpsError(error);
+  }
+});
+
+/** Department admins: re-check that NERIS still accepts FORGE for this department. */
+exports.nerisTestConnection = onCall({ secrets: NERIS_SECRETS, timeoutSeconds: 60 }, async (request) => {
+  const db = admin.firestore();
+  const departmentId = String(request.data?.departmentId || "").trim();
+  await assertNerisAdmin(db, departmentId, request.auth);
+  try {
+    const connection = await nerisStore.checkConnection(db, departmentId, { credentials: nerisCredentials() });
+    return nerisStatusResponse(connection);
+  } catch (error) {
+    throw nerisHttpsError(error);
+  }
+});
+
+/** Department admins: forget the NERIS ID. (Removing FORGE's enrollment happens in the NERIS portal.) */
+exports.nerisRemoveConnection = onCall({ secrets: NERIS_SECRETS }, async (request) => {
+  const db = admin.firestore();
+  const departmentId = String(request.data?.departmentId || "").trim();
+  await invites.assertDepartmentAdmin(db, departmentId, request.auth);
+  if (isDemoDepartment(departmentId) && !(await isPlatformCreator(db, request.auth))) {
+    throw new HttpsError("permission-denied", "Only FORGE Public Safety can change the demo department's NERIS connection.");
+  }
+  const current = await nerisStore.loadConnection(db, departmentId);
+  await nerisStore.removeConnection(db, departmentId);
+  if (current?.nerisId) {
+    await nerisAudit(db, departmentId, request.auth, "neris.connection-removed", `Removed NERIS ID ${current.nerisId}`);
+  }
+  return nerisStatusResponse(null);
+});
+
+// ---- Department, station and unit sync (FORGE → NERIS). Preview first, then send.
+const nerisSync = require("./lib/nerisSync");
+const { fetchEntity, nerisRequest } = require("./lib/nerisClient");
+const { readListItems } = require("./lib/listStore");
+
+async function loadNerisSyncInputs(db, departmentId, unitSettingsOverride = {}) {
+  const connection = await nerisStore.loadConnection(db, departmentId);
+  if (!connection?.nerisId) {
+    throw new HttpsError("failed-precondition", "Save the department's NERIS ID first.");
+  }
+  const credentials = nerisCredentials();
+  const [profileSnap, apparatus, entity] = await Promise.all([
+    db.doc(`departments/${departmentId}/profile/main`).get(),
+    readListItems(db, departmentId, "hlfd-rms-apparatus"),
+    fetchEntity(connection.nerisId, { credentials }).catch((error) => { throw nerisHttpsError(error); }),
+  ]);
+  const unitSettings = { ...(connection.unitSettings || {}), ...nerisSync.cleanUnitSettings(unitSettingsOverride) };
+  const profile = profileSnap.data() || {};
+  const plan = nerisSync.buildSyncPlan({
+    profile,
+    apparatus,
+    entity: entity.entity,
+    connection: { ...connection, unitSettings },
+  });
+  return { connection, credentials, profile, plan, unitSettings };
+}
+
+/** Department admins: what would change in NERIS. Sends nothing. */
+exports.nerisSyncPreview = onCall({ secrets: NERIS_SECRETS, timeoutSeconds: 60 }, async (request) => {
+  const db = admin.firestore();
+  const departmentId = String(request.data?.departmentId || "").trim();
+  await assertNerisAdmin(db, departmentId, request.auth);
+  const { plan } = await loadNerisSyncInputs(db, departmentId, request.data?.unitSettings);
+  return { plan, unitTypes: nerisSync.NERIS_UNIT_TYPES };
+});
+
+/** Department admins: send the ticked department fields, stations and units to NERIS. */
+exports.nerisSyncApply = onCall({ secrets: NERIS_SECRETS, timeoutSeconds: 300 }, async (request) => {
+  const db = admin.firestore();
+  const departmentId = String(request.data?.departmentId || "").trim();
+  await assertNerisAdmin(db, departmentId, request.auth);
+  const strings = (value) => (Array.isArray(value) ? value.map((v) => String(v)).slice(0, 500) : []);
+  const selection = {
+    departmentFields: strings(request.data?.selection?.departmentFields),
+    stationIds: strings(request.data?.selection?.stationIds),
+    unitIds: strings(request.data?.selection?.unitIds),
+  };
+  const { connection, credentials, profile, plan, unitSettings } = await loadNerisSyncInputs(db, departmentId, request.data?.unitSettings);
+
+  let outcome;
+  try {
+    outcome = await nerisSync.applySyncPlan({
+      plan,
+      profile,
+      nerisId: connection.nerisId,
+      selection,
+      request: (path, { method, body }) => nerisRequest(path, { credentials, method, body }),
+    });
+  } catch (error) {
+    throw nerisHttpsError(error);
+  }
+
+  const sent = outcome.results.length;
+  const failed = outcome.results.filter((r) => !r.ok).length;
+  await nerisStore.saveSyncResult(db, departmentId, {
+    stationLinks: outcome.stationLinks,
+    unitLinks: outcome.unitLinks,
+    unitSettings,
+    summary: { sent, failed, by: request.auth.uid },
+  });
+  if (sent) {
+    await nerisAudit(db, departmentId, request.auth, "neris.sync",
+      `Sent ${sent} item${sent === 1 ? "" : "s"} to NERIS${failed ? ` (${failed} failed)` : ""}`);
+  }
+
+  // Fresh preview so the screen shows NERIS's state after the run.
+  const after = await loadNerisSyncInputs(db, departmentId).catch(() => null);
+  return { results: outcome.results, plan: after?.plan || plan, unitTypes: nerisSync.NERIS_UNIT_TYPES };
+});
+
 // Hydrant app: email the daily activity CSV built in the browser.
 const { sendDailyActivityEmail } = require("./lib/hydrantActivityEmail");
 const { sendTextEmail } = require("./lib/mailer");

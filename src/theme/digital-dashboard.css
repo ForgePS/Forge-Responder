@@ -2777,6 +2777,169 @@ html[data-theme="dark"] .digital-dashboard-page .dd-modal > header {
   gap: 24px;
 }
 
+/* NERIS connection (System Admin → Connected Services) */
+.neris-connection-panel .dd-panel-head h3 {
+  font-size: 1rem;
+}
+
+.neris-connection-panel .dd-panel-body {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+}
+
+.neris-connection-step {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rms-border-subtle);
+}
+
+.neris-connection-step h4 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.neris-connection-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.neris-connection-client-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.neris-connection-client-id code {
+  padding: 8px 12px;
+  border: 1px solid var(--rms-border-subtle);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.neris-connection-guide {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  font-size: 0.82rem;
+}
+
+.neris-connection-env {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--rms-warning);
+}
+
+.neris-connection-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.neris-connection-result.is-ok {
+  color: var(--rms-success);
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.neris-connection-result.is-problem {
+  color: var(--rms-warning);
+  background: rgba(217, 119, 6, 0.1);
+}
+
+.neris-sync-group {
+  display: grid;
+  gap: 8px;
+}
+
+.neris-sync-group h5 {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.neris-sync-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--rms-border-subtle);
+  border-radius: 8px;
+}
+
+.neris-sync-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.neris-sync-table th,
+.neris-sync-table td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--rms-border-subtle);
+}
+
+.neris-sync-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.neris-sync-table th {
+  font-weight: 600;
+  color: var(--rms-text-secondary);
+  white-space: nowrap;
+}
+
+.neris-sync-table select,
+.neris-sync-table input[type="number"] {
+  padding: 4px 6px;
+  border: 1px solid var(--rms-border-subtle);
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.neris-sync-staffing {
+  width: 64px;
+}
+
+.neris-sync-muted {
+  color: var(--rms-text-secondary);
+}
+
+.neris-sync-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+
+.neris-sync-results li {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.neris-sync-results li.is-ok { color: var(--rms-success); }
+.neris-sync-results li.is-problem { color: var(--rms-critical); }
+html[data-theme="light"] .neris-sync-results li.is-ok { color: #15803d; }
+html[data-theme="light"] .neris-sync-results li.is-problem { color: #b91c1c; }
+
+html[data-theme="light"] .neris-connection-result.is-ok { color: #15803d; }
+html[data-theme="light"] .neris-connection-result.is-problem,
+html[data-theme="light"] .neris-connection-env { color: #b45309; }
+
 .dd-alert-settings-body {
   display: grid;
   gap: 18px;
