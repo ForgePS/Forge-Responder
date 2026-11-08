@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Play, Save, UploadCloud, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Play, RotateCcw, Save, UploadCloud, X } from "lucide-react";
 import {
   canConductFleetChecks,
   completeFleetCheck,
@@ -9,6 +9,7 @@ import {
   isUsableChecklist,
   listChecklistTemplates,
   loadCheckOfflineDraft,
+  resolveFailResponseAction,
   saveFleetCheckDraft,
   startFleetCheck,
 } from "../../lib/fleet/index.js";
@@ -50,6 +51,9 @@ function lastReading(asset = {}, field = {}) {
  * Run (or resume) a readiness check on one unit: tap Pass/Fail per item, see
  * progress, and get a plain summary at the end. Used by the Employee Portal and
  * the Fleet Readiness Board.
+ *
+ * previewTemplate: show this checklist (even unsaved) the way members see it.
+ * Answers stay on screen only; nothing is started, saved or reported.
  */
 export default function FleetCheckConductPanel({
   departmentId,
@@ -63,12 +67,17 @@ export default function FleetCheckConductPanel({
   onError,
   allowConduct = false,
   autoStart = false,
+  previewTemplate = null,
 }) {
+  const preview = Boolean(previewTemplate);
   // The Employee Portal lets any member run a daily check on a unit.
-  const canConduct = allowConduct || canConductFleetChecks(permissions, isCreator);
+  const canConduct = preview || allowConduct || canConductFleetChecks(permissions, isCreator);
   const [templates, setTemplates] = useState([]);
   const [templateId, setTemplateId] = useState("");
-  const [check, setCheck] = useState(null);
+  const [check, setCheck] = useState(() => (preview
+    ? { id: "preview", status: "in_progress", templateSnapshot: previewTemplate }
+    : null));
+  const [previewResult, setPreviewResult] = useState("");
   const [answers, setAnswers] = useState({});
   const [failNotes, setFailNotes] = useState({});
   const [busy, setBusy] = useState(false);
@@ -79,6 +88,10 @@ export default function FleetCheckConductPanel({
   const autoStartedRef = useRef(false);
 
   useEffect(() => {
+    if (preview) {
+      setLoading(false);
+      return undefined;
+    }
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -163,6 +176,7 @@ export default function FleetCheckConductPanel({
   function setAnswer(key, value) {
     setAnswers((current) => ({ ...current, [key]: value }));
     setProblem("");
+    setPreviewResult("");
     setHighlightKeys((current) => {
       if (!current.has(key)) return current;
       const next = new Set(current);
@@ -181,6 +195,15 @@ export default function FleetCheckConductPanel({
       return next;
     });
     setProblem("");
+    setPreviewResult("");
+  }
+
+  function resetPreview() {
+    setAnswers({});
+    setFailNotes({});
+    setProblem("");
+    setPreviewResult("");
+    setHighlightKeys(new Set());
   }
 
   async function handleSaveDraft() {
@@ -212,6 +235,20 @@ export default function FleetCheckConductPanel({
         ? `${missing.length} required item${missing.length === 1 ? " is" : "s are"} still blank. They're marked in red.`
         : `Add a note to ${missingNotes.length === 1 ? "the failed item" : "each failed item"} marked in red.`);
       scrollToField((missing[0] || missingNotes[0]).key);
+      return;
+    }
+    if (preview) {
+      const failedCount = failedPreview.length;
+      const blank = progress.total - progress.answered;
+      const action = resolveFailResponseAction(failedPreview);
+      const status = readinessLabel(action === "oos" ? "out_of_service" : action === "restrict" ? "available_restricted" : "available");
+      setPreviewResult([
+        failedCount
+          ? `This check would report ${failedCount} failed item${failedCount === 1 ? "" : "s"} to the fleet team, and the unit would be marked ${status.toLowerCase()}.`
+          : "This check would pass, and the unit would stay in service.",
+        blank ? `${blank} optional item${blank === 1 ? " was" : "s were"} left blank.` : "",
+        "Nothing was saved.",
+      ].filter(Boolean).join(" "));
       return;
     }
     if (progress.answered < progress.total
@@ -266,6 +303,7 @@ export default function FleetCheckConductPanel({
               onChange={(e) => {
                 setFailNotes((c) => ({ ...c, [field.key]: e.target.value }));
                 setProblem("");
+                setPreviewResult("");
               }}
             />
           ) : null}
@@ -356,13 +394,18 @@ export default function FleetCheckConductPanel({
       <header>
         <div>
           <ClipboardCheck size={15} />
-          <strong>{unitName(asset)} · {templateName}</strong>
+          <strong>{preview ? `Preview · ${templateName}` : `${unitName(asset)} · ${templateName}`}</strong>
         </div>
-        <button className="secondary-button" type="button" onClick={onClose} aria-label="Close check">
+        <button className="secondary-button" type="button" onClick={onClose} aria-label={preview ? "Close preview" : "Close check"}>
           <X size={14} /> Close
         </button>
       </header>
       <div className="panel-body config-studio-body">
+        {preview ? (
+          <p className="check-preview-note">
+            This is what members see when they run this checklist. Try the answers; nothing is saved, and no defects or unit status changes are sent.
+          </p>
+        ) : null}
         {loading || (busy && !check) ? <p className="occupancy-muted">Getting the checklist ready…</p> : null}
 
         {!check && !loading ? (
@@ -438,13 +481,23 @@ export default function FleetCheckConductPanel({
             {failedPreview.length ? (
               <p className="check-fail-warning">
                 <AlertTriangle size={14} aria-hidden="true" />
-                {failedPreview.length} failed item{failedPreview.length === 1 ? "" : "s"}. When you finish, each one goes to the fleet team as a defect, and the unit may be marked restricted or out of service.
+                {failedPreview.length} failed item{failedPreview.length === 1 ? "" : "s"}. {preview ? "In a real check, each" : "When you finish, each"} one goes to the fleet team as a defect, and the unit may be marked restricted or out of service.
               </p>
             ) : null}
 
             {problem ? <p className="form-error" role="alert">{problem}</p> : null}
+            {previewResult ? <p className="check-preview-result" role="status">{previewResult}</p> : null}
 
-            {canConduct ? (
+            {preview ? (
+              <div className="occupancy-detail-actions check-actions">
+                <button className="secondary-button" type="button" onClick={resetPreview}>
+                  <RotateCcw size={14} /> Clear answers
+                </button>
+                <button className="primary-button" type="button" onClick={handleComplete}>
+                  <CheckCircle2 size={14} /> Try finishing
+                </button>
+              </div>
+            ) : canConduct ? (
               <div className="occupancy-detail-actions check-actions">
                 <button className="secondary-button" type="button" disabled={busy} onClick={handleSaveDraft}>
                   <Save size={14} /> Save and finish later
