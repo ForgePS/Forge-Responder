@@ -91,6 +91,7 @@ const navPermissionMap = {
   "Water Districts": "viewWaterDistricts",
   "Damage Analytics": "viewHydrantDamageReports",
   "NERIS Fire Reports": "viewNerisReports",
+  "Heat Zone Analytics": "viewHeatZoneAnalytics",
   "SOGs / Policies": "viewDocuments",
   "EMS Protocols": "viewDocuments",
   Forms: "viewDocuments",

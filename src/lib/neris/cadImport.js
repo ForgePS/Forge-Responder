@@ -70,7 +70,23 @@ const CAD_FIELD_ALIASES = {
   incidentType: [
     "incidenttype", "incident_type", "calltype", "call_type", "type", "nature", "problem", "eventtype", "event_type",
   ],
+  latitude: ["latitude", "lat", "incidentlatitude", "incident_latitude", "locationlatitude", "location_latitude", "geoy", "geo_y"],
+  longitude: [
+    "longitude", "lng", "lon", "long", "incidentlongitude", "incident_longitude", "locationlongitude", "location_longitude", "geox", "geo_x",
+  ],
 };
+
+/** CAD coordinates as numbers, or null when missing, out of range or (0,0). */
+export function cadCoordinates(latValue, lngValue) {
+  const latText = String(latValue ?? "").trim();
+  const lngText = String(lngValue ?? "").trim();
+  if (!latText || !lngText) return null;
+  const lat = Number(latText);
+  const lng = Number(lngText);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat === 0 && lng === 0)) return null;
+  return { latitude: lat, longitude: lng };
+}
 
 const UNIT_FIELD_ALIASES = {
   unitId: ["unitid", "unit_id", "unit", "apparatus", "resource", "resourcename", "resource_name", "designation"],
@@ -182,6 +198,14 @@ export function buildCadImportPreview(payload) {
       target: "incidentTypeSummary",
     });
   }
+  if (payload.location?.latitude != null && payload.location?.longitude != null) {
+    fields.push({
+      key: "location",
+      label: "Coordinates",
+      value: `${payload.location.latitude}, ${payload.location.longitude}`,
+      target: "workspace.location",
+    });
+  }
 
   (payload.units || []).forEach((unit, index) => {
     const unitId = unit.unitId || `Unit ${index + 1}`;
@@ -228,6 +252,13 @@ export function applyCadImport(report, payload, meta) {
     autoPopulateSources["workspace.units"] = "cad-import";
   }
   workspace.units = units;
+
+  // CAD coordinates make the incident mappable (Heat Zone Analytics).
+  if (payload.location?.latitude != null && payload.location?.longitude != null) {
+    workspace.location = { ...(workspace.location || {}), latitude: payload.location.latitude, longitude: payload.location.longitude };
+    autoPopulateSources["workspace.location.latitude"] = "cad-import";
+    autoPopulateSources["workspace.location.longitude"] = "cad-import";
+  }
 
   const patch = {
     workspace,
@@ -445,6 +476,10 @@ function mapRawToCadPayload(raw) {
 
   const incidentAddress = pickAlias(source, CAD_FIELD_ALIASES.address);
   const incidentTypeSummary = pickAlias(source, CAD_FIELD_ALIASES.incidentType);
+  const coordinates = cadCoordinates(
+    pickAlias(source, CAD_FIELD_ALIASES.latitude),
+    pickAlias(source, CAD_FIELD_ALIASES.longitude),
+  );
   // The date comes from an explicit date field, else from a full date-time; a bare
   // time like "14:02" is never a date. Bare times are joined to that date.
   const explicitDate = isoDateOnly(pickAlias(source, CAD_FIELD_ALIASES.incidentDate));
@@ -471,6 +506,7 @@ function mapRawToCadPayload(raw) {
     incidentAddress: incidentAddress || undefined,
     incidentDate: incidentDate || undefined,
     incidentTypeSummary: incidentTypeSummary || undefined,
+    ...(coordinates ? { location: coordinates } : {}),
     units,
     raw: source,
   };

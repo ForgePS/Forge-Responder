@@ -90,6 +90,7 @@ export const NAV_MODULE_MAP = {
   Preplans: "preplans",
   "NERIS Fire Reports": "nerisFireReports",
   "NERIS Analytics": "nerisFireReports",
+  "Heat Zone Analytics": "analytics",
   "SOGs / Policies": "documents",
   "EMS Protocols": "documents",
   Forms: "documents",
@@ -255,6 +256,13 @@ export const ADMIN_PERMISSION_LABELS = {
   escalateHydrantDamageReports: "Escalate overdue hydrant damage reports",
   viewNerisReports: "View NERIS fire reports",
   editNerisReports: "Edit NERIS fire reports",
+  viewHeatZoneAnalytics: "View Heat Zone Analytics",
+  viewHeatZoneMarkers: "View individual incidents on the heat map",
+  viewHeatZoneAllDistricts: "View Heat Zone analytics for all districts",
+  viewHeatZoneHistory: "View historical Heat Zone analytics and comparisons",
+  viewHeatZoneRepeatLocations: "View repeat-location analytics",
+  exportHeatZoneReports: "Export Heat Zone reports",
+  manageHeatZoneSettings: "Manage Heat Zone boundaries, weights and district access",
   accessAdminRms: "Access Admin RMS",
   accessEmployeePortal: "Access employee portal",
   submitLeaveRequests: "Submit leave requests",
@@ -406,6 +414,10 @@ export const ADMIN_PERMISSION_GROUPS = [
       "viewNerisReports",
       "editNerisReports",
     ]
+  },
+  {
+    label: "Heat Zone Analytics",
+    keys: ["viewHeatZoneAnalytics", "viewHeatZoneMarkers", "viewHeatZoneAllDistricts", "viewHeatZoneHistory", "viewHeatZoneRepeatLocations", "exportHeatZoneReports", "manageHeatZoneSettings"]
   },
   {
     label: "Portal access",

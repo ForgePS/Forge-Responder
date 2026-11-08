@@ -1024,3 +1024,51 @@ describe("public platform look", () => {
     await assertSucceeds(setDoc(doc(creator().firestore(), "platformBranding/public"), { logoUrl: "https://example.com/new.png", name: "FORGE Responder" }));
   });
 });
+
+describe("heat zone analytics data", () => {
+  const analystA = () => as("analyst-a", { email: "analyst@a.gov", email_verified: true });
+  const analystB = () => as("analyst-b", { email: "analyst@b.gov", email_verified: true });
+  const HZ = ["heatZoneCalls/c1", "heatZoneZones/z1", "heatZoneSettings/main", "heatZoneAccess/analyst-a", "heatZoneEvents/e1"];
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `departments/${A}/users/analyst-a`), membership("analyst-a", A));
+      await setDoc(doc(db, `departments/${B}/users/analyst-b`), membership("analyst-b", B));
+      await setDoc(doc(db, `departments/${A}/memberGrants/analyst-a`), { permissions: { viewHeatZoneAnalytics: true } });
+      await setDoc(doc(db, `departments/${B}/memberGrants/analyst-b`), { permissions: { viewHeatZoneAnalytics: true } });
+      for (const dept of [A, B]) {
+        await setDoc(doc(db, `departments/${dept}/heatZoneMeta/state`), { version: 3 });
+        for (const path of HZ) await setDoc(doc(db, `departments/${dept}/${path}`), { departmentId: dept, lat: 32.3, lng: -89.4 });
+      }
+    });
+  });
+
+  it("members with Heat Zone access can listen to their own department's change counter", async () => {
+    await assertSucceeds(getDoc(doc(analystA().firestore(), `departments/${A}/heatZoneMeta/state`)));
+    await assertSucceeds(getDoc(doc(adminA().firestore(), `departments/${A}/heatZoneMeta/state`)));
+  });
+
+  it("the change counter is closed to other departments and to members without access", async () => {
+    await assertFails(getDoc(doc(analystB().firestore(), `departments/${A}/heatZoneMeta/state`)));
+    await assertFails(getDoc(doc(analystA().firestore(), `departments/${B}/heatZoneMeta/state`)));
+    await assertFails(getDoc(doc(memberA().firestore(), `departments/${A}/heatZoneMeta/state`)));
+    await assertFails(getDoc(doc(stranger().firestore(), `departments/${A}/heatZoneMeta/state`)));
+  });
+
+  it("call projections, boundaries, settings, access and events are never readable from the browser", async () => {
+    for (const ctx of [analystA(), adminA(), analystB(), creator()]) {
+      for (const path of HZ) await assertFails(getDoc(doc(ctx.firestore(), `departments/${A}/${path}`)));
+    }
+    await assertFails(getDocs(collection(analystA().firestore(), `departments/${A}/heatZoneCalls`)));
+  });
+
+  it("no browser can write Heat Zone data, in any department", async () => {
+    for (const ctx of [analystA(), adminA(), creator(), analystB()]) {
+      const db = ctx.firestore();
+      await assertFails(setDoc(doc(db, `departments/${A}/heatZoneMeta/state`), { version: 99 }));
+      for (const path of HZ) await assertFails(setDoc(doc(db, `departments/${A}/${path}`), { departmentId: B }));
+      await assertFails(deleteDoc(doc(db, `departments/${A}/heatZoneCalls/c1`)));
+    }
+  });
+});
