@@ -13,6 +13,7 @@ import {
   syncFleetAssetsFromApparatus,
 } from "../lib/fleet/index.js";
 import { canManageFleetConfig } from "../lib/fleet/fleetPermissions.js";
+import "../styles/check-builder.css";
 
 const UNIT_TYPES = ["Engine", "Ladder / Truck", "Rescue", "Ambulance / Medic", "Brush", "Tanker / Tender", "Command / Battalion", "Hazmat", "Utility", "Boat", "Other"];
 
@@ -367,37 +368,43 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
   if (loading) return <p className="auth-help">Loading checklists…</p>;
 
   return (
-    <div className="check-setup-checklists">
-      <div className="check-setup-toolbar">
-        <label>
+    <div className="check-setup-checklists check-builder">
+      <div className="check-builder-card check-builder-top">
+        <label className="check-builder-field check-builder-picker">
           <span>Checklist</span>
           <select value={selectedId} onChange={(e) => pickTemplate(e.target.value)}>
             {!selectedId && draft ? <option value="">{draft.name} (not saved yet)</option> : null}
             {templates.map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
           </select>
         </label>
+        {draft ? (
+          <label className="check-builder-field check-builder-name">
+            <span>Checklist name</span>
+            <input value={draft.name} onChange={(e) => update((d) => { d.name = e.target.value; })} placeholder="Daily apparatus check" />
+          </label>
+        ) : null}
         <button className="secondary-button" type="button" onClick={newChecklist}><CirclePlus size={14} /> New checklist</button>
+        {draft ? (
+          <p className="check-builder-summary">{itemCount} item{itemCount === 1 ? "" : "s"} in {draft.sections?.length || 0} section{draft.sections?.length === 1 ? "" : "s"}. Members answer these in order.</p>
+        ) : null}
       </div>
 
       {draft ? (
         <>
-          <div className="workflow-form">
-            <label className="wide-field">
-              <span>Checklist name</span>
-              <input value={draft.name} onChange={(e) => update((d) => { d.name = e.target.value; })} placeholder="Daily apparatus check" />
-            </label>
-          </div>
-          <p className="auth-help">{itemCount} item{itemCount === 1 ? "" : "s"} in {draft.sections?.length || 0} section{draft.sections?.length === 1 ? "" : "s"}. Members answer these in order.</p>
 
           {(draft.sections || []).map((section, sectionIndex) => (
-            <div key={section.id} className="template-section-card check-setup-section">
+            <section key={section.id} className="check-builder-card check-setup-section">
               <div className="check-setup-section-head">
-                <input
-                  className="check-setup-section-title"
-                  value={section.title}
-                  onChange={(e) => update((d) => { d.sections[sectionIndex].title = e.target.value; })}
-                  aria-label="Section name"
-                />
+                <label className="check-builder-field check-builder-section-name">
+                  <span>Section {sectionIndex + 1}</span>
+                  <input
+                    className="check-setup-section-title"
+                    value={section.title}
+                    onChange={(e) => update((d) => { d.sections[sectionIndex].title = e.target.value; })}
+                    placeholder="Section name, e.g. Exterior"
+                  />
+                </label>
+                <div className="check-builder-icons">
                 <button type="button" className="icon-button" title="Move section up" aria-label="Move section up" disabled={sectionIndex === 0} onClick={() => update((d) => { d.sections = move(d.sections, sectionIndex, -1); })}><ArrowUp size={14} /></button>
                 <button type="button" className="icon-button" title="Move section down" aria-label="Move section down" disabled={sectionIndex === draft.sections.length - 1} onClick={() => update((d) => { d.sections = move(d.sections, sectionIndex, 1); })}><ArrowDown size={14} /></button>
                 <button
@@ -410,26 +417,32 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
                     update((d) => { d.sections.splice(sectionIndex, 1); });
                   }}
                 ><Trash2 size={14} /></button>
+                </div>
               </div>
 
+              <div className="check-builder-items">
               {(section.fields || []).map((field, fieldIndex) => (
                 <div key={field.id || field.key} className="check-setup-item">
                   <div className="check-setup-item-main">
-                    <input
-                      value={field.label}
-                      onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].label = e.target.value; })}
-                      placeholder="What to check, e.g. Tire pressure"
-                      aria-label="Item name"
-                    />
-                    <select
-                      value={field.type}
-                      onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].type = e.target.value; })}
-                      aria-label="Answer type"
-                    >
-                      {[...ITEM_TYPES, ...(ITEM_TYPES.some((t) => t.id === field.type) ? [] : [{ id: field.type, label: field.type }])].map((type) => (
-                        <option key={type.id} value={type.id}>{type.label}</option>
-                      ))}
-                    </select>
+                    <label className="check-builder-field">
+                      <span>Item {fieldIndex + 1}</span>
+                      <input
+                        value={field.label}
+                        onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].label = e.target.value; })}
+                        placeholder="What to check, e.g. Tire pressure"
+                      />
+                    </label>
+                    <label className="check-builder-field">
+                      <span>Answer type</span>
+                      <select
+                        value={field.type}
+                        onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].type = e.target.value; })}
+                      >
+                        {[...ITEM_TYPES, ...(ITEM_TYPES.some((t) => t.id === field.type) ? [] : [{ id: field.type, label: field.type }])].map((type) => (
+                          <option key={type.id} value={type.id}>{type.label}</option>
+                        ))}
+                      </select>
+                    </label>
                     <div className="check-setup-item-buttons">
                       {draft.sections.length > 1 ? (
                         <select
@@ -475,19 +488,19 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
                   </div>
                   {field.type !== "instruction" ? (
                     <div className="check-setup-item-options">
-                      <label className="inline-check">
+                      <label className="inline-check check-builder-check">
                         <input type="checkbox" checked={Boolean(field.required)} onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].required = e.target.checked; })} />
                         Required
                       </label>
                       {PASS_TYPES.includes(field.type) ? (
                         <>
-                          <label>
+                          <label className="check-builder-inline">
                             <span>If it fails</span>
                             <select value={field.failAction || "continue"} onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].failAction = e.target.value; })}>
                               {FAIL_ACTIONS.map((action) => <option key={action.id} value={action.id}>{action.label}</option>)}
                             </select>
                           </label>
-                          <label className="inline-check">
+                          <label className="inline-check check-builder-check">
                             <input type="checkbox" checked={Boolean(field.noteRequiredOnFail)} onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].noteRequiredOnFail = e.target.checked; })} />
                             Ask what's wrong
                           </label>
@@ -495,19 +508,21 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
                       ) : null}
                     </div>
                   ) : null}
-                  <input
-                    className="check-setup-help"
-                    value={field.helpText || ""}
-                    onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].helpText = e.target.value; })}
-                    placeholder={field.type === "instruction" ? "Instructions shown to the member" : "Hint for the member (optional), e.g. Check all four sides"}
-                    aria-label="Hint"
-                  />
+                  <label className="check-builder-field">
+                    <span>{field.type === "instruction" ? "Instructions" : "Hint for the member (optional)"}</span>
+                    <input
+                      className="check-setup-help"
+                      value={field.helpText || ""}
+                      onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].helpText = e.target.value; })}
+                      placeholder={field.type === "instruction" ? "Instructions shown to the member" : "e.g. Check all four sides"}
+                    />
+                  </label>
                 </div>
               ))}
 
               <button
                 type="button"
-                className="text-button"
+                className="check-builder-add-item"
                 onClick={() => update((d) => {
                   d.sections[sectionIndex].fields = [...(d.sections[sectionIndex].fields || []), {
                     id: `field-${Date.now()}`, key: makeKey(), label: "", type: "pass_fail", required: true, failAction: "continue", noteRequiredOnFail: true, helpText: "",
@@ -516,7 +531,8 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
               >
                 <CirclePlus size={14} /> Add item
               </button>
-            </div>
+              </div>
+            </section>
           ))}
 
           <button
