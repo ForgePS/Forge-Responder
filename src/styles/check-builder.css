@@ -1,0 +1,388 @@
+/* Apparatus Check Setup → Checklists: the checklist builder.
+ * Same building blocks as the NERIS form (labels above fields, bordered
+ * cards, uniform inputs and icon buttons), using the shared theme tokens so
+ * light and dark both follow the platform. Scoped under .check-builder so it
+ * wins over the older .check-setup-* rules in styles.css. */
+
+.apparatus-check-setup .check-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ── Cards (picker/name card and each section) ── */
+.apparatus-check-setup .check-builder .check-builder-card {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
+  box-shadow: var(--rms-shadow-sm);
+}
+
+/* ── Labelled fields ── */
+.apparatus-check-setup .check-builder .check-builder-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  color: var(--rms-text);
+}
+
+.apparatus-check-setup .check-builder .check-builder-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--rms-text-muted);
+}
+
+.apparatus-check-setup .check-builder input:not([type="checkbox"]),
+.apparatus-check-setup .check-builder select {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.apparatus-check-setup .check-builder select {
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+.apparatus-check-setup .check-builder input:not([type="checkbox"]):focus,
+.apparatus-check-setup .check-builder select:focus {
+  outline: none;
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft);
+}
+
+.apparatus-check-setup .check-builder input::placeholder {
+  color: var(--rms-text-subtle);
+}
+
+/* ── Picker / name card ── */
+.apparatus-check-setup .check-builder .check-builder-top {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(220px, 1.4fr) auto;
+  align-items: end;
+  gap: 12px 14px;
+  padding: 14px 16px;
+}
+
+.apparatus-check-setup .check-builder .check-builder-top > .secondary-button {
+  height: 36px;
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.apparatus-check-setup .check-builder .check-builder-summary {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--rms-text-muted);
+  font-size: 13px;
+}
+
+/* ── Section card ── */
+.apparatus-check-setup .check-builder .check-setup-section {
+  overflow: hidden;
+}
+
+.apparatus-check-setup .check-builder .check-setup-section-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rms-border-strong);
+  background: var(--rms-bg-panel-header);
+}
+
+.apparatus-check-setup .check-builder .check-builder-section-name {
+  flex: 1;
+}
+
+.apparatus-check-setup .check-builder .check-builder-section-name > span {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+
+.apparatus-check-setup .check-builder .check-setup-section-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.apparatus-check-setup .check-builder .check-builder-icons,
+.apparatus-check-setup .check-builder .check-setup-item-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+/* ── Icon buttons (move up/down, delete): one size everywhere ── */
+.apparatus-check-setup .check-builder .icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text-body);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.apparatus-check-setup .check-builder .icon-button:hover:not(:disabled) {
+  border-color: var(--rms-primary);
+  background: var(--rms-bg-hover);
+  color: var(--rms-primary);
+}
+
+.apparatus-check-setup .check-builder .icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.apparatus-check-setup .check-builder .icon-button.danger {
+  color: #dc2626;
+}
+
+.apparatus-check-setup .check-builder .icon-button.danger:hover:not(:disabled) {
+  border-color: rgba(220, 38, 38, 0.5);
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+}
+
+html[data-theme="dark"] .apparatus-check-setup .check-builder .icon-button.danger,
+html[data-theme="dark"] .apparatus-check-setup .check-builder .icon-button.danger:hover:not(:disabled) {
+  color: #f87171;
+}
+
+.apparatus-check-setup .check-builder .check-setup-move {
+  width: 150px;
+  max-width: 150px;
+  font-size: 13px;
+}
+
+/* ── Item rows ── */
+.apparatus-check-setup .check-builder .check-builder-items {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+
+.apparatus-check-setup .check-builder .check-setup-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-surface-2);
+}
+
+html[data-theme="dark"] .apparatus-check-setup .check-builder .check-setup-item {
+  background: var(--rms-bg-surface-3);
+}
+
+.apparatus-check-setup .check-builder .check-setup-item-main {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(210px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.apparatus-check-setup .check-builder .check-setup-item-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  font-size: 13px;
+  color: var(--rms-text);
+}
+
+.apparatus-check-setup .check-builder .check-builder-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rms-text);
+  cursor: pointer;
+}
+
+.apparatus-check-setup .check-builder .check-builder-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin: 0;
+  accent-color: var(--rms-primary-solid);
+  cursor: pointer;
+}
+
+.apparatus-check-setup .check-builder .check-builder-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rms-text);
+}
+
+.apparatus-check-setup .check-builder .check-builder-inline select {
+  width: auto;
+  min-width: 220px;
+  max-width: 100%;
+  font-size: 13px;
+}
+
+/* Add item: a dashed drop-in row at the end of the section. */
+.apparatus-check-setup .check-builder .check-builder-add-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px dashed var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: transparent;
+  color: var(--rms-text-link);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apparatus-check-setup .check-builder .check-builder-add-item:hover {
+  border-color: var(--rms-primary);
+  background: var(--rms-primary-soft);
+}
+
+.apparatus-check-setup .check-builder > .secondary-button {
+  justify-self: start;
+}
+
+/* Save bar: stays at the bottom while scrolling. */
+.apparatus-check-setup .check-builder .check-setup-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
+  box-shadow: var(--rms-shadow-md);
+}
+
+/* ── Tablet ── */
+@media (max-width: 900px) {
+  .apparatus-check-setup .check-builder .check-builder-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .apparatus-check-setup .check-builder .check-builder-name {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .apparatus-check-setup .check-builder .check-setup-item-main {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .apparatus-check-setup .check-builder .check-setup-item-buttons {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+/* ── Phone ── */
+@media (max-width: 640px) {
+  .apparatus-check-setup .check-builder .check-builder-top {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .apparatus-check-setup .check-builder .check-builder-name {
+    grid-row: auto;
+  }
+
+  .apparatus-check-setup .check-builder .check-builder-top > .secondary-button {
+    justify-self: start;
+  }
+
+  .apparatus-check-setup .check-builder .check-setup-section-head {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+
+  .apparatus-check-setup .check-builder .check-builder-section-name {
+    flex: 1 1 100%;
+  }
+
+  .apparatus-check-setup .check-builder .check-builder-icons {
+    margin-left: auto;
+  }
+
+  .apparatus-check-setup .check-builder .check-builder-items {
+    padding: 12px;
+  }
+
+  .apparatus-check-setup .check-builder .check-setup-item {
+    padding: 12px;
+  }
+
+  .apparatus-check-setup .check-builder .check-setup-item-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .apparatus-check-setup .check-builder .check-setup-item-buttons {
+    justify-content: flex-start;
+  }
+
+  .apparatus-check-setup .check-builder .check-setup-move {
+    flex: 1;
+    width: auto;
+    max-width: none;
+  }
+
+  .apparatus-check-setup .check-builder .check-builder-inline {
+    display: grid;
+    flex: 1 1 100%;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .apparatus-check-setup .check-builder .check-builder-inline select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .apparatus-check-setup .check-builder .check-setup-save {
+    justify-content: flex-start;
+  }
+}
