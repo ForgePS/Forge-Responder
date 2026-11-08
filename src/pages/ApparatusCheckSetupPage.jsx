@@ -54,6 +54,17 @@ function move(list, index, delta) {
   return next;
 }
 
+// Move one checklist item to another section (at "start" or "end" of it).
+function moveFieldToSection(draft, fromSection, fieldIndex, toSection, position = "end") {
+  const source = draft.sections[fromSection];
+  const target = draft.sections[toSection];
+  if (!source || !target || fromSection === toSection) return;
+  const [field] = source.fields.splice(fieldIndex, 1);
+  target.fields = target.fields || [];
+  if (position === "start") target.fields.unshift(field);
+  else target.fields.push(field);
+}
+
 /* ------------------------------ Units ------------------------------ */
 
 function UnitsTab({ departmentId, actor, stations, legacyApparatus, onMessage }) {
@@ -420,8 +431,45 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
                       ))}
                     </select>
                     <div className="check-setup-item-buttons">
-                      <button type="button" className="icon-button" aria-label="Move item up" title="Move up" disabled={fieldIndex === 0} onClick={() => update((d) => { d.sections[sectionIndex].fields = move(d.sections[sectionIndex].fields, fieldIndex, -1); })}><ArrowUp size={14} /></button>
-                      <button type="button" className="icon-button" aria-label="Move item down" title="Move down" disabled={fieldIndex === section.fields.length - 1} onClick={() => update((d) => { d.sections[sectionIndex].fields = move(d.sections[sectionIndex].fields, fieldIndex, 1); })}><ArrowDown size={14} /></button>
+                      {draft.sections.length > 1 ? (
+                        <select
+                          className="check-setup-move"
+                          value=""
+                          aria-label="Move item to another section"
+                          title="Move to another section"
+                          onChange={(e) => {
+                            const to = Number(e.target.value);
+                            update((d) => moveFieldToSection(d, sectionIndex, fieldIndex, to, "end"));
+                          }}
+                        >
+                          <option value="" disabled>Move to…</option>
+                          {draft.sections.map((other, otherIndex) => (otherIndex === sectionIndex ? null : (
+                            <option key={other.id} value={otherIndex}>{other.title || `Section ${otherIndex + 1}`}</option>
+                          )))}
+                        </select>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label="Move item up"
+                        title={fieldIndex === 0 && sectionIndex > 0 ? `Move to the end of ${draft.sections[sectionIndex - 1].title || "the section above"}` : "Move up"}
+                        disabled={fieldIndex === 0 && sectionIndex === 0}
+                        onClick={() => update((d) => {
+                          if (fieldIndex > 0) d.sections[sectionIndex].fields = move(d.sections[sectionIndex].fields, fieldIndex, -1);
+                          else moveFieldToSection(d, sectionIndex, fieldIndex, sectionIndex - 1, "end");
+                        })}
+                      ><ArrowUp size={14} /></button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label="Move item down"
+                        title={fieldIndex === section.fields.length - 1 && sectionIndex < draft.sections.length - 1 ? `Move to the start of ${draft.sections[sectionIndex + 1].title || "the section below"}` : "Move down"}
+                        disabled={fieldIndex === section.fields.length - 1 && sectionIndex === draft.sections.length - 1}
+                        onClick={() => update((d) => {
+                          if (fieldIndex < d.sections[sectionIndex].fields.length - 1) d.sections[sectionIndex].fields = move(d.sections[sectionIndex].fields, fieldIndex, 1);
+                          else moveFieldToSection(d, sectionIndex, fieldIndex, sectionIndex + 1, "start");
+                        })}
+                      ><ArrowDown size={14} /></button>
                       <button type="button" className="icon-button danger" aria-label="Delete item" title="Delete item" onClick={() => update((d) => { d.sections[sectionIndex].fields.splice(fieldIndex, 1); })}><Trash2 size={14} /></button>
                     </div>
                   </div>
