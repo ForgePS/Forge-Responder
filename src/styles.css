@@ -3107,6 +3107,42 @@ html .app-shell .modal-card.neris-cad-import-modal {
 
 /* .config-field labels and inputs come from the shared form kit (src/styles/form-kit.css). */
 
+/* Preplan template layout editor: drag or arrow-move sections and fields. */
+.pp-layout { display: grid; gap: 12px; }
+.pp-section { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--rms-border); border-radius: 8px; background: var(--rms-bg-surface-3); transition: border-color 120ms ease, opacity 120ms ease; }
+.pp-section.is-dragging, .pp-field.is-dragging { opacity: 0.45; }
+.pp-section.is-drop-target { border-color: var(--rms-primary); box-shadow: 0 -3px 0 var(--rms-primary); }
+.pp-section-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.pp-section-title-input input { width: 100%; font-weight: 700; font-size: 15px; }
+.pp-section-title { font-size: 15px; color: var(--rms-text-strong); }
+.pp-grip { display: grid; place-items: center; width: 24px; height: 34px; border-radius: 6px; color: var(--rms-text-subtle); cursor: grab; touch-action: none; }
+.pp-grip:hover { color: var(--rms-text-body); background: var(--rms-bg-hover-2); }
+.pp-grip:active { cursor: grabbing; }
+.pp-actions { display: inline-flex; gap: 4px; align-items: center; }
+.pp-actions .icon-button { width: 30px; height: 30px; min-width: 30px; padding: 0; border: 1px solid var(--rms-border); background: var(--rms-bg-panel); }
+.pp-actions .icon-button:disabled { opacity: 0.35; cursor: default; }
+.pp-actions .icon-button.danger { color: var(--rms-danger-text); }
+.pp-actions .icon-button.danger:hover:not(:disabled) { background: var(--rms-danger-soft); }
+.pp-fields { display: grid; gap: 6px; min-height: 8px; padding: 2px 0; border-radius: 6px; }
+.pp-fields.is-drop-end { box-shadow: inset 0 -3px 0 var(--rms-primary); }
+.pp-empty { margin: 0; padding: 10px; border: 1px dashed var(--rms-border-strong); border-radius: 6px; color: var(--rms-text-muted); font-size: 13px; text-align: center; }
+.pp-field { display: grid; grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.3fr) auto auto; gap: 8px; align-items: end; padding: 8px 10px; border: 1px solid var(--rms-border); border-radius: 6px; background: var(--rms-bg-panel); }
+.pp-field.is-drop-target { box-shadow: 0 -3px 0 var(--rms-primary); }
+.pp-field > .pp-grip { align-self: end; }
+.pp-field label > span { display: block; margin-bottom: 3px; color: var(--rms-text-muted); font-size: 12px; font-weight: 600; }
+.pp-field label input:not([type="checkbox"]), .pp-field label select { width: 100%; }
+.pp-field-flag { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; color: var(--rms-text-body); font-size: 13px; white-space: nowrap; }
+.pp-readonly-fields { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.pp-readonly-fields li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--rms-border); font-size: 13px; }
+.pp-readonly-fields small { color: var(--rms-text-muted); }
+@media (max-width: 1100px) {
+  .pp-field { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); }
+  .pp-field-label { grid-column: 2 / -1; }
+  .pp-field > .pp-grip { grid-row: 1 / span 3; align-self: start; }
+  .pp-field-flag { grid-column: 2; }
+  .pp-field > .pp-actions { grid-column: 3; justify-self: end; }
+}
+
 .template-section-card {
   border: 1px solid var(--rms-border);
   border-radius: 8px;
