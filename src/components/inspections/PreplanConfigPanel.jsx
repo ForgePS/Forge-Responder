@@ -292,13 +292,14 @@ export default function PreplanConfigPanel({
                           const id = `sec-${Date.now().toString(36)}`;
                           setDraft((current) => ({
                             ...current,
+                            // New sections go at the top, right under the Add section button.
                             sections: [
-                              ...(current.sections || []),
                               {
                                 id,
                                 title: "New section",
                                 fields: [{ key: `${id}_notes`, label: "Notes", type: "textarea" }],
                               },
+                              ...(current.sections || []),
                             ],
                           }));
                         }}
