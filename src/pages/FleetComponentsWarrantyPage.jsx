@@ -476,7 +476,7 @@ export default function FleetComponentsWarrantyPage({ onNavigate, legacyApparatu
         {modal === "tire" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Add tire</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Add tire</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={tireDraft.fleetAssetId} onChange={(e) => setTireDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -520,7 +520,7 @@ export default function FleetComponentsWarrantyPage({ onNavigate, legacyApparatu
         {modal === "battery" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Add battery</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Add battery</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={batteryDraft.fleetAssetId} onChange={(e) => setBatteryDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -559,7 +559,7 @@ export default function FleetComponentsWarrantyPage({ onNavigate, legacyApparatu
         {modal === "fluid" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Record fluid event</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Record fluid event</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={fluidDraft.fleetAssetId} onChange={(e) => setFluidDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -613,7 +613,7 @@ export default function FleetComponentsWarrantyPage({ onNavigate, legacyApparatu
         {modal === "recall" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>New recall / bulletin</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>New recall / bulletin</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Campaign #"><input value={recallDraft.campaignNumber} onChange={(e) => setRecallDraft((c) => ({ ...c, campaignNumber: e.target.value }))} /></Field>
                 <Field label="Type">
@@ -660,7 +660,7 @@ export default function FleetComponentsWarrantyPage({ onNavigate, legacyApparatu
         {modal === "warranty" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Add warranty coverage</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Add warranty coverage</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={warrantyDraft.fleetAssetId} onChange={(e) => setWarrantyDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -695,7 +695,7 @@ export default function FleetComponentsWarrantyPage({ onNavigate, legacyApparatu
         {modal === "claim" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>New warranty claim</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>New warranty claim</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={claimDraft.fleetAssetId} onChange={(e) => setClaimDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>

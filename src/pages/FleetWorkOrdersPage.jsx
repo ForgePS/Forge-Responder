@@ -609,7 +609,7 @@ export default function FleetWorkOrdersPage({
             <section className="workflow-modal">
               <header>
                 <strong>{initialDefect ? "Create work order from defect" : "New work order"}</strong>
-                <button type="button" onClick={() => setShowCreate(false)}>×</button>
+                <button type="button" className="icon-button" aria-label="Close" onClick={() => setShowCreate(false)}>×</button>
               </header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">

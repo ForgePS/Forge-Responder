@@ -4,10 +4,11 @@ import {
   readUtilityAckToken,
   submitUtilityAckPortal,
 } from "../lib/hydrantDamage/utilityAckPortal.js";
+import "../styles/utility-ack-portal.css";
 
 function Field({ label, children }) {
   return (
-    <label className="config-field" style={{ display: "grid", gap: 6 }}>
+    <label className="utility-ack-portal__field">
       <span>{label}</span>
       {children}
     </label>
@@ -83,41 +84,41 @@ export default function UtilityAckPortalPage() {
   }
 
   return (
-    <main className="utility-ack-portal" style={{ minHeight: "100vh", padding: "32px 16px", background: "linear-gradient(180deg, #e8f4f2 0%, #f7faf9 40%, #ffffff 100%)" }}>
-      <div style={{ maxWidth: 720, margin: "0 auto", display: "grid", gap: 16 }}>
+    <main className="utility-ack-portal">
+      <div className="utility-ack-portal__inner">
         <header>
-          <p style={{ margin: 0, letterSpacing: "0.08em", textTransform: "uppercase", color: "#145d55", fontWeight: 700, fontSize: 12 }}>
+          <p className="utility-ack-portal__eyebrow">
             FORGE RMS
           </p>
-          <h1 style={{ margin: "6px 0 0", fontSize: "1.75rem" }}>Hydrant damage acknowledgment</h1>
-          <p style={{ margin: "8px 0 0", color: "#475569" }}>
+          <h1 className="utility-ack-portal__title">Hydrant damage acknowledgment</h1>
+          <p className="utility-ack-portal__lead">
             Secure utility portal. Internal fire-department notes are never shown here.
           </p>
         </header>
 
         {loading ? <p role="status">Loading report…</p> : null}
-        {error ? <p role="alert" style={{ color: "#b91c1c" }}>{error}</p> : null}
-        {message ? <p role="status" style={{ color: "#145d55" }}>{message}</p> : null}
+        {error ? <p role="alert" className="utility-ack-portal__error">{error}</p> : null}
+        {message ? <p role="status" className="utility-ack-portal__success">{message}</p> : null}
 
         {snapshot ? (
-          <section style={{ background: "#fff", border: "1px solid #d5e3df", borderRadius: 12, padding: 20, display: "grid", gap: 12 }}>
+          <section className="utility-ack-portal__card">
             <div>
               <strong>{snapshot.reportNumber}</strong>
-              <div style={{ color: "#64748b" }}>{snapshot.statusLabel || snapshot.status}</div>
+              <div className="utility-ack-portal__muted">{snapshot.statusLabel || snapshot.status}</div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div><div style={{ fontSize: 12, color: "#64748b" }}>Hydrant</div><div>{snapshot.hydrantLabel}</div></div>
-              <div><div style={{ fontSize: 12, color: "#64748b" }}>Address</div><div>{snapshot.hydrantAddress || "—"}</div></div>
-              <div><div style={{ fontSize: 12, color: "#64748b" }}>Severity</div><div>{snapshot.severityLabel || snapshot.severity}</div></div>
-              <div><div style={{ fontSize: 12, color: "#64748b" }}>Operational</div><div>{snapshot.operationalStatusLabel || snapshot.operationalStatus}</div></div>
+            <div className="utility-ack-portal__facts">
+              <div><div className="utility-ack-portal__fact-label">Hydrant</div><div>{snapshot.hydrantLabel}</div></div>
+              <div><div className="utility-ack-portal__fact-label">Address</div><div>{snapshot.hydrantAddress || "—"}</div></div>
+              <div><div className="utility-ack-portal__fact-label">Severity</div><div>{snapshot.severityLabel || snapshot.severity}</div></div>
+              <div><div className="utility-ack-portal__fact-label">Operational</div><div>{snapshot.operationalStatusLabel || snapshot.operationalStatus}</div></div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>Description</div>
+              <div className="utility-ack-portal__fact-label">Description</div>
               <div>{snapshot.description || "—"}</div>
             </div>
             {snapshot.utilityFacingNotes ? (
               <div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>Utility notes from FD</div>
+                <div className="utility-ack-portal__fact-label">Utility notes from FD</div>
                 <div>{snapshot.utilityFacingNotes}</div>
               </div>
             ) : null}
@@ -125,7 +126,7 @@ export default function UtilityAckPortalPage() {
         ) : null}
 
         {snapshot && !["closed", "cancelled", "verified"].includes(snapshot.status) ? (
-          <form onSubmit={handleSubmit} style={{ background: "#fff", border: "1px solid #d5e3df", borderRadius: 12, padding: 20, display: "grid", gap: 12 }}>
+          <form onSubmit={handleSubmit} className="utility-ack-portal__card">
             <Field label="Action">
               <select
                 value={form.action}
@@ -177,15 +178,7 @@ export default function UtilityAckPortalPage() {
             <button
               type="submit"
               disabled={saving}
-              style={{
-                minHeight: 44,
-                border: 0,
-                borderRadius: 8,
-                background: "#145d55",
-                color: "#fff",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
+              className="utility-ack-portal__submit"
             >
               {saving ? "Submitting…" : "Submit update"}
             </button>

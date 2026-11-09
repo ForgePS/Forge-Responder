@@ -74,10 +74,10 @@ function ListValue({ items, options = [], editing, onChange, label, addLabel }) 
       {items.map((item, index) => (
         <div key={index} className="profile-row-edit is-single">
           <ComboField value={item} options={options} onChange={(next) => onChange(items.map((other, i) => (i === index ? next : other)))} ariaLabel={`${label} ${index + 1}`} />
-          <button type="button" className="profile-icon-btn" onClick={() => onChange(items.filter((_, i) => i !== index))} title="Remove" aria-label={`Remove ${label.toLowerCase()} ${index + 1}`}><Trash2 size={15} /></button>
+          <button type="button" className="icon-button danger" onClick={() => onChange(items.filter((_, i) => i !== index))} title="Remove" aria-label={`Remove ${label.toLowerCase()} ${index + 1}`}><Trash2 size={15} /></button>
         </div>
       ))}
-      <button type="button" className="secondary-button profile-add" onClick={() => onChange([...items, ""])}>
+      <button type="button" className="rms-add-row profile-add" onClick={() => onChange([...items, ""])}>
         <Plus size={14} /> {addLabel || `Add ${label.toLowerCase()}`}
       </button>
     </div>
@@ -176,11 +176,11 @@ export function ContactList({ kind, rows, editing, onChange }) {
           {!isPhone ? (
             <label className="profile-check"><input type="checkbox" checked={row.notifications !== false} onChange={(event) => update(index, { notifications: event.target.checked })} /> Notifications</label>
           ) : null}
-          <button type="button" className={`profile-icon-btn ${row.primary ? "is-on" : ""}`} onClick={() => onChange(rows.map((other, i) => ({ ...other, primary: i === index })))} title="Make primary" aria-label="Make primary"><Star size={15} /></button>
-          <button type="button" className="profile-icon-btn" onClick={() => onChange(rows.filter((_, i) => i !== index))} title="Remove" aria-label="Remove"><Trash2 size={15} /></button>
+          <button type="button" className={`icon-button profile-star ${row.primary ? "is-on" : ""}`} onClick={() => onChange(rows.map((other, i) => ({ ...other, primary: i === index })))} title="Make primary" aria-label="Make primary"><Star size={15} /></button>
+          <button type="button" className="icon-button danger" onClick={() => onChange(rows.filter((_, i) => i !== index))} title="Remove" aria-label="Remove"><Trash2 size={15} /></button>
         </div>
       ))}
-      <button type="button" className="secondary-button profile-add" onClick={() => onChange([...rows, { id: `${kind}-${Date.now().toString(36)}`, [valueKey]: "", type: types[0], primary: !rows.length, ...(isPhone ? {} : { notifications: true }) }])}>
+      <button type="button" className="rms-add-row profile-add" onClick={() => onChange([...rows, { id: `${kind}-${Date.now().toString(36)}`, [valueKey]: "", type: types[0], primary: !rows.length, ...(isPhone ? {} : { notifications: true }) }])}>
         <Plus size={14} /> Add {isPhone ? "phone" : "email"}
       </button>
     </div>
@@ -301,8 +301,8 @@ export function IssuedEquipment({ rows, editing, onChange, showReturned = false 
                 </p>
               ) : null}
               <footer>
-                <button type="button" className="profile-icon-btn" disabled={index === 0} onClick={() => onChange(moveRow(rows, index, -1))} title="Move up" aria-label="Move up"><ArrowUp size={15} /></button>
-                <button type="button" className="profile-icon-btn" disabled={index === rows.length - 1} onClick={() => onChange(moveRow(rows, index, 1))} title="Move down" aria-label="Move down"><ArrowDown size={15} /></button>
+                <button type="button" className="icon-button" disabled={index === 0} onClick={() => onChange(moveRow(rows, index, -1))} title="Move up" aria-label="Move up"><ArrowUp size={15} /></button>
+                <button type="button" className="icon-button" disabled={index === rows.length - 1} onClick={() => onChange(moveRow(rows, index, 1))} title="Move down" aria-label="Move down"><ArrowDown size={15} /></button>
                 <button type="button" className="profile-icon-btn is-danger" onClick={() => onChange(rows.filter((_, i) => i !== index))} title="Remove" aria-label="Remove"><Trash2 size={15} /> Remove</button>
               </footer>
             </article>
@@ -310,7 +310,7 @@ export function IssuedEquipment({ rows, editing, onChange, showReturned = false 
         })}
       </div>
       {editing ? (
-        <button type="button" className="secondary-button profile-add" onClick={() => onChange([...rows, emptyEquipment()])}><Plus size={14} /> Add equipment</button>
+        <button type="button" className="rms-add-row profile-add" onClick={() => onChange([...rows, emptyEquipment()])}><Plus size={14} /> Add equipment</button>
       ) : hiddenCount > 0 ? (
         <button type="button" className="profile-link" onClick={() => setShowAll(true)}>Show {hiddenCount} returned or retired item{hiddenCount === 1 ? "" : "s"}</button>
       ) : null}
@@ -347,10 +347,10 @@ export function RowsEditor({ columns, rows, onChange, addLabel }) {
           {columns.map(([key, label, type]) => (
             <input key={key} type={type === "date" || type === "expires" ? "date" : "text"} value={type === "date" || type === "expires" ? formatPersonnelDateForInput(row[key]) : row[key] || ""} placeholder={label} aria-label={label} onChange={(event) => update(index, { [key]: event.target.value })} />
           ))}
-          <button type="button" className="profile-icon-btn" onClick={() => onChange(rows.filter((_, i) => i !== index))} title="Remove" aria-label="Remove"><Trash2 size={15} /></button>
+          <button type="button" className="icon-button danger" onClick={() => onChange(rows.filter((_, i) => i !== index))} title="Remove" aria-label="Remove"><Trash2 size={15} /></button>
         </div>
       ))}
-      <button type="button" className="secondary-button profile-add" onClick={() => onChange([...rows, { id: `row-${Date.now().toString(36)}` }])}><Plus size={14} /> {addLabel}</button>
+      <button type="button" className="rms-add-row profile-add" onClick={() => onChange([...rows, { id: `row-${Date.now().toString(36)}` }])}><Plus size={14} /> {addLabel}</button>
     </div>
   );
 }

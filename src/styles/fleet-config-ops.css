@@ -2,7 +2,7 @@
 
 .fco-intro {
   margin: 0 0 12px;
-  color: var(--rms-text-muted, #64748b);
+  color: var(--rms-text-muted);
   font-size: 14px;
   line-height: 1.45;
   max-width: 72ch;
@@ -13,13 +13,13 @@
   gap: 8px;
   justify-items: start;
   padding: 16px 4px;
-  color: var(--rms-text-muted, #64748b);
+  color: var(--rms-text-muted);
   font-size: 14px;
   line-height: 1.45;
 }
 
 .fco-empty strong {
-  color: var(--rms-text-body, inherit);
+  color: var(--rms-text-body);
   font-size: 15px;
 }
 
@@ -28,16 +28,17 @@
   margin-left: 6px;
   padding: 1px 6px;
   border-radius: 999px;
-  border: 1px solid var(--rms-border, rgba(148, 163, 184, 0.4));
-  color: var(--rms-text-muted, #64748b);
+  border: 1px solid var(--rms-border-strong);
+  color: var(--rms-text-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   vertical-align: middle;
 }
 
 .fco-tag.fco-tag-new {
-  border-color: rgba(37, 99, 235, 0.5);
-  color: var(--rms-text-link, #2563eb);
+  border-color: var(--rms-primary);
+  background: var(--rms-primary-soft);
+  color: var(--rms-text-link);
 }
 
 .fco-row-off strong {
@@ -47,17 +48,17 @@
 .fco-hint {
   display: block;
   margin-top: 2px;
-  color: var(--rms-text-muted, #64748b);
+  color: var(--rms-text-muted);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.35;
 }
 
 .fco-readonly {
-  min-height: 33px;
+  min-height: 36px;
   display: flex;
   align-items: center;
-  color: var(--rms-text-body, inherit);
+  color: var(--rms-text-body);
   font-size: 14px;
   font-weight: 700;
 }
@@ -86,9 +87,9 @@
 .fco-note {
   margin-top: 12px;
   padding: 10px 12px;
-  border: 1px dashed var(--rms-border, rgba(148, 163, 184, 0.4));
-  border-radius: 6px;
-  color: var(--rms-text-muted, #64748b);
+  border: 1px dashed var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  color: var(--rms-text-muted);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -97,6 +98,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--rms-text-muted, #64748b);
+  color: var(--rms-text-muted);
   font-size: 13px;
 }

@@ -325,7 +325,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
             />
           </div>
           <div className="upload-form">
-            <label>
+            <label className="rms-field">
               <span>Issue Date</span>
               <input
                 type="date"
@@ -334,7 +334,7 @@ export default function CertificationsPage({ query, records = [], setRecords, ca
                 onChange={(event) => setUploadDraft((current) => ({ ...current, issue: event.target.value }))}
               />
             </label>
-            <label>
+            <label className="rms-field">
               <span>Expiration Date</span>
               <input
                 type="date"

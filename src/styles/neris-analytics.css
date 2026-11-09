@@ -17,22 +17,22 @@
 .analytics-empty-value {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-muted, #64748b);
+  color: var(--rms-text-muted);
 }
 .neris-analytics-note,
 .analytics-range-note {
   margin: 0;
   font-size: 13px;
-  color: var(--text-muted, #64748b);
+  color: var(--rms-text-muted);
 }
 .analytics-panel-note {
   margin: 0 0 8px;
   font-size: 12px;
-  color: var(--text-muted, #64748b);
+  color: var(--rms-text-muted);
 }
 .analytics-empty {
   margin: 0;
   padding: 12px 0;
   font-size: 13px;
-  color: var(--text-muted, #64748b);
+  color: var(--rms-text-muted);
 }

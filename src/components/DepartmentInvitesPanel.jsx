@@ -146,11 +146,11 @@ export default function DepartmentInvitesPanel({ departmentId, roles = [], onMes
 
       <form className="department-invite-form" onSubmit={handleSubmit}>
         <div className="department-invite-fields">
-          <label>
+          <label className="rms-field">
             <span>Email</span>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@department.org" required />
           </label>
-          <label>
+          <label className="rms-field">
             <span>Name (optional)</span>
             <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Jordan Smith" />
           </label>
@@ -202,7 +202,7 @@ export default function DepartmentInvitesPanel({ departmentId, roles = [], onMes
         {pending.length > 0 && (
           <ul>
             {pending.map((invite) => (
-              <li key={invite.id} style={invite.expired ? { color: "var(--rms-text-muted)" } : undefined}>
+              <li key={invite.id} className={invite.expired ? "muted" : undefined}>
                 <span>
                   <strong>{invite.displayName || invite.email}</strong>
                   {invite.displayName && <> · {invite.email}</>}

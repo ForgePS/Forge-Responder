@@ -112,7 +112,7 @@ function CreateInspectionModal({
       <section className="workflow-modal inspection-create-modal">
         <header>
           <strong>Create inspection</strong>
-          <button type="button" onClick={onClose}>×</button>
+          <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>×</button>
         </header>
         <div className="modal-content occupancy-form-grid">
           <Field label="Occupancy">

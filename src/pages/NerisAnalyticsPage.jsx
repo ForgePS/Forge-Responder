@@ -223,8 +223,8 @@ export default function NerisAnalyticsPage({ reports = [] }) {
       {activeTab === "annual" ? (
         <section className="neris-analytics-grid">
           <div className="neris-analytics-toolbar">
-            <label>
-              Survey year
+            <label className="rms-field">
+              <span>Survey year</span>
               <input
                 type="number"
                 value={surveyYear}
@@ -313,12 +313,12 @@ export default function NerisAnalyticsPage({ reports = [] }) {
       {activeTab === "adhoc" ? (
         <section className="neris-analytics-grid">
           <div className="neris-analytics-toolbar">
-            <label>
-              Status filter
+            <label className="rms-field">
+              <span>Status filter</span>
               <input value={adHocFilter.status} onChange={(e) => setAdHocFilter((f) => ({ ...f, status: e.target.value }))} placeholder="Draft, Approved…" />
             </label>
-            <label>
-              Type filter
+            <label className="rms-field">
+              <span>Type filter</span>
               <input value={adHocFilter.incidentType} onChange={(e) => setAdHocFilter((f) => ({ ...f, incidentType: e.target.value }))} placeholder="Chest pain, fire…" />
             </label>
             <button

@@ -103,7 +103,7 @@ export default function DepartmentModulesPanel({ onMessage, onOpenDepartment }) 
       </p>
 
       <div className="department-modules-toolbar">
-        <label>
+        <label className="rms-field">
           <span>Department</span>
           <select value={selectedDepartmentId} onChange={(event) => setSelectedDepartmentId(event.target.value)}>
             {departments.map((department) => (

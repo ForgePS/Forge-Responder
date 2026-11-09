@@ -98,10 +98,10 @@
 .call-shift-rules-form label:not(.call-shift-rule-toggle) > span,
 .call-shift-rule-field-label {
   color: var(--rms-text-muted);
-  font-size: 0.72rem;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .call-shift-rule-field {
@@ -128,12 +128,12 @@
 }
 
 .call-shift-rule-toggle:hover:not(:has(input:disabled)) {
-  border-color: rgba(37, 99, 235, 0.35);
+  border-color: var(--rms-primary);
   background: var(--rms-bg-hover);
 }
 
 .call-shift-rule-toggle:has(input:checked) {
-  border-color: rgba(37, 99, 235, 0.45);
+  border-color: var(--rms-primary);
   background: var(--rms-primary-soft);
 }
 
@@ -188,8 +188,8 @@
 .call-shift-qualifier-trigger {
   width: 100%;
   min-height: 36px;
-  padding: 8px 12px;
-  border: 1px solid var(--rms-border);
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
   border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
   color: var(--rms-text-strong);
@@ -199,8 +199,8 @@
 }
 
 .call-shift-qualifier-select.is-open .call-shift-qualifier-trigger {
-  border-color: rgba(37, 99, 235, 0.55);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft);
 }
 
 .call-shift-qualifier-menu {
@@ -304,7 +304,7 @@ html[data-theme="light"] .call-shift-rule-toggle {
 
 html[data-theme="light"] .call-shift-rule-toggle:has(input:checked) {
   background: #eff6ff;
-  border-color: rgba(37, 99, 235, 0.35);
+  border-color: var(--rms-primary);
 }
 
 html[data-theme="light"] .call-shift-qualifier-option.is-selected {

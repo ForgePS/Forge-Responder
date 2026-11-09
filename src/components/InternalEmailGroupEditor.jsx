@@ -66,7 +66,7 @@ export default function InternalEmailGroupEditor({
 
       {!disabled && (
         <div className="internal-email-group-form">
-          <label>
+          <label className="rms-field">
             <span>Group name</span>
             <input
               value={draftLabel}

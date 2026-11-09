@@ -16,24 +16,47 @@
 .daily-log-auto-lock span {
   color: var(--rms-text-muted);
   font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .daily-log-toolbar input,
 .daily-log-toolbar select,
-.daily-log-form input,
+.daily-log-form input:not([type="checkbox"]),
 .daily-log-form textarea,
 .daily-log-form select {
-  min-height: 32px;
+  height: 36px;
+  min-height: 36px;
   width: 100%;
-  padding: 0 8px;
-  border: 1px solid var(--rms-border);
-  border-radius: 4px;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
-  color: var(--rms-text-strong);
+  color: var(--rms-text);
+  font: inherit;
   font-size: 14px;
+}
+
+.daily-log-form textarea {
+  height: auto;
+  min-height: 84px;
+  padding: 8px 10px;
+  line-height: 1.45;
+}
+
+.daily-log-toolbar :is(input, select):focus,
+.daily-log-form :is(input:not([type="checkbox"]), select, textarea):focus {
+  outline: none;
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft);
+}
+
+.daily-log-form > label {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
 }
 
 .daily-log-toolbar-meta {
@@ -76,7 +99,7 @@
 }
 
 .daily-log-row.selected {
-  box-shadow: inset 3px 0 #3b82f6;
+  box-shadow: inset 3px 0 var(--rms-primary);
 }
 
 .daily-log-row strong,
@@ -107,18 +130,18 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 6px;
-  background: rgba(217, 119, 6, 0.08);
-  color: #d97706;
+  border: 1px solid color-mix(in srgb, var(--rms-warning) 35%, transparent);
+  border-radius: var(--rms-radius-sm);
+  background: color-mix(in srgb, var(--rms-warning) 8%, transparent);
+  color: var(--rms-warning);
 }
 
 .daily-log-detail {
   display: grid;
   gap: 10px;
-  border: 1px solid var(--rms-border);
-  border-radius: 7px;
-  background: var(--rms-bg-surface-2);
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
   overflow: hidden;
 }
 
@@ -128,8 +151,8 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--rms-border-subtle);
-  background: var(--rms-bg-surface-3);
+  border-bottom: 1px solid var(--rms-border-strong);
+  background: var(--rms-bg-panel-header);
 }
 
 .daily-log-detail-header h2 {
@@ -170,9 +193,9 @@
   gap: 5px;
   align-content: center;
   padding: 8px 10px;
-  border: 1px dashed var(--rms-border);
-  border-radius: 6px;
-  background: var(--rms-bg-surface-3);
+  border: 1px dashed var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-surface-2);
 }
 
 .daily-log-auto-lock strong {
@@ -189,9 +212,9 @@
   display: grid;
   gap: 0;
   padding: 0;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
-  background: var(--rms-bg-surface-3);
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-surface-2);
   overflow: hidden;
 }
 
@@ -256,14 +279,22 @@
   gap: 8px;
   align-items: start;
   padding: 8px;
-  border: 1px solid var(--rms-border-subtle);
-  border-radius: 5px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
+  cursor: pointer;
 }
 
 .daily-log-crew-grid label.active {
-  border-color: #3b82f6;
-  background: rgba(59, 130, 246, 0.08);
+  border-color: var(--rms-primary);
+  background: var(--rms-primary-soft);
+}
+
+.daily-log-crew-grid input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--rms-primary-solid);
 }
 
 .daily-log-crew-grid label strong,
@@ -279,7 +310,7 @@
 
 .daily-log-notes textarea {
   min-height: 240px;
-  padding: 10px;
+  padding: 8px 10px;
   resize: vertical;
   line-height: 1.45;
 }
@@ -302,18 +333,18 @@
 }
 
 .daily-log-badge-info {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  background: var(--rms-primary-soft);
+  color: var(--rms-text-link);
 }
 
 .daily-log-badge-warning {
-  background: rgba(217, 119, 6, 0.15);
-  color: #d97706;
+  background: color-mix(in srgb, var(--rms-warning) 15%, transparent);
+  color: var(--rms-warning);
 }
 
 .daily-log-badge-critical {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  background: var(--rms-danger-soft);
+  color: var(--rms-danger-text);
 }
 
 @media (max-width: 980px) {

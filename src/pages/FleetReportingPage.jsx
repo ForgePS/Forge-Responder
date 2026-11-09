@@ -314,8 +314,8 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                 <div><strong>{reportResult?.label || "Results"}</strong></div>
                 {reportResult ? (
                   <div className="inspections-header-actions">
-                    <button type="button" onClick={() => exportResult(reportResult, "csv")}><Download size={14} /> Spreadsheet (CSV)</button>
-                    <button type="button" onClick={() => exportResult(reportResult, "json")}><Download size={14} /> Data file (JSON)</button>
+                    <button type="button" className="secondary-button" onClick={() => exportResult(reportResult, "csv")}><Download size={14} /> Spreadsheet (CSV)</button>
+                    <button type="button" className="secondary-button" onClick={() => exportResult(reportResult, "json")}><Download size={14} /> Data file (JSON)</button>
                   </div>
                 ) : null}
               </header>
@@ -347,7 +347,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
               <div><strong>Custom report builder</strong></div>
               {canEdit ? (
                 <div className="inspections-header-actions">
-                  <button type="button" disabled={saving} onClick={async () => {
+                  <button type="button" className="secondary-button" disabled={saving} onClick={async () => {
                     setSaving(true);
                     try {
                       await saveSavedReport(departmentId, customDraft, actor);
@@ -411,7 +411,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                 <span>Fields</span>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                   {selectedSourceFields.map((field) => (
-                    <label key={field} style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <label key={field} className="rms-check">
                       <input
                         type="checkbox"
                         checked={customDraft.fields.includes(field)}
@@ -433,8 +433,8 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
             {reportResult?.rows && tab === "custom" ? (
               <div className="panel-body">
                 <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                  <button type="button" onClick={() => exportResult(reportResult, "csv")}><Download size={14} /> Spreadsheet (CSV)</button>
-                  <button type="button" onClick={() => exportResult(reportResult, "json")}><Download size={14} /> Data file (JSON)</button>
+                  <button type="button" className="secondary-button" onClick={() => exportResult(reportResult, "csv")}><Download size={14} /> Spreadsheet (CSV)</button>
+                  <button type="button" className="secondary-button" onClick={() => exportResult(reportResult, "json")}><Download size={14} /> Data file (JSON)</button>
                 </div>
                 <p className="muted">{reportResult.rowCount} rows</p>
               </div>
@@ -468,7 +468,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
           <>
             {canEdit ? (
               <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                <button type="button" onClick={() => setModal("automation")}><CirclePlus size={14} /> New automation</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("automation")}><CirclePlus size={14} /> New automation</button>
               </div>
             ) : null}
             {(board?.automations || []).length ? (
@@ -506,7 +506,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                         </dl>
                         {canEdit ? (
                           <div className="inspections-header-actions" style={{ marginTop: "12px", flexWrap: "wrap" }}>
-                            <select
+                            <select className="status-select" style={{ width: "auto" }}
                               value={selectedAutomation.status}
                               onChange={async (e) => {
                                 await saveAutomation(departmentId, { ...selectedAutomation, status: e.target.value }, actor);
@@ -515,7 +515,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                             >
                               {autoStatuses.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
                             </select>
-                            <button type="button" disabled={saving} onClick={async () => {
+                            <button type="button" className="secondary-button" disabled={saving} onClick={async () => {
                               setSaving(true);
                               try {
                                 const result = await runAutomation(departmentId, selectedAutomation.id, { dryRun: true }, actor);
@@ -573,7 +573,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
           <>
             {canEdit ? (
               <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                <button type="button" onClick={() => setModal("workflow")}><CirclePlus size={14} /> New workflow</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("workflow")}><CirclePlus size={14} /> New workflow</button>
               </div>
             ) : null}
             {(board?.workflows || []).length ? (
@@ -627,7 +627,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
               <header>
                 <div><strong>Adapters</strong></div>
                 {canEdit ? (
-                  <button type="button" onClick={() => setModal("adapter")}><CirclePlus size={14} /> Add adapter</button>
+                  <button type="button" className="secondary-button" onClick={() => setModal("adapter")}><CirclePlus size={14} /> Add adapter</button>
                 ) : null}
               </header>
               <div className="panel-body">
@@ -642,7 +642,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                       <FleetStatusBadge status={row.status} />
                       <span>{row.lastTestResult || "—"}</span>
                       {canEdit ? (
-                        <button type="button" disabled={saving} onClick={async () => {
+                        <button type="button" className="secondary-button" disabled={saving} onClick={async () => {
                           setSaving(true);
                           try {
                             const next = await testIntegrationAdapter(departmentId, row.id, actor);
@@ -665,7 +665,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
               <section className="panel">
                 <header>
                   <div><strong>NERIS mappings</strong></div>
-                  {canEdit ? <button type="button" onClick={() => setModal("neris")}><CirclePlus size={14} /> Map</button> : null}
+                  {canEdit ? <button type="button" className="secondary-button" onClick={() => setModal("neris")}><CirclePlus size={14} /> Map</button> : null}
                 </header>
                 <div className="panel-body">
                   {(board?.neris || []).length ? (
@@ -688,7 +688,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
               <section className="panel">
                 <header>
                   <div><strong>CAD mappings</strong></div>
-                  {canEdit ? <button type="button" onClick={() => setModal("cad")}><CirclePlus size={14} /> Map</button> : null}
+                  {canEdit ? <button type="button" className="secondary-button" onClick={() => setModal("cad")}><CirclePlus size={14} /> Map</button> : null}
                 </header>
                 <div className="panel-body">
                   {(board?.cad || []).length ? (
@@ -715,7 +715,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
         {modal === "automation" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>New automation</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>New automation</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Name"><input value={automationDraft.name} onChange={(e) => setAutomationDraft((c) => ({ ...c, name: e.target.value }))} /></Field>
                 <Field label="Trigger">
@@ -731,7 +731,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                 <Field label="Description"><textarea rows={2} value={automationDraft.description} onChange={(e) => setAutomationDraft((c) => ({ ...c, description: e.target.value }))} /></Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !automationDraft.name} onClick={async () => {
                   setSaving(true);
                   try {
@@ -753,7 +753,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
         {modal === "workflow" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>New workflow</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>New workflow</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Name"><input value={workflowDraft.name} onChange={(e) => setWorkflowDraft((c) => ({ ...c, name: e.target.value }))} /></Field>
                 <Field label="Template">
@@ -763,7 +763,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                 </Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !workflowDraft.name} onClick={async () => {
                   setSaving(true);
                   try {
@@ -795,7 +795,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
         {modal === "adapter" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>Add integration adapter</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Add integration adapter</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Name"><input id="adapter-name" defaultValue="" /></Field>
                 <Field label="Type">
@@ -806,7 +806,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                 <Field label="Endpoint"><input id="adapter-endpoint" defaultValue="" placeholder="https://..." /></Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving} onClick={async () => {
                   setSaving(true);
                   try {
@@ -831,7 +831,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
         {modal === "neris" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>NERIS mapping</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>NERIS mapping</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Asset">
                   <select value={nerisDraft.fleetAssetId} onChange={(e) => setNerisDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -844,7 +844,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                 <Field label="Capability"><input value={nerisDraft.capability} onChange={(e) => setNerisDraft((c) => ({ ...c, capability: e.target.value }))} /></Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving} onClick={async () => {
                   setSaving(true);
                   try {
@@ -866,7 +866,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
         {modal === "cad" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>CAD mapping</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>CAD mapping</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Asset">
                   <select value={cadDraft.fleetAssetId} onChange={(e) => setCadDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -884,7 +884,7 @@ export default function FleetReportingPage({ onNavigate, legacyApparatus = [] })
                 </Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving} onClick={async () => {
                   setSaving(true);
                   try {

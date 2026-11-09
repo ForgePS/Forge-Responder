@@ -4,7 +4,7 @@
   padding: 12px 14px;
   border: 1px solid var(--rms-border);
   border-radius: 8px;
-  background: var(--rms-bg-subtle, rgba(255, 255, 255, 0.04));
+  background: var(--rms-bg-surface-2);
 }
 
 .employee-officer-box span {
@@ -23,7 +23,7 @@
 }
 
 .workflow-form input.employee-computed-value {
-  background: var(--rms-bg-subtle, rgba(255, 255, 255, 0.04));
+  background: var(--rms-bg-surface-2);
   color: var(--rms-text-muted);
   border-color: var(--rms-border-subtle, var(--rms-border));
   cursor: default;
@@ -43,13 +43,13 @@
 .maintenance-line-field,
 .maintenance-block-field {
   display: grid;
-  gap: 8px;
+  gap: 5px;
 }
 
 .maintenance-line-field > span,
 .maintenance-block-field > span {
-  color: var(--rms-text-strong);
-  font-size: 14px;
+  color: var(--rms-text-muted);
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -57,12 +57,19 @@
 .maintenance-line-field select,
 .maintenance-block-field textarea {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
-  color: var(--rms-text-body);
+  color: var(--rms-text);
   font: inherit;
+  font-size: 14px;
+}
+
+.maintenance-block-field textarea {
+  min-height: 84px;
+  padding: 8px 10px;
 }
 
 .maintenance-optional {
@@ -99,7 +106,7 @@
   overflow: hidden;
   border: 1px solid var(--rms-border);
   border-radius: 8px;
-  background: var(--rms-bg-subtle, #f1f5f9);
+  background: var(--rms-bg-surface-2);
 }
 
 .maintenance-photo-grid img,
@@ -142,7 +149,7 @@
   width: 18px;
   height: 18px;
   margin: 2px 0 0;
-  accent-color: #dc2626;
+  accent-color: var(--rms-danger-text);
   cursor: pointer;
 }
 
@@ -163,16 +170,16 @@
 }
 
 .maintenance-oos-check.is-checked {
-  border-color: #dc2626;
-  background: color-mix(in srgb, #dc2626 8%, var(--rms-bg-surface));
+  border-color: var(--rms-danger-border);
+  background: var(--rms-danger-soft);
 }
 
 .maintenance-oos-check.is-checked strong {
-  color: #b91c1c;
+  color: var(--rms-danger-text);
 }
 
 html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
-  color: #fca5a5;
+  color: var(--rms-danger-text);
 }
 
 .maintenance-submitted-by {
@@ -183,8 +190,8 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
 }
 
 .maintenance-submitted-by > span {
-  color: var(--rms-text-strong);
-  font-size: 14px;
+  color: var(--rms-text-muted);
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -474,7 +481,7 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
   border: 1px solid var(--rms-border);
   border-radius: 999px;
   padding: 8px 16px;
-  background: var(--rms-bg-surface-2, var(--rms-bg-subtle));
+  background: var(--rms-bg-surface-2);
   color: var(--rms-text-body);
   font-size: 13px;
   font-weight: 600;
@@ -537,10 +544,10 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
 }
 
 .daily-roster-station {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--rms-border-strong);
   border-radius: 6px;
   overflow: hidden;
-  background: #fff;
+  background: var(--rms-bg-panel);
 }
 
 .daily-roster-station-head {
@@ -567,18 +574,18 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
   display: grid;
   gap: 8px;
   padding: 8px;
-  background: #f8fafc;
+  background: var(--rms-bg-surface-2);
 }
 
 .daily-roster-unit {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--rms-border-strong);
   border-radius: 4px;
   overflow: hidden;
-  background: #fff;
+  background: var(--rms-bg-panel);
 }
 
 .daily-roster-unit.has-vacancy {
-  border-color: #fdba74;
+  border-color: color-mix(in srgb, var(--rms-warning) 60%, var(--rms-border-strong));
 }
 
 .daily-roster-unit-head {
@@ -591,8 +598,8 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
   width: 100%;
   padding: 8px 10px;
   border: 0;
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--rms-bg-surface-3);
+  color: var(--rms-text-strong);
   font-size: 12px;
   font-weight: 700;
   text-align: left;
@@ -603,7 +610,7 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
   display: flex;
   align-items: stretch;
   gap: 8px;
-  background: #e2e8f0;
+  background: var(--rms-bg-surface-3);
 }
 
 .daily-roster-overtime-add {
@@ -619,16 +626,16 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
   min-height: 32px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid #94a3b8;
+  border: 1px solid var(--rms-border-strong);
   border-radius: 6px;
-  background: #fff;
-  color: #0f172a;
+  background: var(--rms-bg-panel);
+  color: var(--rms-text-strong);
   cursor: pointer;
 }
 
 .daily-roster-overtime-add-btn:hover {
-  border-color: #0369a1;
-  color: #0369a1;
+  border-color: var(--rms-primary);
+  color: var(--rms-primary);
 }
 
 .daily-roster-overtime-add-select {
@@ -636,10 +643,10 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
   max-width: 280px;
   min-height: 32px;
   padding: 0 8px;
-  border: 1px solid #94a3b8;
+  border: 1px solid var(--rms-border-strong);
   border-radius: 6px;
-  background: #fff;
-  color: #0f172a;
+  background: var(--rms-bg-panel);
+  color: var(--rms-text-strong);
   font-size: 12px;
 }
 
@@ -655,7 +662,7 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
 .daily-roster-unit-toggle {
   display: inline-grid;
   place-items: center;
-  color: #475569;
+  color: var(--rms-text-muted);
 }
 
 .daily-roster-unit-name {
@@ -664,7 +671,7 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
 }
 
 .daily-roster-unit-meta {
-  color: #475569;
+  color: var(--rms-text-muted);
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
@@ -689,14 +696,14 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
   gap: 8px;
   align-items: center;
   padding: 8px 10px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--rms-border);
   font-size: 12px;
-  color: #111827;
+  color: var(--rms-text);
 }
 
 .daily-roster-member-head {
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--rms-table-head);
+  color: var(--rms-text-muted);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -704,19 +711,19 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
 }
 
 .daily-roster-member-row.is-open {
-  background: #fff7ed;
+  background: color-mix(in srgb, var(--rms-warning) 10%, var(--rms-bg-panel));
 }
 
 .daily-roster-member-row.is-partial-open {
-  background: #fffbeb;
-  border-left: 3px solid #f59e0b;
+  background: color-mix(in srgb, var(--rms-warning) 7%, var(--rms-bg-panel));
+  border-left: 3px solid var(--rms-warning);
 }
 
 .daily-roster-duration-input {
   width: 100%;
   max-width: 72px;
   padding: 4px 6px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--rms-border-strong);
   border-radius: 4px;
   font-size: 12px;
 }
@@ -740,14 +747,14 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
   width: 2.85rem;
   min-width: 2.85rem;
   padding: 4px 2px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--rms-border-strong);
   border-radius: 4px;
   font-size: 12px;
   line-height: 1.2;
   text-align: center;
   font-variant-numeric: tabular-nums;
-  background: #fff;
-  color: #111827;
+  background: var(--rms-bg-panel);
+  color: var(--rms-text);
   -moz-appearance: auto;
   appearance: auto;
 }
@@ -760,7 +767,7 @@ html[data-theme="dark"] .maintenance-oos-check.is-checked strong {
 
 .daily-roster-time-separator,
 .daily-roster-time-range-separator {
-  color: #64748b;
+  color: var(--rms-text-muted);
   font-weight: 700;
   line-height: 1;
 }
@@ -781,7 +788,7 @@ html[data-theme="dark"] .daily-roster-time-part,
   align-items: center;
   gap: 3px;
   font-size: 10px;
-  color: #64748b;
+  color: var(--rms-text-muted);
   white-space: nowrap;
 }
 
@@ -854,7 +861,7 @@ html[data-theme="dark"] .daily-roster-time-part,
 }
 
 .cell-info {
-  color: #0369a1;
+  color: var(--rms-text-link);
   font-weight: 700;
 }
 
@@ -908,7 +915,7 @@ html[data-theme="dark"] .daily-roster-time-part,
   padding: 14px 16px;
   border: 1px solid var(--rms-border);
   border-radius: 10px;
-  background: var(--rms-bg-surface-2, #f8fafc);
+  background: var(--rms-bg-surface-2);
 }
 
 .employee-trade-not-on-shift strong {
@@ -930,24 +937,26 @@ html[data-theme="dark"] .daily-roster-time-part,
 }
 
 .employee-trade-preview > span {
-  color: var(--rms-text-body);
-  font-size: 13px;
+  color: var(--rms-text-muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .employee-trade-preview select {
   min-width: 260px;
-  padding: 7px 10px;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
-  background: var(--rms-bg-input, #fff);
-  color: var(--rms-text-body);
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .employee-approval-queue {
   margin-bottom: 14px;
-  border-color: color-mix(in srgb, #f59e0b 45%, var(--rms-border));
+  border-color: color-mix(in srgb, var(--rms-warning) 45%, var(--rms-border));
 }
 
 .employee-approval-queue header .employee-approval-count {
@@ -957,8 +966,8 @@ html[data-theme="dark"] .daily-roster-time-part,
   height: 22px;
   padding: 0 6px;
   border-radius: 999px;
-  background: #fef3c7;
-  color: #92400e;
+  background: color-mix(in srgb, var(--rms-warning) 18%, var(--rms-bg-panel));
+  color: color-mix(in srgb, var(--rms-warning) 55%, var(--rms-text-strong));
   font-size: 12px;
   font-weight: 700;
 }

@@ -182,8 +182,8 @@ function ApprovalQueue({ leaveActions = [], tradeActions = [], onDecideLeave, on
               <span>{request.dates}{request.hours ? ` · ${request.hours}` : ""} · as {LEAVE_STAGE_ROLE[request.approvalStage] || "approver"}{request.coveringFor ? ` (covering for ${request.coveringFor})` : ""}</span>
             </div>
             <div className="inline-actions">
-              <button type="button" onClick={() => onDecideLeave(request.id, "Approved")}><Check size={13} /> Approve</button>
-              <button type="button" onClick={() => onDecideLeave(request.id, "Denied")}><X size={13} /> Deny</button>
+              <button type="button" className="primary-button" onClick={() => onDecideLeave(request.id, "Approved")}><Check size={13} /> Approve</button>
+              <button type="button" className="secondary-button" onClick={() => onDecideLeave(request.id, "Denied")}><X size={13} /> Deny</button>
             </div>
           </div>
         ))}
@@ -194,8 +194,8 @@ function ApprovalQueue({ leaveActions = [], tradeActions = [], onDecideLeave, on
               <span>{trade.give} → {trade.receive} · as {shiftTradeActionLabel(role)}</span>
             </div>
             <div className="inline-actions">
-              <button type="button" onClick={() => onDecideTrade(trade.id, "Approved")}><Check size={13} /> Approve</button>
-              <button type="button" onClick={() => onDecideTrade(trade.id, "Denied")}><X size={13} /> Deny</button>
+              <button type="button" className="primary-button" onClick={() => onDecideTrade(trade.id, "Approved")}><Check size={13} /> Approve</button>
+              <button type="button" className="secondary-button" onClick={() => onDecideTrade(trade.id, "Denied")}><X size={13} /> Deny</button>
             </div>
           </div>
         ))}
@@ -1263,10 +1263,10 @@ export default function EmployeePortalPage({
                           <span>Awaiting your approval as {shiftTradeActionLabel(role)}</span>
                         </p>
                         <div className="inline-actions">
-                          <button type="button" onClick={() => decideTradeApproval(trade.id, "Approved")}>
+                          <button type="button" className="primary-button" onClick={() => decideTradeApproval(trade.id, "Approved")}>
                             <Check size={13} /> Approve
                           </button>
-                          <button type="button" onClick={() => decideTradeApproval(trade.id, "Denied")}>
+                          <button type="button" className="secondary-button" onClick={() => decideTradeApproval(trade.id, "Denied")}>
                             <X size={13} /> Deny
                           </button>
                         </div>
