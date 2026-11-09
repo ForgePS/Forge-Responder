@@ -3084,6 +3084,21 @@ html .app-shell .modal-card.neris-cad-import-modal {
   }
 }
 
+/* List + editor split (Preplan templates, Notice documents, Preplan workspace). */
+.config-split { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.config-split > * { min-width: 0; }
+.config-list-pane { display: grid; gap: 8px; align-content: start; }
+.config-list-pane > .occupancy-detail-actions { justify-content: space-between; align-items: center; }
+.config-list-pane > .occupancy-detail-actions > strong { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--rms-text-strong); }
+.config-list { display: grid; gap: 4px; }
+.config-list-item { display: grid; gap: 2px; width: 100%; padding: 8px 10px; border: 1px solid var(--rms-border); border-radius: 6px; background: var(--rms-bg-surface-2); color: var(--rms-text-body); text-align: left; cursor: pointer; }
+.config-list-item strong { color: var(--rms-text-strong); font-size: 14px; overflow-wrap: anywhere; }
+.config-list-item .occupancy-muted { font-size: 12px; overflow-wrap: anywhere; }
+.config-list-item:hover { background: var(--rms-bg-hover-2); }
+.config-list-item.active { background: var(--rms-bg-hover-2); border-color: var(--rms-primary); box-shadow: inset 3px 0 var(--rms-primary); }
+.config-editor-pane { display: grid; gap: 12px; align-content: start; }
+@media (max-width: 900px) { .config-split { grid-template-columns: 1fr; } }
+
 /* Inspection Configuration Studio (Phase 3) */
 .inspection-config-studio .config-studio-body {
   display: grid;
