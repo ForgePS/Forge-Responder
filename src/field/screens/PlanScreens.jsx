@@ -9,6 +9,7 @@ import { distanceMeters, formatDistance } from "../fieldHydrants.js";
 import { getSavedPlanFile, isImageFile, openPlanFile, savePlanFileOffline } from "../fieldPlanFiles.js";
 import { Banner, ErrorSummary, Field, PhotoStrip, Screen, Section, Segmented, TextArea, TextInput, cx, formatWhen } from "../ui.jsx";
 import { STARTER_PREPLAN_TEMPLATE_SECTIONS } from "../../lib/inspections/preplanDefaults.js";
+import { isPreplanFieldShown, withPreplanFollowUps } from "../../lib/inspections/preplanFollowUps.js";
 
 /** Which FORGE FIELD setting controls a template section (by its title). */
 export function sectionConfigKey(title = "") {
@@ -210,10 +211,10 @@ export function PlanViewScreen({ params = {} }) {
       {plan.narrative?.dispatchSummary ? <Banner tone="info" icon={<KeyRound size={22} />} title="Dispatch summary">{plan.narrative.dispatchSummary}</Banner> : null}
 
       {plan.source === "preplan" ? (
-        (plan.sections || []).map((section) => {
+        withPreplanFollowUps(plan.sections || []).map((section) => {
           const configKey = sectionConfigKey(section.title);
           if (configKey && !rules.show(configKey)) return null;
-          const fields = (section.fields || []).filter((field) => caps.preplanSensitive || !field.sensitive);
+          const fields = (section.fields || []).filter((field) => (caps.preplanSensitive || !field.sensitive) && isPreplanFieldShown(field, plan.sectionAnswers));
           const hasAnswers = fields.some((field) => String(plan.sectionAnswers?.[field.key] ?? "").trim());
           if (!hasAnswers) return null;
           return (
@@ -398,10 +399,10 @@ export function PlanEditScreen({ params = {} }) {
           ))
         )}
       </Section>
-      {data.source === "preplan" ? (data.sections || []).map((section) => {
+      {data.source === "preplan" ? withPreplanFollowUps(data.sections || []).map((section) => {
         const configKey = sectionConfigKey(section.title);
         if (configKey && !rules.show(configKey)) return null;
-        const fields = (section.fields || []).filter((field) => caps.preplanSensitive || !field.sensitive);
+        const fields = (section.fields || []).filter((field) => (caps.preplanSensitive || !field.sensitive) && isPreplanFieldShown(field, data.sectionAnswers));
         if (!fields.length) return null;
         return (
           <Section key={section.id || section.title} title={section.title}>
