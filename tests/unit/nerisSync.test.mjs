@@ -83,6 +83,31 @@ test("plan: stations are created, matched by name, or skipped with a reason", ()
   assert.match(byName["Station 3"].reason, /street address, city, state, ZIP code/);
 });
 
+test("plan: a station with a new name links to the NERIS station at the same address", () => {
+  const headquarters = { neris_id: "FD24021886S000", station_id: "HQ", address_line_1: "16825 S. Seton Avenue", city: "Emmitsburg", state: "MD", zip_code: "21727-1234", units: [] };
+  const named = { neris_id: "FD24021886S001", station_id: "Station 1", address_line_1: "1 Other Rd", city: "Emmitsburg", state: "MD", zip_code: "21727", units: [] };
+  const forge = {
+    ...profile,
+    stationDetails: [
+      { id: "st-2", name: "Station 2", address: "16825 South Seton Ave", city: "Emmitsburg", state: "MD", zip: "21727" },
+      // Same address as HQ too, but Station 1 matches by name first, so HQ stays free for Station 2.
+      { id: "st-1", name: "Station 1", address: "16825 S Seton Ave", city: "Emmitsburg", state: "MD", zip: "21727" },
+      { id: "st-4", name: "Station 4", address: "16825 S Seton Ave", city: "Emmitsburg", state: "MD", zip: "21727" },
+      { id: "st-5", name: "Station 5", address: "1 Other Rd", city: "Emmitsburg", state: "MD", zip: "99999" },
+    ],
+  };
+  const plan = sync.buildSyncPlan({ profile: forge, apparatus: [], entity: { ...entity, stations: [headquarters, named] }, connection: {} });
+  const s = Object.fromEntries(plan.stations.map((x) => [x.name, x]));
+  assert.equal(s["Station 2"].nerisStationId, "FD24021886S000");
+  assert.equal(s["Station 2"].matchedBy, "address");
+  assert.equal(s["Station 2"].action, "update");
+  assert.ok(s["Station 2"].changes.includes("station_id"), "renames HQ to Station 2 in NERIS");
+  assert.equal(s["Station 1"].nerisStationId, "FD24021886S001");
+  assert.equal(s["Station 1"].matchedBy, "name");
+  assert.equal(s["Station 4"].action, "create", "HQ is already taken by Station 2");
+  assert.equal(s["Station 5"].action, "create", "same street, different ZIP");
+});
+
 test("plan: units", () => {
   const plan = sync.buildSyncPlan({ profile, apparatus, entity, connection: {} });
   const u = Object.fromEntries(plan.units.map((x) => [x.name, x]));
@@ -173,4 +198,53 @@ test("apply: a unit whose new station failed is reported, not sent", async () =>
   assert.deepEqual(calls, ["POST /entity/FD24021886/station"]);
   assert.match(results[0].message, /zip_code invalid/);
   assert.match(results[1].message, /Send the station first/);
+});
+
+test("apply: when NERIS says the new station already exists, FORGE updates that station and sends its units there", async () => {
+  const plan = sync.buildSyncPlan({ profile, apparatus, entity, connection: {} });
+  const calls = [];
+  const request = async (path, { method, body }) => {
+    calls.push({ path, method, body });
+    if (method === "POST" && path.endsWith("/station")) {
+      return { ok: false, status: 409, data: { detail: "Submitted station matches either an existing station_id or address of station FD24021886S000" } };
+    }
+    if (method === "POST" && path.endsWith("/unit")) return { ok: true, status: 201, data: { neris_id: "FD24021886S000U001" } };
+    return { ok: true, status: 200, data: {} };
+  };
+  const { results, stationLinks, unitLinks } = await sync.applySyncPlan({
+    plan, profile, nerisId: "FD24021886", selection: { stationIds: ["station-station-1"], unitIds: ["APP-1"] }, request,
+  });
+  assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), [
+    "POST /entity/FD24021886/station",
+    "PATCH /entity/FD24021886/station/FD24021886S000",
+    "POST /entity/FD24021886/station/FD24021886S000/unit",
+  ]);
+  assert.equal(calls[1].body.station_id, "Station 1");
+  assert.ok(results.every((r) => r.ok));
+  assert.match(results[0].message, /already had this station \(FD24021886S000\)/);
+  assert.equal(stationLinks["station-station-1"], "FD24021886S000");
+  assert.equal(unitLinks["APP-1"], "FD24021886S000U001");
+});
+
+test("apply: an existing station linked to another FORGE station is not taken over", async () => {
+  const plan = sync.buildSyncPlan({ profile, apparatus, entity, connection: {} });
+  const calls = [];
+  const request = async (path, { method }) => {
+    calls.push(`${method} ${path}`);
+    return { ok: false, status: 409, data: { detail: "Submitted station matches either an existing station_id or address of station FD24021886S001" } };
+  };
+  const { results } = await sync.applySyncPlan({
+    plan, profile, nerisId: "FD24021886", selection: { stationIds: ["station-station-1"] }, request,
+  });
+  assert.deepEqual(calls, ["POST /entity/FD24021886/station"]);
+  assert.match(results[0].message, /linked to Station 2/);
+});
+
+test("plan: shows how NERIS has each station on file, and stations only in NERIS", () => {
+  const extra = { neris_id: "FD24021886S009", station_id: "Old HQ", address_line_1: "1 Elm St", city: "Springfield", state: "MS", zip_code: "38654", units: [{}] };
+  const plan = sync.buildSyncPlan({ profile, apparatus: [], entity: { ...entity, stations: [...entity.stations, extra] }, connection: {} });
+  const s2 = plan.stations.find((s) => s.name === "Station 2");
+  assert.equal(s2.nerisRecord, "station 2 at 200 Oak Ave, Springfield, MS 38654");
+  assert.equal(plan.stations.find((s) => s.name === "Station 1").nerisRecord, "");
+  assert.deepEqual(plan.nerisOnlyStations, [{ nerisStationId: "FD24021886S009", nerisRecord: "Old HQ at 1 Elm St, Springfield, MS 38654", units: 1 }]);
 });
