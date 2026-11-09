@@ -54,6 +54,7 @@ import {
   VERIFICATION_CHECKLIST_ITEMS,
 } from "../lib/inspections/index.js";
 import { friendlyError } from "../lib/friendlyError.js";
+import { dropdownOptionNote } from "../lib/inspections/constructionTypes.js";
 
 const PREPLAN_TABS = [
   { id: "workQueue", label: "Preplan Work Queue", navName: "Preplan Work Queue" },
@@ -570,18 +571,29 @@ function PreplanDetailWorkspace({
                         onChange={(e) => setAnswer(field.key, e.target.value)}
                       />
                     ) : field.type === "select" || field.type === "dropdown" ? (
-                      <select
-                        value={answers[field.key] || ""}
-                        disabled={!editable}
-                        onChange={(e) => setAnswer(field.key, e.target.value)}
-                      >
-                        <option value="">Select…</option>
-                        {options.map((opt) => (
-                          <option key={opt.id || opt.value || opt.label} value={opt.label || opt.value || opt.id}>
-                            {opt.label || opt.value || opt.id}
-                          </option>
-                        ))}
-                      </select>
+                      <>
+                        <select
+                          value={answers[field.key] || ""}
+                          disabled={!editable}
+                          onChange={(e) => setAnswer(field.key, e.target.value)}
+                        >
+                          <option value="">Select…</option>
+                          {options.map((opt) => {
+                            const name = opt.label || opt.value || opt.id;
+                            const note = dropdownOptionNote(field.dropdownLibrary, opt);
+                            return (
+                              <option key={opt.id || opt.value || opt.label} value={name}>
+                                {note ? `${name} — ${note}` : name}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        {(() => {
+                          const chosen = options.find((opt) => (opt.label || opt.value || opt.id) === answers[field.key]);
+                          const detail = chosen ? dropdownOptionNote(field.dropdownLibrary, chosen, true) : "";
+                          return detail ? <small className="config-field-note">{detail}</small> : null;
+                        })()}
+                      </>
                     ) : (
                       <input
                         value={answers[field.key] || ""}
