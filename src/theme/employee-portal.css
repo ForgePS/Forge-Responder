@@ -1001,3 +1001,127 @@ html[data-theme="dark"] .daily-roster-time-part,
   color: var(--rms-text-muted);
   font-size: 13px;
 }
+
+/* ── Document viewer: read a document before acknowledging it ── */
+.employee-portal .operational-notes.employee-doc-ack-list p.is-clickable {
+  cursor: pointer;
+  border-radius: var(--rms-radius-sm);
+}
+
+.employee-portal .operational-notes.employee-doc-ack-list p.is-clickable:hover,
+.employee-portal .operational-notes.employee-doc-ack-list p.is-clickable:focus-visible {
+  background: var(--rms-bg-hover);
+  outline: none;
+}
+
+.employee-portal .doc-row.employee-doc-row {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--rms-border-alpha);
+  font: inherit;
+  cursor: pointer;
+}
+
+.employee-portal .doc-row.employee-doc-row:hover,
+.employee-portal .doc-row.employee-doc-row:focus-visible {
+  background: var(--rms-bg-hover);
+  outline: none;
+}
+
+.employee-doc-row-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--rms-text-link);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.document-viewer-backdrop {
+  place-items: center;
+}
+
+html .app-shell .workflow-modal.document-viewer {
+  width: min(960px, 100%);
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.document-viewer-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.document-viewer-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-viewer-title small {
+  color: var(--rms-text-muted);
+  font-size: 12px;
+}
+
+.workflow-modal.document-viewer .document-viewer-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+
+.document-viewer-description {
+  margin: 0;
+  color: var(--rms-text-body);
+  font-size: 14px;
+}
+
+.document-viewer-frame {
+  width: 100%;
+  height: min(70vh, 900px);
+  min-height: 360px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: #ffffff;
+}
+
+.document-viewer-image {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+}
+
+.document-viewer-note {
+  padding: 24px 16px;
+  border: 1px dashed var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  color: var(--rms-text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.document-viewer-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--rms-success-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.workflow-modal.document-viewer > footer {
+  flex-wrap: wrap;
+}
+
+.workflow-modal.document-viewer > footer a.secondary-button {
+  text-decoration: none;
+}
