@@ -15,6 +15,11 @@ import {
   recordFleetTest,
 } from "../lib/fleet/index.js";
 
+function readableResult(value = "") {
+  const text = String(value || "").replace(/_/g, " ").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "—";
+}
+
 function Field({ label, children }) {
   return (
     <label className="config-field">
@@ -199,7 +204,7 @@ export default function FleetTestsPage({
                     <div><span className="occupancy-muted">Section</span><strong>{selected.section || "—"}</strong></div>
                     <div><span className="occupancy-muted">Test date</span><strong>{selected.testDate || "—"}</strong></div>
                     <div><span className="occupancy-muted">Next due</span><strong>{selected.nextDue || "—"}</strong></div>
-                    <div><span className="occupancy-muted">Result</span><strong>{selected.result}</strong></div>
+                    <div><span className="occupancy-muted">Result</span><strong>{readableResult(selected.result)}</strong></div>
                     <div><span className="occupancy-muted">Compliance</span><strong>{selected.complianceLabel}</strong></div>
                   </div>
 

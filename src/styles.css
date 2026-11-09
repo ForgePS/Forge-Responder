@@ -1140,7 +1140,7 @@ tbody tr:hover { background: var(--rms-bg-hover); }
 .workflow-form span { color: var(--rms-text-muted); font-size: 14px; text-transform: uppercase; }
 .workflow-form input:not([type="checkbox"]):not([type="radio"]), .status-select { min-height: 29px; width: 100%; padding: 0 7px; border: 1px solid var(--rms-border); border-radius: 4px; outline: 0; background: var(--rms-bg-input); color: var(--rms-text-strong); font-size: 14px; }
 .workflow-form .wide-field { grid-column: 1 / -1; }
-.fleet-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.fleet-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
 .fleet-stat { position: relative; min-height: 58px; display: grid; align-content: center; gap: 3px; padding: 9px 12px; border: 1px solid var(--rms-border); border-radius: 6px; background: var(--rms-bg-surface-2); overflow: hidden; }
 .fleet-stat::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--rms-text-subtle); }
 .fleet-stat strong { color: var(--rms-text-strong); font-size: 19px; }.fleet-stat span { color: var(--rms-text-muted); font-size: 14px; }
@@ -1163,9 +1163,11 @@ tbody tr:hover { background: var(--rms-bg-hover); }
 .metric-strip > div { min-height: 58px; display: grid; align-content: center; gap: 5px; padding: 9px 12px; border-right: 1px solid var(--rms-border-subtle); }
 .metric-strip > div:last-child { border-right: 0; }.metric-strip span { color: var(--rms-text-muted); font-size: 14px; text-transform: uppercase; }.metric-strip strong { color: var(--rms-text-strong); font-size: 14px; }
 .fleet-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; align-items: start; }
-/* Fleet detail panels (Defects, Work Orders): label above its value instead of run together. */
-.fleet-module .occupancy-form-grid > div > .occupancy-muted:first-child { display: block; margin-bottom: 2px; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
-.fleet-module .occupancy-form-grid > div > .occupancy-muted:first-child + strong { display: block; color: var(--rms-text-strong); overflow-wrap: anywhere; }
+/* Detail panels: label above its value instead of run together. */
+.occupancy-form-grid > div > .occupancy-muted:first-child:has(+ strong) { display: block; margin-bottom: 2px; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+.occupancy-form-grid > div > .occupancy-muted:first-child + strong { display: block; color: var(--rms-text-strong); overflow-wrap: anywhere; }
+/* Detail panels (fleet, inspections, preplans, violations): inset the content from the panel edge. */
+.panel > .panel-body.config-studio-body { display: grid; gap: 14px; padding: 12px 14px 14px; }
 .check-list, .compact-orders { display: grid; padding: 5px 9px; }
 .check-list > div, .compact-orders > div { min-height: 42px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 7px; border-bottom: 1px solid var(--rms-border-subtle); }
 .check-list > div:last-child, .compact-orders > div:last-child { border-bottom: 0; }.check-list span { color: var(--rms-text-body); font-size: 14px; }
