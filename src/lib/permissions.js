@@ -20,6 +20,7 @@ const navPermissionMap = {
   "Readiness Board": "viewFleetReadiness",
   "Fleet Defects": "viewFleetDefects",
   "Fleet Work Orders": "viewFleetWorkOrders",
+  "Maintenance Dashboard": "viewFleetWorkOrders",
   "PM Forecast": "viewFleetPm",
   "Fleet Tests": "viewFleetTests",
   "Fuel & Energy": "viewFleetFuel",

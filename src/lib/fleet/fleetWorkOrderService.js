@@ -131,6 +131,12 @@ export function normalizeFleetWorkOrder(raw = {}, departmentId = "") {
     roadTestNotes: data.roadTestNotes || "",
     returnToServiceApprovedBy: data.returnToServiceApprovedBy || "",
     migratedFromList: Boolean(data.migratedFromList),
+    // Maintenance Issues tracking: the chosen path (repair / replace / dispose / no_action),
+    // the step reached on that path, and a dated history of each change.
+    damageFormId: data.damageFormId || "",
+    issueOutcome: data.issueOutcome || "",
+    issueStep: data.issueStep || "",
+    issueHistory: Array.isArray(data.issueHistory) ? data.issueHistory.filter((entry) => entry && entry.at) : [],
     createdAt: data.createdAt || "",
     updatedAt: data.updatedAt || "",
   };

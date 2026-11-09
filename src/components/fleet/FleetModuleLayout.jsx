@@ -5,6 +5,7 @@ import { isFleetPageVisible } from "../../lib/fleet/fleetNavVisibility.js";
 const DEFAULT_TABS = [
   { id: "dashboard", label: "Dashboard", navName: "Fleet Dashboard" },
   { id: "readiness", label: "Readiness Board", navName: "Readiness Board" },
+  { id: "issues", label: "Maintenance Dashboard", navName: "Maintenance Dashboard" },
   { id: "defects", label: "Fleet Defects", navName: "Fleet Defects" },
   { id: "workOrders", label: "Work Orders", navName: "Fleet Work Orders" },
   { id: "pm", label: "PM Forecast", navName: "PM Forecast" },
@@ -149,10 +150,10 @@ function formatStatusLabel(status = "") {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-export function FleetStatusBadge({ status = "", tone } = {}) {
+export function FleetStatusBadge({ status = "", tone, label: labelOverride = "" } = {}) {
   const key = String(status || "").toLowerCase();
   const resolvedTone = tone || TONE_BY_STATUS[key] || "neutral";
-  const label = formatStatusLabel(status);
+  const label = labelOverride || formatStatusLabel(status);
   return (
     <span
       className={`badge badge-${resolvedTone}`}

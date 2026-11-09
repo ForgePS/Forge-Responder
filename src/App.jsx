@@ -178,6 +178,7 @@ const ApparatusCheckSetupPage = lazyPage(() => import("./pages/ApparatusCheckSet
 const FleetReadinessBoardPage = lazyPage(() => import("./pages/FleetReadinessBoardPage.jsx"));
 const FleetDefectsPage = lazyPage(() => import("./pages/FleetDefectsPage.jsx"));
 const FleetWorkOrdersPage = lazyPage(() => import("./pages/FleetWorkOrdersPage.jsx"));
+const MaintenanceIssuesPage = lazyPage(() => import("./pages/MaintenanceIssuesPage.jsx"));
 const FleetPmForecastPage = lazyPage(() => import("./pages/FleetPmForecastPage.jsx"));
 const FleetTestsPage = lazyPage(() => import("./pages/FleetTestsPage.jsx"));
 const FleetFuelEnergyPage = lazyPage(() => import("./pages/FleetFuelEnergyPage.jsx"));
@@ -208,6 +209,7 @@ const navGroups = [
   { label: "RMS", items: [["Personnel", Users], ["Certifications", FileCheck2], ["Training", BookOpen], ["Academy Class Schedule", GraduationCap, FORGE_ACADEMY_CLASS_SCHEDULE_URL], ["Scheduling", CalendarDays], ["Time Sheets", Clock3], ["Daily Log", ClipboardCheck]] },
   { label: "Fleet", items: [
     ["Readiness Board", ClipboardCheck],
+    ["Maintenance Dashboard", Wrench],
     ["Fleet Defects", AlertTriangle],
     ["Fleet Work Orders", Wrench],
     ["PM Forecast", CalendarDays],
@@ -1473,6 +1475,13 @@ function AppShell() {
       || hasPermission(permissions, "viewApparatus")
       || isCreator
       ? <FleetDefectsPage query={query} onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Maintenance Dashboard" ? (
+    hasPermission(permissions, "viewFleetWorkOrders")
+      || hasPermission(permissions, "viewFleetDefects")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <MaintenanceIssuesPage onNavigate={setCurrent} legacyApparatus={apparatus} legacyWorkOrders={workOrders} />
       : <AccessDeniedModule name={current} />
   ) : current === "Fleet Work Orders" ? (
     hasPermission(permissions, "viewFleetWorkOrders")
