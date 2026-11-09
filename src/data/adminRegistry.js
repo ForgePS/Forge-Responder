@@ -15,6 +15,7 @@ export const NAV_MODULE_MAP = {
   "Readiness Board": "apparatus",
   "Fleet Defects": "apparatus",
   "Fleet Work Orders": "apparatus",
+  "Maintenance Dashboard": "apparatus",
   "PM Forecast": "apparatus",
   "Fleet Tests": "apparatus",
   "Fuel & Energy": "apparatus",
