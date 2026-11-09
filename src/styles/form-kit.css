@@ -411,3 +411,11 @@ html .app-shell :is(.workflow-modal, .modal-card) > :is(header, .modal-header) {
   align-items: center;
   gap: 8px;
 }
+
+/* Explanation under a field for the chosen option (e.g. construction type). */
+.app-shell .config-field > .config-field-note {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--rms-text-muted);
+}
