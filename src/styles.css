@@ -489,24 +489,6 @@ footer i, .app-footer i { width: 9px; height: 9px; border-radius: 50%; backgroun
 }
 .damage-form-empty svg { color: #f59e0b; }
 .damage-form-setup-copy { margin: 0; line-height: 1.45; }
-.damage-form-setup-details {
-  margin-top: 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
-  background: var(--rms-bg-surface-2);
-}
-.damage-form-setup-details summary { cursor: pointer; font-weight: 600; color: var(--rms-text-body); }
-.damage-form-setup-details code {
-  display: block;
-  margin-top: 8px;
-  padding: 8px;
-  border-radius: 4px;
-  background: var(--rms-bg-input);
-  color: var(--rms-text-body);
-  font-size: 12px;
-  word-break: break-all;
-}
 .damage-form-backdrop {
   position: fixed;
   inset: 0;
@@ -608,58 +590,6 @@ footer i, .app-footer i { width: 9px; height: 9px; border-radius: 50%; backgroun
   border-radius: 6px;
   background: var(--rms-bg-surface-2);
 }
-.damage-form-setup-inline {
-  margin: 12px;
-}
-.damage-form-setup-field {
-  display: grid;
-  gap: 6px;
-  margin-top: 10px;
-}
-.damage-form-setup-field span {
-  color: var(--rms-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-.damage-form-setup-field input {
-  height: 36px;
-  min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--rms-border-strong);
-  border-radius: var(--rms-radius-sm);
-  background: var(--rms-bg-input);
-  color: var(--rms-text);
-  font-size: 14px;
-}
-.damage-form-setup-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-.damage-form-setup-message {
-  margin: 8px 0 0;
-  color: var(--rms-text-muted);
-  font-size: 13px;
-}
-.damage-form-api-key-status {
-  display: inline-block;
-  margin-top: 6px;
-  color: var(--rms-success-text);
-  font-size: 13px;
-  font-weight: 600;
-}
-.damage-form-webhook-row { display: flex; gap: 8px; align-items: flex-start; }
-.damage-form-webhook-row code { flex: 1; margin-top: 0 !important; }
-.damage-form-api-key-status .dd-action-button { margin-left: 10px; vertical-align: middle; }
-.dd-damage-form-admin .dd-panel-head h3 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 15px; }
-.damage-form-embed-frame {
-  width: 100%;
-  min-height: 640px;
-  border: 1px solid var(--rms-border);
-  border-radius: 8px;
-  background: #fff;
-}
 .damage-form-modal-tabs {
   display: flex;
   gap: 8px;
@@ -685,10 +615,6 @@ footer i, .app-footer i { width: 9px; height: 9px; border-radius: 50%; backgroun
   vertical-align: middle;
   margin-right: 6px;
   animation: spin 1s linear infinite;
-}
-.damage-form-embed-actions {
-  display: flex;
-  justify-content: flex-end;
 }
 .operational-notes { padding: 4px 0; }
 .operational-notes p {

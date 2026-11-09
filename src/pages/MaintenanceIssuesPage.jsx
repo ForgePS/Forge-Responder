@@ -40,7 +40,7 @@ import "../styles/maintenance-issues.css";
 
 const PATH_TONE = { repair: "info", replace: "warning", dispose: "neutral", no_action: "neutral" };
 const OUTCOME_TONE = { repaired: "success", replaced: "success", disposed: "neutral", no_action: "neutral", cancelled: "neutral" };
-const SOURCES = ["Employee Portal", "FORGE FIELD", "Jotform", "Fleet"];
+const SOURCES = ["Employee Portal", "FORGE FIELD", "Fleet", "JotForm (older)"];
 
 function formatDate(value) {
   if (!value) return "";

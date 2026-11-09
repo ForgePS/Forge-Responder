@@ -27,17 +27,7 @@ const {
   lookupPlace,
 } = require("./lib/googleMapsService");
 const { loadPublicAlertDashboard } = require("./lib/alertDashboardPublic");
-const {
-  buildWebhookUrl,
-  ensureSettings,
-  loadSettings,
-  saveDamageFormSubmission,
-  saveSetup: saveJotformDamageSetupRecord,
-  validateWebhookToken,
-} = require("./lib/jotformDamageStore");
-const { fetchJotformSubmissionPdf, resolveReportId, buildPublicPdfUrls } = require("./lib/jotformDamagePdf");
 const { generateDamageFormPdfBuffer } = require("./lib/damageFormPdfGenerator");
-const { syncFormSubmissions } = require("./lib/jotformSubmissionApi");
 const {
   generateHydrantDamagePdfBuffer,
   sendHydrantDamageEmail,
@@ -497,191 +487,28 @@ function normalizeWebhookBody(req) {
   return {};
 }
 
-exports.jotformDamageWebhook = onRequest(
-  { region: "us-central1", invoker: "public" },
-  async (req, res) => {
-    if (req.method !== "POST") {
-      res.status(405).send("Method not allowed");
-      return;
-    }
-
-    const departmentId = String(req.query.departmentId || "").trim();
-    const token = String(req.query.token || "").trim();
-    if (!departmentId) {
-      res.status(400).send("departmentId is required");
-      return;
-    }
-
-    const db = admin.firestore();
-    const allowed = await validateWebhookToken(db, departmentId, token);
-    if (!allowed) {
-      res.status(403).send("Invalid webhook token");
-      return;
-    }
-
-    try {
-      const saved = await saveDamageFormSubmission(db, departmentId, normalizeWebhookBody(req));
-      res.status(200).json({ ok: true, id: saved.id });
-    } catch (error) {
-      console.error("jotformDamageWebhook failed", error);
-      res.status(400).send(error.message || "Could not save JotForm submission.");
-    }
-  }
-);
-
-exports.getJotformDamageSetup = onCall(
+/**
+ * Damage forms are filled in on the platform (Employee Portal and FORGE FIELD)
+ * and saved to departments/{id}/damageForms. This builds a printable PDF of one.
+ */
+exports.getDamageFormPdf = onCall(
   { region: "us-central1" },
   async (request) => {
     const db = admin.firestore();
-    const { departmentId = "" } = request.data || {};
+    const { departmentId = "", recordId = "" } = request.data || {};
     await assertDepartmentAccess(db, departmentId, request.auth);
+    if (!recordId) throw new HttpsError("invalid-argument", "Pick a damage form.");
 
-    return jotformSetupResponse(departmentId, await ensureSettings(db, departmentId));
-  }
-);
-
-function jotformSetupResponse(departmentId, settings = {}) {
-  const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || admin.app().options.projectId;
-  return {
-    formUrl: settings.formUrl || "",
-    formId: settings.formId || "",
-    formTitle: settings.formTitle || "Damage Form",
-    apiKeyConfigured: Boolean(settings.apiKey),
-    // The webhook link carries the token, so only admins get it.
-    webhookUrl: "",
-    lastSubmissionAt: settings.lastSubmissionAt || "",
-  };
-}
-
-/** Admins only: everything the setup screen needs, including the webhook link. */
-exports.saveJotformDamageSetup = onCall(
-  { region: "us-central1" },
-  async (request) => {
-    const db = admin.firestore();
-    const { departmentId = "", formUrl, formTitle, apiKey, removeApiKey = false, readOnly = false } = request.data || {};
-    await invites.assertDepartmentAdmin(db, departmentId, request.auth);
-    let settings;
-    try {
-      settings = readOnly
-        ? await ensureSettings(db, departmentId)
-        : await saveJotformDamageSetupRecord(db, departmentId, { formUrl, formTitle, apiKey, removeApiKey });
-    } catch (error) {
-      if (error.code === "invalid-argument") throw new HttpsError("invalid-argument", error.message);
-      throw error;
-    }
-    const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || admin.app().options.projectId;
-    return {
-      ...jotformSetupResponse(departmentId, settings),
-      webhookUrl: buildWebhookUrl(projectId, departmentId, settings.webhookToken),
-    };
-  }
-);
-
-exports.getJotformDamagePdf = onCall(
-  { region: "us-central1" },
-  async (request) => {
-    const db = admin.firestore();
-    const {
-      departmentId = "",
-      recordId = "",
-      submissionId = "",
-      formId = "",
-    } = request.data || {};
-    await assertDepartmentAccess(db, departmentId, request.auth);
-
-    const settings = await loadSettings(db, departmentId);
-    const apiKey = settings?.apiKey;
-
-    let record = null;
-    if (recordId) {
-      const recordSnap = await db.doc(`departments/${departmentId}/damageForms/${recordId}`).get();
-      if (recordSnap.exists) {
-        record = { id: recordSnap.id, ...recordSnap.data() };
-      }
-    }
-
-    const resolvedFormId = String(formId || record?.formId || settings?.formId || "").trim();
-    const resolvedSubmissionId = String(submissionId || record?.submissionId || "").trim();
-    const pdfLinks = buildPublicPdfUrls(resolvedFormId, resolvedSubmissionId);
-
-    if (record?.source === "jotform") {
-      if (!apiKey || !resolvedFormId || !resolvedSubmissionId) {
-        throw new HttpsError(
-          "failed-precondition",
-          "JotForm PDF download requires a saved API key and a real submission."
-        );
-      }
-
-      try {
-        const { buffer, reportId } = await fetchJotformSubmissionPdf(
-          resolvedFormId,
-          resolvedSubmissionId,
-          apiKey,
-          settings?.reportId || ""
-        );
-        if (reportId && reportId !== settings?.reportId) {
-          await db.doc(`departments/${departmentId}/settings/damageFormJotform`).set(
-            { reportId, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
-            { merge: true }
-          );
-        }
-        return {
-          pdfBase64: buffer.toString("base64"),
-          filename: `damage-form-${resolvedSubmissionId}.pdf`,
-          source: "jotform",
-          viewerUrl: pdfLinks.viewerUrl || pdfLinks.publicPdfUrl,
-          formTitle: record?.formTitle || settings?.formTitle || "Damage Form",
-        };
-      } catch (error) {
-        throw new HttpsError(
-          "failed-precondition",
-          error.message || "Could not download the JotForm PDF."
-        );
-      }
-    }
-
-    if (!record) {
-      throw new HttpsError("not-found", "Damage form record not found.");
-    }
+    const snap = await db.doc(`departments/${departmentId}/damageForms/${recordId}`).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Damage form record not found.");
+    const record = { id: snap.id, ...snap.data() };
 
     const pdfBuffer = await generateDamageFormPdfBuffer(record);
     return {
       pdfBase64: pdfBuffer.toString("base64"),
-      filename: `damage-form-${recordId || "report"}.pdf`,
-      source: "generated",
-      viewerUrl: "",
-      formTitle: record?.formTitle || settings?.formTitle || "Damage Form",
+      filename: `damage-form-${recordId}.pdf`,
+      formTitle: record.formTitle || "Damage Form",
     };
-  }
-);
-
-exports.syncJotformDamageSubmissions = onCall(
-  { region: "us-central1" },
-  async (request) => {
-    const db = admin.firestore();
-    const { departmentId = "", limit = 25 } = request.data || {};
-    await assertDepartmentAccess(db, departmentId, request.auth);
-
-    const settings = await loadSettings(db, departmentId);
-    const apiKey = settings?.apiKey;
-    if (!apiKey) {
-      throw new HttpsError("failed-precondition", "Save your JotForm API key in System Admin first.");
-    }
-    if (!settings?.formId) {
-      throw new HttpsError("failed-precondition", "Save your JotForm form URL in System Admin first.");
-    }
-
-    try {
-      const result = await syncFormSubmissions(db, departmentId, settings, apiKey, limit);
-      return {
-        count: result.count,
-        message: result.count
-          ? `Synced ${result.count} submission${result.count === 1 ? "" : "s"} from JotForm.`
-          : "No submissions were found in JotForm for this form.",
-      };
-    } catch (error) {
-      throw new HttpsError("failed-precondition", error.message || "Could not sync JotForm submissions.");
-    }
   }
 );
 

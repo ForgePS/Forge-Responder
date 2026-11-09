@@ -1,12 +1,12 @@
 import DamagePhotoGrid from "./DamagePhotoGrid.jsx";
 import { doc, onSnapshot } from "firebase/firestore";
-import { Download, ExternalLink, FileWarning, LoaderCircle, Printer } from "lucide-react";
+import { Download, FileWarning, LoaderCircle, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   buildDamageFormListLabel,
-  fetchJotformDamagePdf,
+  damageFormSourceLabel,
+  fetchDamageFormPdf,
   formatDamageFormDate,
-  resolveJotformPdfViewerUrl,
   subscribeDamageForms,
 } from "../lib/damageFormService.js";
 import { getFirestoreDb } from "../lib/firebaseClient.js";
@@ -20,18 +20,13 @@ function DamageFormDetail({ record, departmentId = "", onClose }) {
   const [liveRecord, setLiveRecord] = useState(record);
   const [viewMode, setViewMode] = useState("details");
   const [pdfBlobUrl, setPdfBlobUrl] = useState("");
-  const [pdfViewerUrl, setPdfViewerUrl] = useState("");
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState("");
 
-  const [pdfSource, setPdfSource] = useState("");
   const activeRecord = liveRecord || record;
-  const sourceLabel = activeRecord.source === "jotform" ? "JotForm" : "Employee portal";
+  const sourceLabel = damageFormSourceLabel(activeRecord);
   const formTitle = activeRecord.formTitle || "Damage Form";
-  const submissionUrl = activeRecord.viewUrl || "";
-  const formUrl = activeRecord.formUrl || "";
   const hasAnswers = Array.isArray(activeRecord.answers) && activeRecord.answers.length > 0;
-  const isJotform = activeRecord.source === "jotform";
   const pdfFilename = useMemo(
     () => `damage-form-${activeRecord.submissionId || activeRecord.id || "report"}.pdf`,
     [activeRecord.id, activeRecord.submissionId]
@@ -56,10 +51,8 @@ function DamageFormDetail({ record, departmentId = "", onClose }) {
   useEffect(() => {
     setViewMode("details");
     setPdfBlobUrl("");
-    setPdfViewerUrl("");
     setPdfError("");
     setPdfLoading(false);
-    setPdfSource("");
   }, [record.id]);
 
   useEffect(() => () => {
@@ -67,33 +60,16 @@ function DamageFormDetail({ record, departmentId = "", onClose }) {
   }, [pdfBlobUrl]);
 
   useEffect(() => {
-    if (viewMode !== "pdf" || !activeRecord?.id) return undefined;
+    if (viewMode !== "pdf" || !activeRecord?.id || !departmentId) return undefined;
 
     let cancelled = false;
     setPdfError("");
-
-    if (isJotform && activeRecord.submissionId) {
-      setPdfViewerUrl(resolveJotformPdfViewerUrl(activeRecord));
-      setPdfSource("jotform");
-      setPdfLoading(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    if (!departmentId) return undefined;
-
     setPdfLoading(true);
-    fetchJotformDamagePdf(departmentId, {
-      recordId: activeRecord.id,
-      submissionId: activeRecord.submissionId,
-      formId: activeRecord.formId,
-    })
+    fetchDamageFormPdf(departmentId, activeRecord.id)
       .then((result) => {
         if (cancelled) return;
         const blob = base64ToPdfBlob(result.pdfBase64 || "");
         setPdfBlobUrl(URL.createObjectURL(blob));
-        setPdfSource(result.source || "generated");
       })
       .catch((error) => {
         if (!cancelled) {
@@ -107,9 +83,9 @@ function DamageFormDetail({ record, departmentId = "", onClose }) {
     return () => {
       cancelled = true;
     };
-  }, [viewMode, departmentId, isJotform, activeRecord.id, activeRecord.submissionId, activeRecord.formId, activeRecord.publicPdfUrl]);
+  }, [viewMode, departmentId, activeRecord.id]);
 
-  const pdfFrameUrl = pdfViewerUrl || pdfBlobUrl;
+  const pdfFrameUrl = pdfBlobUrl;
 
   function handlePrint() {
     if (viewMode === "pdf" && pdfFrameUrl) {
@@ -131,22 +107,10 @@ function DamageFormDetail({ record, departmentId = "", onClose }) {
       return;
     }
 
-    if (isJotform && activeRecord.submissionId) {
-      const viewerUrl = resolveJotformPdfViewerUrl(activeRecord);
-      if (viewerUrl) {
-        window.open(viewerUrl, "_blank", "noopener,noreferrer")?.focus?.();
-        return;
-      }
-    }
-
     if (!departmentId) return;
 
     setPdfLoading(true);
-    fetchJotformDamagePdf(departmentId, {
-      recordId: activeRecord.id,
-      submissionId: activeRecord.submissionId,
-      formId: activeRecord.formId,
-    })
+    fetchDamageFormPdf(departmentId, activeRecord.id)
       .then((result) => {
         downloadBlob(base64ToPdfBlob(result.pdfBase64 || ""), result.filename || pdfFilename);
       })
@@ -248,36 +212,6 @@ function DamageFormDetail({ record, departmentId = "", onClose }) {
             <Download size={16} />
             Download PDF
           </button>
-          {submissionUrl ? (
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => window.open(submissionUrl, "_blank", "noopener,noreferrer")?.focus?.()}
-            >
-              <ExternalLink size={16} />
-              View in JotForm
-            </button>
-          ) : null}
-          {isJotform && activeRecord.submissionId ? (
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => window.open(resolveJotformPdfViewerUrl(activeRecord), "_blank", "noopener,noreferrer")?.focus?.()}
-            >
-              <ExternalLink size={16} />
-              Open official PDF
-            </button>
-          ) : null}
-          {formUrl && formUrl !== submissionUrl ? (
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => window.open(formUrl, "_blank", "noopener,noreferrer")?.focus?.()}
-            >
-              <ExternalLink size={16} />
-              Open form
-            </button>
-          ) : null}
         </footer>
       </article>
     </div>
@@ -315,6 +249,7 @@ export default function DamageFormsPanel({ departmentId = "" }) {
   }, [departmentId]);
 
   const visibleRecords = records
+    // Hide the old JotForm test submission.
     .filter((item) => item.submissionId !== "999888777")
     .slice(0, 8);
 
@@ -338,7 +273,7 @@ export default function DamageFormsPanel({ departmentId = "" }) {
               </span>
               <strong className="damage-form-row-title">{buildDamageFormListLabel(record)}</strong>
               <span className="damage-form-row-submitter">
-                {record.submitterName || (record.source === "jotform" ? "JotForm" : "Employee portal")}
+                {record.submitterName || damageFormSourceLabel(record)}
               </span>
             </button>
           ))}
@@ -348,7 +283,7 @@ export default function DamageFormsPanel({ departmentId = "" }) {
           <FileWarning size={18} />
           <p>No active damage forms.</p>
           <p className="damage-form-setup-copy">
-            New JotForm submissions and employee damage reports will appear here.
+            Damage reports from the Employee Portal and FORGE FIELD will appear here.
           </p>
         </div>
       )}

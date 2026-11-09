@@ -39,7 +39,7 @@ async function moveWorkOrderTo(departmentId, workOrderId, fromStatus, target, ac
 }
 
 /**
- * Damage reports that never got a work order (e.g. Jotform submissions): open one so the
+ * Damage reports that never got a work order (e.g. older JotForm submissions): open one so the
  * issue can be tracked. The report itself is not changed; the order points back to it.
  */
 export async function startTrackingIssue(departmentId, form = {}, actor = {}) {

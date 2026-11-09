@@ -21,7 +21,6 @@ import LeaveRequestForm from "../components/employee/LeaveRequestForm.jsx";
 import LeaveRequestsPanel from "../components/scheduling/LeaveRequestsPanel.jsx";
 import VacancyPickupPanel from "../components/employee/VacancyPickupPanel.jsx";
 import MaintenanceIssueForm from "../components/employee/MaintenanceIssueForm.jsx";
-import DamageFormEmbed from "../components/employee/DamageFormEmbed.jsx";
 import EmployeeTimeCard from "../components/employee/EmployeeTimeCard.jsx";
 import ShiftTradeForm from "../components/employee/ShiftTradeForm.jsx";
 import DailyLogPage from "./DailyLogPage.jsx";
@@ -36,7 +35,7 @@ import {
   resolveAllBattalionChiefs,
   validateMaintenanceIssueForm,
 } from "../lib/maintenanceIssueWorkflow.js";
-import { createPortalDamageFormRecord, loadDamageFormSettings } from "../lib/damageFormService.js";
+import { createPortalDamageFormRecord } from "../lib/damageFormService.js";
 import { createFleetWorkOrder } from "../lib/fleet/fleetWorkOrderService.js";
 import { createDefect } from "../lib/fleet/fleetDefectService.js";
 import { resolveFleetAsset } from "../lib/fleet/resolveFleetAsset.js";
@@ -269,7 +268,6 @@ export default function EmployeePortalPage({
   const [tradeForm, setTradeForm] = useState(defaultTradeForm);
   const [maintenanceForm, setMaintenanceForm] = useState(defaultMaintenanceIssueForm);
   const [submittingMaintenance, setSubmittingMaintenance] = useState(false);
-  const [damageFormSettings, setDamageFormSettings] = useState(null);
   const calendarToday = new Date();
   const [scheduleCalendarYear, setScheduleCalendarYear] = useState(calendarToday.getFullYear());
   const [scheduleCalendarMonth, setScheduleCalendarMonth] = useState(calendarToday.getMonth());
@@ -331,26 +329,6 @@ export default function EmployeePortalPage({
       cancelled = true;
     };
   }, [departmentId, myPerson?.id, myPerson?.forgePersonId, current]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!departmentId) {
-      setDamageFormSettings(null);
-      return undefined;
-    }
-
-    loadDamageFormSettings(departmentId)
-      .then((settings) => {
-        if (!cancelled) setDamageFormSettings(settings);
-      })
-      .catch(() => {
-        if (!cancelled) setDamageFormSettings(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [departmentId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1432,12 +1410,7 @@ export default function EmployeePortalPage({
 
       {current === "Maintenance Issues" && (
         <Panel title="Report Maintenance Issue" icon={Wrench}>
-          {damageFormSettings?.formUrl ? (
-            <DamageFormEmbed
-              formUrl={damageFormSettings.formUrl}
-              formTitle={damageFormSettings.formTitle || "Damage Form"}
-            />
-          ) : canSubmitMaintenance ? (
+          {canSubmitMaintenance ? (
             <MaintenanceIssueForm
               value={maintenanceForm}
               onChange={setMaintenanceForm}

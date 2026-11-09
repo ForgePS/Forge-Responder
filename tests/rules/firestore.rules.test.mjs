@@ -373,12 +373,12 @@ describe("department admins", () => {
   it("are the only ones who change department settings", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), `departments/${A}/settings/main`), { payRules: { overtimeMultiplier: 1.5 } });
-      await setDoc(doc(ctx.firestore(), `departments/${A}/settings/damageFormJotform`), { formUrl: "https://form.jotform.com/1" });
+      await setDoc(doc(ctx.firestore(), `departments/${A}/settings/fieldApp`), { appName: "Field" });
     });
     const member = memberA().firestore();
     await assertSucceeds(getDoc(doc(member, `departments/${A}/settings/main`)));
     await assertFails(setDoc(doc(member, `departments/${A}/settings/main`), { payRules: { overtimeMultiplier: 3 } }, { merge: true }));
-    await assertFails(setDoc(doc(member, `departments/${A}/settings/damageFormJotform`), { formUrl: "https://evil.example" }, { merge: true }));
+    await assertFails(setDoc(doc(member, `departments/${A}/settings/fieldApp`), { appName: "Hacked" }, { merge: true }));
     await assertFails(setDoc(doc(member, `departments/${A}/settings/other`), { anything: true }));
     // Distribution groups are the one thing members may save (the app checks the permission).
     await assertSucceeds(setDoc(doc(member, `departments/${A}/settings/main`), { internalEmailGroups: [], updatedAt: "now" }, { merge: true }));
