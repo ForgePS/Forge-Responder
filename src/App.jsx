@@ -199,6 +199,7 @@ import {
   changedUnitStatuses,
   findFleetAssetForUnit,
   fleetDecisionForClassicStatus,
+  fleetUpdatesForClassicEdits,
 } from "./lib/fleet/fleetStatusOverlay.js";
 import { isFleetPageVisible } from "./lib/fleet/fleetNavVisibility.js";
 
@@ -1006,10 +1007,10 @@ function AppShell() {
   const apparatusLive = useMemo(() => applyFleetStatus(apparatus, fleetStatusAssets), [apparatus, fleetStatusAssets]);
 
   // Status changed on the classic Apparatus page: record it on the fleet unit too.
-  async function syncClassicStatusesToFleet(changedUnits = []) {
+  async function syncClassicStatusesToFleet(changedUnits = [], assets = fleetStatusAssets) {
     const actor = { actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "User" };
     for (const unit of changedUnits) {
-      const asset = findFleetAssetForUnit(fleetStatusAssets, unit);
+      const asset = findFleetAssetForUnit(assets, unit);
       const change = fleetDecisionForClassicStatus(unit.status);
       if (!asset || !change) continue;
       if (change.decision) {
@@ -1024,18 +1025,32 @@ function AppShell() {
     }
   }
 
+  // Name, type, station or status changed on the classic Apparatus page: copy it to the fleet unit.
+  async function syncClassicEditsToFleet(before = [], next = []) {
+    const actor = { actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "User" };
+    const edits = fleetUpdatesForClassicEdits(before, next, fleetStatusAssets);
+    for (const { asset, patch } of edits) {
+      await saveFleetAsset(departmentId, { ...asset, ...patch }, actor);
+    }
+    // Status changes run after, on the renamed copies, so they don't put the old name back.
+    const patched = fleetStatusAssets.map((asset) => {
+      const edit = edits.find((item) => item.asset.id === asset.id);
+      return edit ? { ...asset, ...edit.patch } : asset;
+    });
+    const changed = changedUnitStatuses(before, next);
+    if (changed.length) await syncClassicStatusesToFleet(changed, patched);
+    // New units added here also become fleet units (checks, work orders, Readiness Board).
+    // A rename can free up a unit that was skipped for sharing a name (two "New Apparatus").
+    if (next.length > before.length || edits.some(({ patch }) => patch.unitDesignation)) {
+      await syncFleetAssetsFromApparatus(departmentId, next, actor);
+    }
+  }
+
   function setApparatusFromClassicPage(update) {
     const next = typeof update === "function" ? update(apparatusLive) : update;
     setApparatus(next);
-    const changed = changedUnitStatuses(apparatusLive, next);
-    if (changed.length) {
-      syncClassicStatusesToFleet(changed).catch((error) => console.warn("Couldn't update fleet status", error));
-    }
-    // New units added here also become fleet units (checks, work orders, Readiness Board).
-    if (Array.isArray(next) && next.length > apparatusLive.length) {
-      syncFleetAssetsFromApparatus(departmentId, next, { actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "User" })
-        .catch(() => {});
-    }
+    if (!Array.isArray(next)) return;
+    syncClassicEditsToFleet(apparatusLive, next).catch((error) => console.warn("Couldn't update the fleet unit", error));
   }
   const [workOrders, setWorkOrders] = useTenantPersistentState(departmentId, LIST_KEYS.workOrders, getTenantListFallback(departmentId, LIST_KEYS.workOrders));
   const [fleetCutover, setFleetCutover] = useState({

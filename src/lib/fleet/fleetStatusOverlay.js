@@ -62,6 +62,37 @@ export function changedUnitStatuses(before = [], after = []) {
   });
 }
 
+/**
+ * Fleet asset updates for units renamed or re-described on the classic page
+ * (name, type, station, model year), so Fleet doesn't keep showing "New Apparatus".
+ * Fleet number and display name follow the rename only when they still matched the
+ * old name, so a fleet number set on All Fleet Assets is left alone.
+ * @returns {Array<{asset: object, patch: object}>}
+ */
+export function fleetUpdatesForClassicEdits(before = [], after = [], fleetAssets = []) {
+  const previous = new Map((Array.isArray(before) ? before : []).filter((unit) => unit.id).map((unit) => [unit.id, unit]));
+  const updates = [];
+  for (const unit of Array.isArray(after) ? after : []) {
+    const old = previous.get(unit.id);
+    if (!old) continue;
+    const asset = findFleetAssetForUnit(fleetAssets, old);
+    if (!asset) continue;
+    const patch = {};
+    const newName = String(unit.unit || "").trim();
+    if (newName && unitKey(newName) !== unitKey(old.unit)) {
+      patch.unitDesignation = newName;
+      if (!asset.fleetNumber || unitKey(asset.fleetNumber) === unitKey(old.unit)) patch.fleetNumber = newName;
+      if (!asset.name || unitKey(asset.name) === unitKey(old.unit)) patch.name = newName;
+    }
+    for (const key of ["type", "station", "year"]) {
+      const value = String(unit[key] ?? "").trim();
+      if (value && value !== String(old[key] ?? "").trim() && value !== String(asset[key] ?? "").trim()) patch[key] = value;
+    }
+    if (Object.keys(patch).length) updates.push({ asset, patch });
+  }
+  return updates;
+}
+
 /** Readiness that matches a status chosen on All Fleet Assets (so the Readiness Board agrees). */
 export function readinessForFleetStatus(status = "") {
   return {
