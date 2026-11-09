@@ -72,7 +72,7 @@ const SOURCE_LABELS = {
   employee_portal: "Employee Portal",
   "field-app": "FORGE FIELD",
   field_app: "FORGE FIELD",
-  jotform: "Jotform",
+  jotform: "JotForm (older)",
 };
 
 const WORK_STATUSES = new Set(["in_progress", "awaiting_parts", "awaiting_vendor", "ready_for_qc"]);

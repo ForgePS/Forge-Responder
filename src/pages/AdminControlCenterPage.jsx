@@ -5,7 +5,6 @@ import DepartmentConfigPanel from "../components/DepartmentConfigPanel.jsx";
 import FieldAppSettingsPanel from "../components/FieldAppSettingsPanel.jsx";
 import GoogleApisIntegrationPanel from "../components/digitalDashboard/GoogleApisIntegrationPanel.jsx";
 import Active911IntegrationPanel from "../components/digitalDashboard/Active911IntegrationPanel.jsx";
-import DamageFormJotformIntegrationPanel from "../components/digitalDashboard/DamageFormJotformIntegrationPanel.jsx";
 import TrainingAcademiesPanel from "../components/academy/TrainingAcademiesPanel.jsx";
 import NerisConnectionPanel from "../components/neris/NerisConnectionPanel.jsx";
 import { isAdminMembershipRoles } from "../lib/adminGuards.js";
@@ -69,9 +68,6 @@ export default function AdminControlCenterPage({
   const { departmentId, profile, settings, isModuleEnabled } = useTenant();
   const { isCreator, membership, permissions } = useAuth();
   const canConfigureApiKeys = canManagePlatformSecrets(permissions, isCreator, membership);
-  const canConfigureDamageForm = isCreator
-    || hasPermission(permissions, "manageSystemSettings")
-    || hasPermission(permissions, "accessAdminRms");
   // Matches the server check: department admin or creator; the public demo is creator-only.
   const canConfigureNeris = isCreator || (isAdminMembershipRoles(membership) && !isDemoDepartment(departmentId));
   const canViewAcademyIntegrations = isCreator
@@ -272,7 +268,7 @@ export default function AdminControlCenterPage({
         <AdminSectionPill
           id="integrations"
           label="Connected Services"
-          description="NERIS reporting, Google Maps, Active911, the JotForm damage form, and FORGE Academy."
+          description="NERIS reporting, Google Maps, Active911, and FORGE Academy."
           icon={KeyRound}
           isOpen={isOpen("integrations")}
           onToggle={toggleSection}
@@ -294,10 +290,6 @@ export default function AdminControlCenterPage({
               departmentId={departmentId}
               canConfigure={canConfigureApiKeys}
               variant="admin"
-            />
-            <DamageFormJotformIntegrationPanel
-              departmentId={departmentId}
-              canConfigure={canConfigureDamageForm}
             />
             <TrainingAcademiesPanel
               departmentId={departmentId}
