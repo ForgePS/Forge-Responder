@@ -6,6 +6,7 @@ import InspectionEmptyState from "../components/inspections/InspectionEmptyState
 import InspectionPermissionGate from "../components/inspections/InspectionPermissionGate.jsx";
 import InspectionStatusBadge from "../components/inspections/InspectionStatusBadge.jsx";
 import InspectionsModuleLayout from "../components/inspections/InspectionsModuleLayout.jsx";
+import PreventionKpiGroups from "../components/inspections/PreventionKpiGroups.jsx";
 import ChecklistFieldInput from "../components/inspections/ChecklistFieldInput.jsx";
 import { findMissingRequiredFields, formatMissingFieldsMessage } from "../lib/inspections/checklistFields.js";
 import { describeNumberingFormat } from "../lib/inspections/inspectionNumbering.js";
@@ -751,25 +752,7 @@ function InspectionsShellPage({
 
         {!loading && !error && mode === "dashboard" ? (
           <>
-            <div className="inspections-kpi-grid">
-              {kpiCards.map((card) => {
-                const raw = dashboardKpis[card.id];
-                const display = card.id === "outstanding_fees" || card.id === "revenue_collected"
-                  ? formatCurrency(raw || 0)
-                  : (raw ?? 0);
-                return (
-                  <button
-                    key={card.id}
-                    type="button"
-                    className="inspections-kpi-card inspections-kpi-card-button"
-                    onClick={() => onNavigate?.(card.drillNav)}
-                  >
-                    <span>{card.label}</span>
-                    <strong>{display}</strong>
-                  </button>
-                );
-              })}
-            </div>
+            <PreventionKpiGroups cards={kpiCards} values={dashboardKpis} onNavigate={onNavigate} />
             {commandBoard?.charts ? (
               <div className="inspection-chart-grid">
                 {[
