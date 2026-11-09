@@ -53,28 +53,28 @@ export default function AddCertificationModal({ records = [], personnel = [], de
   return (
     <Modal title="Add certification" onClose={() => !busy && onClose()}>
       <div className="upload-form">
-        <label>
+        <label className="rms-field">
           <span>Person</span>
           <input list="add-cert-people" value={draft.person} disabled={busy} onChange={set("person")} placeholder="Choose or type a name" />
           <datalist id="add-cert-people">{people.map((name) => <option key={name} value={name} />)}</datalist>
         </label>
-        <label>
+        <label className="rms-field">
           <span>Certification</span>
           <input list="add-cert-types" value={draft.type} disabled={busy} onChange={set("type")} placeholder="e.g. Paramedic, Firefighter II" />
           <datalist id="add-cert-types">{types.map((type) => <option key={type} value={type} />)}</datalist>
         </label>
-        <label>
+        <label className="rms-field">
           <span>Category</span>
           <select value={draft.category} disabled={busy} onChange={set("category")}>
             <option value="">Choose…</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
         </label>
-        <label>
+        <label className="rms-field">
           <span>Issue date</span>
           <input type="date" value={draft.issue} disabled={busy} onChange={set("issue")} />
         </label>
-        <label>
+        <label className="rms-field">
           <span>Expiration date</span>
           <input type="date" value={draft.expires} disabled={busy} onChange={set("expires")} />
         </label>

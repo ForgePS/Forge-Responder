@@ -329,7 +329,7 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [], secti
             {isCreator ? (
               <label><span>Branch Label (FORGE staff)</span><input value={profileForm.branchLabel} onChange={(e) => setProfileForm({ ...profileForm, branchLabel: e.target.value })} /><small className="field-hint">Shown only in the platform workspace.</small></label>
             ) : null}
-            <div className="wide-field" style={{ display: "grid", gap: "10px" }}>
+            <div className="wide-field rms-field department-logo-field">
               <span>Department logo</span>
               <ObjectUploadField
                 variant="logo"
@@ -348,7 +348,6 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [], secti
                 <button
                   type="button"
                   className="secondary-button"
-                  style={{ justifySelf: "start" }}
                   onClick={() => setProfileForm((current) => ({ ...current, logoUrl: "" }))}
                 >
                   Remove logo
@@ -381,17 +380,17 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [], secti
 
         {activeSection === "academy" ? (
           <div className="workflow-form">
-            <p className="hint-text" style={{ gridColumn: "1 / -1" }}>
+            <p className="hint-text wide-field">
               Forge Person Identity is owned by the Integration Hub. Prefer configuring academy
               connections under <strong>System Admin → Integrations → Training Academies</strong>
               (multi-academy, secret references). Legacy Hub fields below remain for identity resolve
               until migrated.
             </p>
-            <p className="hint-text" style={{ gridColumn: "1 / -1" }}>
+            <p className="hint-text wide-field">
               This department is not permanently tied to any single academy project. Hub URL and
               tokens here only enable <code>forgePersonId</code> resolution for personnel saves.
             </p>
-            <label className="wide-field" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <label className="wide-field">
               <input
                 type="checkbox"
                 checked={forgeAcademy.hubEnabled !== false}
@@ -415,7 +414,7 @@ export default function DepartmentConfigPanel({ onMessage, apparatus = [], secti
                 placeholder="forge-platform"
               />
             </label>
-            <p className="hint-text" style={{ gridColumn: "1 / -1" }}>
+            <p className="hint-text wide-field">
               The hub token and shared secret are kept on the server (members could read them here). Set them with
               Integrations → Training Academies, or scripts/move-hub-secrets.mjs.
             </p>

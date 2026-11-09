@@ -32,9 +32,9 @@
 .personnel-table-card,
 .personnel-section-nav,
 .personnel-section-card {
-  border: 1px solid var(--rms-border);
-  border-radius: 8px;
-  background: var(--rms-bg-surface-1);
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
 }
 
 .personnel-filter-card { padding: 14px; }
@@ -52,7 +52,7 @@
 
 .personnel-filter-field span {
   color: var(--rms-text-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -60,10 +60,10 @@
 .personnel-filter-field select,
 .personnel-filter-field .managed-select {
   width: 100%;
-  min-height: 34px;
+  min-height: 36px;
   padding: 0 10px;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
   color: var(--rms-text-strong);
   font-size: 14px;
@@ -103,10 +103,10 @@
 }
 
 .personnel-show-options select {
-  min-height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
   color: var(--rms-text-strong);
 }
@@ -177,14 +177,14 @@
 }
 
 .icon-button {
-  min-width: 34px;
-  min-height: 34px;
+  min-width: 36px;
+  min-height: 36px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
-  background: var(--rms-bg-surface-2);
-  color: var(--rms-primary-solid);
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text-body);
   cursor: pointer;
 }
 
@@ -260,14 +260,14 @@
 }
 
 .personnel-section-button {
-  min-height: 34px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 10px;
   border: 1px solid var(--rms-border);
   border-radius: 6px;
-  background: var(--rms-bg-surface-1);
+  background: var(--rms-bg-panel);
   color: var(--rms-text-body);
   text-align: left;
   font-size: 13px;
@@ -324,9 +324,9 @@
 }
 
 .personnel-form-card {
-  border: 1px solid var(--rms-border);
-  border-radius: 8px;
-  background: var(--rms-bg-surface-1);
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
   overflow: hidden;
 }
 
@@ -434,7 +434,7 @@
 .personnel-form-flow.is-viewing .personnel-flow-label,
 .personnel-form-flow.is-viewing .personnel-flow-field > span:first-child {
   color: var(--rms-text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
@@ -444,10 +444,10 @@
 .personnel-flow-label,
 .personnel-flow-field > span:first-child {
   color: var(--rms-text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.045em;
+  text-transform: none;
+  letter-spacing: normal;
   line-height: 1.35;
 }
 
@@ -470,7 +470,7 @@
 }
 
 .personnel-flow-field strong {
-  min-height: 34px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   color: var(--rms-text-strong);
@@ -482,10 +482,10 @@
 .personnel-form-flow.is-editing .personnel-flow-field select,
 .personnel-form-flow.is-editing .personnel-flow-field .managed-select {
   width: 100%;
-  min-height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
   color: var(--rms-text-strong);
   font-size: 14px;
@@ -646,24 +646,22 @@ html[data-theme="light"] .personnel-section-nav-header strong,
 html[data-theme="light"] .personnel-section-heading h3,
 html[data-theme="light"] .personnel-form-section-title,
 html[data-theme="light"] .personnel-form-card-header strong,
-html[data-theme="light"] .personnel-filter-field span,
-html[data-theme="light"] .personnel-flow-label,
 html[data-theme="light"] .personnel-flow-value,
 html[data-theme="light"] .profile-fields strong {
   color: #000;
 }
 
 html[data-theme="light"] .personnel-flow-label {
-  color: #64748b;
+  color: var(--rms-text-muted);
 }
 
 html[data-theme="light"] .personnel-form-flow.is-viewing .personnel-flow-label,
 html[data-theme="light"] .personnel-form-flow.is-viewing .personnel-flow-field > span:first-child {
-  color: #64748b;
+  color: var(--rms-text-muted);
 }
 
 html[data-theme="light"] .personnel-form-flow.is-viewing .personnel-flow-value {
-  color: #0f172a;
+  color: var(--rms-text-strong);
   font-weight: 500;
 }
 
@@ -679,7 +677,7 @@ html[data-theme="light"] .personnel-section-nav,
 html[data-theme="light"] .personnel-form-card,
 html[data-theme="light"] .personnel-accrual-card,
 html[data-theme="light"] .personnel-promotion-row {
-  background: #ffffff;
+  background: var(--rms-bg-panel);
 }
 
 html[data-theme="light"] .personnel-accrual-card {
@@ -732,9 +730,9 @@ html[data-theme="light"] .personnel-data-table tbody tr:nth-child(even) {
   gap: 12px;
   align-items: end;
   padding: 12px;
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-  border-radius: 10px;
-  background: var(--surface-raised, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-surface-2);
 }
 
 .personnel-promotions-add {
@@ -952,8 +950,8 @@ html[data-theme="light"] .personnel-data-table tbody tr:nth-child(even) {
   width: min(860px, 100%);
   max-height: calc(100vh - 40px);
   overflow: auto;
-  border: 1px solid #42637c;
-  border-radius: 7px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
   background: var(--rms-bg-kpi-b);
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
 }
@@ -1021,15 +1019,15 @@ html[data-theme="light"] .personnel-data-table tbody tr:nth-child(even) {
 
 .personnel-bulk-edit-field span {
   color: var(--rms-text-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 
 .personnel-bulk-edit-field select {
-  min-height: 34px;
+  min-height: 36px;
   padding: 0 10px;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
   color: var(--rms-text-strong);
   font-size: 14px;

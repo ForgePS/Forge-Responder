@@ -9,6 +9,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
+import "../styles/code-library.css";
 import {
   buildIfc2024PreviewSeed,
   canUsePublication,
@@ -45,19 +46,19 @@ import {
 
 function Panel({ title, children, actions }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+    <section className="panel cl-panel">
+      <header>
+        <h2 className="cl-panel-title">{title}</h2>
         {actions}
-      </div>
-      <div className="p-4">{children}</div>
+      </header>
+      <div className="cl-panel-body">{children}</div>
     </section>
   );
 }
 
 function AccessDenied({ name }) {
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+    <div className="cl-notice is-warning">
       You do not have permission to open {name}.
     </div>
   );
@@ -333,7 +334,7 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
   if (!allowed) return <AccessDenied name="Code Library" />;
   if (!access?.moduleEnabled && !isCreator) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-700">
+      <div className="cl-notice">
         Code Library isn't turned on for this department yet. Contact FORGE support to enable it.
       </div>
     );
@@ -342,54 +343,55 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
   const treeNodes = nodes.filter((n) => n.nodeType !== "commentary" || showCommentary);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="cl-page">
+      <div className="cl-page-head">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">
+          <h1 className="cl-title">
             {mode === "search" ? "Search Codes" : "Browse Codes"}
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="cl-subtitle">
             2024 IFC structured library — citations snapshot onto violations.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => onNavigate?.("Adopted Codes")}>
+        <div className="cl-button-row">
+          <button type="button" className="secondary-button" onClick={() => onNavigate?.("Adopted Codes")}>
             Adopted Codes
           </button>
-          <button type="button" className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => onNavigate?.("Code Administration")}>
+          <button type="button" className="secondary-button" onClick={() => onNavigate?.("Code Administration")}>
             Code Administration
           </button>
         </div>
       </div>
 
-      {message ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{message}</p> : null}
-      {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}
-      {loading ? <p className="text-sm text-slate-500">Loading…</p> : null}
+      {message ? <p className="banner success">{message}</p> : null}
+      {error ? <p className="banner error">{error}</p> : null}
+      {loading ? <p className="cl-hint">Loading…</p> : null}
 
-      <form onSubmit={runSearch} className="flex flex-wrap gap-2">
+      <form onSubmit={runSearch} className="cl-search">
+        <div className="rms-field cl-search-field">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search section #, title, or keyword (e.g. 903.2, sprinkler)"
-          className="min-w-[240px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
-        <button type="submit" className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
-          <Search className="h-3.5 w-3.5" /> Search
+        </div>
+        <button type="submit" className="primary-button">
+          <Search size={14} /> Search
         </button>
-        <label className="flex items-center gap-2 text-xs text-slate-600">
+        <label className="rms-check">
           <input type="checkbox" checked={showCommentary} onChange={(e) => setShowCommentary(e.target.checked)} />
           Show commentary
         </label>
       </form>
 
       {history.length ? (
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="text-slate-500">Recent:</span>
+        <div className="cl-chips">
+          <span className="cl-hint">Recent:</span>
           {history.map((item) => (
             <button
               key={item.id}
               type="button"
-              className="rounded-full border border-slate-200 px-2 py-1"
+              className="cl-chip"
               onClick={() => {
                 setQuery(item.query);
               }}
@@ -400,13 +402,13 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_280px]">
+      <div className="cl-browser-grid">
         <Panel title="Hierarchy">
-          <label className="mb-2 block text-xs font-semibold text-slate-500">Chapter</label>
+          <label className="rms-field cl-chapter">
+          <span>Chapter</span>
           <select
             value={chapterNumber}
             onChange={(e) => setChapterNumber(e.target.value)}
-            className="mb-3 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
           >
             {chapters.map((chapter) => (
               <option key={chapter.id} value={chapter.number}>
@@ -414,22 +416,21 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
               </option>
             ))}
           </select>
-          <div className="max-h-[60vh] space-y-1 overflow-auto text-sm">
+          </label>
+          <div className="cl-tree">
             {treeNodes.map((node) => (
               <button
                 key={node.id}
                 type="button"
                 onClick={() => setSelectedId(node.id)}
-                className={`block w-full rounded-md px-2 py-1.5 text-left ${
-                  selectedId === node.id ? "bg-red-50 font-semibold text-red-800" : "hover:bg-slate-50"
-                }`}
+                className={`cl-tree-item${selectedId === node.id ? " is-active" : ""}`}
               >
-                <span className="font-mono text-[11px] text-slate-500">{node.number}</span>{" "}
+                <span className="cl-node-number">{node.number}</span>{" "}
                 {node.title}
               </button>
             ))}
             {!treeNodes.length ? (
-              <p className="text-xs text-slate-500">
+              <p className="cl-hint">
                 {error
                   ? "Unable to load hierarchy. See error above."
                   : loading
@@ -442,12 +443,12 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
 
         <Panel title={selected ? `${selected.number} ${selected.title}` : "Section detail"}>
           {searchSummary && !searchResults.length ? (
-            <p className="mb-4 text-xs text-slate-500">{searchSummary}</p>
+            <p className="cl-hint cl-gap-below">{searchSummary}</p>
           ) : null}
           {searchResults.length ? (
-            <div className="mb-4 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Search results</p>
-              {searchSummary ? <p className="text-xs text-slate-500">{searchSummary}</p> : null}
+            <div className="cl-results">
+              <p className="cl-section-label">Search results</p>
+              {searchSummary ? <p className="cl-hint">{searchSummary}</p> : null}
               {searchResults.map((row) => (
                 <button
                   key={row.node.id}
@@ -456,27 +457,27 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
                     setSelectedId(row.node.id);
                     setChapterNumber(row.node.chapterNumber || chapterNumber);
                   }}
-                  className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-left hover:border-slate-400"
+                  className="cl-result"
                 >
-                  <div className="text-sm font-semibold">{row.node.number} — {row.node.title}</div>
-                  <div className="mt-1 text-xs text-slate-600">{row.preview}</div>
+                  <div className="cl-result-title">{row.node.number} — {row.node.title}</div>
+                  <div className="cl-result-preview">{row.preview}</div>
                 </button>
               ))}
             </div>
           ) : null}
 
           {selected ? (
-            <div className="space-y-3 text-sm">
-              <p className="text-xs text-slate-500">
+            <div className="cl-detail">
+              <p className="cl-hint">
                 {selected.nodeType} · Ch {selected.chapterNumber || "—"} · {selected.publicationId}
               </p>
-              <div className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 leading-relaxed text-slate-800">
+              <div className="cl-body-text">
                 {selected.bodyText || "No body text stored for this node yet."}
               </div>
               {compareResult ? (
-                <div className="rounded-lg border border-slate-200 p-3 text-xs">
-                  <p className="font-semibold">Edition compare</p>
-                  <p className="mt-1">
+                <div className="cl-compare">
+                  <p className="cl-row-title">Edition compare</p>
+                  <p>
                     Changed: {String(compareResult.changed)} · Only left: {String(compareResult.onlyInLeft)} · Only
                     right: {String(compareResult.onlyInRight)}
                   </p>
@@ -484,25 +485,25 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
               ) : null}
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Select a section from the hierarchy or search results.</p>
+            <p className="cl-hint">Select a section from the hierarchy or search results.</p>
           )}
         </Panel>
 
         <Panel title="Actions">
-          <div className="flex flex-col gap-2">
+          <div className="cl-actions">
             <button
               type="button"
               disabled={!selected || !canCiteCodeSections(permissions, isCreator)}
               onClick={handleCreateViolation}
-              className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+              className="primary-button"
             >
-              <Gavel className="h-3.5 w-3.5" /> Create violation
+              <Gavel size={14} /> Create violation
             </button>
             <button
               type="button"
               disabled={!selected}
               onClick={handleAddToInspection}
-              className="inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
+              className="secondary-button"
             >
               Add to inspection
             </button>
@@ -510,23 +511,23 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
               type="button"
               disabled={!selected}
               onClick={handleSaveSection}
-              className="inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
+              className="secondary-button"
             >
-              <BookmarkPlus className="h-3.5 w-3.5" /> Save section
+              <BookmarkPlus size={14} /> Save section
             </button>
             <button
               type="button"
               disabled={!selected}
               onClick={handleCopyCitation}
-              className="inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
+              className="secondary-button"
             >
-              <Copy className="h-3.5 w-3.5" /> Copy citation
+              <Copy size={14} /> Copy citation
             </button>
             <button
               type="button"
               disabled={!selected}
               onClick={() => onNavigate?.("Local Amendments")}
-              className="inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
+              className="secondary-button"
             >
               View amendment
             </button>
@@ -534,31 +535,32 @@ export function CodeLibraryBrowsePage({ mode = "browse", onNavigate }) {
               type="button"
               disabled={!selected}
               onClick={handleReportIssue}
-              className="inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
+              className="secondary-button"
             >
               Report extraction issue
             </button>
-            <div className="mt-2 border-t border-slate-100 pt-3">
-              <p className="mb-1 text-xs font-semibold text-slate-500">Compare edition</p>
+            <div className="cl-subsection">
+              <label className="rms-field">
+              <span>Compare edition</span>
               <input
                 value={compareEdition}
                 onChange={(e) => setCompareEdition(e.target.value)}
                 placeholder="Other publication id"
-                className="mb-2 w-full rounded border px-2 py-1 text-xs"
               />
-              <button type="button" disabled={!selected || !compareEdition} onClick={handleCompare} className="w-full rounded border px-2 py-1.5 text-xs disabled:opacity-40">
+              </label>
+              <button type="button" disabled={!selected || !compareEdition} onClick={handleCompare} className="secondary-button">
                 Compare
               </button>
             </div>
             {saved.length ? (
-              <div className="mt-3 border-t border-slate-100 pt-3">
-                <p className="mb-2 text-xs font-semibold text-slate-500">Saved / frequent</p>
-                <div className="space-y-1">
+              <div className="cl-subsection">
+                <p className="cl-section-label">Saved / frequent</p>
+                <div className="cl-link-list">
                   {saved.slice(0, 8).map((row) => (
                     <button
                       key={row.id}
                       type="button"
-                      className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-slate-50"
+                      className="cl-link"
                       onClick={() => setSelectedId(row.codeNodeId)}
                     >
                       {row.sectionNumber} — {row.sectionTitle}
@@ -668,21 +670,21 @@ export function AdoptedCodesPage() {
   if (!allowed) return <AccessDenied name="Adopted Codes" />;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-slate-900">Adopted Codes</h1>
-      <p className="text-sm text-slate-600">
+    <div className="cl-page">
+      <h1 className="cl-title">Adopted Codes</h1>
+      <p className="cl-subtitle">
         Configure which Creator-enabled publications this jurisdiction adopts. Historical inspections keep their
         citation snapshots.
       </p>
       {!access?.moduleEnabled ? (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="cl-notice is-warning">
           Code Library module is not enabled for this department yet.
         </p>
       ) : null}
-      {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {message ? <p className="banner success">{message}</p> : null}
+      {error ? <p className="banner error">{error}</p> : null}
 
-      <form onSubmit={handleSave} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2">
+      <form onSubmit={handleSave} className="panel cl-form">
         {[
           ["jurisdictionName", "Jurisdiction name"],
           ["state", "State"],
@@ -695,23 +697,21 @@ export function AdoptedCodesPage() {
           ["adoptedAppendices", "Adopted appendices (comma-separated)"],
           ["secondaryPublicationIds", "Secondary publication ids (comma-separated)"],
         ].map(([key, label]) => (
-          <label key={key} className="text-xs font-semibold text-slate-600">
-            {label}
+          <label key={key} className="rms-field">
+            <span>{label}</span>
             <input
               disabled={!canEdit}
               value={form[key]}
               onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal"
             />
           </label>
         ))}
-        <label className="text-xs font-semibold text-slate-600">
-          Primary publication
+        <label className="rms-field">
+          <span>Primary publication</span>
           <select
             disabled={!canEdit}
             value={form.primaryPublicationId}
             onChange={(e) => setForm((prev) => ({ ...prev, primaryPublicationId: e.target.value }))}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal"
           >
             {(access?.enabledPublicationIds?.length
               ? publications.filter((p) => access.enabledPublicationIds.includes(p.id) || p.id === form.primaryPublicationId)
@@ -724,37 +724,36 @@ export function AdoptedCodesPage() {
             {!publications.length ? <option value={IFC_2024_PUBLICATION_ID}>ifc-2024</option> : null}
           </select>
         </label>
-        <label className="md:col-span-2 text-xs font-semibold text-slate-600">
-          Notes
+        <label className="rms-field wide">
+          <span>Notes</span>
           <textarea
             disabled={!canEdit}
             value={form.notes}
             onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal"
             rows={3}
           />
         </label>
         {canEdit ? (
-          <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white md:col-span-2 md:w-fit">
+          <button type="submit" className="primary-button cl-form-submit">
             Save adopted code profile
           </button>
         ) : null}
       </form>
 
       <Panel title="Profiles">
-        <div className="space-y-2 text-sm">
+        <div className="cl-list">
           {profiles.map((profile) => (
-            <div key={profile.id} className="rounded-lg border border-slate-200 px-3 py-2">
-              <div className="font-semibold">
+            <div key={profile.id} className="cl-row">
+              <div className="cl-row-title">
                 {profile.jurisdictionName || profile.id}{" "}
-                <span className="text-xs font-normal text-slate-500">{profile.active ? "active" : "inactive"}</span>
+                <span className="cl-tag">{profile.active ? "active" : "inactive"}</span>
               </div>
-              <div className="text-xs text-slate-600">
+              <div className="cl-row-meta">
                 {profile.primaryPublicationId} · {profile.edition} · effective {profile.effectiveDate || "—"}
               </div>
             </div>
           ))}
-          {!profiles.length ? <p className="text-xs text-slate-500">No adopted profiles yet.</p> : null}
+          {!profiles.length ? <p className="cl-hint">No adopted profiles yet.</p> : null}
         </div>
       </Panel>
     </div>
@@ -852,79 +851,79 @@ export function CodeAdministrationPage({ onNavigate }) {
   if (!allowed) return <AccessDenied name="Code Administration" />;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-slate-900">Code Administration</h1>
-      <p className="text-sm text-slate-600">
+    <div className="cl-page">
+      <h1 className="cl-title">Code Administration</h1>
+      <p className="cl-subtitle">
         Choose which code books this department can search and cite during inspections.
       </p>
-      {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {message ? <p className="banner success">{message}</p> : null}
+      {error ? <p className="banner error">{error}</p> : null}
 
       <Panel title="Department availability" actions={null}>
-        <div className="flex flex-wrap gap-2">
+        <div className="cl-button-row">
           <button
             type="button"
             disabled={busy}
             onClick={() => handleEnableModule(true)}
-            className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
+            className="primary-button"
           >
             Enable module
           </button>
-          <button type="button" disabled={busy} onClick={() => handleEnableModule(false)} className="rounded-lg border px-3 py-2 text-xs font-semibold">
+          <button type="button" disabled={busy} onClick={() => handleEnableModule(false)} className="secondary-button">
             Disable module
           </button>
-          <button type="button" disabled={busy} onClick={handleEnableIfc} className="rounded-lg border px-3 py-2 text-xs font-semibold">
+          <button type="button" disabled={busy} onClick={handleEnableIfc} className="secondary-button">
             Enable 2024 IFC
           </button>
-          <button type="button" disabled={busy} onClick={handlePublishSeed} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold">
-            <BookOpen className="h-3.5 w-3.5" /> Publish sample code book
+          <button type="button" disabled={busy} onClick={handlePublishSeed} className="secondary-button">
+            <BookOpen size={14} /> Publish sample code book
           </button>
-          <button type="button" onClick={() => onNavigate?.("Browse Codes")} className="rounded-lg border px-3 py-2 text-xs font-semibold">
+          <button type="button" onClick={() => onNavigate?.("Browse Codes")} className="secondary-button">
             Open browser
           </button>
         </div>
-        <p className="mt-3 text-xs text-slate-600">
+        <p className="cl-hint cl-gap-above">
           Module: {access?.moduleEnabled ? "enabled" : "disabled"} · Publications:{" "}
           {(access?.enabledPublicationIds || []).join(", ") || "none"}
         </p>
       </Panel>
 
       <Panel title="Publications">
-        <div className="space-y-2 text-sm">
+        <div className="cl-list">
           {publications.map((pub) => (
-            <div key={pub.id} className="rounded-lg border border-slate-200 px-3 py-2">
-              <div className="font-semibold">
-                {pub.name} <span className="text-xs font-normal text-slate-500">{pub.status}</span>
+            <div key={pub.id} className="cl-row">
+              <div className="cl-row-title">
+                {pub.name} <span className="cl-tag">{pub.status}</span>
               </div>
-              <div className="text-xs text-slate-600">
+              <div className="cl-row-meta">
                 {pub.id} · edition {pub.edition} · nodes {pub.nodeCount || 0} · hash {pub.sourceHash ? `${pub.sourceHash.slice(0, 12)}…` : "—"}
               </div>
             </div>
           ))}
-          {!publications.length ? <p className="text-xs text-slate-500">No publications yet.</p> : null}
+          {!publications.length ? <p className="cl-hint">No publications yet.</p> : null}
         </div>
       </Panel>
 
       <Panel title="Import batches">
-        <div className="space-y-2 text-sm">
+        <div className="cl-list">
           {batches.map((batch) => (
-            <div key={batch.id} className="rounded-lg border border-slate-200 px-3 py-2 text-xs">
-              <div className="font-semibold">{batch.id}</div>
+            <div key={batch.id} className="cl-row">
+              <div className="cl-row-title">{batch.id}</div>
               <div>{batch.previewSummary || batch.sourceFilename}</div>
-              <div className="text-slate-500">{batch.createdAt}</div>
+              <div className="cl-row-meta">{batch.createdAt}</div>
             </div>
           ))}
           {!batches.length ? (
-            <p className="text-xs text-slate-500">
+            <p className="cl-hint">
               No code book imports yet.
             </p>
           ) : null}
         </div>
       </Panel>
 
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        <div className="mb-1 flex items-center gap-2 font-semibold">
-          <AlertTriangle className="h-4 w-4" /> Licensing
+      <div className="cl-notice is-warning">
+        <div className="cl-notice-title">
+          <AlertTriangle size={16} /> Licensing
         </div>
         Import only the owner-supplied ICC file. Do not redistribute outside authorized tenants.
       </div>
@@ -953,23 +952,23 @@ export function CodeLibrarySavedPage() {
   if (!allowed) return <AccessDenied name="Saved Sections" />;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Frequently Used & Saved Sections</h1>
+    <div className="cl-page">
+      <h1 className="cl-title">Frequently Used & Saved Sections</h1>
       <Panel title="Frequent">
         {frequent.map((row) => (
-          <div key={row.id} className="border-b border-slate-100 py-2 text-sm">
-            {row.sectionNumber} — {row.sectionTitle} <span className="text-xs text-slate-500">×{row.useCount || 0}</span>
+          <div key={row.id} className="cl-list-row">
+            {row.sectionNumber} — {row.sectionTitle} <span className="cl-hint">×{row.useCount || 0}</span>
           </div>
         ))}
-        {!frequent.length ? <p className="text-xs text-slate-500">No frequent sections yet.</p> : null}
+        {!frequent.length ? <p className="cl-hint">No frequent sections yet.</p> : null}
       </Panel>
       <Panel title="Saved">
         {saved.map((row) => (
-          <div key={row.id} className="border-b border-slate-100 py-2 text-sm">
+          <div key={row.id} className="cl-list-row">
             {row.sectionNumber} — {row.sectionTitle || row.label}
           </div>
         ))}
-        {!saved.length ? <p className="text-xs text-slate-500">No saved sections yet.</p> : null}
+        {!saved.length ? <p className="cl-hint">No saved sections yet.</p> : null}
       </Panel>
     </div>
   );
@@ -977,18 +976,18 @@ export function CodeLibrarySavedPage() {
 
 export function LocalAmendmentsLibraryPage({ onNavigate }) {
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Local Amendments</h1>
-      <p className="text-sm text-slate-600">
+    <div className="cl-page">
+      <h1 className="cl-title">Local Amendments</h1>
+      <p className="cl-subtitle">
         Local amendments continue to live with the tenant code catalog. Manage them in Configuration Studio → Codes &
         catalog, and link them when creating violations from the Code Library.
       </p>
       <button
         type="button"
-        className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold"
+        className="secondary-button"
         onClick={() => onNavigate?.("Configuration Studio")}
       >
-        <Settings2 className="h-3.5 w-3.5" /> Open Configuration Studio
+        <Settings2 size={14} /> Open Configuration Studio
       </button>
     </div>
   );

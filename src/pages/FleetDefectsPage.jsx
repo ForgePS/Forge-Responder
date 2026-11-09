@@ -506,7 +506,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
             <section className="workflow-modal">
               <header>
                 <strong>Report defect</strong>
-                <button type="button" onClick={() => setShowCreate(false)}>×</button>
+                <button type="button" className="icon-button" aria-label="Close" onClick={() => setShowCreate(false)}>×</button>
               </header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">

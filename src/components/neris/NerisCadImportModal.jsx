@@ -236,7 +236,7 @@ export default function NerisCadImportModal({
         </div>
       ) : mode === "paste" ? (
         <div className="neris-cad-import-pane">
-          <label className="neris-field neris-field-wide">
+          <label className="rms-field">
             <span>Call details from CAD</span>
             <textarea
               rows={8}

@@ -215,13 +215,13 @@ export default function TrainingAcademiesPanel({
           {canConfigure ? (
             <>
               {connections.length ? (
-                <button type="button" className="btn-secondary" onClick={openCreate} disabled={Boolean(busy)}>
+                <button type="button" className="secondary-button" onClick={openCreate} disabled={Boolean(busy)}>
                   Add another academy
                 </button>
               ) : null}
               {canMigrateLegacy ? <button
                 type="button"
-                className="btn-secondary"
+                className="secondary-button"
                 disabled={Boolean(busy)}
                 onClick={() =>
                   runAction(
@@ -254,7 +254,7 @@ export default function TrainingAcademiesPanel({
             academy records remain available.
           </p>
           {canConfigure ? (
-            <button type="button" className="btn-primary" onClick={openCreate}>
+            <button type="button" className="primary-button" onClick={openCreate}>
               Configure Academy Integration
             </button>
           ) : null}
@@ -288,7 +288,7 @@ export default function TrainingAcademiesPanel({
                   <>
                     <button
                       type="button"
-                      className="btn-secondary"
+                      className="secondary-button"
                       disabled={Boolean(busy)}
                       onClick={() =>
                         runAction(
@@ -304,13 +304,13 @@ export default function TrainingAcademiesPanel({
                     >
                       Test connection
                     </button>
-                    <button type="button" className="btn-secondary" onClick={() => openEdit(connection)}>
+                    <button type="button" className="secondary-button" onClick={() => openEdit(connection)}>
                       Edit
                     </button>
                     {!connection.isPrimary ? (
                       <button
                         type="button"
-                        className="btn-secondary"
+                        className="secondary-button"
                         disabled={Boolean(busy)}
                         onClick={() =>
                           runAction(
@@ -325,7 +325,7 @@ export default function TrainingAcademiesPanel({
                     ) : null}
                     <button
                       type="button"
-                      className="btn-secondary"
+                      className="secondary-button"
                       disabled={Boolean(busy)}
                       onClick={() =>
                         window.confirm("Pause this academy connection? Nothing is deleted; you can turn it back on.") && runAction(
@@ -339,7 +339,7 @@ export default function TrainingAcademiesPanel({
                     </button>
                     <button
                       type="button"
-                      className="btn-secondary"
+                      className="secondary-button"
                       disabled={Boolean(busy)}
                       onClick={() =>
                         window.confirm("Disconnect this academy? Its saved login details are deleted and the Academy menu item is hidden until you connect again.") && runAction(
@@ -355,7 +355,7 @@ export default function TrainingAcademiesPanel({
                 ) : null}
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="secondary-button"
                   disabled={Boolean(busy)}
                   onClick={() => openAudit(connection.connectionId)}
                 >
@@ -371,16 +371,16 @@ export default function TrainingAcademiesPanel({
       {showForm ? (
         <form className="academy-connection-form" onSubmit={handleSave}>
           <h4>{form.connectionId ? "Edit academy connection" : "Configure Academy Integration"}</h4>
-          <label>
-            Display name
+          <label className="rms-field">
+            <span>Display name</span>
             <input
               value={form.displayName}
               onChange={(e) => setForm({ ...form, displayName: e.target.value })}
               required
             />
           </label>
-          <label>
-            Provider type
+          <label className="rms-field">
+            <span>Provider type</span>
             <select
               value={form.providerType}
               onChange={(e) => setForm({ ...form, providerType: e.target.value })}
@@ -392,16 +392,16 @@ export default function TrainingAcademiesPanel({
                 ))}
             </select>
           </label>
-          <label>
-            Academy organization ID
+          <label className="rms-field">
+            <span>Academy organization ID</span>
             <input
               value={form.academyOrganizationId}
               onChange={(e) => setForm({ ...form, academyOrganizationId: e.target.value })}
               placeholder="e.g. arkansas-fire-academy"
             />
           </label>
-          <label>
-            Sync mode
+          <label className="rms-field">
+            <span>Sync mode</span>
             <select
               value={form.syncMode}
               onChange={(e) => setForm({ ...form, syncMode: e.target.value })}
@@ -412,7 +412,7 @@ export default function TrainingAcademiesPanel({
               <option value="manual">Manual</option>
             </select>
           </label>
-          <label className="checkbox-row">
+          <label className="rms-check checkbox-row">
             <input
               type="checkbox"
               checked={form.isPrimary}
@@ -428,23 +428,23 @@ export default function TrainingAcademiesPanel({
                 Stored via secret reference — not written to the connection document.
                 Do not enter a Firebase project ID; routing is server-side only.
               </p>
-              <label>
-                Hub base URL
+              <label className="rms-field">
+                <span>Hub base URL</span>
                 <input
                   value={form.hubBaseUrl}
                   onChange={(e) => setForm({ ...form, hubBaseUrl: e.target.value })}
                   placeholder="https://…run.app"
                 />
               </label>
-              <label>
-                Forge department ID
+              <label className="rms-field">
+                <span>Forge department ID</span>
                 <input
                   value={form.forgeDepartmentId}
                   onChange={(e) => setForm({ ...form, forgeDepartmentId: e.target.value })}
                 />
               </label>
-              <label>
-                Hub bearer token
+              <label className="rms-field">
+                <span>Hub bearer token</span>
                 <input
                   type="password"
                   value={form.hubBearerToken}
@@ -452,8 +452,8 @@ export default function TrainingAcademiesPanel({
                   autoComplete="new-password"
                 />
               </label>
-              <label>
-                Hub integration secret
+              <label className="rms-field">
+                <span>Hub integration secret</span>
                 <input
                   type="password"
                   value={form.hubSecret}
@@ -467,15 +467,15 @@ export default function TrainingAcademiesPanel({
           {form.providerType === "external_api" ? (
             <fieldset className="academy-provider-fields">
               <legend>External API</legend>
-              <label>
-                API base URL
+              <label className="rms-field">
+                <span>API base URL</span>
                 <input
                   value={form.apiBaseUrl}
                   onChange={(e) => setForm({ ...form, apiBaseUrl: e.target.value })}
                 />
               </label>
-              <label>
-                API key
+              <label className="rms-field">
+                <span>API key</span>
                 <input
                   type="password"
                   value={form.apiKey}
@@ -492,8 +492,8 @@ export default function TrainingAcademiesPanel({
               <p className="muted small">
                 CSV upload isn't available in the app yet. Use these notes to record how this academy's records are imported.
               </p>
-              <label>
-                Import notes
+              <label className="rms-field">
+                <span>Import notes</span>
                 <textarea
                   value={form.csvNotes}
                   onChange={(e) => setForm({ ...form, csvNotes: e.target.value })}
@@ -506,22 +506,22 @@ export default function TrainingAcademiesPanel({
           {form.providerType === "sftp_import" ? (
             <fieldset className="academy-provider-fields">
               <legend>SFTP import</legend>
-              <label>
-                Host
+              <label className="rms-field">
+                <span>Host</span>
                 <input
                   value={form.sftpHost}
                   onChange={(e) => setForm({ ...form, sftpHost: e.target.value })}
                 />
               </label>
-              <label>
-                Username
+              <label className="rms-field">
+                <span>Username</span>
                 <input
                   value={form.sftpUsername}
                   onChange={(e) => setForm({ ...form, sftpUsername: e.target.value })}
                 />
               </label>
-              <label>
-                Password
+              <label className="rms-field">
+                <span>Password</span>
                 <input
                   type="password"
                   value={form.sftpPassword}
@@ -542,10 +542,10 @@ export default function TrainingAcademiesPanel({
           ) : null}
 
           <div className="academy-connection-card__actions">
-            <button type="submit" className="btn-primary" disabled={Boolean(busy) || !canConfigure}>
+            <button type="submit" className="primary-button" disabled={Boolean(busy) || !canConfigure}>
               {busy === "save" ? "Saving…" : "Save connection"}
             </button>
-            <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>
+            <button type="button" className="secondary-button" onClick={() => setShowForm(false)}>
               Cancel
             </button>
           </div>
@@ -556,7 +556,7 @@ export default function TrainingAcademiesPanel({
         <div className="academy-audit-drawer">
           <div className="admin-integration-card__header">
             <h4>Audit history{auditConnectionId ? ` · ${auditConnectionId}` : ""}</h4>
-            <button type="button" className="btn-secondary" onClick={() => setAuditOpen(false)}>
+            <button type="button" className="secondary-button" onClick={() => setAuditOpen(false)}>
               Close
             </button>
           </div>

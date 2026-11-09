@@ -1,0 +1,16 @@
+/* System Admin (Admin Control Center): keep the form-kit field look in light mode.
+ *
+ * light-polish.css paints every admin label span near-black
+ * (html[data-theme="light"] .admin-page .workflow-form span, .admin-field > span, …),
+ * which beats the shared muted label colour. These rules put labels back to
+ * the 12px / 600 / muted look; checkbox rows keep the body text colour. */
+
+html[data-theme="light"] .app-shell .admin-page :is(.workflow-form label, .rms-field, .admin-field.admin-field, .role-meta-field, .user-permissions-toolbar label) > span,
+html[data-theme="light"] .app-shell .admin-page .system-record-editor.system-record-editor .admin-field.admin-field > span,
+html[data-theme="light"] .app-shell .admin-page .dropdown-option-row.dropdown-option-row .admin-field.admin-field > span {
+  color: var(--rms-text-muted);
+}
+
+html[data-theme="light"] .app-shell .admin-page :is(.workflow-form label, .rms-field):has(> input[type="checkbox"]) > span {
+  color: var(--rms-text);
+}

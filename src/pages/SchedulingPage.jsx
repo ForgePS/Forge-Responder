@@ -633,8 +633,8 @@ export default function SchedulingPage({
                       {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
                     </select>
                   ) : null}
-                  <button onClick={() => decideVacancyPickup(request.id, "Approved")} disabled={!request.apparatus && !pickupUnits[request.id]}><Check size={13} /> Approve</button>
-                  <button onClick={() => decideVacancyPickup(request.id, "Denied")}><X size={13} /> Deny</button>
+                  <button className="primary-button" onClick={() => decideVacancyPickup(request.id, "Approved")} disabled={!request.apparatus && !pickupUnits[request.id]}><Check size={13} /> Approve</button>
+                  <button className="secondary-button" onClick={() => decideVacancyPickup(request.id, "Denied")}><X size={13} /> Deny</button>
                 </div>
               )}
             </div>

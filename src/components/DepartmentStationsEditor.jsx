@@ -58,7 +58,7 @@ export default function DepartmentStationsEditor({
               <header className="department-station-card-head">
                 <strong>{station.name || `Station ${index + 1}`}</strong>
                 <button
-                  className="row-action danger"
+                  className="icon-button danger"
                   type="button"
                   onClick={() => removeStation(index)}
                   aria-label={`Remove ${station.name || "station"}`}

@@ -336,7 +336,7 @@ export default function FleetHardeningPage({ onNavigate }) {
           <section className="panel">
             <header><div><strong>Cutover flags</strong></div></header>
             <div className="panel-body config-grid">
-              <label className="config-field" style={{ flexDirection: "row", gap: "8px", alignItems: "center" }}>
+              <label className="rms-check">
                 <input
                   type="checkbox"
                   disabled={!canEdit || saving}
@@ -360,7 +360,7 @@ export default function FleetHardeningPage({ onNavigate }) {
                 />
                 <span>Lock classic Apparatus list writes</span>
               </label>
-              <label className="config-field" style={{ flexDirection: "row", gap: "8px", alignItems: "center" }}>
+              <label className="rms-check">
                 <input
                   type="checkbox"
                   disabled={!canEdit || saving}

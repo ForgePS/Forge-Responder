@@ -20,6 +20,7 @@ import { isDemoDepartment, isPlatformScope } from "../lib/tenantPaths.js";
 import { listRecords } from "../lib/firestoreService.js";
 import { canManagePlatformSecrets, hasPermission } from "../lib/permissions.js";
 import { ensureDefaultRoles } from "../lib/roleService.js";
+import "../styles/admin-control-center.css";
 
 function AdminSectionPill({ id, label, description = "", icon: Icon, isOpen, onToggle, children }) {
   return (

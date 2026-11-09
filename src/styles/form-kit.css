@@ -1,0 +1,413 @@
+/* RMS form kit: the checklist-builder / NERIS look for every RMS page.
+ *
+ * Labels above fields (12px, 600, muted), bordered cards, 36px inputs,
+ * selects and buttons with one focus ring, theme-coloured checkboxes and
+ * dashed "Add" rows. Colours come from the theme tokens (src/theme/tokens.css),
+ * so light and dark both follow the platform.
+ *
+ * Imported last (src/main.jsx) and scoped under .app-shell, so it wins over
+ * the older per-page rules but never touches FORGE FIELD, sign-in or public
+ * pages. The NERIS form keeps its own skin (it doesn't use these classes). */
+
+/* ── Colour names some pages use that the theme never defined ──
+ * Without these they fall back to light-only hex, so dark mode breaks. */
+.app-shell {
+  --rms-bg-surface-1: var(--rms-bg-surface);
+  --rms-text-secondary: var(--rms-text-muted);
+  --rms-surface: var(--rms-bg-surface);
+  --rms-status-critical: var(--rms-critical);
+  --border: var(--rms-border-strong);
+  --border-subtle: var(--rms-border);
+  --card: var(--rms-bg-panel);
+  --surface: var(--rms-bg-surface-2);
+  --surface-raised: var(--rms-bg-surface-3);
+  --muted: var(--rms-text-muted);
+  --text-muted: var(--rms-text-muted);
+}
+
+/* ── Labelled fields ─────────────────────────────────────────── */
+.app-shell :is(.config-field, .occupancy-field, .workflow-form label, .upload-form label, .rms-field) {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--rms-text);
+}
+
+.app-shell :is(.config-field, .occupancy-field, .workflow-form label, .upload-form label, .rms-field) > span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--rms-text-muted);
+}
+
+/* Wide fields span the whole form grid. */
+.app-shell :is(.config-field.wide, .wide-field, .rms-field.wide) {
+  grid-column: 1 / -1;
+}
+
+/* ── Inputs, selects, textareas (inside RMS forms) ───────────── */
+.app-shell :is(.config-field, .occupancy-field, .workflow-form, .occupancy-form-grid, .config-grid, .upload-form, .check-setup-add, .check-setup-toolbar, .modal-content, .modal-body, .rms-field, .occupancy-search)
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]), select),
+.app-shell .status-select,
+.app-shell :is(.workflow-form, .upload-form) .managed-select {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.app-shell :is(.config-field, .occupancy-field, .workflow-form, .occupancy-form-grid, .config-grid, .upload-form, .check-setup-add, .check-setup-toolbar, .modal-content, .modal-body, .rms-field) select {
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+.app-shell :is(.config-field, .occupancy-field, .workflow-form, .occupancy-form-grid, .config-grid, .upload-form, .check-setup-add, .check-setup-toolbar, .modal-content, .modal-body, .rms-field) textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 84px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+/* One focus ring everywhere in the RMS. */
+.app-shell input:not([type="checkbox"]):not([type="radio"]):focus,
+.app-shell select:focus,
+.app-shell textarea:focus {
+  outline: none;
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft);
+}
+
+.app-shell :is(input, textarea)::placeholder {
+  color: var(--rms-text-subtle);
+}
+
+.app-shell :is(input, select, textarea):disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* ── Checkboxes and radios ───────────────────────────────────── */
+.app-shell input[type="checkbox"],
+.app-shell input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  appearance: auto;
+  accent-color: var(--rms-primary-solid);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.app-shell :is(.occupancy-primary-toggle, .checkbox-inline, .inline-check, .rms-check) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rms-text);
+  cursor: pointer;
+}
+
+/* A field label wrapping just a checkbox reads as a check row, not a stacked field. */
+.app-shell :is(.config-field, .occupancy-field, .workflow-form label):has(> input[type="checkbox"]) {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rms-text);
+}
+
+.app-shell :is(.config-field, .occupancy-field, .workflow-form label):has(> input[type="checkbox"]) > span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rms-text);
+}
+
+/* ── Form grids ─────────────────────────────────────────────── */
+.app-shell :is(.occupancy-form-grid, .workflow-form, .config-grid) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px 14px;
+}
+
+@media (max-width: 720px) {
+  .app-shell :is(.occupancy-form-grid, .workflow-form, .config-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Cards ──────────────────────────────────────────────────── */
+.app-shell .panel {
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  box-shadow: var(--rms-shadow-sm);
+}
+
+.app-shell .panel > header {
+  min-height: 44px;
+  padding: 0 14px;
+  border-bottom-color: var(--rms-border-strong);
+}
+
+.app-shell :is(.template-section-card, .occupancy-contact-card) {
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
+  box-shadow: var(--rms-shadow-sm);
+}
+
+.app-shell .template-field-card {
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-surface-2);
+}
+
+html[data-theme="dark"] .app-shell .template-field-card {
+  background: var(--rms-bg-surface-3);
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.app-shell :is(.primary-button, .secondary-button, .filter-button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--rms-radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app-shell .secondary-button {
+  border: 1px solid var(--rms-border-strong);
+}
+
+/* Square icon buttons: move, delete, close. */
+.app-shell .icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text-body);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.app-shell .icon-button:hover:not(:disabled) {
+  border-color: var(--rms-primary);
+  background: var(--rms-bg-hover);
+  color: var(--rms-primary);
+}
+
+.app-shell .icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.app-shell .icon-button:is(.danger, .danger-button) {
+  color: var(--rms-danger-text);
+}
+
+.app-shell .icon-button:is(.danger, .danger-button):hover:not(:disabled) {
+  border-color: var(--rms-danger-border);
+  background: var(--rms-danger-soft);
+  color: var(--rms-danger-text);
+}
+
+/* Dashed "Add …" row: the end of a list of editable rows. */
+.app-shell .rms-add-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px dashed var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: transparent;
+  color: var(--rms-text-link);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-shell .rms-add-row:hover:not(:disabled) {
+  border-color: var(--rms-primary);
+  background: var(--rms-primary-soft);
+}
+
+.app-shell .rms-add-row.is-block {
+  display: flex;
+  width: 100%;
+}
+
+/* ── Dialogs ────────────────────────────────────────────────── */
+html .app-shell :is(.workflow-modal, .modal-card) {
+  width: min(640px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
+  box-shadow: var(--rms-shadow-lg, 0 22px 60px rgba(0, 0, 0, 0.35));
+}
+
+html .app-shell :is(.workflow-modal, .modal-card) > :is(header, .modal-header) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--rms-border-strong);
+  background: var(--rms-bg-panel-header);
+}
+
+.app-shell :is(.workflow-modal, .modal-card) > :is(header, .modal-header) :is(strong, h2, h3) {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--rms-text-strong);
+}
+
+/* Header close button reads as an icon button. */
+.app-shell .workflow-modal > header > button {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text-body);
+}
+
+.app-shell .workflow-modal > header > button:hover {
+  border-color: var(--rms-primary);
+  color: var(--rms-primary);
+}
+
+.app-shell :is(.workflow-modal, .modal-card) :is(.modal-content, .modal-body) {
+  padding: 16px;
+}
+
+.app-shell :is(.workflow-modal, .modal-card) > footer,
+.app-shell .modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.app-shell :is(.workflow-modal, .modal-card) > footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--rms-border-strong);
+  background: var(--rms-bg-panel-header);
+}
+
+/* Unclassed Cancel / Close buttons in dialog footers look like secondary buttons. */
+.app-shell :is(.workflow-modal, .modal-card) > footer > button:not([class]) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-surface-3);
+  color: var(--rms-text-body);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── Small helpers several pages use but nothing styled ──────── */
+.app-shell .detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px 16px;
+}
+
+.app-shell .detail-grid > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.app-shell .muted {
+  color: var(--rms-text-muted);
+}
+
+.app-shell .list-select {
+  display: grid;
+  gap: 6px;
+}
+
+.app-shell :is(.banner.success, .banner.error) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: var(--rms-radius-sm);
+  font-size: 14px;
+}
+
+.app-shell .banner.success {
+  border: 1px solid var(--rms-success-border);
+  background: var(--rms-success-soft);
+  color: var(--rms-success-text);
+}
+
+.app-shell .banner.error {
+  border: 1px solid var(--rms-danger-border);
+  background: var(--rms-danger-soft);
+  color: var(--rms-danger-text);
+}
+
+.app-shell .inspections-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

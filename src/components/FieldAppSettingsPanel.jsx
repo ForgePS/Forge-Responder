@@ -149,7 +149,7 @@ function RowsEditor({ rows = [], columns, onChange, disabled, addLabel, idPrefix
       </div>
       <button
         type="button"
-        className="secondary-button"
+        className="rms-add-row is-block"
         disabled={disabled}
         onClick={() => onChange([...rows, { id: `${idPrefix}-${Date.now()}` }])}
       >
@@ -203,9 +203,9 @@ function CheckoffListEditor({ list, onChange, onSave, onArchive, onCancel, savin
                 <td><input type="number" min="1" value={item.warnDays} disabled={!item.tracksExpiration} onChange={(e) => setItem(index, { warnDays: e.target.value })} className="fa-admin-num" /></td>
                 <td className="fa-admin-center"><input type="checkbox" checked={item.required} onChange={(e) => setItem(index, { required: e.target.checked })} aria-label="Required" /></td>
                 <td className="fa-admin-actions">
-                  <button type="button" className="ghost-button icon-button" onClick={() => move(index, -1)} disabled={index === 0} aria-label="Move up"><ArrowUp size={14} /></button>
-                  <button type="button" className="ghost-button icon-button" onClick={() => move(index, 1)} disabled={index === list.items.length - 1} aria-label="Move down"><ArrowDown size={14} /></button>
-                  <button type="button" className="ghost-button icon-button danger" onClick={() => onChange({ ...list, items: list.items.filter((_, i) => i !== index) })} aria-label="Remove item"><Trash2 size={14} /></button>
+                  <button type="button" className="icon-button" onClick={() => move(index, -1)} disabled={index === 0} aria-label="Move up"><ArrowUp size={14} /></button>
+                  <button type="button" className="icon-button" onClick={() => move(index, 1)} disabled={index === list.items.length - 1} aria-label="Move down"><ArrowDown size={14} /></button>
+                  <button type="button" className="icon-button danger" onClick={() => onChange({ ...list, items: list.items.filter((_, i) => i !== index) })} aria-label="Remove item"><Trash2 size={14} /></button>
                 </td>
               </tr>
             ))}
@@ -213,11 +213,11 @@ function CheckoffListEditor({ list, onChange, onSave, onArchive, onCancel, savin
         </table>
       </div>
       <div className="fa-admin-row">
-        <button type="button" className="secondary-button" onClick={() => onChange({ ...list, items: [...list.items, newCheckoffItem({ category: list.items[list.items.length - 1]?.category || "" })] })}><Plus size={14} /> Add item</button>
+        <button type="button" className="rms-add-row" onClick={() => onChange({ ...list, items: [...list.items, newCheckoffItem({ category: list.items[list.items.length - 1]?.category || "" })] })}><Plus size={14} /> Add item</button>
         <span className="hint-text">{Object.values(errors)[0] || `${list.items.filter((item) => item.name.trim()).length} items`}</span>
         <span className="fa-admin-spacer" />
-        {onArchive ? <button type="button" className="ghost-button danger" onClick={onArchive} disabled={saving}>Archive list</button> : null}
-        <button type="button" className="ghost-button" onClick={onCancel} disabled={saving}>Cancel</button>
+        {onArchive ? <button type="button" className="secondary-button danger-button" onClick={onArchive} disabled={saving}>Archive list</button> : null}
+        <button type="button" className="secondary-button" onClick={onCancel} disabled={saving}>Cancel</button>
         <button type="button" className="primary-button" onClick={onSave} disabled={saving || Object.keys(errors).length > 0}><Save size={14} /> Save list</button>
       </div>
     </div>
@@ -328,7 +328,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
           </button>
         ))}
         <span className="fa-admin-spacer" />
-        <a className="ghost-button" href={fieldAppUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open FORGE FIELD</a>
+        <a className="secondary-button" href={fieldAppUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open FORGE FIELD</a>
       </div>
 
       {!canConfigure && ["general", "workflows", "fields", "contacts", "dosages", "lists"].includes(tab) ? (
@@ -345,7 +345,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
       {tab === "general" ? (
         <div className="workflow-form">
           <label><span>App name (shown under the department name)</span><input value={config.appName} disabled={!canConfigure} onChange={(e) => change({ ...config, appName: e.target.value })} placeholder="FORGE FIELD" /></label>
-          <div className="wide-field" style={{ display: "grid", gap: "10px" }}>
+          <div className="wide-field rms-field">
             <span>Field app logo</span>
             <ObjectUploadField
               variant="logo"
@@ -360,7 +360,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
               }}
               disabled={!canConfigure || saving}
             />
-            {config.logoUrl ? <button type="button" className="ghost-button" disabled={!canConfigure} onClick={() => change({ ...config, logoUrl: "", logoStoragePath: "" })}>Use the department logo instead</button> : null}
+            {config.logoUrl ? <button type="button" className="secondary-button" disabled={!canConfigure} onClick={() => change({ ...config, logoUrl: "", logoStoragePath: "" })}>Use the department logo instead</button> : null}
           </div>
           <p className="hint-text wide-field">Crews open FORGE FIELD at <strong>{fieldAppUrl}</strong> on their phone and can add it to the home screen. Settings reach phones the next time they update (on open with signal, every 20 minutes, or Update on the home screen).</p>
         </div>
@@ -552,7 +552,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
           <div className="fa-admin-row">
             <span className="hint-text">{restockOpen.length ? `${restockOpen.length} check-off${restockOpen.length === 1 ? "" : "s"} need restocking` : "Nothing waiting to be restocked"}</span>
             <span className="fa-admin-spacer" />
-            <button type="button" className="ghost-button" onClick={reload}><RefreshCw size={14} /> Refresh</button>
+            <button type="button" className="secondary-button" onClick={reload}><RefreshCw size={14} /> Refresh</button>
           </div>
           {results.slice(0, 80).map((row) => (
             <div key={row.id} className={`fa-admin-card${row.restockNeeded && !row.restockedAt ? " is-alert" : ""}`}>
@@ -585,7 +585,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
           <div className="fa-admin-row">
             <span className="hint-text">{pendingUpdates.length ? `${pendingUpdates.length} update${pendingUpdates.length === 1 ? "" : "s"} waiting for review. Edit the plan in Pre-fire Plans, then mark the update reviewed.` : "No updates waiting."}</span>
             <span className="fa-admin-spacer" />
-            <button type="button" className="ghost-button" onClick={reload}><RefreshCw size={14} /> Refresh</button>
+            <button type="button" className="secondary-button" onClick={reload}><RefreshCw size={14} /> Refresh</button>
           </div>
           {updates.slice(0, 100).map((row) => (
             <div key={row.id} className={`fa-admin-card${row.status === "pending" ? " is-alert" : ""}`}>
@@ -602,7 +602,7 @@ export default function FieldAppSettingsPanel({ onMessage, apparatus = [] }) {
               {row.status === "pending" && canReviewPlans ? (
                 <div className="fa-admin-row">
                   <button type="button" className="primary-button" onClick={async () => { await reviewPreplanFieldUpdate(departmentId, row.id, "applied", actor); setUpdates(await listPreplanFieldUpdates(departmentId)); }}>Mark reviewed (plan updated)</button>
-                  <button type="button" className="ghost-button" onClick={async () => { await reviewPreplanFieldUpdate(departmentId, row.id, "dismissed", actor); setUpdates(await listPreplanFieldUpdates(departmentId)); }}>Dismiss</button>
+                  <button type="button" className="secondary-button" onClick={async () => { await reviewPreplanFieldUpdate(departmentId, row.id, "dismissed", actor); setUpdates(await listPreplanFieldUpdates(departmentId)); }}>Dismiss</button>
                 </div>
               ) : null}
             </div>

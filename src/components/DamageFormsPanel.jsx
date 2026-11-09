@@ -239,19 +239,19 @@ function DamageFormDetail({ record, departmentId = "", onClose }) {
         </div>
 
         <footer className="damage-form-modal-actions">
-          <button type="button" className="secondary" onClick={onClose}>Close</button>
-          <button type="button" className="secondary" onClick={handlePrint}>
+          <button type="button" className="secondary-button" onClick={onClose}>Close</button>
+          <button type="button" className="secondary-button" onClick={handlePrint}>
             <Printer size={16} />
             Print
           </button>
-          <button type="button" className="secondary" onClick={handleDownloadPdf} disabled={pdfLoading}>
+          <button type="button" className="secondary-button" onClick={handleDownloadPdf} disabled={pdfLoading}>
             <Download size={16} />
             Download PDF
           </button>
           {submissionUrl ? (
             <button
               type="button"
-              className="primary"
+              className="primary-button"
               onClick={() => window.open(submissionUrl, "_blank", "noopener,noreferrer")?.focus?.()}
             >
               <ExternalLink size={16} />
@@ -261,7 +261,7 @@ function DamageFormDetail({ record, departmentId = "", onClose }) {
           {isJotform && activeRecord.submissionId ? (
             <button
               type="button"
-              className="secondary"
+              className="secondary-button"
               onClick={() => window.open(resolveJotformPdfViewerUrl(activeRecord), "_blank", "noopener,noreferrer")?.focus?.()}
             >
               <ExternalLink size={16} />
@@ -271,7 +271,7 @@ function DamageFormDetail({ record, departmentId = "", onClose }) {
           {formUrl && formUrl !== submissionUrl ? (
             <button
               type="button"
-              className="secondary"
+              className="secondary-button"
               onClick={() => window.open(formUrl, "_blank", "noopener,noreferrer")?.focus?.()}
             >
               <ExternalLink size={16} />
