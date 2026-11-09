@@ -3,6 +3,7 @@ import {
   Activity,
   CalendarDays,
   Check,
+  ChevronRight,
   CirclePlus,
   Clock3,
   ClipboardCheck,
@@ -89,7 +90,8 @@ import MyProfile from "../components/profile/MyProfile.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { uniqueRecordId } from "../lib/recordIds.js";
-import { acknowledgementKeys, pendingForPerson, withAcknowledgement } from "../lib/documentAcknowledgement.js";
+import { acknowledgementKeys, hasAcknowledged, pendingForPerson, withAcknowledgement } from "../lib/documentAcknowledgement.js";
+import DocumentViewerDialog from "../components/DocumentViewerDialog.jsx";
 import { loadDepartmentMembership } from "../lib/departmentMembership.js";
 import { uploadDamageReportPhotos } from "../lib/damageReportPhotos.js";
 import { processLeaveDecision } from "../lib/leaveAccrualIntegration.js";
@@ -261,6 +263,7 @@ export default function EmployeePortalPage({
   const { departmentId } = useTenant();
   const { patchMembership } = useAuth();
   const [message, setMessage] = useState("");
+  const [viewingDocId, setViewingDocId] = useState("");
   const [academyTraining, setAcademyTraining] = useState([]);
   const [leaveForm, setLeaveForm] = useState(defaultLeaveForm);
   const [tradeForm, setTradeForm] = useState(defaultTradeForm);
@@ -429,6 +432,8 @@ export default function EmployeePortalPage({
     () => pendingForPerson(documents, acknowledgementKeys(myAckIdentity)),
     [documents, myAckIdentity]
   );
+  // Looked up from all documents so the viewer stays open after acknowledging.
+  const viewingDoc = viewingDocId ? documents.find((item) => item.id === viewingDocId) || null : null;
 
   const myLeave = useMemo(
     () => leaveRequests.filter((item) => recordBelongsToEmployee(item, membership, myPerson)),
@@ -1046,7 +1051,7 @@ export default function EmployeePortalPage({
             <div className="dashboard-column">
               <Panel title="Documents to Acknowledge" icon={FileText}>
                 <div className="operational-notes employee-doc-ack-list">
-                  {myDocs.map((item) => <p key={item.id}><time>{formatShortDate(item.effectiveDate)}</time><b>{item.title}</b><span>{item.category}</span></p>)}
+                  {myDocs.map((item) => <p key={item.id} className="is-clickable" role="button" tabIndex={0} title="Open to read and acknowledge" onClick={() => setViewingDocId(item.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setViewingDocId(item.id); } }}><time>{formatShortDate(item.effectiveDate)}</time><b>{item.title}</b><span>{item.category}</span></p>)}
                   {!myDocs.length && <p className="operational-notes-empty"><b>All caught up</b><span>No pending acknowledgements</span></p>}
                 </div>
               </Panel>
@@ -1369,10 +1374,10 @@ export default function EmployeePortalPage({
         <Panel title="My Documents" icon={FileText}>
           <div className="document-library">
             {myDocs.map((item) => (
-              <div className="doc-row" key={item.id}>
+              <button type="button" className="doc-row employee-doc-row" key={item.id} onClick={() => setViewingDocId(item.id)}>
                 <span><strong>{item.title}</strong><small>{item.category}</small></span>
-                <button className="row-action" onClick={() => acknowledgeDocument(item.id)}>Acknowledge</button>
-              </div>
+                <span className="employee-doc-row-action">Read &amp; acknowledge <ChevronRight size={16} aria-hidden="true" /></span>
+              </button>
             ))}
             {!myDocs.length && <p className="empty-table">No pending document acknowledgements.</p>}
           </div>
@@ -1445,6 +1450,15 @@ export default function EmployeePortalPage({
             <p className="auth-help">Your role cannot submit maintenance issues.</p>
           )}
         </Panel>
+      )}
+
+      {viewingDoc && (
+        <DocumentViewerDialog
+          doc={viewingDoc}
+          acknowledged={hasAcknowledged(viewingDoc, acknowledgementKeys(myAckIdentity))}
+          onAcknowledge={() => acknowledgeDocument(viewingDoc.id)}
+          onClose={() => setViewingDocId("")}
+        />
       )}
     </div>
   );
