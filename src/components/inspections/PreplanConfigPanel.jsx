@@ -16,6 +16,7 @@ import {
   STARTER_PREPLAN_SYMBOLS,
   defaultPreplanFeatures,
 } from "../../lib/inspections/index.js";
+import PreplanSectionsEditor from "./PreplanSectionsEditor.jsx";
 import { useTenant } from "../../context/TenantContext.jsx";
 
 function Field({ label, children, wide = false }) {
@@ -283,72 +284,12 @@ export default function PreplanConfigPanel({
                     Publish freezes an immutable snapshot; new revisions pin that version.
                   </p>
 
-                  {canManage ? (
-                    <div className="occupancy-detail-actions" style={{ marginBottom: "0.75rem" }}>
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        onClick={() => {
-                          const id = `sec-${Date.now().toString(36)}`;
-                          setDraft((current) => ({
-                            ...current,
-                            sections: [
-                              ...(current.sections || []),
-                              {
-                                id,
-                                title: "New section",
-                                fields: [{ key: `${id}_notes`, label: "Notes", type: "textarea" }],
-                              },
-                            ],
-                          }));
-                        }}
-                      >
-                        Add section
-                      </button>
-                    </div>
-                  ) : null}
-
-                  {(draft.sections || []).map((section, sectionIndex) => (
-                    <div key={section.id} className="template-section-card">
-                      {canManage ? (
-                        <Field label="Section title" wide>
-                          <input
-                            value={section.title || ""}
-                            onChange={(e) => {
-                              const title = e.target.value;
-                              setDraft((current) => ({
-                                ...current,
-                                sections: (current.sections || []).map((row, idx) => (
-                                  idx === sectionIndex ? { ...row, title } : row
-                                )),
-                              }));
-                            }}
-                          />
-                        </Field>
-                      ) : (
-                        <strong>{section.title}</strong>
-                      )}
-                      <ul className="occupancy-muted">
-                        {(section.fields || []).map((field) => (
-                          <li key={field.key}>{field.label} ({field.type})</li>
-                        ))}
-                      </ul>
-                      {canManage ? (
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={() => {
-                            setDraft((current) => ({
-                              ...current,
-                              sections: (current.sections || []).filter((_, idx) => idx !== sectionIndex),
-                            }));
-                          }}
-                        >
-                          Remove section
-                        </button>
-                      ) : null}
-                    </div>
-                  ))}
+                  <PreplanSectionsEditor
+                    sections={draft.sections || []}
+                    libraries={libraries}
+                    canManage={canManage}
+                    onChange={(sections) => setDraft((current) => ({ ...current, sections }))}
+                  />
 
                   {canManage ? (
                     <div className="occupancy-detail-actions">
