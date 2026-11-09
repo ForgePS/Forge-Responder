@@ -11,6 +11,7 @@ import { useTenant } from "../context/TenantContext.jsx";
 import InspectionEmptyState from "../components/inspections/InspectionEmptyState.jsx";
 import InspectionPermissionGate from "../components/inspections/InspectionPermissionGate.jsx";
 import InspectionStatusBadge from "../components/inspections/InspectionStatusBadge.jsx";
+import PreventionKpiGroups from "../components/inspections/PreventionKpiGroups.jsx";
 import { labelFromKey } from "../lib/labelFromKey.js";
 import InspectionsModuleLayout, {
   PREVENTION_TOOL_TABS,
@@ -349,25 +350,7 @@ export default function InspectionReportsPage({ onNavigate, query = "" }) {
 
         {!loading && tab === "overview" ? (
           <>
-            <div className="inspections-kpi-grid">
-              {kpiCards.map((card) => {
-                const value = board?.kpis?.[card.id];
-                const display = card.id === "outstanding_fees" || card.id === "revenue_collected"
-                  ? formatCurrency(value || 0)
-                  : (value ?? 0);
-                return (
-                  <button
-                    key={card.id}
-                    type="button"
-                    className="inspections-kpi-card inspections-kpi-card-button"
-                    onClick={() => onNavigate?.(card.drillNav)}
-                  >
-                    <span>{card.label}</span>
-                    <strong>{display}</strong>
-                  </button>
-                );
-              })}
-            </div>
+            <PreventionKpiGroups cards={kpiCards} values={board?.kpis} onNavigate={onNavigate} />
             <div className="inspection-chart-grid">
               <ChartBars title="Inspections by status" rows={board?.charts?.inspectionsByStatus || []} />
               <ChartBars title="Inspections by type" rows={board?.charts?.inspectionsByType || []} />
