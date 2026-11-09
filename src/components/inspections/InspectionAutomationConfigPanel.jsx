@@ -20,7 +20,7 @@ export default function InspectionAutomationConfigPanel() {
   const neris = getNerisEntityTypes();
 
   return (
-    <section className="personnel-workspace occupancy-workspace">
+    <section className="config-reference-layout">
       <section className="panel">
         <header>
           <div>

@@ -3166,31 +3166,15 @@ html .app-shell .modal-card.neris-cad-import-modal {
   display: none;
 }
 
-.config-reference-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.config-reference-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-
-.config-reference-list li {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-
-.config-reference-list code {
-  font-size: 0.78rem;
-  opacity: 0.8;
-}
+/* Reference tabs in the config studios (Fire protection, Automation, Offline, Reporting, Hardening). */
+.config-reference-layout { display: grid; gap: 12px; align-content: start; }
+.config-reference-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; align-items: start; }
+:is(.config-reference-layout, .config-reference-grid) > .panel > .panel-body { display: grid; gap: 10px; padding: 12px 14px 14px; }
+:is(.config-reference-layout, .config-reference-grid) > .panel > .panel-body > p { margin: 0; }
+.config-reference-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); column-gap: 24px; }
+.config-reference-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-width: 0; padding: 7px 0; border-bottom: 1px solid var(--rms-border); }
+.config-reference-list li > span { order: -1; min-width: 0; color: var(--rms-text-strong); font-size: 14px; overflow-wrap: anywhere; }
+.config-reference-list code { flex: none; padding: 1px 6px; border-radius: 4px; background: var(--rms-bg-surface-2); color: var(--rms-text-muted); font-size: 12px; }
 
 .inspections-kpi-card-button {
   appearance: none;
