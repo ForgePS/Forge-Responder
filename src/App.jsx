@@ -1041,7 +1041,11 @@ function AppShell() {
     if (changed.length) await syncClassicStatusesToFleet(changed, patched);
     // New units added here also become fleet units (checks, work orders, Readiness Board).
     // A rename can free up a unit that was skipped for sharing a name (two "New Apparatus").
-    if (next.length > before.length || edits.some(({ patch }) => patch.unitDesignation)) {
+    const renamed = next.some((unit) => {
+      const old = before.find((item) => item.id === unit.id);
+      return old && String(old.unit || "").trim() !== String(unit.unit || "").trim();
+    });
+    if (next.length > before.length || renamed) {
       await syncFleetAssetsFromApparatus(departmentId, next, actor);
     }
   }

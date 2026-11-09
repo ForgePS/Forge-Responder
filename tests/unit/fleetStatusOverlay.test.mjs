@@ -4,6 +4,7 @@ import {
   applyFleetStatus,
   changedUnitStatuses,
   classicStatusLabel,
+  findFleetAssetForUnit,
   fleetDecisionForClassicStatus,
   fleetUpdatesForClassicEdits,
   readinessForFleetStatus,
@@ -69,4 +70,24 @@ test("no fleet update when nothing Fleet shows has changed", () => {
   const fleetAssets = [{ id: "APP-1", legacyApparatusId: "APP-1", unitDesignation: "Engine 1", station: "Station 1" }];
   assert.deepEqual(fleetUpdatesForClassicEdits(units, [{ ...units[0], mileage: "200" }], fleetAssets), []);
   assert.deepEqual(fleetUpdatesForClassicEdits(units, [{ id: "APP-2", unit: "Engine 2" }], fleetAssets), [], "new units are handled by the add sync");
+});
+
+test("renaming the second 'New Apparatus' doesn't rename the first unit's fleet record", () => {
+  const before = [
+    { id: "APP-A", unit: "New Apparatus" },
+    { id: "APP-B", unit: "New Apparatus" },
+  ];
+  const after = [before[0], { id: "APP-B", unit: "Engine 5" }];
+  // Only the first got a fleet record; the second was skipped for sharing its name.
+  const fleetAssets = [{ id: "APP-A", legacyApparatusId: "APP-A", unitDesignation: "New Apparatus", fleetNumber: "New Apparatus", name: "New Apparatus" }];
+  assert.deepEqual(fleetUpdatesForClassicEdits(before, after, fleetAssets), []);
+  assert.equal(findFleetAssetForUnit(fleetAssets, before[1]), null, "the second unit has no fleet record of its own");
+  assert.equal(findFleetAssetForUnit(fleetAssets, before[0]).id, "APP-A");
+});
+
+test("a name-only fleet record shared by two classic units is left alone", () => {
+  const before = [{ id: "APP-1", unit: "Engine 1" }, { id: "APP-2", unit: "Engine 1" }];
+  const after = [{ id: "APP-1", unit: "Engine 10" }, before[1]];
+  const fleetAssets = [{ id: "FLT-1", unitDesignation: "Engine 1" }];
+  assert.deepEqual(fleetUpdatesForClassicEdits(before, after, fleetAssets), []);
 });

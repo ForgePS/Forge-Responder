@@ -26,7 +26,11 @@ export function findFleetAssetForUnit(fleetAssets = [], unit = {}) {
   }
   const name = unitKey(unit.unit || unit.name);
   if (!name) return null;
-  return list.find((asset) => [asset.unitDesignation, asset.fleetNumber, asset.name].some((value) => unitKey(value) === name)) || null;
+  // A fleet asset linked to a different classic unit is that unit's, even when the
+  // names match (two units both still called "New Apparatus").
+  const linkedElsewhere = (asset) => unit.id && asset.legacyApparatusId && asset.legacyApparatusId !== unit.id;
+  return list.find((asset) => !linkedElsewhere(asset)
+    && [asset.unitDesignation, asset.fleetNumber, asset.name].some((value) => unitKey(value) === name)) || null;
 }
 
 /** The classic apparatus list with each unit's status taken from its fleet asset. */
@@ -70,13 +74,18 @@ export function changedUnitStatuses(before = [], after = []) {
  * @returns {Array<{asset: object, patch: object}>}
  */
 export function fleetUpdatesForClassicEdits(before = [], after = [], fleetAssets = []) {
-  const previous = new Map((Array.isArray(before) ? before : []).filter((unit) => unit.id).map((unit) => [unit.id, unit]));
+  const beforeList = Array.isArray(before) ? before : [];
+  const previous = new Map(beforeList.filter((unit) => unit.id).map((unit) => [unit.id, unit]));
+  const sameName = (unit) => beforeList.filter((other) => unitKey(other.unit) === unitKey(unit.unit)).length;
   const updates = [];
   for (const unit of Array.isArray(after) ? after : []) {
     const old = previous.get(unit.id);
     if (!old) continue;
     const asset = findFleetAssetForUnit(fleetAssets, old);
     if (!asset) continue;
+    // Only edit a fleet asset this unit clearly owns: linked by id, or the one unit with that name.
+    const linkedById = asset.legacyApparatusId === old.id || asset.id === old.id;
+    if (!linkedById && sameName(old) > 1) continue;
     const patch = {};
     const newName = String(unit.unit || "").trim();
     if (newName && unitKey(newName) !== unitKey(old.unit)) {
