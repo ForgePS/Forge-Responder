@@ -1072,3 +1072,79 @@ describe("heat zone analytics data", () => {
     }
   });
 });
+
+describe("forge ai data", () => {
+  const userA = () => as("ai-a", { email: "ai@a.gov", email_verified: true });
+  const otherA = () => as("ai-a2", { email: "ai2@a.gov", email_verified: true });
+  const userB = () => as("ai-b", { email: "ai@b.gov", email_verified: true });
+  const OWNED = ["forgeAiConversations/c1", "forgeAiMessages/m1", "forgeAiMessageSources/s1"];
+  const SERVER_ONLY = ["forgeAiSettings/main", "forgeAiUsage/2026-11-09", "forgeAiUsageLogs/l1", "forgeAiFeedback/f1"];
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const grant = { useForgeAi: true, useForgeAiBriefings: true };
+      await setDoc(doc(db, `departments/${A}/users/ai-a`), membership("ai-a", A));
+      await setDoc(doc(db, `departments/${A}/users/ai-a2`), membership("ai-a2", A));
+      await setDoc(doc(db, `departments/${B}/users/ai-b`), membership("ai-b", B));
+      await setDoc(doc(db, `departments/${A}/memberGrants/ai-a`), { permissions: grant });
+      await setDoc(doc(db, `departments/${A}/memberGrants/ai-a2`), { permissions: grant });
+      await setDoc(doc(db, `departments/${B}/memberGrants/ai-b`), { permissions: grant });
+      for (const dept of [A, B]) {
+        const owner = dept === A ? "ai-a" : "ai-b";
+        for (const path of OWNED) await setDoc(doc(db, `departments/${dept}/${path}`), { departmentId: dept, ownerUid: owner, text: "Answer" });
+        await setDoc(doc(db, `departments/${dept}/forgeAiBriefings/b1`), { departmentId: dept, createdBy: owner, summary: "Briefing" });
+        for (const path of SERVER_ONLY) await setDoc(doc(db, `departments/${dept}/${path}`), { departmentId: dept, uid: owner });
+      }
+    });
+  });
+
+  it("a member reads their own conversations, messages and sources", async () => {
+    for (const path of OWNED) await assertSucceeds(getDoc(doc(userA().firestore(), `departments/${A}/${path}`)));
+    await assertSucceeds(getDocs(query(collection(userA().firestore(), `departments/${A}/forgeAiConversations`), where("ownerUid", "==", "ai-a"))));
+    await assertSucceeds(getDoc(doc(userA().firestore(), `departments/${A}/forgeAiBriefings/b1`)));
+  });
+
+  it("another member of the same department can't read them, admins included", async () => {
+    for (const ctx of [otherA(), adminA(), memberA()]) {
+      for (const path of OWNED) await assertFails(getDoc(doc(ctx.firestore(), `departments/${A}/${path}`)));
+      await assertFails(getDoc(doc(ctx.firestore(), `departments/${A}/forgeAiBriefings/b1`)));
+    }
+    await assertFails(getDocs(collection(otherA().firestore(), `departments/${A}/forgeAiConversations`)));
+  });
+
+  it("other departments and signed-out visitors can't read them", async () => {
+    for (const path of OWNED) {
+      await assertFails(getDoc(doc(userB().firestore(), `departments/${A}/${path}`)));
+      await assertFails(getDoc(doc(userA().firestore(), `departments/${B}/${path}`)));
+      await assertFails(getDoc(doc(stranger().firestore(), `departments/${A}/${path}`)));
+      await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `departments/${A}/${path}`)));
+    }
+    await assertFails(getDoc(doc(userB().firestore(), `departments/${A}/forgeAiBriefings/b1`)));
+  });
+
+  it("a member who lost Forge AI access can't read even their own history", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `departments/${A}/memberGrants/ai-a`), { permissions: { viewNerisReports: true } });
+    });
+    for (const path of OWNED) await assertFails(getDoc(doc(userA().firestore(), `departments/${A}/${path}`)));
+  });
+
+  it("settings, usage, usage logs and feedback are never readable from the browser", async () => {
+    for (const ctx of [userA(), adminA(), creator(), userB()]) {
+      for (const path of SERVER_ONLY) await assertFails(getDoc(doc(ctx.firestore(), `departments/${A}/${path}`)));
+    }
+  });
+
+  it("no browser can write Forge AI data, including the owner", async () => {
+    for (const ctx of [userA(), adminA(), creator(), userB()]) {
+      const db = ctx.firestore();
+      for (const path of [...OWNED, ...SERVER_ONLY, "forgeAiBriefings/b1"]) {
+        await assertFails(setDoc(doc(db, `departments/${A}/${path}`), { departmentId: A, ownerUid: "ai-a", createdBy: "ai-a", enabled: true }));
+      }
+      await assertFails(updateDoc(doc(db, `departments/${A}/forgeAiConversations/c1`), { ownerUid: "admin-a" }));
+      await assertFails(deleteDoc(doc(db, `departments/${A}/forgeAiMessages/m1`)));
+      await assertFails(setDoc(doc(db, `departments/${A}/forgeAiConversations/new`), { departmentId: A, ownerUid: "ai-a" }));
+    }
+  });
+});

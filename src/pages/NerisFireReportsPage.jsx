@@ -25,6 +25,8 @@ import {
 import { buildNewNerisReport } from "../lib/neris/newReport.js";
 import { allocateRecordNumber } from "../lib/recordCounters.js";
 import { nerisReportNumberFormat } from "../lib/recordNumbering.js";
+import ForgeAiLaunchButton from "../components/forgeAi/ForgeAiLaunchButton.jsx";
+import { clearRecordToOpen, recordToOpen } from "../lib/forgeAi/launch.js";
 
 export { NERIS_REPORT_STATUSES };
 
@@ -79,7 +81,9 @@ export default function NerisFireReportsPage({
 }) {
   const { settings, departmentId, profile } = useTenant();
   const { user, membership } = useAuth();
-  const [selectedId, setSelectedId] = useState("");
+  // Opened from a Forge AI source link: start on that report.
+  const [selectedId, setSelectedId] = useState(() => recordToOpen("NERIS Fire Reports"));
+  useEffect(() => clearRecordToOpen("NERIS Fire Reports"), []);
   const [group, setGroup] = useState("all");
   const [search, setSearch] = useState("");
   const [starting, setStarting] = useState(false);
@@ -329,6 +333,7 @@ export default function NerisFireReportsPage({
         </div>
         <div className="nr-hero-actions">
           <span className={`nr-pill ${online ? "nr-pill-ok" : "nr-pill-warn"}`}>{online ? <Wifi size={12} /> : <WifiOff size={12} />} {online ? "Online" : "Offline — saving on this device"}</span>
+          <ForgeAiLaunchButton capability="dispatch" prompt="List calls from the last 24 hours" label="Ask about calls" className="nr-btn" />
           {canEdit ? <button type="button" className="nr-btn nr-btn-primary nr-btn-lg" onClick={() => setStarting(true)}><CirclePlus size={18} /> Start a report</button> : null}
         </div>
       </section>

@@ -1,0 +1,170 @@
+/* Forge AI. Scoped to .forge-ai-page; theme tokens only, so light and dark both work. */
+
+.forge-ai-page { min-width: 0; }
+.forge-ai-page .fa-muted { color: var(--rms-text-muted); font-size: 13px; }
+.forge-ai-page .fa-stack { display: grid; gap: 12px; }
+.forge-ai-page .fa-tabs { margin-bottom: 12px; justify-content: flex-start; gap: 6px; }
+
+.forge-ai-page .fa-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+/* History */
+.forge-ai-page .fa-history ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.forge-ai-page .fa-history li { display: flex; align-items: center; gap: 4px; border-radius: var(--rms-radius-sm); }
+.forge-ai-page .fa-history li.is-active { background: var(--rms-primary-soft); }
+.forge-ai-page .fa-history-item {
+  flex: 1 1 auto; min-width: 0; display: grid; text-align: left; gap: 2px;
+  padding: 8px; background: none; border: 0; color: var(--rms-text); cursor: pointer; border-radius: var(--rms-radius-sm);
+}
+.forge-ai-page .fa-history-item:hover { background: var(--rms-bg-hover); }
+.forge-ai-page .fa-history-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.forge-ai-page .fa-history-item small { color: var(--rms-text-muted); font-size: 11px; }
+.forge-ai-page .fa-history-actions { display: none; gap: 2px; }
+.forge-ai-page .fa-history li:hover .fa-history-actions,
+.forge-ai-page .fa-history li:focus-within .fa-history-actions,
+.forge-ai-page .fa-history li.is-active .fa-history-actions { display: inline-flex; }
+.forge-ai-page .fa-history .icon-button { width: 28px; height: 28px; min-height: 28px; }
+.forge-ai-page .fa-rename { display: flex; gap: 4px; width: 100%; padding: 4px; }
+.forge-ai-page .fa-rename input { flex: 1 1 auto; min-width: 0; min-height: 30px; }
+
+/* Chat */
+.forge-ai-page .fa-chat { display: flex; flex-direction: column; min-height: 520px; }
+.forge-ai-page .fa-notice {
+  display: flex; gap: 8px; align-items: center; margin: 12px 12px 0; padding: 8px 10px;
+  border: 1px solid var(--rms-border-strong); border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-surface-2); color: var(--rms-text-body); font-size: 13px;
+}
+.forge-ai-page .fa-messages { flex: 1 1 auto; overflow-y: auto; max-height: 68vh; padding: 12px; display: grid; gap: 14px; align-content: start; }
+.forge-ai-page .fa-empty { display: grid; justify-items: center; text-align: center; gap: 8px; padding: 28px 8px; color: var(--rms-text); }
+.forge-ai-page .fa-empty > svg { color: var(--rms-primary); }
+.forge-ai-page .fa-suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 760px; margin-top: 8px; }
+
+.forge-ai-page .fa-chip {
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 7px 11px; min-height: 32px; border-radius: 999px; cursor: pointer; text-align: left;
+  border: 1px solid var(--rms-border-strong); background: var(--rms-bg-panel); color: var(--rms-text); font-size: 13px;
+}
+.forge-ai-page .fa-suggestions .fa-chip { border-radius: var(--rms-radius-md); max-width: 340px; }
+.forge-ai-page .fa-chip small { color: var(--rms-primary); font-size: 11px; font-weight: 600; }
+.forge-ai-page .fa-chip:hover { border-color: var(--rms-primary); }
+.forge-ai-page .fa-chip.is-on { border-color: var(--rms-primary); background: var(--rms-primary-soft); color: var(--rms-text-strong); font-weight: 600; }
+
+/* Messages */
+.forge-ai-page .fa-msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; align-items: start; }
+.forge-ai-page .fa-avatar {
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--rms-bg-surface-3); color: var(--rms-icon);
+}
+.forge-ai-page .fa-msg.is-assistant .fa-avatar { background: var(--rms-primary-soft); color: var(--rms-primary); }
+.forge-ai-page .fa-bubble {
+  min-width: 0; padding: 10px 12px; border-radius: var(--rms-radius-md);
+  border: 1px solid var(--rms-border-strong); background: var(--rms-bg-panel); color: var(--rms-text);
+}
+.forge-ai-page .fa-msg.is-user .fa-bubble { background: var(--rms-bg-surface-2); }
+.forge-ai-page .fa-bubble p { margin: 0 0 6px; line-height: 1.5; overflow-wrap: anywhere; }
+.forge-ai-page .fa-bubble p:last-child { margin-bottom: 0; }
+.forge-ai-page .fa-answer-text ul { margin: 4px 0 8px; padding-left: 20px; }
+.forge-ai-page .fa-answer-text li { margin: 2px 0; line-height: 1.45; overflow-wrap: anywhere; }
+.forge-ai-page .fa-answer-text li.is-nested { margin-left: 16px; }
+.forge-ai-page .fa-cite { color: var(--rms-text-link); font-weight: 600; margin: 0 1px; cursor: help; }
+
+.forge-ai-page .fa-msg-head { display: grid; gap: 6px; margin-bottom: 8px; }
+.forge-ai-page .fa-msg-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.forge-ai-page .fa-pill {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--rms-border-strong); color: var(--rms-text-body); background: var(--rms-bg-surface-2);
+}
+.forge-ai-page .fa-pill.is-ai { border-color: var(--rms-primary); color: var(--rms-primary); background: var(--rms-primary-soft); }
+.forge-ai-page .fa-pill.is-rules { color: var(--rms-text-body); }
+.forge-ai-page .fa-pill.is-live { border-color: var(--rms-success-border); color: var(--rms-success-text); background: var(--rms-success-soft); }
+.forge-ai-page .fa-pill.is-muted { color: var(--rms-text-muted); }
+.forge-ai-page .fa-when { font-size: 12px; color: var(--rms-text-muted); }
+
+.forge-ai-page .fa-section { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--rms-border-subtle); }
+.forge-ai-page .fa-section h3 { display: flex; gap: 8px; align-items: center; margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--rms-text-strong); }
+.forge-ai-page .fa-section.is-ai { border-left: 3px solid var(--rms-primary); padding-left: 10px; }
+
+.forge-ai-page .fa-table { margin: 10px 0 0; }
+.forge-ai-page .fa-table figcaption { font-size: 12px; font-weight: 600; color: var(--rms-text-muted); margin-bottom: 4px; }
+.forge-ai-page .fa-table-scroll { overflow-x: auto; max-width: 100%; border: 1px solid var(--rms-border-strong); border-radius: var(--rms-radius-sm); }
+.forge-ai-page .fa-table table,
+.forge-ai-page .fa-admin-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.forge-ai-page .fa-table th,
+.forge-ai-page .fa-table td,
+.forge-ai-page .fa-admin-table th,
+.forge-ai-page .fa-admin-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--rms-border-subtle); white-space: nowrap; color: var(--rms-text); }
+.forge-ai-page .fa-table th,
+.forge-ai-page .fa-admin-table th { background: var(--rms-bg-panel-header); font-weight: 600; color: var(--rms-text-muted); position: sticky; top: 0; }
+.forge-ai-page .fa-table tbody tr:last-child td,
+.forge-ai-page .fa-admin-table tbody tr:last-child td { border-bottom: 0; }
+
+.forge-ai-page .fa-limits { margin-top: 10px; font-size: 13px; color: var(--rms-text-body); }
+.forge-ai-page .fa-limits summary { cursor: pointer; display: inline-flex; gap: 4px; align-items: center; font-weight: 600; color: var(--rms-text-muted); }
+.forge-ai-page .fa-limits ul { margin: 6px 0 0; padding-left: 20px; }
+
+.forge-ai-page .fa-sources { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+.forge-ai-page .fa-sources-label { font-size: 12px; font-weight: 600; color: var(--rms-text-muted); }
+.forge-ai-page .fa-source {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 3px 8px; min-height: 28px;
+  border: 1px solid var(--rms-border-strong); border-radius: var(--rms-radius-sm); background: var(--rms-bg-surface-2);
+  color: var(--rms-text); font-size: 12px; cursor: pointer;
+}
+.forge-ai-page .fa-source.is-cited { border-color: var(--rms-primary); }
+.forge-ai-page .fa-source-id { font-weight: 700; color: var(--rms-text-link); }
+.forge-ai-page .fa-source-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.forge-ai-page .fa-source-live { color: var(--rms-text-muted); font-size: 11px; }
+.forge-ai-page .fa-source-live.is-live { color: var(--rms-success-text); }
+.forge-ai-page .fa-more { font-size: 12px; }
+
+.forge-ai-page .fa-followups { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.forge-ai-page .fa-msg-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+.forge-ai-page .fa-msg-actions .icon-button { width: 32px; height: 32px; min-height: 32px; }
+.forge-ai-page .fa-msg-actions .icon-button.is-on { border-color: var(--rms-primary); color: var(--rms-primary); background: var(--rms-primary-soft); }
+.forge-ai-page .fa-disclaimer { font-size: 11.5px; color: var(--rms-text-muted); flex: 1 1 240px; }
+
+.forge-ai-page .fa-thinking { display: inline-flex; gap: 6px; align-items: center; color: var(--rms-text-muted); font-size: 13px; padding-left: 36px; }
+.forge-ai-page .fa-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rms-primary); animation: fa-pulse 1.2s infinite ease-in-out; }
+.forge-ai-page .fa-dot:nth-child(2) { animation-delay: 0.15s; }
+.forge-ai-page .fa-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes fa-pulse { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .forge-ai-page .fa-dot { animation: none; opacity: 0.7; } }
+
+.forge-ai-page .fa-error { display: flex; gap: 8px; align-items: center; margin: 0 12px; }
+.forge-ai-page .fa-error span { flex: 1 1 auto; }
+
+/* Composer */
+.forge-ai-page .fa-composer { display: grid; gap: 8px; padding: 12px; border-top: 1px solid var(--rms-border-strong); }
+.forge-ai-page .fa-caps { display: flex; flex-wrap: wrap; gap: 6px; }
+.forge-ai-page .fa-caps .fa-chip { padding: 4px 10px; min-height: 28px; font-size: 12px; }
+.forge-ai-page .fa-context { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: var(--rms-text-body); }
+.forge-ai-page .fa-context .icon-button { width: 24px; height: 24px; min-height: 24px; }
+.forge-ai-page .fa-input-row { display: flex; gap: 8px; align-items: flex-end; }
+.forge-ai-page .fa-input-row textarea {
+  flex: 1 1 auto; min-height: 44px; max-height: 180px; resize: vertical; padding: 8px 10px; font: inherit; font-size: 14px;
+  border: 1px solid var(--rms-border-strong); border-radius: var(--rms-radius-sm); background: var(--rms-bg-input); color: var(--rms-text);
+}
+.forge-ai-page .fa-input-row textarea:focus { outline: none; border-color: var(--rms-primary); box-shadow: 0 0 0 3px var(--rms-primary-soft); }
+.forge-ai-page .fa-input-row .primary-button { min-width: 44px; min-height: 44px; }
+
+/* Admin */
+.forge-ai-page .fa-admin { display: grid; gap: 12px; }
+.forge-ai-page .fa-admin-settings { display: grid; gap: 14px; }
+.forge-ai-page .fa-cap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; border: 0; padding: 0; margin: 0; }
+.forge-ai-page .fa-cap-grid legend { font-size: 12px; font-weight: 600; color: var(--rms-text-muted); margin-bottom: 6px; }
+.forge-ai-page .fa-limit { max-width: 280px; }
+.forge-ai-page .fa-admin h3 { margin: 6px 0 0; font-size: 13px; color: var(--rms-text-strong); }
+.forge-ai-page .fa-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.forge-ai-page .fa-stats div { display: grid; gap: 2px; padding: 10px; border: 1px solid var(--rms-border-strong); border-radius: var(--rms-radius-sm); background: var(--rms-bg-surface-2); }
+.forge-ai-page .fa-stats strong { font-size: 18px; color: var(--rms-text-strong); }
+.forge-ai-page .fa-stats span { font-size: 12px; color: var(--rms-text-muted); }
+
+@media (max-width: 860px) {
+  .forge-ai-page .fa-layout { grid-template-columns: minmax(0, 1fr); }
+  .forge-ai-page .fa-history { order: 2; }
+  .forge-ai-page .fa-messages { max-height: none; }
+  .forge-ai-page .fa-chat { min-height: 420px; }
+}

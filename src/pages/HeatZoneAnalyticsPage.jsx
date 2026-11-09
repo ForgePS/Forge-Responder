@@ -4,6 +4,7 @@ import {
   RefreshCw, Repeat, Settings, ShieldAlert, Tags, TrendingUp,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
+import ForgeAiLaunchButton from "../components/forgeAi/ForgeAiLaunchButton.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { Panel } from "../components/shell/ui.jsx";
 import { BarChart, ColumnChart } from "../components/heatZone/BarChart.jsx";
@@ -246,6 +247,7 @@ function HeatZoneWorkspace({ departmentId }) {
     <>
       <LiveStatus state={live} updating={updating && Boolean(data)} lastUpdated={lastUpdated} timeZone={timeZone} />
       <button type="button" className="secondary-button" onClick={refreshNow} disabled={updating}><RefreshCw size={14} /> Refresh</button>
+      <ForgeAiLaunchButton capability="heatZone" prompt="Which districts and hours had the most calls in the last 30 days, and how does that compare to the previous period?" />
     </>
   );
 

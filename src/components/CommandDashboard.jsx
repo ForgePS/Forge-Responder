@@ -14,6 +14,7 @@ import HydrantCompletionChart from "./HydrantCompletionChart.jsx";
 import DamageFormsPanel from "./DamageFormsPanel.jsx";
 
 import ThemeToggle from "./ThemeToggle.jsx";
+import ForgeAiLaunchButton from "./forgeAi/ForgeAiLaunchButton.jsx";
 
 function Panel({ title, icon: Icon, action, children, className = "" }) {
   return (
@@ -169,6 +170,7 @@ export default function CommandDashboard({
           <span>Operational overview, readiness, and action items</span>
         </div>
         <div className="dashboard-theme-actions">
+          <ForgeAiLaunchButton capability="briefing" prompt="Create a shift briefing for the last 24 hours" label="Shift briefing" title="Forge AI writes a shift briefing from the last 24 hours of records" />
           <ThemeToggle />
         </div>
       </section>
