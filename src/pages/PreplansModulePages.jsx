@@ -53,6 +53,7 @@ import {
   updatePreplanRevision,
   VERIFICATION_CHECKLIST_ITEMS,
 } from "../lib/inspections/index.js";
+import { isPreplanFieldShown, withPreplanFollowUps } from "../lib/inspections/preplanFollowUps.js";
 import { friendlyError } from "../lib/friendlyError.js";
 import { dropdownOptionNote } from "../lib/inspections/constructionTypes.js";
 
@@ -350,7 +351,7 @@ function PreplanDetailWorkspace({
     return () => { cancelled = true; };
   }, [departmentId, revision?.id, revision?.templateSnapshot]);
 
-  const sections = revision?.templateSnapshot?.sections || [];
+  const sections = useMemo(() => withPreplanFollowUps(revision?.templateSnapshot?.sections || []), [revision?.templateSnapshot?.sections]);
   const editable = canEdit && !["published", "superseded"].includes(revision?.status);
 
   function setAnswer(key, value) {
@@ -358,9 +359,7 @@ function PreplanDetailWorkspace({
   }
 
   function fieldVisible(field) {
-    if (!field?.showIf?.key) return true;
-    const expected = field.showIf.equals ?? field.showIf.value;
-    return String(answers[field.showIf.key] || "") === String(expected);
+    return isPreplanFieldShown(field, answers);
   }
 
   function toggleSymbol(symbolId) {
@@ -561,11 +560,12 @@ function PreplanDetailWorkspace({
                   ? (dropdownMap[field.dropdownLibrary] || [])
                   : (field.options || []);
                 return (
-                  <div key={field.key} className="config-field">
+                  <div key={field.key} className={`config-field${field.followUp ? " preplan-follow-up" : ""}`}>
                     <span>{field.label}</span>
                     {field.type === "long_text" || field.type === "textarea" ? (
                       <textarea
                         rows={3}
+                        placeholder={field.placeholder || undefined}
                         value={answers[field.key] || ""}
                         disabled={!editable}
                         onChange={(e) => setAnswer(field.key, e.target.value)}
@@ -597,6 +597,7 @@ function PreplanDetailWorkspace({
                     ) : (
                       <input
                         value={answers[field.key] || ""}
+                        placeholder={field.placeholder || undefined}
                         disabled={!editable}
                         onChange={(e) => setAnswer(field.key, e.target.value)}
                       />

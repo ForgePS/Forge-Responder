@@ -3078,6 +3078,9 @@ html .app-shell .modal-card.neris-cad-import-modal {
   background: var(--rms-bg-surface-3);
 }
 
+/* Preplan follow-up questions (e.g. Knox box location) sit indented under the answer that opened them. */
+.template-fields > .preplan-follow-up { margin-left: 14px; padding-left: 12px; border-left: 3px solid var(--rms-primary); }
+
 .template-fields {
   display: grid;
   gap: 8px;
