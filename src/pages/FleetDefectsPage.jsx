@@ -30,6 +30,24 @@ import {
 import { activeOptionsWithSelected, firstActiveId } from "../lib/fleet/repairsConfig.js";
 import { friendlyError } from "../lib/friendlyError.js";
 
+const SOURCE_LABELS = {
+  employee_portal: "Employee Portal",
+  field_app: "FORGE FIELD",
+  check: "Apparatus check",
+  manual: "Entered by staff",
+};
+const OOS_LABELS = {
+  out_of_service: "Take out of service",
+  restrict: "Restrict use",
+  none: "None",
+};
+
+/** "work_order_created" → "Work order created" for codes without their own label. */
+function readable(value = "") {
+  const text = String(value || "").replace(/_/g, " ").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "—";
+}
+
 function Field({ label, children }) {
   return (
     <label className="config-field">
@@ -255,7 +273,7 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
                       <span>
                         <strong>{item.defectNumber}</strong>
                         <small>
-                          {item.fleetNumber || "No unit"} · {item.severity}
+                          {item.fleetNumber || "No unit"} · {severities.find((option) => option.id === item.severity)?.label || readable(item.severity)}
                           {item.checkItemLabel ? ` · ${item.checkItemLabel}` : ""}
                         </small>
                       </span>
@@ -270,16 +288,19 @@ export default function FleetDefectsPage({ query = "", onNavigate, legacyApparat
               <section className="panel">
                 <header>
                   <div><strong>{selected.defectNumber}</strong></div>
-                  <FleetStatusBadge status={selected.severity} />
+                  <FleetStatusBadge
+                    status={selected.severity}
+                    label={severities.find((option) => option.id === selected.severity)?.label || ""}
+                  />
                 </header>
                 <div className="panel-body config-studio-body">
                   <div className="occupancy-form-grid">
                     <div><span className="occupancy-muted">Unit</span><strong>{selected.fleetNumber || "—"}</strong></div>
-                    <div><span className="occupancy-muted">Status</span><strong>{selected.status}</strong></div>
+                    <div><span className="occupancy-muted">Status</span><strong>{readable(selected.status)}</strong></div>
                     <div><span className="occupancy-muted">Category</span><strong>{selected.categoryName || "—"}</strong></div>
-                    <div><span className="occupancy-muted">Source</span><strong>{selected.source}</strong></div>
+                    <div><span className="occupancy-muted">Source</span><strong>{SOURCE_LABELS[selected.source] || readable(selected.source)}</strong></div>
                     <div><span className="occupancy-muted">Reported</span><strong>{selected.reportedAt ? new Date(selected.reportedAt).toLocaleString() : "—"}</strong></div>
-                    <div><span className="occupancy-muted">OOS rec.</span><strong>{selected.oosRecommendation}</strong></div>
+                    <div><span className="occupancy-muted">Out-of-service recommendation</span><strong>{OOS_LABELS[selected.oosRecommendation] || readable(selected.oosRecommendation)}</strong></div>
                   </div>
                   <p>{selected.description}</p>
                   {selected.activeRestriction || selected.restriction ? (
