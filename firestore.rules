@@ -700,7 +700,8 @@ service cloud.firestore {
         "users", "violationCatalog", "violations", "waterCompanies",
         "waterCompanyContacts", "waterDistricts",
         "fieldCheckoffLists", "fieldCheckoffs", "fieldPlanUpdates",
-        "hydrants", "hydrantInspections", "hydrantFlowTests", "dailyActivity"
+        "hydrants", "hydrantInspections", "hydrantFlowTests", "dailyActivity",
+        "heatZoneAccess", "heatZoneCalls", "heatZoneEvents", "heatZoneGeocodes", "heatZoneMeta", "heatZoneSettings", "heatZoneZones"
       ];
     }
 
@@ -894,6 +895,32 @@ service cloud.firestore {
           );
         allow delete: if canWriteModule(departmentId, "internalEmail")
           && (resource.data.get("fromUid", "") == request.auth.uid || memberCanAny(departmentId, ["manageInternalEmail"]));
+      }
+      // Heat Zone Analytics (functions/lib/heatZone). Everything is written by Cloud
+      // Functions only; analytics are served through callables that check the
+      // caller's department membership, permissions and district scope. Browsers
+      // may only listen to the change counter, to know when to refresh.
+      match /heatZoneMeta/{document} {
+        allow read: if canAccessDepartment(departmentId) && memberCanAny(departmentId, ["viewHeatZoneAnalytics"]);
+        allow write: if false;
+      }
+      match /heatZoneCalls/{document} {
+        allow read, write: if false;
+      }
+      match /heatZoneZones/{document} {
+        allow read, write: if false;
+      }
+      match /heatZoneSettings/{document} {
+        allow read, write: if false;
+      }
+      match /heatZoneAccess/{document} {
+        allow read, write: if false;
+      }
+      match /heatZoneEvents/{document} {
+        allow read, write: if false;
+      }
+      match /heatZoneGeocodes/{document} {
+        allow read, write: if false;
       }
       match /auditLogs/{logId} {
         allow read: if canAccessDepartment(departmentId);

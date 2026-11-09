@@ -19,7 +19,9 @@ async function geocodeAddress(db, departmentId, address = "") {
   const response = await fetch(url);
   const payload = await response.json();
   if (payload.status !== "OK" || !payload.results?.length) {
-    throw new Error(payload.error_message || "Could not geocode address.");
+    const error = new Error(payload.error_message || "Could not geocode address.");
+    error.status = payload.status || "";
+    throw error;
   }
 
   const result = payload.results[0];
@@ -29,6 +31,8 @@ async function geocodeAddress(db, departmentId, address = "") {
     latitude: location.lat ?? null,
     longitude: location.lng ?? null,
     placeId: result.place_id || "",
+    locationType: result.geometry?.location_type || "",
+    partialMatch: result.partial_match === true,
   };
 }
 

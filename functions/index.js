@@ -1596,3 +1596,33 @@ const messageRecipients = require("./lib/messageRecipients");
 exports.internalMessageAudience = onDocumentWritten("departments/{departmentId}/internalEmails/{messageId}", (event) =>
   messageRecipients.handleMessageWritten(admin.firestore(), event)
     .catch((error) => console.error(`Message audience failed for ${event.params.departmentId}/${event.params.messageId}`, error)));
+
+// Heat Zone Analytics: call-density analytics over NERIS incident reports.
+// Triggers keep the derived projection (departments/<id>/heatZoneCalls) in step
+// with the report list; callables verify membership + permissions server-side.
+const heatZone = require("./lib/heatZone/service");
+const HEAT_ZONE_SOURCE = "departments/{departmentId}/lists/hlfd-rms-neris-fire-reports";
+
+// retry: processing is idempotent (re-reads the source, compares a content hash,
+// and records each event id), so a retried delivery cannot double count.
+exports.heatZoneOnReportItem = onDocumentWritten({ document: `${HEAT_ZONE_SOURCE}/items/{itemId}`, retry: true }, (event) =>
+  heatZone.handleItemWritten(admin.firestore(), event));
+
+exports.heatZoneOnReportList = onDocumentWritten({ document: HEAT_ZONE_SOURCE, retry: true }, (event) =>
+  heatZone.handleListWritten(admin.firestore(), event));
+
+const heatZoneCall = (handler, options = {}) => onCall({ memory: "512MiB", timeoutSeconds: 120, ...options }, (request) =>
+  handler(admin.firestore(), request));
+
+exports.heatZoneDashboard = heatZoneCall(heatZone.dashboard);
+exports.heatZoneMarkers = heatZoneCall(heatZone.markers);
+exports.heatZoneIncident = heatZoneCall(heatZone.incident, { memory: "256MiB", timeoutSeconds: 30 });
+exports.heatZoneBoundaries = heatZoneCall(heatZone.boundaries, { memory: "256MiB", timeoutSeconds: 30 });
+exports.heatZoneReport = heatZoneCall(heatZone.report);
+exports.heatZoneGetSettings = heatZoneCall(heatZone.getSettings, { memory: "256MiB", timeoutSeconds: 30 });
+exports.heatZoneSaveZones = heatZoneCall(heatZone.saveZones, { timeoutSeconds: 300 });
+exports.heatZoneDeleteZone = heatZoneCall(heatZone.deleteZone, { timeoutSeconds: 300 });
+exports.heatZoneSaveSettings = heatZoneCall(heatZone.saveSettings, { memory: "256MiB", timeoutSeconds: 30 });
+exports.heatZoneSetDistrictAccess = heatZoneCall(heatZone.setDistrictAccess, { memory: "256MiB", timeoutSeconds: 30 });
+exports.heatZoneRebuild = heatZoneCall(heatZone.rebuild, { timeoutSeconds: 540 });
+exports.heatZoneSaveGeocoding = heatZoneCall(heatZone.saveGeocoding, { timeoutSeconds: 540 });

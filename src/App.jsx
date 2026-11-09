@@ -83,6 +83,7 @@ import {
   Users,
   Wrench,
   X,
+  Flame,
 } from "lucide-react";
 const InternalEmailBoardPage = lazyPage(() => import("./pages/InternalEmailBoardPage.jsx"));
 const DigitalDashboardPage = lazyPage(() => import("./pages/DigitalDashboardPage.jsx"));
@@ -137,6 +138,7 @@ const WaterDistrictsPage = lazyPage(() => import("./pages/WaterDistrictsPage.jsx
 const HydrantDamageAnalyticsPage = lazyPage(() => import("./pages/HydrantDamageAnalyticsPage.jsx"));
 const NerisFireReportsPage = lazyPage(() => import("./pages/NerisFireReportsPage.jsx"));
 const NerisAnalyticsPage = lazyPage(() => import("./pages/NerisAnalyticsPage.jsx"));
+const HeatZoneAnalyticsPage = lazyPage(() => import("./pages/HeatZoneAnalyticsPage.jsx"));
 import { resolveInitialHydrantTab, resolveInitialAppModule, shouldOpenHydrantsModule } from "./lib/hydrantAppRouting.js";
 // Pages grouped in one file each still load only when opened.
 const AnalyticsPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.AnalyticsPage })));
@@ -232,7 +234,7 @@ const navGroups = [
     tree: PREVENTION_NAV_TREE,
     items: [],
   },
-  { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["NERIS Analytics", BarChart3]] },
+  { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["NERIS Analytics", BarChart3], ["Heat Zone Analytics", Flame]] },
   { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Uploads", Upload]] },
   { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay]] },
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
@@ -1786,6 +1788,10 @@ function AppShell() {
   ) : current === "NERIS Analytics" ? (
     hasPermission(permissions, "viewNerisReports") ? (
       <NerisAnalyticsPage reports={nerisFireReports} />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Heat Zone Analytics" ? (
+    hasPermission(permissions, "viewHeatZoneAnalytics") || isCreator ? (
+      <HeatZoneAnalyticsPage />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Analytics" ? (
     hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={liveCertifications} training={training} apparatus={apparatusLive} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />
