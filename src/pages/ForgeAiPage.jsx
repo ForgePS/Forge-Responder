@@ -304,7 +304,7 @@ export default function ForgeAiPage({ onNavigate }) {
                   onOpenSource={openSource}
                 />
               ))}
-              {sending ? <div className="fa-thinking" role="status"><span className="fa-dot" /><span className="fa-dot" /><span className="fa-dot" /> Reading records…</div> : null}
+              {sending ? <div className="fa-thinking" role="status"><span className="fa-dot" /><span className="fa-dot" /><span className="fa-dot" /> Working on it…</div> : null}
             </div>
 
             {sendError ? (

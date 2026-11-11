@@ -10,6 +10,8 @@ const RULES = [
   ["units", 4, /\b(units?|apparatus|fleet|readiness|out of service|in service|reserve|restricted|engine|ladder|medic|truck)\b/i],
   ["dispatch", 4, /\b(calls?|dispatch(ed)?|cad|active ?911|alerts?|responded|ran|run)\b/i],
   ["incident", 3, /\b(incidents?|reports?|timeline|similar|summar(y|ize)|fires?|medical|crash|mva)\b/i],
+  // Topics that live outside FORGE. Only routed here when the caller can use Web Research.
+  ["web", 5, /\b(nfpa|osha|niosh|usfa|fema|cdc|epa|dot|ul fsri|regulations?|statutes?|state law|federal law|code requirements?|recalls?|grants?|news|weather|forecast|best practices?|research (on|about)|studies|industry standards?)\b/i],
   ["knowledge", 5, /\b(how (do|does|can|to)|where (is|do|can)|what is forge|help with|explain (the|how)|documentation|feature|setting up|configure|offline demo)\b/i],
 ];
 
@@ -26,8 +28,13 @@ function classify(message, allowed = []) {
     const matches = topic.match(new RegExp(re.source, "gi"));
     if (matches) scores[id] = (scores[id] || 0) + weight + matches.length - 1;
   }
+  // Asking for the web by name always routes there (and is refused if it's off).
+  if (/\b(search|look (it |this )?up|check|find)\b.{0,30}\b(web|internet|online|google)\b|\b(on|from) the (web|internet)\b|\bonline sources?\b/i.test(topic)) {
+    return { capability: "web", scores: { ...scores, web: 99 } };
+  }
+  if (!allowed.includes("web")) delete scores.web;
   // "How do I..." / "Where is..." asks how FORGE works, even when it names a module.
-  if (scores.knowledge && /^\s*(how (do|does|can|to)|where (is|do|can))\b/i.test(String(message || ""))) scores.knowledge += 3;
+  if (scores.knowledge && !scores.web && /^\s*(how (do|does|can|to)|where (is|do|can))\b/i.test(String(message || ""))) scores.knowledge += 3;
   // A unit id ("E1", "Medic 2") alongside call words is a dispatch question.
   if (scores.units && scores.dispatch) scores.dispatch += 1;
   const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1]);

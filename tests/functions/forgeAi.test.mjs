@@ -356,3 +356,79 @@ describe("capabilities", () => {
     assert.match(none.message.text, /document/i);
   });
 });
+
+describe("web research", () => {
+  const WEB_ON = { enabled: true, capabilities: { web: true }, dailyLimit: 300 };
+  function webClient({ status } = {}) {
+    const calls = [];
+    return {
+      calls,
+      beta: {
+        messages: {
+          create: async (body) => {
+            calls.push(body);
+            if (status) throw Object.assign(new Error("web search disabled"), { status });
+            return {
+              stop_reason: "end_turn",
+              model: "claude-opus-5-5",
+              content: [
+                { type: "server_tool_use", id: "s1", name: "web_search", input: { query: "osha respirator" } },
+                { type: "web_search_tool_result", tool_use_id: "s1", content: [{ type: "web_search_result", url: "https://www.osha.gov/r", title: "OSHA", encrypted_content: "e" }] },
+                { type: "text", text: "OSHA 1910.134 requires a written respiratory protection program.", citations: [{ type: "web_search_result_location", url: "https://www.osha.gov/r", title: "OSHA Respiratory Protection", cited_text: "written program" }] },
+              ],
+              usage: { input_tokens: 900, output_tokens: 120, server_tool_use: { web_search_requests: 2 } },
+            };
+          },
+        },
+      },
+    };
+  }
+
+  it("is refused until an administrator turns it on", async () => {
+    const res = await ask("chief-a", A, "Search the web for OSHA respirator rules", {}, { getClient: () => webClient() });
+    assert.equal(res.message.capability, "web");
+    assert.equal(res.message.generatedBy, "policy");
+    const boot = await forgeAi.bootstrap(db, req("chief-a", { departmentId: A }));
+    assert.equal(boot.capabilities.find((c) => c.id === "web").allowed, false);
+    const settings = await forgeAi.getSettings(db, req("chief-a", { departmentId: A }));
+    assert.equal(settings.capabilities.find((c) => c.id === "web").enabled, false);
+  });
+
+  it("answers from cited web pages, sends no department records and counts searches", async () => {
+    await db.doc(`departments/${A}/forgeAiSettings/main`).set(WEB_ON);
+    const client = webClient();
+    const res = await ask("chief-a", A, "What does OSHA require for respiratory protection?", {}, { getClient: () => client });
+    assert.equal(res.message.capability, "web");
+    assert.equal(res.message.generatedBy, "model");
+    assert.equal(res.message.liveness, "web");
+    assert.equal(res.message.window, null);
+    assert.match(res.message.text, /written respiratory protection program\. \[S1\]/);
+    assert.deepEqual(res.message.sources.map((s) => [s.kind, s.link.url, s.cited]), [["web", "https://www.osha.gov/r", true]]);
+    assert.equal(client.calls.length, 1);
+    const sent = JSON.stringify(client.calls[0]);
+    assert.doesNotMatch(sent, /A-1|Alpha|Shared Ave|<records>/);
+    assert.equal(client.calls[0].tools[0].name, "web_search");
+    const logs = await db.collection(`departments/${A}/forgeAiUsageLogs`).get();
+    assert.equal(logs.docs[0].data().webSearches, 2);
+    const report = await forgeAi.usageReport(db, req("it-a", { departmentId: A }));
+    assert.equal(report.days[0].webSearches, 2);
+  });
+
+  it("explains when the model or web search is not available", async () => {
+    await db.doc(`departments/${A}/forgeAiSettings/main`).set(WEB_ON);
+    const none = await ask("chief-a", A, "Search the web for OSHA respirator rules");
+    assert.equal(none.message.generatedBy, "rules");
+    assert.equal(none.message.fallbackReason, "model-not-configured");
+    assert.match(none.message.text, /needs the AI model/);
+    assert.equal(none.message.sources.length, 0);
+    const down = await ask("chief-a", A, "Search the web for OSHA respirator rules", {}, { getClient: () => webClient({ status: 400 }) });
+    assert.equal(down.message.fallbackReason, "web-search-unavailable");
+    assert.match(down.message.text, /couldn't search the web/);
+  });
+
+  it("turning it on is audited", async () => {
+    await forgeAi.saveSettings(db, req("chief-a", { departmentId: A, settings: { enabled: true, capabilities: { web: true } } }));
+    const audit = await db.collection(`departments/${A}/auditLogs`).where("action", "==", "forge_ai.settings").get();
+    assert.match(audit.docs[0].data().summary, /Web Research on/);
+  });
+});

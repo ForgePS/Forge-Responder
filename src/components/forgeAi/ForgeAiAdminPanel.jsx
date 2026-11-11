@@ -65,7 +65,7 @@ export default function ForgeAiAdminPanel({ departmentId, canManage, canViewUsag
 
   if (!settings && !error) return <section className="panel fa-admin"><div className="panel-body fa-muted">Loading Forge AI settings…</div></section>;
 
-  const totals = (usage?.days || []).reduce((t, d) => ({ requests: t.requests + d.requests, model: t.model + d.modelAnswers, rules: t.rules + d.ruleAnswers, errors: t.errors + d.errors, tokens: t.tokens + d.inputTokens + d.outputTokens }), { requests: 0, model: 0, rules: 0, errors: 0, tokens: 0 });
+  const totals = (usage?.days || []).reduce((t, d) => ({ requests: t.requests + d.requests, model: t.model + d.modelAnswers, rules: t.rules + d.ruleAnswers, errors: t.errors + d.errors, tokens: t.tokens + d.inputTokens + d.outputTokens, searches: t.searches + (d.webSearches || 0) }), { requests: 0, model: 0, rules: 0, errors: 0, tokens: 0, searches: 0 });
 
   return (
     <div className="fa-admin">
@@ -85,7 +85,7 @@ export default function ForgeAiAdminPanel({ departmentId, canManage, canViewUsag
               {capabilities.map((c) => (
                 <label key={c.id} className="rms-check">
                   <input type="checkbox" checked={settings.capabilities?.[c.id] !== false} onChange={() => toggleCapability(c.id)} />
-                  <span><strong>{c.label}</strong><br /><span className="fa-muted">{c.description}</span></span>
+                  <span><strong>{c.label}</strong>{c.defaultOff ? <span className="fa-pill is-muted">Off unless turned on</span> : null}<br /><span className="fa-muted">{c.description}</span>{c.id === "web" ? <><br /><span className="fa-muted">Questions asked here are sent to Anthropic's web search. Each search is billed on the FORGE API account.</span></> : null}</span>
                 </label>
               ))}
             </fieldset>
@@ -117,10 +117,11 @@ export default function ForgeAiAdminPanel({ departmentId, canManage, canViewUsag
               <div><strong>{totals.rules}</strong><span>Answers from records</span></div>
               <div><strong>{totals.errors}</strong><span>Errors</span></div>
               <div><strong>{totals.tokens.toLocaleString()}</strong><span>Model tokens</span></div>
+              <div><strong>{totals.searches}</strong><span>Web searches</span></div>
               <div><strong>{usage.dailyLimit}</strong><span>Daily limit</span></div>
             </div>
             <h3>By day</h3>
-            <Table columns={["Day", "Questions", "AI", "Records", "Access checks", "Errors", "Tokens"]} rows={usage.days.map((d) => [d.day, d.requests, d.modelAnswers, d.ruleAnswers, d.policyAnswers, d.errors, (d.inputTokens + d.outputTokens).toLocaleString()])} empty="No questions yet." />
+            <Table columns={["Day", "Questions", "AI", "Records", "Access checks", "Errors", "Tokens", "Web searches"]} rows={usage.days.map((d) => [d.day, d.requests, d.modelAnswers, d.ruleAnswers, d.policyAnswers, d.errors, (d.inputTokens + d.outputTokens).toLocaleString(), d.webSearches || 0])} empty="No questions yet." />
             <h3>Recent questions</h3>
             <p className="fa-muted">Question text is not logged here; it stays in each member's own history.</p>
             <Table columns={["When", "Member", "Capability", "Answer", "Outcome", "Sources", "Time (ms)"]} rows={usage.logs.map((l) => [when(l.createdAt), l.actorName, l.capability, l.generatedBy === "model" ? "AI" : l.generatedBy === "policy" ? "Access check" : `Records${l.fallbackReason ? ` (${l.fallbackReason})` : ""}`, l.outcome, l.sourceCount, l.latencyMs])} empty="No questions yet." />

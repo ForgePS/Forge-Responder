@@ -16,10 +16,10 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { assertDepartmentAccess, isPlatformCreator, memberPermissions } = require("../access");
-const { CAPABILITIES, CAPABILITY_IDS, PERMISSIONS, byId, capabilityAccess } = require("./capabilities");
+const { CAPABILITIES, CAPABILITY_IDS, PERMISSIONS, byId, capabilityAccess, capabilityOn } = require("./capabilities");
 const { classify } = require("./router");
 const { parseQuestion } = require("./query");
-const { generate } = require("./model");
+const { generate, generateWeb } = require("./model");
 const { validateOutput } = require("./validate");
 const { loadProfile } = require("./records");
 const { safeTimeZone, localParts } = require("../heatZone/time");
@@ -33,6 +33,7 @@ const SERVICES = {
   nerisQuality: (ctx) => require("./services/quality").runNerisQuality(ctx),
   supervisorQa: (ctx) => require("./services/quality").runSupervisorQa(ctx),
   knowledge: (ctx) => require("./services/knowledge").run(ctx),
+  web: (ctx) => require("./services/web").run(ctx),
 };
 const DEFAULT_DAYS = { incident: 7, dispatch: 7, heatZone: 30, units: 7, briefing: 1, nerisQuality: 30, supervisorQa: 7, knowledge: 7 };
 const DEFAULT_DAILY_LIMIT = 300;
@@ -66,8 +67,10 @@ function cleanId(value, label = "id") {
 
 function normalizeSettings(raw = {}) {
   const capabilities = {};
-  for (const id of CAPABILITY_IDS) {
-    if (typeof raw?.capabilities?.[id] === "boolean") capabilities[id] = raw.capabilities[id];
+  for (const cap of CAPABILITIES) {
+    if (typeof raw?.capabilities?.[cap.id] === "boolean") capabilities[cap.id] = raw.capabilities[cap.id];
+    // Off-by-default capabilities are always stored explicitly.
+    else if (cap.defaultOff) capabilities[cap.id] = false;
   }
   const limit = Number(raw?.dailyLimit);
   return {
@@ -164,6 +167,7 @@ async function recordUsage(db, caller, usageRef, entry) {
       byCapability: { [entry.capability]: inc(1) },
       inputTokens: inc(entry.inputTokens || 0),
       outputTokens: inc(entry.outputTokens || 0),
+      ...(entry.webSearches ? { webSearches: inc(entry.webSearches) } : {}),
       updatedAt: nowIso(),
     }, { merge: true }),
     db.collection(paths.usageLogs(caller.departmentId)).add({
@@ -178,6 +182,7 @@ async function recordUsage(db, caller, usageRef, entry) {
       latencyMs: entry.latencyMs,
       inputTokens: entry.inputTokens || 0,
       outputTokens: entry.outputTokens || 0,
+      webSearches: entry.webSearches || 0,
       sourceCount: entry.sourceCount || 0,
       conversationId: entry.conversationId,
       messageId: entry.messageId,
@@ -293,7 +298,7 @@ async function ask(db, request, options = {}) {
   let generatedBy = "rules";
   let model = "";
   let fallbackReason = "";
-  let usage = { inputTokens: 0, outputTokens: 0 };
+  let usage = { inputTokens: 0, outputTokens: 0, webSearches: 0 };
   let outcome = "ok";
 
   if (!access.allowed) {
@@ -325,7 +330,37 @@ async function ask(db, request, options = {}) {
         throw new HttpsError("internal", "Forge AI couldn't read the records just now. Try again.");
       }
     }
-    if (retrieval) {
+    if (retrieval?.webSearch) {
+      // Web Research: only the question goes out; no department records.
+      const web = require("./services/web");
+      let validated = null;
+      const client = options.getClient?.();
+      if (!client) {
+        fallbackReason = "model-not-configured";
+      } else {
+        try {
+          const result = await generateWeb(client, {
+            question: message,
+            department: { name: caller.profile.name, timeZone: caller.profile.timeZone, now: `${localParts(now, caller.profile.timeZone).date}` },
+          });
+          usage = { ...result.usage, webSearches: result.searches };
+          validated = validateOutput(web.toOutput(retrieval, result), { knownSourceIds: retrieval.book.ids(), sectionIds: [], capability });
+          if (validated.ok) {
+            generatedBy = "model";
+            model = result.model;
+          } else {
+            fallbackReason = "invalid-output";
+            validated = null;
+          }
+        } catch (error) {
+          // A 400 here usually means web search is turned off for the API organization.
+          fallbackReason = error?.reason || (error?.status === 400 ? "web-search-unavailable" : "model-error");
+          console.warn("forge ai web research unavailable", fallbackReason, error?.status || "");
+        }
+        if (!validated) retrieval.fallbackAnswer = web.UNAVAILABLE;
+      }
+      answer = composeAnswer(retrieval, validated);
+    } else if (retrieval) {
       let validated = null;
       const client = retrieval.empty ? null : options.getClient?.();
       if (!client) {
@@ -383,7 +418,7 @@ async function ask(db, request, options = {}) {
     fallbackReason,
     liveness: retrieval?.liveness || "none",
     dataAsOf: createdAt,
-    window: retrieval && capability !== "knowledge" ? (() => { const w = windowFor(capability, message, caller, now).window; return { from: w.from, to: w.to, label: w.label }; })() : null,
+    window: retrieval && capability !== "knowledge" && capability !== "web" ? (() => { const w = windowFor(capability, message, caller, now).window; return { from: w.from, to: w.to, label: w.label }; })() : null,
     createdAt,
   };
   const batch = db.batch();
@@ -530,7 +565,7 @@ async function requireAdmin(db, request, kind) {
 
 async function getSettings(db, request) {
   const caller = await requireAdmin(db, request, "settings");
-  return { settings: caller.settings, capabilities: CAPABILITIES.map(({ id, label, description }) => ({ id, label, description, enabled: caller.settings.capabilities[id] !== false })), canManage: caller.can.manage };
+  return { settings: caller.settings, capabilities: CAPABILITIES.map((cap) => ({ id: cap.id, label: cap.label, description: cap.description, defaultOff: Boolean(cap.defaultOff), enabled: capabilityOn(cap, caller.settings) })), canManage: caller.can.manage };
 }
 
 async function saveSettings(db, request) {
@@ -548,8 +583,9 @@ async function saveSettings(db, request) {
   await db.doc(paths.settings(caller.departmentId)).set(doc);
   const changes = [];
   if (caller.settings.enabled !== next.enabled) changes.push(next.enabled ? "turned on" : "turned off");
-  for (const id of CAPABILITY_IDS) {
-    if ((caller.settings.capabilities[id] !== false) !== (next.capabilities[id] !== false)) changes.push(`${byId(id).label} ${next.capabilities[id] === false ? "off" : "on"}`);
+  for (const cap of CAPABILITIES) {
+    const after = capabilityOn(cap, next);
+    if (capabilityOn(cap, caller.settings) !== after) changes.push(`${cap.label} ${after ? "on" : "off"}`);
   }
   if (caller.settings.dailyLimit !== next.dailyLimit) changes.push(`daily limit ${next.dailyLimit}`);
   await audit(db, caller, "forge_ai.settings", `Forge AI settings: ${changes.join(", ") || "saved"}`, { recordId: "forgeAiSettings", before: caller.settings, after: doc });
@@ -569,13 +605,13 @@ async function usageReport(db, request) {
     .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.day))
     .sort((a, b) => b.day.localeCompare(a.day))
     .slice(0, 30)
-    .map((x) => ({ day: x.day, requests: x.requests || 0, modelAnswers: x.modelAnswers || 0, ruleAnswers: x.ruleAnswers || 0, policyAnswers: x.policyAnswers || 0, errors: x.errors || 0, inputTokens: x.inputTokens || 0, outputTokens: x.outputTokens || 0, byCapability: x.byCapability || {} }));
+    .map((x) => ({ day: x.day, requests: x.requests || 0, modelAnswers: x.modelAnswers || 0, ruleAnswers: x.ruleAnswers || 0, policyAnswers: x.policyAnswers || 0, errors: x.errors || 0, inputTokens: x.inputTokens || 0, outputTokens: x.outputTokens || 0, webSearches: x.webSearches || 0, byCapability: x.byCapability || {} }));
   return {
     dailyLimit: caller.settings.dailyLimit,
     days,
     logs: logsSnap.docs.map((doc) => {
       const x = doc.data();
-      return { id: doc.id, createdAt: x.createdAt, actorName: x.actorName, capability: x.capability, generatedBy: x.generatedBy, outcome: x.outcome, fallbackReason: x.fallbackReason, latencyMs: x.latencyMs, inputTokens: x.inputTokens, outputTokens: x.outputTokens, sourceCount: x.sourceCount };
+      return { id: doc.id, createdAt: x.createdAt, actorName: x.actorName, capability: x.capability, generatedBy: x.generatedBy, outcome: x.outcome, fallbackReason: x.fallbackReason, latencyMs: x.latencyMs, inputTokens: x.inputTokens, outputTokens: x.outputTokens, webSearches: x.webSearches || 0, sourceCount: x.sourceCount };
     }),
     feedback: feedbackSnap.docs.map((doc) => {
       const x = doc.data();

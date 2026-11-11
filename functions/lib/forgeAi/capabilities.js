@@ -82,10 +82,27 @@ const CAPABILITIES = Object.freeze([
     module: "",
     suggestions: ["How does Heat Zone Analytics assign calls to districts?", "How does the offline demo work?"],
   },
+  {
+    id: "web",
+    label: "Web Research",
+    description: "Answers from public websites, with links. Only your question is sent to the web search; department records are never included.",
+    allOf: [],
+    module: "",
+    // Questions leave FORGE, so an administrator must switch this on.
+    defaultOff: true,
+    suggestions: ["Search the web for the latest NFPA 1710 response time standard", "What does OSHA require for respiratory protection programs?"],
+  },
 ]);
 
 const CAPABILITY_IDS = CAPABILITIES.map((c) => c.id);
 const byId = (id) => CAPABILITIES.find((c) => c.id === id) || null;
+
+/** Is the capability switched on in the department's settings? Most are on unless switched off; defaultOff ones need an explicit on. */
+function capabilityOn(capability, settings = {}) {
+  const cap = typeof capability === "string" ? byId(capability) : capability;
+  const value = settings?.capabilities?.[cap?.id];
+  return cap?.defaultOff ? value === true : value !== false;
+}
 
 /**
  * Is a capability available to this member right now?
@@ -95,7 +112,7 @@ function capabilityAccess(capability, { permissions = {}, isCreator = false, mod
   const cap = typeof capability === "string" ? byId(capability) : capability;
   if (!cap) return { allowed: false, reason: "Unknown capability." };
   if (settings.enabled !== true) return { allowed: false, reason: "Forge AI is turned off for your department." };
-  if (settings.capabilities && settings.capabilities[cap.id] === false) {
+  if (!capabilityOn(cap, settings)) {
     return { allowed: false, reason: `${cap.label} is turned off for your department.` };
   }
   if (cap.module && Array.isArray(modules) && !modules.includes(cap.module)) {
@@ -115,4 +132,5 @@ module.exports = {
   PERMISSIONS,
   byId,
   capabilityAccess,
+  capabilityOn,
 };
