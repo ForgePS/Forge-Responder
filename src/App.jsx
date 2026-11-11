@@ -84,6 +84,7 @@ import {
   Wrench,
   X,
   Flame,
+  Sparkles,
 } from "lucide-react";
 const InternalEmailBoardPage = lazyPage(() => import("./pages/InternalEmailBoardPage.jsx"));
 const DigitalDashboardPage = lazyPage(() => import("./pages/DigitalDashboardPage.jsx"));
@@ -139,6 +140,9 @@ const HydrantDamageAnalyticsPage = lazyPage(() => import("./pages/HydrantDamageA
 const NerisFireReportsPage = lazyPage(() => import("./pages/NerisFireReportsPage.jsx"));
 const NerisAnalyticsPage = lazyPage(() => import("./pages/NerisAnalyticsPage.jsx"));
 const HeatZoneAnalyticsPage = lazyPage(() => import("./pages/HeatZoneAnalyticsPage.jsx"));
+const ForgeAiPage = lazyPage(() => import("./pages/ForgeAiPage.jsx"));
+import { FORGE_AI_OPEN_EVENT, FORGE_AI_PAGE } from "./lib/forgeAi/launch.js";
+import "./styles/forge-ai-shell.css";
 import { resolveInitialHydrantTab, resolveInitialAppModule, shouldOpenHydrantsModule } from "./lib/hydrantAppRouting.js";
 // Pages grouped in one file each still load only when opened.
 const AnalyticsPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.AnalyticsPage })));
@@ -204,8 +208,11 @@ import {
 } from "./lib/fleet/fleetStatusOverlay.js";
 import { isFleetPageVisible } from "./lib/fleet/fleetNavVisibility.js";
 
+// Optional second line under a nav label (shown when the sidebar is expanded).
+const NAV_SUBTITLES = { "Forge AI": "Public Safety Operations Intelligence" };
+
 const navGroups = [
-  { label: "", items: [["Dashboard", Home]] },
+  { label: "", items: [["Dashboard", Home], ["Forge AI", Sparkles]] },
   { label: "RMS", items: [["Personnel", Users], ["Certifications", FileCheck2], ["Training", BookOpen], ["Academy Class Schedule", GraduationCap, FORGE_ACADEMY_CLASS_SCHEDULE_URL], ["Scheduling", CalendarDays], ["Time Sheets", Clock3], ["Daily Log", ClipboardCheck]] },
   { label: "Fleet", items: [
     ["Readiness Board", ClipboardCheck],
@@ -518,7 +525,9 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
                           aria-current={!isExternal && current === name ? "page" : undefined}
                         >
                           <NavIcon size={15} aria-hidden />
-                          <span>{name}</span>
+                          {NAV_SUBTITLES[name] && !collapsed ? (
+                            <span className="nav-item-text"><span>{name}</span><small className="nav-item-subtitle">{NAV_SUBTITLES[name]}</small></span>
+                          ) : <span>{name}</span>}
                           {isExternal && !collapsed ? (
                             <ExternalLink size={12} className="nav-external-icon" aria-hidden />
                           ) : null}
@@ -731,6 +740,12 @@ function AppShell() {
   );
   const [schedulingTab, setSchedulingTab] = useState(null);
   const clearSchedulingTab = useCallback(() => setSchedulingTab(null), []);
+  // "Ask Forge AI" buttons on other pages open the Forge AI page.
+  useEffect(() => {
+    const open = () => setCurrent(FORGE_AI_PAGE);
+    window.addEventListener(FORGE_AI_OPEN_EVENT, open);
+    return () => window.removeEventListener(FORGE_AI_OPEN_EVENT, open);
+  }, []);
   const deepLinkAppliedRef = useRef(Boolean(initialDeepLink?.module));
   const [codeLibraryAccess, setCodeLibraryAccess] = useState(null);
   const [preplanFeatures, setPreplanFeatures] = useState(null);
@@ -1820,6 +1835,10 @@ function AppShell() {
   ) : current === "Heat Zone Analytics" ? (
     hasPermission(permissions, "viewHeatZoneAnalytics") || isCreator ? (
       <HeatZoneAnalyticsPage />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === FORGE_AI_PAGE ? (
+    hasPermission(permissions, "useForgeAi") || hasPermission(permissions, "manageForgeAi") || hasPermission(permissions, "viewForgeAiUsage") || isCreator ? (
+      <ForgeAiPage onNavigate={setCurrent} />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Analytics" ? (
     hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={liveCertifications} training={training} apparatus={apparatusLive} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />

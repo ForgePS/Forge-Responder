@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Field, Picker, ProgressRing, Section, TextArea, TextInput, YesNo } from "./NerisControls.jsx";
 import NerisAiNarrative from "./NerisAiNarrative.jsx";
+import ForgeAiLaunchButton from "../../components/forgeAi/ForgeAiLaunchButton.jsx";
 import NerisSubmitSection from "./NerisSubmitSection.jsx";
 import NerisCadImportModal from "./NerisCadImportModal.jsx";
 import {
@@ -100,6 +101,16 @@ export default function NerisReportEditor({
           {report.locked ? <span className="nr-pill"><Lock size={12} /> Locked</span> : null}
           <span className={`nr-status nr-status-${statusTone(report.status)}`}>{report.status || "Draft"}</span>
           {savedAt ? <span className="nr-saved"><Check size={13} /> Saved {savedAt}</span> : null}
+          {online && report.id ? (
+            <ForgeAiLaunchButton
+              capability="nerisQuality"
+              context={{ reportId: report.id }}
+              prompt={report.reportNumber ? `Check report ${report.reportNumber} against Forge's NERIS rules` : "Check this report against Forge's NERIS rules"}
+              label="Check with Forge AI"
+              className="nr-btn nr-btn-ghost"
+              title="Forge AI checks the saved report against Forge's NERIS rules. It doesn't change the report."
+            />
+          ) : null}
           {onDelete && canEdit && !report.locked && ["Draft", "In Progress", "Returned"].includes(report.status || "Draft") ? (
             <button type="button" className="nr-icon-btn" title="Delete this draft" aria-label="Delete this draft" onClick={onDelete}><Trash2 size={15} /></button>
           ) : null}

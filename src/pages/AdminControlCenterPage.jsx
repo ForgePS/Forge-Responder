@@ -19,6 +19,7 @@ import { isDemoDepartment, isPlatformScope } from "../lib/tenantPaths.js";
 import { listRecords } from "../lib/firestoreService.js";
 import { canManagePlatformSecrets, hasPermission } from "../lib/permissions.js";
 import { ensureDefaultRoles } from "../lib/roleService.js";
+import ForgeAiLaunchButton from "../components/forgeAi/ForgeAiLaunchButton.jsx";
 import "../styles/admin-control-center.css";
 
 function AdminSectionPill({ id, label, description = "", icon: Icon, isOpen, onToggle, children }) {
@@ -164,13 +165,16 @@ export default function AdminControlCenterPage({
           </div>
         </div>
         {inPlatformScope ? null : (
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => window.dispatchEvent(new CustomEvent("forge:open-setup-wizard"))}
-          >
-            <Wand2 size={14} /> Run setup wizard
-          </button>
+          <div className="heading-actions">
+            <ForgeAiLaunchButton view="admin" label="Forge AI settings" title="Turn Forge AI on or off, choose capabilities and see usage" />
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => window.dispatchEvent(new CustomEvent("forge:open-setup-wizard"))}
+            >
+              <Wand2 size={14} /> Run setup wizard
+            </button>
+          </div>
         )}
       </section>
 

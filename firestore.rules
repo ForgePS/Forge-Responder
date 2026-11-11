@@ -701,7 +701,9 @@ service cloud.firestore {
         "waterCompanyContacts", "waterDistricts",
         "fieldCheckoffLists", "fieldCheckoffs", "fieldPlanUpdates",
         "hydrants", "hydrantInspections", "hydrantFlowTests", "dailyActivity",
-        "heatZoneAccess", "heatZoneCalls", "heatZoneEvents", "heatZoneGeocodes", "heatZoneMeta", "heatZoneSettings", "heatZoneZones"
+        "heatZoneAccess", "heatZoneCalls", "heatZoneEvents", "heatZoneGeocodes", "heatZoneMeta", "heatZoneSettings", "heatZoneZones",
+        "forgeAiBriefings", "forgeAiConversations", "forgeAiFeedback", "forgeAiMessageSources", "forgeAiMessages",
+        "forgeAiSettings", "forgeAiUsage", "forgeAiUsageLogs"
       ];
     }
 
@@ -920,6 +922,46 @@ service cloud.firestore {
         allow read, write: if false;
       }
       match /heatZoneGeocodes/{document} {
+        allow read, write: if false;
+      }
+      // Forge AI (functions/lib/forgeAi). Written only by Cloud Functions. A member
+      // may read their own conversations, messages and message sources; settings,
+      // usage, feedback and audit data are served by permission-checked callables.
+      match /forgeAiConversations/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["useForgeAi"])
+          && resource.data.get("ownerUid", "") == request.auth.uid;
+        allow write: if false;
+      }
+      match /forgeAiMessages/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["useForgeAi"])
+          && resource.data.get("ownerUid", "") == request.auth.uid;
+        allow write: if false;
+      }
+      match /forgeAiMessageSources/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["useForgeAi"])
+          && resource.data.get("ownerUid", "") == request.auth.uid;
+        allow write: if false;
+      }
+      match /forgeAiBriefings/{document} {
+        // A briefing holds what its author was allowed to see, so only its author reads it.
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["useForgeAiBriefings"])
+          && resource.data.get("createdBy", "") == request.auth.uid;
+        allow write: if false;
+      }
+      match /forgeAiSettings/{document} {
+        allow read, write: if false;
+      }
+      match /forgeAiUsage/{document} {
+        allow read, write: if false;
+      }
+      match /forgeAiUsageLogs/{document} {
+        allow read, write: if false;
+      }
+      match /forgeAiFeedback/{document} {
         allow read, write: if false;
       }
       match /auditLogs/{logId} {

@@ -13,6 +13,7 @@ import { isNerisFeatureEnabled } from "../lib/neris/featureFlags.js";
 import { useTenant } from "../context/TenantContext.jsx";
 import { labelFromKey } from "../lib/labelFromKey.js";
 import { INCIDENT_KINDS, primaryTypeLabel } from "../lib/neris/reportModel.js";
+import ForgeAiLaunchButton from "../components/forgeAi/ForgeAiLaunchButton.jsx";
 import "../styles/neris-analytics.css";
 
 const NOT_ENOUGH = "Not enough data";
@@ -130,6 +131,9 @@ export default function NerisAnalyticsPage({ reports = [] }) {
             <h1>NERIS Analytics</h1>
             <p>NFPA 1710 response metrics, annual survey exports, incident heat mapping, and ad-hoc reporting.</p>
           </div>
+        </div>
+        <div className="heading-actions">
+          <ForgeAiLaunchButton capability="incident" prompt="Summarize incidents this month by type and response time" />
         </div>
       </section>
 

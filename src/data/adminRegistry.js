@@ -264,6 +264,11 @@ export const ADMIN_PERMISSION_LABELS = {
   viewHeatZoneRepeatLocations: "View repeat-location analytics",
   exportHeatZoneReports: "Export Heat Zone reports",
   manageHeatZoneSettings: "Manage Heat Zone boundaries, weights and district access",
+  useForgeAi: "Use Forge AI (only with data the member can already see)",
+  useForgeAiBriefings: "Generate Forge AI shift and command briefings",
+  useForgeAiSupervisorQa: "Run Forge AI supervisor QA reviews",
+  manageForgeAi: "Turn Forge AI and its capabilities on or off",
+  viewForgeAiUsage: "View Forge AI usage, feedback and audit trail",
   accessAdminRms: "Access Admin RMS",
   accessEmployeePortal: "Access employee portal",
   submitLeaveRequests: "Submit leave requests",
@@ -419,6 +424,10 @@ export const ADMIN_PERMISSION_GROUPS = [
   {
     label: "Heat Zone Analytics",
     keys: ["viewHeatZoneAnalytics", "viewHeatZoneMarkers", "viewHeatZoneAllDistricts", "viewHeatZoneHistory", "viewHeatZoneRepeatLocations", "exportHeatZoneReports", "manageHeatZoneSettings"]
+  },
+  {
+    label: "Forge AI",
+    keys: ["useForgeAi", "useForgeAiBriefings", "useForgeAiSupervisorQa", "manageForgeAi", "viewForgeAiUsage"]
   },
   {
     label: "Portal access",

@@ -1453,3 +1453,39 @@ exports.heatZoneSaveSettings = heatZoneCall(heatZone.saveSettings, { memory: "25
 exports.heatZoneSetDistrictAccess = heatZoneCall(heatZone.setDistrictAccess, { memory: "256MiB", timeoutSeconds: 30 });
 exports.heatZoneRebuild = heatZoneCall(heatZone.rebuild, { timeoutSeconds: 540 });
 exports.heatZoneSaveGeocoding = heatZoneCall(heatZone.saveGeocoding, { timeoutSeconds: 540 });
+
+// Forge AI Operations Copilot (functions/lib/forgeAi). Read-only over department
+// records; every callable re-verifies membership, permissions and the
+// department's Forge AI settings. Uses the same ANTHROPIC_API_KEY secret as the
+// narrative writer; without a key (offline demo) answers come from the records
+// alone, clearly labelled.
+const forgeAi = require("./lib/forgeAi/service");
+
+function forgeAiClient() {
+  let key = "";
+  try {
+    key = anthropicApiKey.value();
+  } catch {
+    key = "";
+  }
+  if (!key) return null;
+  const Anthropic = require("@anthropic-ai/sdk");
+  const AnthropicClient = Anthropic.default || Anthropic;
+  return new AnthropicClient({ apiKey: key, timeout: 90_000, maxRetries: 2 });
+}
+
+const forgeAiCall = (handler, options = {}) => onCall({ memory: "512MiB", timeoutSeconds: 60, ...options }, (request) =>
+  handler(admin.firestore(), request));
+
+exports.forgeAiBootstrap = onCall({ secrets: [anthropicApiKey], memory: "256MiB", timeoutSeconds: 30 }, (request) =>
+  forgeAi.bootstrap(admin.firestore(), request, { modelConfigured: Boolean(forgeAiClient()) }));
+exports.forgeAiAsk = onCall({ secrets: [anthropicApiKey], memory: "1GiB", timeoutSeconds: 180 }, (request) =>
+  forgeAi.ask(admin.firestore(), request, { getClient: forgeAiClient }));
+exports.forgeAiListConversations = forgeAiCall(forgeAi.listConversations, { memory: "256MiB" });
+exports.forgeAiGetConversation = forgeAiCall(forgeAi.getConversation, { memory: "256MiB" });
+exports.forgeAiRenameConversation = forgeAiCall(forgeAi.renameConversation, { memory: "256MiB" });
+exports.forgeAiArchiveConversation = forgeAiCall(forgeAi.archiveConversation, { memory: "256MiB" });
+exports.forgeAiFeedback = forgeAiCall(forgeAi.feedback, { memory: "256MiB" });
+exports.forgeAiGetSettings = forgeAiCall(forgeAi.getSettings, { memory: "256MiB" });
+exports.forgeAiSaveSettings = forgeAiCall(forgeAi.saveSettings, { memory: "256MiB" });
+exports.forgeAiUsageReport = forgeAiCall(forgeAi.usageReport, { memory: "256MiB" });

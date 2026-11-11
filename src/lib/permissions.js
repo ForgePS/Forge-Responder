@@ -93,6 +93,7 @@ const navPermissionMap = {
   "Damage Analytics": "viewHydrantDamageReports",
   "NERIS Fire Reports": "viewNerisReports",
   "Heat Zone Analytics": "viewHeatZoneAnalytics",
+  "Forge AI": "useForgeAi",
   "SOGs / Policies": "viewDocuments",
   "EMS Protocols": "viewDocuments",
   Forms: "viewDocuments",
