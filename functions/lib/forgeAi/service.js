@@ -353,6 +353,7 @@ async function ask(db, request, options = {}) {
             validated = null;
           }
         } catch (error) {
+          if (error?.usage) usage = error.usage;
           // A 400 here usually means web search is turned off for the API organization.
           fallbackReason = error?.reason || (error?.status === 400 ? "web-search-unavailable" : "model-error");
           console.warn("forge ai web research unavailable", fallbackReason, error?.status || "");

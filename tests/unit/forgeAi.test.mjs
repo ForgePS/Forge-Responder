@@ -453,6 +453,19 @@ describe("web research", () => {
     await assert.rejects(generateWeb(webClient([paused]), { question: "q", department: {} }), (e) => e.reason === "search-unfinished");
   });
 
+  it("keeps the tokens and searches already spent when a web answer fails", async () => {
+    const paused = { stop_reason: "pause_turn", content: searchBlocks, usage: { input_tokens: 5, output_tokens: 1, server_tool_use: { web_search_requests: 2 } } };
+    const cut = { stop_reason: "max_tokens", content: [], usage: { input_tokens: 7, output_tokens: 3, server_tool_use: { web_search_requests: 1 } } };
+    await assert.rejects(generateWeb(webClient([paused, cut]), { question: "q", department: {} }), (e) => {
+      assert.equal(e.reason, "max_tokens");
+      assert.deepEqual(e.usage, { inputTokens: 12, outputTokens: 4, webSearches: 3 });
+      return true;
+    });
+    let n = 0;
+    const flaky = { beta: { messages: { create: async () => { if (n++) throw Object.assign(new Error("overloaded"), { status: 529 }); return paused; } } } };
+    await assert.rejects(generateWeb(flaky, { question: "q", department: {} }), (e) => e.status === 529 && e.usage.webSearches === 2);
+  });
+
   it("turns citations into linked sources and still removes doses, URLs and action claims", () => {
     const retrieval = { book: new SourceBook() };
     const output = web.toOutput(retrieval, {
@@ -463,13 +476,16 @@ describe("web research", () => {
         { text: "OSHA 1910.134 covers respirators.", urls: ["https://www.osha.gov/1910.134", "https://a.example/x"] },
       ],
       citations: [
-        { url: "https://a.example/x", title: "A", citedText: "a" },
+        { url: "https://a.example/x", title: "A: 0.3 mg dosing", citedText: "Give 0.3 mg of epinephrine IM. See <b>https://a.example/more</b>" },
         { url: "javascript:alert(1)", title: "bad", citedText: "" },
         { url: "https://www.osha.gov/1910.134", title: "", citedText: "Respiratory protection" },
       ],
     });
     assert.equal(retrieval.book.items.length, 2);
     assert.equal(retrieval.book.items[1].label, "osha.gov");
+    // Source titles and excerpts are shown and copied, so they are scrubbed too.
+    assert.doesNotMatch(JSON.stringify(retrieval.book.items.map(({ label, detail }) => ({ label, detail }))), /0\.3 mg|https?:|<b>/);
+    assert.match(retrieval.book.items[0].detail, /^a\.example — Give \[dose removed\] of epinephrine IM\./);
     assert.equal(retrieval.book.items[0].link.url, "https://a.example/x");
     assert.ok(retrieval.book.items.every((s) => s.kind === "web" && s.liveness === "web"));
     const v = validateOutput(output, { knownSourceIds: retrieval.book.ids(), sectionIds: [], capability: "web" });

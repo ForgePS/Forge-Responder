@@ -426,6 +426,16 @@ describe("web research", () => {
     assert.match(down.message.text, /couldn't search the web/);
   });
 
+  it("failed web answers still log the tokens and searches they used", async () => {
+    await db.doc(`departments/${A}/forgeAiSettings/main`).set(WEB_ON);
+    const cut = { beta: { messages: { create: async () => ({ stop_reason: "max_tokens", content: [], usage: { input_tokens: 400, output_tokens: 8000, server_tool_use: { web_search_requests: 3 } } }) } } };
+    const res = await ask("chief-a", A, "Search the web for OSHA respirator rules", {}, { getClient: () => cut });
+    assert.equal(res.message.fallbackReason, "max_tokens");
+    const log = (await db.collection(`departments/${A}/forgeAiUsageLogs`).get()).docs[0].data();
+    assert.equal(log.webSearches, 3);
+    assert.equal(log.inputTokens + log.outputTokens, 8400);
+  });
+
   it("turning it on is audited", async () => {
     await forgeAi.saveSettings(db, req("chief-a", { departmentId: A, settings: { enabled: true, capabilities: { web: true } } }));
     const audit = await db.collection(`departments/${A}/auditLogs`).where("action", "==", "forge_ai.settings").get();

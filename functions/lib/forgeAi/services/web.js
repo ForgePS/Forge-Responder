@@ -4,6 +4,7 @@
  * search by model.generateWeb. Sources are the web pages the answer cites.
  */
 const R = require("../records");
+const { safeSnippet } = require("../validate");
 
 const LIMITATIONS = [
   "This answer comes from public websites, not your department's records. Check important details at the source.",
@@ -51,8 +52,9 @@ function toOutput(retrieval, result) {
     const id = retrieval.book.add({
       kind: "web",
       recordId: c.url,
-      label: R.text(c.title, 160) || host,
-      detail: [host, R.text(c.citedText, 200)].filter(Boolean).join(" — "),
+      // Page titles and excerpts are shown and copied too, so they get the answer's dose and URL scrubbing.
+      label: safeSnippet(c.title, 160) || host,
+      detail: [host, safeSnippet(c.citedText, 200)].filter(Boolean).join(" — "),
       liveness: "web",
       asOf: null,
       link: { url: c.url },

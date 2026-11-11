@@ -101,15 +101,21 @@ async function generateWeb(client, { question, department }) {
   let searches = 0;
   const usage = { inputTokens: 0, outputTokens: 0 };
   const content = [];
+  // Errors carry what was already spent, so failed searches still count in usage.
+  const withUsage = (error) => Object.assign(error, { usage: { ...usage, webSearches: searches } });
   for (let turn = 0; turn <= WEB_MAX_CONTINUATIONS; turn += 1) {
-    response = await client.beta.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      output_config: { effort: "medium" },
-      system: WEB_SYSTEM_PROMPT,
-      tools: [tool],
-      messages,
-    });
+    try {
+      response = await client.beta.messages.create({
+        model: MODEL,
+        max_tokens: 8000,
+        output_config: { effort: "medium" },
+        system: WEB_SYSTEM_PROMPT,
+        tools: [tool],
+        messages,
+      });
+    } catch (error) {
+      throw withUsage(error);
+    }
     usage.inputTokens += Number(response.usage?.input_tokens) || 0;
     usage.outputTokens += Number(response.usage?.output_tokens) || 0;
     searches += Number(response.usage?.server_tool_use?.web_search_requests) || 0;
@@ -118,9 +124,9 @@ async function generateWeb(client, { question, department }) {
     // A long search turn paused: send it back unchanged to let it finish.
     messages.push({ role: "assistant", content: response.content });
   }
-  if (response.stop_reason === "refusal") throw new ModelUnavailableError("refusal");
-  if (response.stop_reason === "max_tokens") throw new ModelUnavailableError("max_tokens");
-  if (response.stop_reason === "pause_turn") throw new ModelUnavailableError("search-unfinished");
+  if (response.stop_reason === "refusal") throw withUsage(new ModelUnavailableError("refusal"));
+  if (response.stop_reason === "max_tokens") throw withUsage(new ModelUnavailableError("max_tokens"));
+  if (response.stop_reason === "pause_turn") throw withUsage(new ModelUnavailableError("search-unfinished"));
 
   // The answer is the text after the last search result; earlier text is
   // the model narrating its searches ("I'll search for...").
@@ -141,7 +147,7 @@ async function generateWeb(client, { question, department }) {
     }
   }
   const text = blocks.map((b) => b.text).join("").trim();
-  if (!text) throw new ModelUnavailableError("unreadable");
+  if (!text) throw withUsage(new ModelUnavailableError("unreadable"));
   return { text, citations, blocks, searches, model: response.model || MODEL, usage };
 }
 
