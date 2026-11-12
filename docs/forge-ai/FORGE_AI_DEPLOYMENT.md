@@ -48,6 +48,7 @@ firebase deploy --only functions:forgeAiBootstrap,functions:forgeAiAsk,functions
 1. Forge AI is off for every department. Turn it on per department in **Forge AI → Admin** (see [FORGE_AI_CONFIGURATION.md](FORGE_AI_CONFIGURATION.md)).
 2. Grant the Forge AI permissions to custom roles where needed.
 3. Ask one question per capability and check the answers cite real records.
+4. Web Research stays off for every department until a manager turns it on. Before turning it on, check that web search is allowed for the API organization in the Anthropic Console.
 
 ## Rolling back
 

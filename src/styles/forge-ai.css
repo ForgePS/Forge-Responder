@@ -114,6 +114,8 @@
   color: var(--rms-text); font-size: 12px; cursor: pointer;
 }
 .forge-ai-page .fa-source.is-cited { border-color: var(--rms-primary); }
+.forge-ai-page a.fa-source { text-decoration: none; }
+.forge-ai-page a.fa-source:hover .fa-source-label { text-decoration: underline; }
 .forge-ai-page .fa-source-id { font-weight: 700; color: var(--rms-text-link); }
 .forge-ai-page .fa-source-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
 .forge-ai-page .fa-source-live { color: var(--rms-text-muted); font-size: 11px; }

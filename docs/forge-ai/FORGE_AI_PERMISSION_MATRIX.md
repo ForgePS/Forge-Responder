@@ -27,7 +27,7 @@ Forge AI adds five permissions. They are set per role in **System Admin → Role
 A capability works only when **all** of these are true:
 
 1. Forge AI is on for the department.
-2. The capability is not switched off in Forge AI settings.
+2. The capability is not switched off in Forge AI settings. Web Research must be switched on; it is off by default.
 3. The department has the module the capability reads from.
 4. The member has `useForgeAi` (platform creators always pass this step).
 5. The member has the capability's data permissions.
@@ -42,6 +42,7 @@ A capability works only when **all** of these are true:
 | NERIS Data Quality | `viewNerisReports` | NERIS Fire Reports |
 | Supervisor QA | `useForgeAiSupervisorQa` and `viewNerisReports` | NERIS Fire Reports |
 | Platform Knowledge | none beyond `useForgeAi` | none |
+| Web Research | none beyond `useForgeAi` (off until a manager turns it on) | none |
 
 Briefings include the District, Geographic and Unit sections only when the member can also use Heat Zone Intelligence or Unit & Resource Intelligence. Heat Zone answers are further limited by the member's Heat Zone station or district scope, the same as the Heat Zone page.
 

@@ -16,13 +16,14 @@ import { defaultRoles as DEFAULT_ROLES } from "../../src/data/defaultRoles.js";
 const require = createRequire(new URL("../../functions/package.json", import.meta.url));
 const query = require("./lib/forgeAi/query.js");
 const { classify } = require("./lib/forgeAi/router.js");
-const { CAPABILITIES, CAPABILITY_IDS, capabilityAccess, byId } = require("./lib/forgeAi/capabilities.js");
+const { CAPABILITIES, CAPABILITY_IDS, capabilityAccess, capabilityOn, byId } = require("./lib/forgeAi/capabilities.js");
 const { validateOutput, clean, fixCitations } = require("./lib/forgeAi/validate.js");
 const { composeAnswer, normalizeSettings } = require("./lib/forgeAi/service.js");
 const knowledge = require("./lib/forgeAi/services/knowledge.js");
 const bundled = require("./lib/forgeAi/generated/nerisValidation.cjs");
 const { SourceBook, incidentFact } = require("./lib/forgeAi/records.js");
-const { buildUserMessage, SYSTEM_PROMPT, OUTPUT_SCHEMA } = require("./lib/forgeAi/model.js");
+const { buildUserMessage, SYSTEM_PROMPT, OUTPUT_SCHEMA, generateWeb, WEB_SYSTEM_PROMPT } = require("./lib/forgeAi/model.js");
+const web = require("./lib/forgeAi/services/web.js");
 
 const TZ = "America/Chicago";
 // 2026-11-09 15:00 local (21:00 UTC)
@@ -145,7 +146,7 @@ describe("capability access (fails closed)", () => {
   });
 
   it("lets the Fire Chief use every capability once on", () => {
-    for (const cap of CAPABILITIES) {
+    for (const cap of CAPABILITIES.filter((c) => !c.defaultOff)) {
       assert.equal(capabilityAccess(cap, { permissions: chief, isCreator: false, modules: null, settings: enabled }).allowed, true, cap.id);
     }
   });
@@ -176,7 +177,7 @@ describe("settings", () => {
     assert.equal(normalizeSettings({ dailyLimit: 0 }).dailyLimit, 300);
     assert.equal(normalizeSettings({ dailyLimit: 9999 }).dailyLimit, 300);
     assert.equal(normalizeSettings({ dailyLimit: 50 }).dailyLimit, 50);
-    assert.deepEqual(normalizeSettings({ capabilities: { heatZone: false, bogus: false, units: "no" } }).capabilities, { heatZone: false });
+    assert.deepEqual(normalizeSettings({ capabilities: { heatZone: false, bogus: false, units: "no" } }).capabilities, { heatZone: false, web: false });
   });
 });
 
@@ -379,5 +380,118 @@ describe("answer rendering", () => {
     assert.match(text, /Fire\t3/);
     assert.match(text, /\[S1\] Report HL-1/);
     assert.match(text, /No CAD feed/);
+  });
+});
+
+describe("web research", () => {
+  const all = [...CAPABILITY_IDS];
+  const noWeb = CAPABILITY_IDS.filter((id) => id !== "web");
+  const chief = DEFAULT_ROLES.find((r) => r.id === "fireChief").permissions;
+
+  it("is off until an administrator turns it on", () => {
+    const on = { enabled: true, capabilities: {}, dailyLimit: 300 };
+    assert.equal(capabilityOn("web", on), false);
+    assert.equal(capabilityAccess("web", { permissions: chief, isCreator: true, modules: null, settings: on }).allowed, false);
+    assert.equal(capabilityAccess("web", { permissions: chief, isCreator: false, modules: null, settings: { ...on, capabilities: { web: true } } }).allowed, true);
+    assert.equal(capabilityAccess("web", { permissions: { useForgeAi: false }, isCreator: false, modules: null, settings: { ...on, capabilities: { web: true } } }).allowed, false);
+    assert.equal(normalizeSettings({ enabled: true }).capabilities.web, false);
+    assert.equal(normalizeSettings({ enabled: true, capabilities: { web: true } }).capabilities.web, true);
+    assert.equal(capabilityOn("incident", on), true);
+  });
+
+  it("routes outside topics to the web only when the caller can use it", () => {
+    assert.equal(classify("What does OSHA require for respiratory protection?", all).capability, "web");
+    assert.notEqual(classify("What does OSHA require for respiratory protection?", noWeb).capability, "web");
+    assert.equal(classify("How does NFPA 1710 define turnout time?", all).capability, "web");
+    assert.equal(classify("Summarize incidents from the last 7 days", all).capability, "incident");
+    assert.equal(classify("How do I turn on Heat Zone Analytics?", all).capability, "knowledge");
+  });
+
+  it("asking for the web by name routes there even when it is off, so the answer says it is off", () => {
+    assert.equal(classify("Search the web for the newest SCBA recall", noWeb).capability, "web");
+    assert.equal(classify("Look this up online: hydrant flow testing", all).capability, "web");
+  });
+
+  function webClient(responses) {
+    const calls = [];
+    let i = 0;
+    return { calls, beta: { messages: { create: async (body) => { calls.push(JSON.parse(JSON.stringify(body))); return responses[Math.min(i++, responses.length - 1)]; } } } };
+  }
+  const cite = (url, title) => ({ type: "web_search_result_location", url, title, cited_text: `${title} says so.`, encrypted_index: "x" });
+  const searchBlocks = [
+    { type: "text", text: "I will search for that." },
+    { type: "server_tool_use", id: "srv1", name: "web_search", input: { query: "nfpa 1710 turnout" } },
+    { type: "web_search_tool_result", tool_use_id: "srv1", content: [{ type: "web_search_result", url: "https://www.nfpa.org/1710", title: "NFPA 1710", encrypted_content: "e" }] },
+  ];
+
+  it("sends only the question with the web search tool, and no JSON output format", async () => {
+    const client = webClient([{ stop_reason: "end_turn", model: "claude-opus-5-5", content: [...searchBlocks, { type: "text", text: "Turnout is 80 seconds for fire calls.", citations: [cite("https://www.nfpa.org/1710", "NFPA 1710")] }], usage: { input_tokens: 10, output_tokens: 5, server_tool_use: { web_search_requests: 1 } } }]);
+    const out = await generateWeb(client, { question: "How does NFPA 1710 define turnout time?", department: { name: "A FD", timeZone: TZ, now: "2026-11-09" } });
+    const body = client.calls[0];
+    assert.equal(body.tools.length, 1);
+    assert.equal(body.tools[0].type, "web_search_20260209");
+    assert.equal(body.tools[0].max_uses, 5);
+    assert.equal(body.tools[0].user_location.timezone, TZ);
+    assert.equal(body.output_config.format, undefined);
+    assert.equal(body.system, WEB_SYSTEM_PROMPT);
+    assert.equal(out.text, "Turnout is 80 seconds for fire calls.");
+    assert.equal(out.searches, 1);
+    assert.deepEqual(out.citations.map((c) => c.url), ["https://www.nfpa.org/1710"]);
+  });
+
+  it("continues a paused search turn and fails cleanly on refusal", async () => {
+    const paused = { stop_reason: "pause_turn", content: searchBlocks, usage: { input_tokens: 5, output_tokens: 1, server_tool_use: { web_search_requests: 1 } } };
+    const done = { stop_reason: "end_turn", content: [{ type: "text", text: "Done.", citations: [] }], usage: { input_tokens: 5, output_tokens: 1 } };
+    const client = webClient([paused, done]);
+    const out = await generateWeb(client, { question: "q", department: {} });
+    assert.equal(client.calls.length, 2);
+    assert.equal(client.calls[1].messages.at(-1).role, "assistant");
+    assert.deepEqual(client.calls[1].messages.at(-1).content, searchBlocks);
+    assert.equal(out.text, "Done.");
+    assert.equal(out.searches, 1);
+    await assert.rejects(generateWeb(webClient([{ stop_reason: "refusal", content: [] }]), { question: "q", department: {} }), (e) => e.reason === "refusal");
+    await assert.rejects(generateWeb(webClient([paused]), { question: "q", department: {} }), (e) => e.reason === "search-unfinished");
+  });
+
+  it("keeps the tokens and searches already spent when a web answer fails", async () => {
+    const paused = { stop_reason: "pause_turn", content: searchBlocks, usage: { input_tokens: 5, output_tokens: 1, server_tool_use: { web_search_requests: 2 } } };
+    const cut = { stop_reason: "max_tokens", content: [], usage: { input_tokens: 7, output_tokens: 3, server_tool_use: { web_search_requests: 1 } } };
+    await assert.rejects(generateWeb(webClient([paused, cut]), { question: "q", department: {} }), (e) => {
+      assert.equal(e.reason, "max_tokens");
+      assert.deepEqual(e.usage, { inputTokens: 12, outputTokens: 4, webSearches: 3 });
+      return true;
+    });
+    let n = 0;
+    const flaky = { beta: { messages: { create: async () => { if (n++) throw Object.assign(new Error("overloaded"), { status: 529 }); return paused; } } } };
+    await assert.rejects(generateWeb(flaky, { question: "q", department: {} }), (e) => e.status === 529 && e.usage.webSearches === 2);
+  });
+
+  it("turns citations into linked sources and still removes doses, URLs and action claims", () => {
+    const retrieval = { book: new SourceBook() };
+    const output = web.toOutput(retrieval, {
+      blocks: [
+        { text: "Give 0.3 mg of epinephrine. ", urls: ["https://a.example/x"] },
+        { text: "See https://evil.example/now for more.\n", urls: [] },
+        { text: "I have dispatched E1. ", urls: ["javascript:alert(1)"] },
+        { text: "OSHA 1910.134 covers respirators.", urls: ["https://www.osha.gov/1910.134", "https://a.example/x"] },
+      ],
+      citations: [
+        { url: "https://a.example/x", title: "A: 0.3 mg dosing", citedText: "Give 0.3 mg of epinephrine IM. See <b>https://a.example/more</b>" },
+        { url: "javascript:alert(1)", title: "bad", citedText: "" },
+        { url: "https://www.osha.gov/1910.134", title: "", citedText: "Respiratory protection" },
+      ],
+    });
+    assert.equal(retrieval.book.items.length, 2);
+    assert.equal(retrieval.book.items[1].label, "osha.gov");
+    // Source titles and excerpts are shown and copied, so they are scrubbed too.
+    assert.doesNotMatch(JSON.stringify(retrieval.book.items.map(({ label, detail }) => ({ label, detail }))), /0\.3 mg|https?:|<b>/);
+    assert.match(retrieval.book.items[0].detail, /^a\.example — Give \[dose removed\] of epinephrine IM\./);
+    assert.equal(retrieval.book.items[0].link.url, "https://a.example/x");
+    assert.ok(retrieval.book.items.every((s) => s.kind === "web" && s.liveness === "web"));
+    const v = validateOutput(output, { knownSourceIds: retrieval.book.ids(), sectionIds: [], capability: "web" });
+    assert.ok(v.ok);
+    assert.doesNotMatch(v.answer, /0\.3 mg|https?:|dispatched/);
+    assert.match(v.answer, /covers respirators\. \[S2\]\[S1\]/);
+    assert.deepEqual(v.citedSourceIds.sort(), ["S1", "S2"]);
   });
 });

@@ -29,6 +29,9 @@ Forge AI picks a capability from your question, or you can choose one with the c
 | NERIS Data Quality | Missing or invalid NERIS fields | "Which draft reports are missing required fields?" |
 | Supervisor QA | Rule failures, potential issues and observations for review | "Run a QA review for last week" |
 | Platform Knowledge | How FORGE Responder works | "How do I turn on Heat Zone Analytics?" |
+| Web Research | Public information from the internet: standards, regulations, recalls, grants, news | "Search the web for the latest NFPA 1710 turnout time" |
+
+Web Research is available only when your department has turned it on. Forge AI uses it for questions about standards bodies and agencies (NFPA, OSHA, NIOSH, USFA, FEMA), regulations, recalls, grants and news, or whenever you say "search the web", "look it up online" or similar. Only your question is sent to the web search; your department's records are never included, so don't type names or other private details into a web question.
 
 Time words Forge AI understands include: today, yesterday, last 24 hours, this shift, last N hours, last N days, last N weeks, this week, last week, this month, last month, this year, last year, month names, and dates such as 2026-03-01. Unit names such as "Engine 1", "E-1" and "E1" are treated the same. Without a time word, Forge AI uses a sensible default window and shows it on the answer.
 
@@ -36,9 +39,10 @@ Time words Forge AI understands include: today, yesterday, last 24 hours, this s
 
 - **AI-written from records** means the AI model wrote the answer from the records listed under Sources.
 - **From records (no AI model)** means Forge AI built the answer directly from the records, for example when the AI model isn't configured or didn't respond.
+- **AI-written from web sources** means the AI model searched the web and wrote the answer from the pages listed under Sources. Select a source to open the page in a new tab.
 - **Access check** means Forge AI explained why it can't answer (for example, a missing permission).
 - Citations such as [S1] point to the sources listed under the answer. Select a source to open the record.
-- **Live** data (Active911 alerts, fleet status) shows when it was last updated. **Historical** data comes from saved reports. **Reference** sources are FORGE documentation.
+- **Live** data (Active911 alerts, fleet status) shows when it was last updated. **Historical** data comes from saved reports. **Reference** sources are FORGE documentation. **Web** sources are public websites, not department records.
 - **AI observation** marks text the model wrote as an observation, not a fact from a record.
 - **Data limitations** lists what the answer could not cover, such as the lack of a live CAD feed.
 - Use the copy button to copy an answer, and the thumbs buttons to rate it.

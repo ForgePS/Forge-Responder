@@ -41,6 +41,7 @@ deterministic answer, labelled "Generated from records without the AI model". Ot
 | `nerisQuality` | NERIS Data Quality Assistant | Bundled Forge rules (`validateNerisReport`, `computeCompletionPercentage`) | historical |
 | `supervisorQa` | Supervisor QA | Validation + time-order checks + response-time outliers | historical |
 | `knowledge` | Platform Knowledge | `generated/knowledgeIndex.json` built from `docs/` | reference |
+| `web` | Web Research | None from the department. Anthropic server-side web search (`web_search_20260209`, max 5 uses); cited pages become `kind: "web"` sources with `link.url`. Off unless `settings.capabilities.web === true` (`defaultOff`) | web |
 
 ### Routing
 `router.classify(message, allowed)` is a deterministic keyword scorer (e.g. "heat", "district", "hot spot" → heatZone;
@@ -132,6 +133,11 @@ output, `server-side-fallback-2026-07-01` with `fallbacks: "default"` (same requ
 - Records are passed as JSON inside `<records>`; the system prompt says record text is data, never instructions.
 - Free text is scrubbed with the narrative writer's `scrubFreeText`; staff appear by rank/role/unit only.
 - No tools, no URLs, no write paths: an injected instruction has nothing to act on.
+- The one exception is Web Research (`model.generateWeb`): its only tool is Anthropic's server-side web search, and its
+  request carries only the question, department name and date, never records. Web pages are treated as data in its system
+  prompt. Structured output can't be combined with web search citations, so the answer is plain text: the text after the
+  last search result, with `[S#]` markers placed after each cited span, then the same `validateOutput` checks (doses,
+  URLs, action claims). Only `http(s)` citation URLs become sources. `pause_turn` is continued up to 3 times.
 - Output is validated: citations must be retrieved source ids; section ids must be known; HTML is stripped; medication-dose
   patterns and blame/discipline language are removed (QA); anything invalid falls back to the deterministic answer.
 - The system prompt forbids speculation about causes ("explain what the data shows, not why"), dispatch/operational

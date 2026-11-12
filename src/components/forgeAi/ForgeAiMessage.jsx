@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, Check, ChevronDown, Copy, Database, FileText, Radio, ThumbsDown, ThumbsUp, User } from "lucide-react";
+import { Bot, Check, ChevronDown, Copy, Database, ExternalLink, FileText, Globe, Radio, ThumbsDown, ThumbsUp, User } from "lucide-react";
 import { answerToPlainText, parseAnswer } from "../../lib/forgeAi/answerText.js";
 
 const LIVENESS = {
@@ -8,6 +8,7 @@ const LIVENESS = {
   current: { label: "Current record", hint: "As maintained in FORGE" },
   mixed: { label: "Mixed", hint: "Historical reports and current records" },
   reference: { label: "Documentation", hint: "From FORGE's documentation" },
+  web: { label: "Web", hint: "From public websites, not department records" },
   none: { label: "", hint: "" },
 };
 
@@ -60,9 +61,17 @@ function AnswerTable({ table }) {
   );
 }
 
+/** Only plain http(s) links open; anything else stays a label. */
+function webUrl(source) {
+  const url = source?.link?.url;
+  return typeof url === "string" && /^https?:\/\//i.test(url) ? url : "";
+}
+
 function GeneratedBadge({ message }) {
+  if (message.generatedBy === "model" && message.capability === "web") return <span className="fa-pill is-ai" title={message.model}><Globe size={12} aria-hidden /> AI-written from web sources</span>;
   if (message.generatedBy === "model") return <span className="fa-pill is-ai" title={message.model}><Bot size={12} aria-hidden /> AI-written from records</span>;
   if (message.generatedBy === "policy") return <span className="fa-pill is-muted">Access check</span>;
+  if (message.capability === "web") return <span className="fa-pill is-muted">Web search not run</span>;
   return <span className="fa-pill is-rules" title="The AI model wasn't used; this answer lists the records directly."><Database size={12} aria-hidden /> From records (no AI model)</span>;
 }
 
@@ -149,14 +158,21 @@ export default function ForgeAiMessage({ message, capabilityLabel, onFeedback, o
         {sources.length ? (
           <div className="fa-sources" aria-label="Sources">
             <span className="fa-sources-label">Sources</span>
-            {shownSources.map((s) => (
+            {shownSources.map((s) => (webUrl(s) ? (
+              <a key={s.id} href={webUrl(s)} target="_blank" rel="noopener noreferrer" className={`fa-source${s.cited ? " is-cited" : ""}`} title={s.detail || webUrl(s)}>
+                <Globe size={12} aria-hidden />
+                <span className="fa-source-id">{s.id}</span>
+                <span className="fa-source-label">{s.label}</span>
+                <ExternalLink size={11} aria-label="opens in a new tab" />
+              </a>
+            ) : (
               <button key={s.id} type="button" className={`fa-source${s.cited ? " is-cited" : ""}`} onClick={() => onOpenSource?.(s)} title={`${s.detail || ""}${s.asOf ? ` · as of ${formatWhen(s.asOf)}` : ""}`}>
                 <FileText size={12} aria-hidden />
                 <span className="fa-source-id">{s.id}</span>
                 <span className="fa-source-label">{s.label}</span>
                 <span className={`fa-source-live is-${s.liveness}`}>{(LIVENESS[s.liveness] || LIVENESS.historical).label}</span>
               </button>
-            ))}
+            )))}
             {sources.length > shownSources.length || showSources ? (
               <button type="button" className="text-button fa-more" onClick={() => setShowSources((v) => !v)}>
                 {showSources ? "Show fewer" : `All ${sources.length} sources`}
@@ -179,7 +195,9 @@ export default function ForgeAiMessage({ message, capabilityLabel, onFeedback, o
               <button type="button" className={`icon-button${message.feedback === "down" ? " is-on" : ""}`} onClick={() => rate("down")} aria-label="Not helpful" aria-pressed={message.feedback === "down"} disabled={feedbackBusy}><ThumbsDown size={15} /></button>
             </>
           ) : null}
-          <span className="fa-disclaimer">Forge AI reads records only. It can't dispatch, change or submit anything. Check important details against the source record.</span>
+          <span className="fa-disclaimer">{message.capability === "web"
+            ? "From public websites, not your department's records. Forge AI can't dispatch, change or submit anything. Check important details at the source."
+            : "Forge AI reads records only. It can't dispatch, change or submit anything. Check important details against the source record."}</span>
         </footer>
       </div>
     </article>

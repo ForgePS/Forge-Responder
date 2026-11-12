@@ -94,4 +94,9 @@ function validateOutput(output, { knownSourceIds, sectionIds = [], capability })
   return { ok, answer, sectionNotes, observations, citedSourceIds: cited, followUps, issues };
 }
 
-module.exports = { validateOutput, clean, fixCitations };
+/** Short third-party text (web page titles, excerpts): tags, links and doses removed. */
+function safeSnippet(value, max = 200) {
+  return clean(value, max).replace(/\n+/g, " ").replace(DOSE, "[dose removed]");
+}
+
+module.exports = { validateOutput, clean, fixCitations, safeSnippet };
