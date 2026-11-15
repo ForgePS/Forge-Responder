@@ -1542,25 +1542,6 @@ tbody tr:hover { background: var(--rms-bg-hover); }
 .employee-nav-scroll { display: flex; flex-wrap: wrap; gap: 4px; max-width: 100%; }
 .employee-portal .training-summary { width: 100%; }
 .employee-portal .dashboard-grid { width: 100%; }
-.internal-email-board { display: grid; gap: 12px; }
-.internal-email-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
-.internal-email-scope { display: flex; align-items: center; gap: 10px; min-width: 220px; }
-.internal-email-scope strong { display: block; color: var(--rms-text-strong); font-size: 15px; }
-.internal-email-scope span { display: block; color: var(--rms-text-muted); font-size: 13px; }
-.internal-email-workspace { display: grid; grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.4fr); gap: 10px; align-items: start; }
-.internal-email-list { display: grid; gap: 0; max-height: 520px; overflow-y: auto; }
-.internal-email-item { width: 100%; display: grid; gap: 4px; padding: 10px 12px; border-bottom: 1px solid var(--rms-border-subtle); background: transparent; color: var(--rms-text-body); text-align: left; }
-.internal-email-item:hover, .internal-email-item.active { background: var(--rms-bg-hover); }
-.internal-email-item.unread strong { color: var(--rms-text-strong); }
-.internal-email-item-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.internal-email-item span, .internal-email-item small { color: var(--rms-text-muted); font-size: 13px; }
-.internal-email-detail { padding: 12px; display: grid; gap: 10px; }
-.internal-email-detail header { display: grid; gap: 6px; }
-.internal-email-detail h2 { margin: 0; font-size: 20px; color: var(--rms-text-strong); }
-.internal-email-delete { display: inline-flex; align-items: center; gap: 6px; }
-.internal-email-detail .row-action.danger { color: var(--rms-danger-text); }
-.internal-email-detail p { margin: 0; color: var(--rms-text-muted); font-size: 14px; }
-.internal-email-body { white-space: pre-wrap; color: var(--rms-text-body); line-height: 1.55; padding-top: 8px; border-top: 1px solid var(--rms-border-subtle); }
 .email-recipient-picker { display: grid; gap: 8px; grid-column: 1 / -1; }
 .email-recipient-selected { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 34px; }
 .email-recipient-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--rms-border); border-radius: 999px; background: var(--rms-bg-hover); color: #e2e8f0; font-size: 13px; }
@@ -1573,9 +1554,6 @@ tbody tr:hover { background: var(--rms-bg-hover); }
 .internal-email-group-members { display: grid; gap: 8px; }
 .internal-email-group-member-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px; max-height: 180px; overflow-y: auto; padding: 8px; border: 1px solid var(--rms-border); border-radius: 7px; background: var(--rms-bg-surface-3); }
 .workflow-form textarea { min-height: 110px; padding: 10px 12px; border: 1px solid var(--rms-border); border-radius: 6px; background: var(--rms-bg-input); color: var(--rms-text-strong); resize: vertical; }
-@media (max-width: 980px) {
-  .internal-email-workspace { grid-template-columns: 1fr; }
-}
 .permission-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
 .permission-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--rms-text-body); cursor: pointer; user-select: none; }
 .permission-toggle span { line-height: 1.35; }
