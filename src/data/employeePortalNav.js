@@ -10,6 +10,7 @@ import {
   FileText,
   GraduationCap,
   Home,
+  LifeBuoy,
   Mail,
   Tablet,
   Truck,
@@ -57,6 +58,7 @@ export const employeePortalNavGroups = [
     label: "Communications",
     items: [
       ["Messages", Mail],
+      ["Help Desk", LifeBuoy],
     ],
   },
 ];

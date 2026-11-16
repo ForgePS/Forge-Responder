@@ -17,6 +17,7 @@ import {
   X
 } from "lucide-react";
 import InternalEmailBoard from "../components/InternalEmailBoard.jsx";
+import HelpDeskPage from "./HelpDeskPage.jsx";
 import LeaveRequestForm from "../components/employee/LeaveRequestForm.jsx";
 import LeaveRequestsPanel from "../components/scheduling/LeaveRequestsPanel.jsx";
 import VacancyPickupPanel from "../components/employee/VacancyPickupPanel.jsx";
@@ -1401,6 +1402,8 @@ export default function EmployeePortalPage({
       )}
 
       {current === "Field App" && fieldApp}
+
+      {current === "Help Desk" && <HelpDeskPage embedded />}
 
       {current === "Messages" && canViewInternalEmail && (
         <Panel title="Messages" icon={Mail}>
