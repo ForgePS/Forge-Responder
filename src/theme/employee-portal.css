@@ -1125,3 +1125,150 @@ html .app-shell .workflow-modal.document-viewer {
 .workflow-modal.document-viewer > footer a.secondary-button {
   text-decoration: none;
 }
+
+/* My Dashboard quick links: cards that open a page directly. */
+.quick-links-body {
+  display: grid;
+  gap: 12px;
+}
+
+.quick-links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 148px), 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quick-links-grid > li {
+  min-width: 0;
+  display: grid;
+}
+
+.quick-link-card {
+  min-width: 0;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 2px 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--rms-border);
+  border-radius: 7px;
+  background: linear-gradient(145deg, var(--rms-bg-kpi-a), var(--rms-bg-kpi-b));
+  color: var(--rms-text-strong);
+  text-align: left;
+}
+
+button.quick-link-card:hover,
+button.quick-link-card:focus-visible {
+  border-color: var(--rms-accent);
+  background: var(--rms-bg-hover);
+}
+
+.quick-link-card > svg {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: var(--rms-text-link);
+}
+
+.quick-link-name {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.quick-link-card small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rms-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Editing: the move/remove buttons take the icon's place so they fit narrow cards. */
+.quick-link-card.is-editing {
+  grid-template-columns: minmax(0, 1fr);
+  border-style: dashed;
+}
+
+.quick-link-card.is-editing > svg {
+  display: none;
+}
+
+.quick-link-tools {
+  display: flex;
+  gap: 2px;
+  margin-left: -8px;
+}
+
+.quick-link-tools .icon-button {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.quick-link-tools .icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.quick-links-empty {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  color: var(--rms-text-muted);
+  font-size: 14px;
+}
+
+.quick-links-empty b {
+  color: var(--rms-text-strong);
+}
+
+.quick-links-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rms-border-alpha);
+}
+
+.quick-links-add {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+}
+
+.quick-links-add select {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 33px;
+  padding: 0 8px;
+  border: 1px solid var(--rms-border);
+  border-radius: 5px;
+  background: var(--rms-bg-input);
+  color: var(--rms-text-strong);
+  font-size: 14px;
+}
+
+.quick-links-add .primary-button,
+.quick-links-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.quick-links-note {
+  flex: 1 1 260px;
+  color: var(--rms-text-muted);
+  font-size: 13px;
+}

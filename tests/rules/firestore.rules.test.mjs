@@ -141,6 +141,13 @@ describe("members keep normal access", () => {
     await assertSucceeds(setDoc(doc(db, `departments/${A}/users/member-a`), { uid: "member-a", preferences: { theme: "dark" }, updatedAt: "now" }, { merge: true }));
   });
 
+  it("member can save their My Dashboard quick links, but not change their role alongside", async () => {
+    const db = memberA().firestore();
+    const ref = doc(db, `departments/${A}/users/member-a`);
+    await assertSucceeds(setDoc(ref, { uid: "member-a", preferences: { dashboardQuickLinks: ["My Schedule", "Messages"] }, updatedAt: "now" }, { merge: true }));
+    await assertFails(setDoc(ref, { preferences: { dashboardQuickLinks: [] }, role: "fireChief", updatedAt: "now" }, { merge: true }));
+  });
+
   it("member can't link themselves to a personnel record (the server does it by verified email)", async () => {
     const db = memberA().firestore();
     await assertFails(setDoc(doc(db, `departments/${A}/users/member-a`), { personnelId: "P1", updatedAt: "now" }, { merge: true }));

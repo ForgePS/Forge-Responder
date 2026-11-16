@@ -87,6 +87,9 @@ import { resolveEmployeeVacancyDays, formatVacancyPickupSummary, buildVacancyPic
 import { hasPermission } from "../lib/permissions.js";
 import { formatRoleLabel } from "../lib/departmentMembership.js";
 import MyProfile from "../components/profile/MyProfile.jsx";
+import DashboardQuickLinks from "../components/employee/DashboardQuickLinks.jsx";
+import { quickLinksPreferenceKey } from "../lib/dashboardQuickLinks.js";
+import { saveUserPreferences } from "../lib/userPreferences.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { uniqueRecordId } from "../lib/recordIds.js";
@@ -218,6 +221,8 @@ export default function EmployeePortalPage({
   membership,
   user,
   permissions = {},
+  // Pages this person can pin as My Dashboard quick links (from their menu).
+  quickLinkOptions = [],
   showInternalEmail = true,
   personnel = [],
   certifications = [],
@@ -262,6 +267,20 @@ export default function EmployeePortalPage({
 }) {
   const { departmentId } = useTenant();
   const { patchMembership } = useAuth();
+  const quickLinksKey = quickLinksPreferenceKey(membership);
+  const savedQuickLinks = membership?.preferences?.[quickLinksKey];
+  async function saveQuickLinks(next) {
+    const previous = savedQuickLinks ?? null;
+    const patch = { [quickLinksKey]: next ?? null };
+    patchMembership({ preferences: patch });
+    try {
+      await saveUserPreferences(membership?.departmentId || departmentId, user?.uid, patch);
+    } catch (error) {
+      console.error("Failed to save quick links", error);
+      patchMembership({ preferences: { [quickLinksKey]: previous } });
+      setMessage("Couldn't save your quick links. Check your connection and try again.");
+    }
+  }
   const [message, setMessage] = useState("");
   const [viewingDocId, setViewingDocId] = useState("");
   const [academyTraining, setAcademyTraining] = useState([]);
@@ -988,6 +1007,14 @@ export default function EmployeePortalPage({
               <div key={label} className={`fleet-stat stat-${tone}`}><strong>{value}</strong><span>{label}</span></div>
             ))}
           </section>
+          {!previewPerson ? (
+            <DashboardQuickLinks
+              options={quickLinkOptions}
+              saved={savedQuickLinks}
+              onSave={saveQuickLinks}
+              onNavigate={onNavigate}
+            />
+          ) : null}
           {approvalCount ? (
             <ApprovalQueue
               leaveActions={pendingLeaveActions}

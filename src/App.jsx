@@ -106,6 +106,7 @@ import {
 import { groupContainsRoute, groupHasNavTree, groupNavLeavesAsItems } from "./lib/navTree.js";
 import { buildPageIndex, depthFromHistoryState, pageFromLocation, pageHistoryState, pageSlug, slugFromHistoryState, urlWithPage } from "./lib/pageUrl.js";
 import { employeePortalNavGroups, filterEmployeePortalNav } from "./data/employeePortalNav.js";
+import { quickLinkOptions } from "./lib/dashboardQuickLinks.js";
 import CommandDashboard from "./components/CommandDashboard.jsx";
 const DailyLogPage = lazyPage(() => import("./pages/DailyLogPage.jsx"));
 const PersonnelPage = lazyPage(() => import("./pages/PersonnelPage.jsx"));
@@ -853,6 +854,8 @@ function AppShell() {
     const [first, ...rest] = visibleNavGroups;
     return first && !first.label ? [first, myWork, ...rest] : [myWork, ...visibleNavGroups];
   }, [showAdminToggle, showEmployeeToggle, visibleNavGroups, visibleEmployeeNavGroups]);
+  // My Dashboard quick links may point at any page this person's menu offers.
+  const dashboardQuickLinkOptions = useMemo(() => quickLinkOptions(menuGroups, groupNavLeavesAsItems), [menuGroups]);
 
   // Keep the open page in the address (?page=...) so it can be bookmarked,
   // shared and reached with back/forward. The first sync replaces the current
@@ -1290,6 +1293,7 @@ function AppShell() {
       membership={membership}
       user={user}
       permissions={permissions}
+      quickLinkOptions={dashboardQuickLinkOptions}
       showInternalEmail={isModuleEnabled("internalEmail")}
       personnel={personnel}
       certifications={liveCertifications}
