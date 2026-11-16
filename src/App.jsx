@@ -898,15 +898,22 @@ function AppShell() {
 
   useEffect(() => {
     if (membershipLoading || !user?.uid || showAdminToggle) return undefined;
+    // A demo persona is the shared demo login viewed as a smaller role on purpose:
+    // "recovering" it would always succeed (the real account is the Fire Chief).
+    if (membership?.demoPersona) return undefined;
     if (adminRecoveryAttemptedRef.current) return undefined;
     let cancelled = false;
     (async () => {
       const restored = await recoverAccess();
       adminRecoveryAttemptedRef.current = true;
-      if (!cancelled && restored) setCurrent("Dashboard");
+      if (!cancelled && restored) {
+        // Keep a page named in the address (?page=...), e.g. after a reload.
+        const requested = pageFromLocation(PAGE_INDEX, window.location);
+        if (!requested || requested === "My Dashboard") setCurrent("Dashboard");
+      }
     })();
     return () => { cancelled = true; };
-  }, [showAdminToggle, user?.uid, recoverAccess, membershipLoading]);
+  }, [showAdminToggle, user?.uid, recoverAccess, membershipLoading, membership?.demoPersona]);
 
   useEffect(() => {
     if (membershipLoading) return;
