@@ -270,6 +270,8 @@ const PERSONAL_PAGE_NAMES = new Set([
 
 // Every in-app page, keyed by its URL slug (?page=...).
 const PAGE_INDEX = buildPageIndex([...new Set([...DEPARTMENT_PAGE_NAMES, ...PERSONAL_PAGE_NAMES])]);
+// "My Dashboard" became the one Dashboard; old links still open it.
+PAGE_INDEX.set("my-dashboard", "Dashboard");
 
 
 const NAV_SECTIONS_STORAGE_KEY = "rms-nav-sections-collapsed";
@@ -842,7 +844,7 @@ function AppShell() {
   // Personal pages render in the Employee Portal page; everything else is a department page.
   const onPersonalPage = !showAdminToggle || (PERSONAL_PAGE_NAMES.has(current) && !DEPARTMENT_PAGE_NAMES.has(current));
   const effectiveAppView = onPersonalPage ? "employee" : "admin";
-  const homePage = showAdminToggle ? "Dashboard" : "My Dashboard";
+  const homePage = "Dashboard";
   const menuGroups = useMemo(() => {
     if (!showAdminToggle) return visibleEmployeeNavGroups;
     if (!showEmployeeToggle) return visibleNavGroups;
@@ -854,7 +856,7 @@ function AppShell() {
     const [first, ...rest] = visibleNavGroups;
     return first && !first.label ? [first, myWork, ...rest] : [myWork, ...visibleNavGroups];
   }, [showAdminToggle, showEmployeeToggle, visibleNavGroups, visibleEmployeeNavGroups]);
-  // My Dashboard quick links may point at any page this person's menu offers.
+  // Dashboard quick links may point at any page this person's menu offers.
   const dashboardQuickLinkOptions = useMemo(() => quickLinkOptions(menuGroups, groupNavLeavesAsItems), [menuGroups]);
 
   // Keep the open page in the address (?page=...) so it can be bookmarked,
@@ -917,7 +919,7 @@ function AppShell() {
       if (!cancelled && restored) {
         // Keep a page named in the address (?page=...), e.g. after a reload.
         const requested = pageFromLocation(PAGE_INDEX, window.location);
-        if (!requested || requested === "My Dashboard") setCurrent("Dashboard");
+        if (!requested) setCurrent("Dashboard");
       }
     })();
     return () => { cancelled = true; };
@@ -932,14 +934,14 @@ function AppShell() {
       setCurrent("Hydrants");
       return;
     }
-    setCurrent(showAdminToggle ? "Dashboard" : "My Dashboard");
+    setCurrent("Dashboard");
   }, [showAdminToggle, showEmployeeToggle, membershipLoading]);
 
   // Members without Admin RMS access only have personal pages (an old link to a
-  // department page lands on My Dashboard instead).
+  // department page lands on the Dashboard instead).
   useEffect(() => {
     if (membershipLoading || showAdminToggle) return;
-    if (!PERSONAL_PAGE_NAMES.has(current)) setCurrent("My Dashboard");
+    if (!PERSONAL_PAGE_NAMES.has(current)) setCurrent("Dashboard");
   }, [membershipLoading, showAdminToggle, current]);
 
   useEffect(() => {
@@ -1286,7 +1288,8 @@ function AppShell() {
   // A page whose module is switched off (reachable by a saved ?page= link) is not shown.
   const blockedModuleKey = effectiveAppView === "employee" ? "" : NAV_MODULE_MAP[current] || "";
   const moduleBlocked = Boolean(!inPlatformScope && blockedModuleKey && !isModuleEnabled(blockedModuleKey));
-  const pageContent = effectiveAppView === "employee" ? (
+  // Personal pages (and the personal part of the Dashboard) render in the Employee Portal page.
+  const renderEmployeePortal = (overrides = {}) => (
     <EmployeePortalPage
       current={current}
       onNavigate={navigate}
@@ -1340,9 +1343,13 @@ function AppShell() {
         setCurrent("System Admin");
         setMobileNav(false);
       }}
+      {...overrides}
     />
+  );
+  const pageContent = effectiveAppView === "employee" ? (
+    renderEmployeePortal()
   ) : current === "Dashboard" ? (
-    <CommandDashboard onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={liveCertifications} apparatus={apparatusLive} workOrders={fleetWorkOrdersForDashboard || workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} dutyDayId={currentDutyDayId} />
+    <CommandDashboard personal={renderEmployeePortal({ embedded: true, previewPerson: null })} onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={liveCertifications} apparatus={apparatusLive} workOrders={fleetWorkOrdersForDashboard || workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} dutyDayId={currentDutyDayId} />
   ) : current === "Personnel" ? (
     hasPermission(permissions, "viewPersonnel") ? (
       <PersonnelPage

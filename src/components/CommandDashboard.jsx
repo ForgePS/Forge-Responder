@@ -48,6 +48,8 @@ function MiniTable({ columns, rows, emptyMessage }) {
 
 export default function CommandDashboard({
   onNavigate,
+  // This person's quick links, approvals and alerts (from EmployeePortalPage, embedded).
+  personal = null,
   departmentId = "",
   personnel,
   certifications,
@@ -174,6 +176,7 @@ export default function CommandDashboard({
           <ThemeToggle />
         </div>
       </section>
+      {personal}
       <section className="kpi-grid">
         {kpis.map(([label, value, note, tone, Icon, target]) => (
           <button key={label} className={`kpi-card tone-${tone}`} onClick={() => onNavigate(target)}>

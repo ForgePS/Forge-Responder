@@ -1,5 +1,5 @@
 /**
- * My Dashboard quick links: cards a person pins to jump straight to a page.
+ * Dashboard quick links: cards a person pins to jump straight to a page.
  *
  * The chosen page names are saved on the member's own user record
  * (preferences.dashboardQuickLinks), so they follow the person across devices.
@@ -21,8 +21,8 @@ export const DEFAULT_QUICK_LINKS = [
 ];
 const DEFAULT_COUNT = 4;
 
-// The dashboard itself is never a quick link.
-const EXCLUDED_PAGES = new Set(["My Dashboard"]);
+// The dashboard itself is never a quick link ("My Dashboard" is its old name).
+const EXCLUDED_PAGES = new Set(["Dashboard", "My Dashboard"]);
 
 /**
  * Pages a person can pin, from their menu groups, in menu order:
