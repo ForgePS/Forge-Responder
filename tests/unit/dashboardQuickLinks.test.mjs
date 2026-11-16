@@ -30,6 +30,11 @@ test("options come from the menu in order, without the dashboard, outside links 
   assert.equal(options[1].icon, Icon);
 });
 
+test("the Dashboard itself (or its old My Dashboard name) is never offered", () => {
+  const menu = [{ label: "", items: [["Dashboard", Icon], ["Forge AI", Icon]] }, { label: "My Work", items: [["My Dashboard", Icon], ["My Profile", Icon]] }];
+  assert.deepEqual(names(quickLinkOptions(menu)), ["Forge AI", "My Profile"]);
+});
+
 test("options read nested menu trees through the leaves helper", () => {
   const tree = [{ label: "Prevention", tree: [], items: [] }];
   const leaves = () => [["Inspections", Icon], ["Preplans", Icon]];

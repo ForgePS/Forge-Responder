@@ -24,7 +24,7 @@ export const employeePortalNavGroups = [
   {
     label: "",
     items: [
-      ["My Dashboard", Home],
+      ["Dashboard", Home],
       ["My Profile", UserRound],
     ],
   },

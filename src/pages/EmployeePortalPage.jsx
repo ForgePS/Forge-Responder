@@ -221,8 +221,10 @@ export default function EmployeePortalPage({
   membership,
   user,
   permissions = {},
-  // Pages this person can pin as My Dashboard quick links (from their menu).
+  // Pages this person can pin as Dashboard quick links (from their menu).
   quickLinkOptions = [],
+  // Render only the personal part of the dashboard (shown on the Command Dashboard).
+  embedded = false,
   showInternalEmail = true,
   personnel = [],
   certifications = [],
@@ -969,13 +971,102 @@ export default function EmployeePortalPage({
     setMessage(`Acknowledged ${doc.title}`);
   }
 
+  // Dashboard pieces, shared by the full personal dashboard and the personal
+  // part shown on the Command Dashboard (`embedded`) for people with department access.
+  const quickLinksBlock = previewPerson ? null : (
+    <DashboardQuickLinks
+      options={quickLinkOptions}
+      saved={savedQuickLinks}
+      onSave={saveQuickLinks}
+      onNavigate={onNavigate}
+    />
+  );
+  const approvalsBlock = approvalCount ? (
+    <ApprovalQueue
+      leaveActions={pendingLeaveActions}
+      tradeActions={pendingTradeActions}
+      onDecideLeave={decideLeaveApproval}
+      onDecideTrade={decideTradeApproval}
+    />
+  ) : null;
+  const certPanel = (
+    <Panel title="Certification Alerts" icon={FileCheck2}>
+      <div className="operational-notes employee-cert-list">
+        {myCertAlerts.map((item) => <p key={item.id}><time>{item.expires}</time><b>{item.type}</b><span>{item.status}</span></p>)}
+        {!myCertAlerts.length && (
+          <p className="operational-notes-empty">
+            <b>All clear</b>
+            <span>{myCerts.length ? `${myCerts.length} certification${myCerts.length === 1 ? "" : "s"} current; none expire in the next 90 days` : "No certifications on file"}</span>
+          </p>
+        )}
+      </div>
+    </Panel>
+  );
+  const requestsPanel = (
+    <Panel title="Pending Requests" icon={CalendarDays}>
+      <div className="operational-notes employee-leave-history">
+        {myPendingLeave.map((item) => (
+          <p key={item.id}>
+            <time>{item.dates}</time>
+            <b>{item.type}</b>
+            <span>{leaveStatusDetail(item)}</span>
+          </p>
+        ))}
+        {myTrades.filter((item) => /pending|awaiting/i.test(item.status || "")).map((item) => (
+          <p key={item.id}><time>{item.submitted}</time><b>Shift trade</b><span>{shiftTradeStatusDetail(item)}</span></p>
+        ))}
+        {!myPendingLeave.length && !pendingTrades && <p className="operational-notes-empty"><b>No pending requests</b><span>Leave and trades will appear here</span></p>}
+      </div>
+    </Panel>
+  );
+  const docsPanel = (
+    <Panel title="Documents to Acknowledge" icon={FileText}>
+      <div className="operational-notes employee-doc-ack-list">
+        {myDocs.map((item) => <p key={item.id} className="is-clickable" role="button" tabIndex={0} title="Open to read and acknowledge" onClick={() => setViewingDocId(item.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setViewingDocId(item.id); } }}><time>{formatShortDate(item.effectiveDate)}</time><b>{item.title}</b><span>{item.category}</span></p>)}
+        {!myDocs.length && <p className="operational-notes-empty"><b>All caught up</b><span>No pending acknowledgements</span></p>}
+      </div>
+    </Panel>
+  );
+  const docViewer = viewingDoc ? (
+    <DocumentViewerDialog
+      doc={viewingDoc}
+      acknowledged={hasAcknowledged(viewingDoc, acknowledgementKeys(myAckIdentity))}
+      onAcknowledge={() => acknowledgeDocument(viewingDoc.id)}
+      onClose={() => setViewingDocId("")}
+    />
+  ) : null;
+  const pendingRequestCount = myPendingLeave.length + pendingTrades;
+
+  if (embedded) {
+    // Only what needs this person's attention; "all clear" panels stay off the Command Dashboard.
+    const myPanels = [
+      myCertAlerts.length ? ["certs", certPanel] : null,
+      pendingRequestCount ? ["requests", requestsPanel] : null,
+      myDocs.length ? ["docs", docsPanel] : null,
+    ].filter(Boolean);
+    return (
+      <div className="employee-portal employee-portal-embedded">
+        {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}>×</button></div>}
+        {quickLinksBlock}
+        {approvalsBlock}
+        {myPanels.length ? (
+          <section className={`dashboard-grid my-work-grid my-work-grid-${myPanels.length}`} aria-label="My work">
+            <h2 className="my-work-heading">My Work</h2>
+            {myPanels.map(([key, panel]) => <div key={key} className="dashboard-column">{panel}</div>)}
+          </section>
+        ) : null}
+        {docViewer}
+      </div>
+    );
+  }
+
   return (
     <div className="employee-portal">
       <section className="module-heading employee-portal-heading">
         <div>
           <span className="module-icon"><UserRound size={22} /></span>
           <div>
-            <h1>{current || "My Dashboard"}</h1>
+            <h1>{current || "Dashboard"}</h1>
             <p>
               {myPerson?.name || membership?.displayName || "Member"}
               {myPerson?.rank ? ` · ${myPerson.rank}` : ""}
@@ -1000,68 +1091,19 @@ export default function EmployeePortalPage({
 
       {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}>×</button></div>}
 
-      {current === "My Dashboard" && (
+      {current === "Dashboard" && (
         <>
           <section className="training-summary">
             {[["Next Shift", scheduleContext.isWorkDayToday && myPerson?.shift ? `Today · ${myPerson.shift}` : myShift ? `${myShift.date} · ${myShift.shift}` : (!onRotation && (myPerson?.shift || membership?.assignedShift) ? "Day staff" : "—"), "info"], ["Certification Alerts", certAlerts, certAlerts ? "warning" : "success"], ["Training Due", trainingDue, trainingDue ? "warning" : "success"], ["Documents", myDocs.length, myDocs.length ? "warning" : "success"], ["Pending Trades", pendingTrades, pendingTrades ? "warning" : "info"]].map(([label, value, tone]) => (
               <div key={label} className={`fleet-stat stat-${tone}`}><strong>{value}</strong><span>{label}</span></div>
             ))}
           </section>
-          {!previewPerson ? (
-            <DashboardQuickLinks
-              options={quickLinkOptions}
-              saved={savedQuickLinks}
-              onSave={saveQuickLinks}
-              onNavigate={onNavigate}
-            />
-          ) : null}
-          {approvalCount ? (
-            <ApprovalQueue
-              leaveActions={pendingLeaveActions}
-              tradeActions={pendingTradeActions}
-              onDecideLeave={decideLeaveApproval}
-              onDecideTrade={decideTradeApproval}
-            />
-          ) : null}
+          {quickLinksBlock}
+          {approvalsBlock}
           <section className="dashboard-grid">
-            <div className="dashboard-column">
-              <Panel title="Certification Alerts" icon={FileCheck2}>
-                <div className="operational-notes employee-cert-list">
-                  {myCertAlerts.map((item) => <p key={item.id}><time>{item.expires}</time><b>{item.type}</b><span>{item.status}</span></p>)}
-                  {!myCertAlerts.length && (
-                    <p className="operational-notes-empty">
-                      <b>All clear</b>
-                      <span>{myCerts.length ? `${myCerts.length} certification${myCerts.length === 1 ? "" : "s"} current; none expire in the next 90 days` : "No certifications on file"}</span>
-                    </p>
-                  )}
-                </div>
-              </Panel>
-            </div>
-            <div className="dashboard-column">
-              <Panel title="Pending Requests" icon={CalendarDays}>
-                <div className="operational-notes employee-leave-history">
-                  {myPendingLeave.map((item) => (
-                    <p key={item.id}>
-                      <time>{item.dates}</time>
-                      <b>{item.type}</b>
-                      <span>{leaveStatusDetail(item)}</span>
-                    </p>
-                  ))}
-                  {myTrades.filter((item) => /pending|awaiting/i.test(item.status || "")).map((item) => (
-                    <p key={item.id}><time>{item.submitted}</time><b>Shift trade</b><span>{shiftTradeStatusDetail(item)}</span></p>
-                  ))}
-                  {!myPendingLeave.length && !pendingTrades && <p className="operational-notes-empty"><b>No pending requests</b><span>Leave and trades will appear here</span></p>}
-                </div>
-              </Panel>
-            </div>
-            <div className="dashboard-column">
-              <Panel title="Documents to Acknowledge" icon={FileText}>
-                <div className="operational-notes employee-doc-ack-list">
-                  {myDocs.map((item) => <p key={item.id} className="is-clickable" role="button" tabIndex={0} title="Open to read and acknowledge" onClick={() => setViewingDocId(item.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setViewingDocId(item.id); } }}><time>{formatShortDate(item.effectiveDate)}</time><b>{item.title}</b><span>{item.category}</span></p>)}
-                  {!myDocs.length && <p className="operational-notes-empty"><b>All caught up</b><span>No pending acknowledgements</span></p>}
-                </div>
-              </Panel>
-            </div>
+            <div className="dashboard-column">{certPanel}</div>
+            <div className="dashboard-column">{requestsPanel}</div>
+            <div className="dashboard-column">{docsPanel}</div>
           </section>
         </>
       )}
@@ -1455,14 +1497,7 @@ export default function EmployeePortalPage({
         </Panel>
       )}
 
-      {viewingDoc && (
-        <DocumentViewerDialog
-          doc={viewingDoc}
-          acknowledged={hasAcknowledged(viewingDoc, acknowledgementKeys(myAckIdentity))}
-          onAcknowledge={() => acknowledgeDocument(viewingDoc.id)}
-          onClose={() => setViewingDocId("")}
-        />
-      )}
+      {docViewer}
     </div>
   );
 }

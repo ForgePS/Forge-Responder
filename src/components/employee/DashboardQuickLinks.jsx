@@ -11,7 +11,7 @@ import {
 } from "../../lib/dashboardQuickLinks.js";
 
 /**
- * My Dashboard quick-link cards. `options` are the pages this person's menu
+ * Dashboard quick-link cards. `options` are the pages this person's menu
  * offers ({ name, icon, group }); `saved` is their stored list (undefined =
  * never customized, so the defaults show). `onSave(nextList)` stores a change.
  */

@@ -1272,3 +1272,43 @@ button.quick-link-card:focus-visible {
   color: var(--rms-text-muted);
   font-size: 13px;
 }
+
+/* The personal part of the Dashboard for people with department access
+   (quick links, approvals, and only the alerts that need attention). */
+/* Its pieces join the Command Dashboard's own layout: quick links and
+   approvals above the KPIs, the person's alerts after the department panels. */
+.employee-portal.employee-portal-embedded {
+  display: contents;
+}
+
+.dashboard .my-work-grid {
+  order: 1;
+}
+
+.my-work-heading {
+  grid-column: 1 / -1;
+  margin: 0 0 -3px;
+  padding-left: 2px;
+  color: var(--rms-text-body);
+  font-size: 14px;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+
+.my-work-grid > .dashboard-column {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.my-work-grid.my-work-grid-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.my-work-grid.my-work-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 980px) {
+  .my-work-grid.my-work-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
