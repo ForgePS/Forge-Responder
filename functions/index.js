@@ -1502,11 +1502,13 @@ exports.helpDeskUpdateTicket = helpDeskCall(helpDesk.updateTicket);
 exports.helpDeskListAssignees = helpDeskCall(helpDesk.listAssignees);
 exports.helpDeskGetSettings = helpDeskCall(helpDesk.getSettings);
 exports.helpDeskSaveSettings = helpDeskCall(helpDesk.saveSettings);
+// No retry policy: each email is claimed with create() before sending, so a retry
+// would skip it anyway; failures are recorded in the notifications log.
 exports.helpDeskOnTicketCreated = onDocumentCreated(
-  { document: "helpDeskTickets/{ticketId}", secrets: EMAIL_SECRETS, retry: true },
+  { document: "helpDeskTickets/{ticketId}", secrets: EMAIL_SECRETS },
   (event) => helpDesk.handleTicketCreated(admin.firestore(), event)
 );
 exports.helpDeskOnMessageCreated = onDocumentCreated(
-  { document: "helpDeskTickets/{ticketId}/messages/{messageId}", secrets: EMAIL_SECRETS, retry: true },
+  { document: "helpDeskTickets/{ticketId}/messages/{messageId}", secrets: EMAIL_SECRETS },
   (event) => helpDesk.handleMessageCreated(admin.firestore(), event)
 );
