@@ -2,6 +2,7 @@ import { resolveDepartmentLogoUrl, resolvePlatformLogoUrl } from "../lib/brandAs
 import { defaultPlatformConfig } from "../data/platformBrand.js";
 import DepartmentPortalLink from "./DepartmentPortalLink.jsx";
 import { isPlatformScope } from "../lib/tenantPaths.js";
+import { describeRmsGateway } from "../lib/gatewayDisplay.js";
 
 export default function PlatformBrandHero({
   config = defaultPlatformConfig,
@@ -60,6 +61,7 @@ export default function PlatformBrandHero({
 
   const brand = { ...defaultPlatformConfig, ...config };
   const logoSrc = resolvePlatformLogoUrl(brand.logoUrl);
+  const gateway = describeRmsGateway(brand.rmsAppUrl);
 
   return (
     <section className={`platform-brand-hero ${compact ? "platform-brand-hero-compact" : ""}`}>
@@ -80,16 +82,16 @@ export default function PlatformBrandHero({
               Website: {brand.websiteUrl.replace(/^https?:\/\//, "")}
             </a>
           )}
-          {brand.rmsAppUrl && (
-            <a className="platform-brand-rms" href={brand.rmsAppUrl} target="_blank" rel="noreferrer">
-              RMS gateway: {brand.rmsAppUrl.replace(/^https?:\/\//, "")}/{"{departmentId}"}
+          {gateway && (
+            <a className="platform-brand-rms" href={gateway.href} target="_blank" rel="noreferrer">
+              RMS gateway: {gateway.label}
             </a>
           )}
         </div>
         <div className="platform-brand-meta">
           <span className="platform-brand-version">Version {brand.version}</span>
           {brand.poweredByLabel && (
-            <span className="platform-brand-powered">{brand.poweredByLabel} FORGE</span>
+            <span className="platform-brand-powered">{brand.poweredByLabel}</span>
           )}
         </div>
       </div>
