@@ -24,7 +24,6 @@ html[data-theme="dark"] {
 /* ---------- Navy-era colours that are unreadable in light mode ---------- */
 .notification-item { color: var(--rms-text-strong); border-bottom-color: var(--rms-border-subtle); }
 .secondary-button.danger-button { color: var(--rms-critical); border-color: color-mix(in srgb, var(--rms-critical) 45%, transparent); }
-.internal-email-body { color: var(--rms-text-body); }
 .email-recipient-chip { color: var(--rms-text-strong); }
 .email-recipient-chip:hover { background: var(--rms-bg-hover-2); }
 .apparatus-member-avatar { color: var(--rms-text-strong); }
