@@ -1,0 +1,190 @@
+{
+  "_about": "Synthetic test PCR (no real patient): 58 y/o male, non-traumatic chest pain, ALS transport. NEMSIS 3.5.1 document shape (src/lib/nemsis/schema.js).",
+  "agency": {
+    "dAgency.01": "TEST-AGENCY-01",
+    "dAgency.02": "TEST001",
+    "dAgency.04": "28"
+  },
+  "uuid": "6f1c2a4e-8b7d-4c3a-9e2f-1a2b3c4d5e6f",
+  "data": {
+    "eRecord": {
+      "eRecord.01": "FORGE-2026-000123",
+      "eRecord.SoftwareApplicationGroup": {
+        "eRecord.02": "Forge Public Safety",
+        "eRecord.03": "Forge Responder ePCR",
+        "eRecord.04": "0.1.0"
+      }
+    },
+    "eResponse": {
+      "eResponse.AgencyGroup": {
+        "eResponse.01": "TEST001",
+        "eResponse.02": "Test Fire Department"
+      },
+      "eResponse.03": "2026-000456",
+      "eResponse.04": "2026-000456-M1",
+      "eResponse.ServiceGroup": {
+        "eResponse.05": "2205001"
+      },
+      "eResponse.07": "2207015",
+      "eResponse.13": "M1",
+      "eResponse.14": "MEDIC 1",
+      "eResponse.23": "2223001",
+      "eResponse.24": [
+        "2224009"
+      ]
+    },
+    "eDispatch": {
+      "eDispatch.01": "2301021"
+    },
+    "eCrew": {
+      "eCrew.CrewGroup": [
+        {
+          "eCrew.01": "P1001",
+          "eCrew.02": "9925007",
+          "eCrew.03": [
+            "2403011",
+            "2403013"
+          ]
+        },
+        {
+          "eCrew.01": "P1002",
+          "eCrew.02": "9925005",
+          "eCrew.03": [
+            "2403001",
+            "2403003"
+          ]
+        }
+      ]
+    },
+    "eTimes": {
+      "eTimes.01": "2026-11-15T14:02:11-06:00",
+      "eTimes.03": "2026-11-15T14:03:05-06:00",
+      "eTimes.05": "2026-11-15T14:04:00-06:00",
+      "eTimes.06": "2026-11-15T14:10:42-06:00",
+      "eTimes.07": "2026-11-15T14:12:30-06:00",
+      "eTimes.09": "2026-11-15T14:31:00-06:00",
+      "eTimes.11": "2026-11-15T14:48:15-06:00",
+      "eTimes.12": "2026-11-15T14:55:00-06:00",
+      "eTimes.13": "2026-11-15T15:20:00-06:00"
+    },
+    "ePatient": {
+      "ePatient.PatientNameGroup": {
+        "ePatient.02": "Testpatient",
+        "ePatient.03": "Alex"
+      },
+      "ePatient.AgeGroup": {
+        "ePatient.15": 58,
+        "ePatient.16": "2516009"
+      },
+      "ePatient.25": "9919003"
+    },
+    "eSituation": {
+      "eSituation.07": "2807005",
+      "eSituation.08": "2808003",
+      "eSituation.09": "R07.9",
+      "eSituation.11": "I21.4",
+      "eSituation.13": "2813003"
+    },
+    "eArrest": {
+      "eArrest.01": "3001001"
+    },
+    "eVitals": {
+      "eVitals.VitalGroup": [
+        {
+          "eVitals.01": "2026-11-15T14:14:00-06:00",
+          "eVitals.02": "9923001",
+          "eVitals.CardiacRhythmGroup": {
+            "eVitals.03": [
+              "9901047"
+            ],
+            "eVitals.04": "3304007",
+            "eVitals.05": [
+              "3305005"
+            ]
+          },
+          "eVitals.BloodPressureGroup": {
+            "eVitals.06": 158,
+            "eVitals.07": 94
+          },
+          "eVitals.HeartRateGroup": {
+            "eVitals.10": 96
+          },
+          "eVitals.12": 97,
+          "eVitals.14": 18,
+          "eVitals.26": "3326001"
+        },
+        {
+          "eVitals.01": "2026-11-15T14:25:00-06:00",
+          "eVitals.02": "9923001",
+          "eVitals.BloodPressureGroup": {
+            "eVitals.06": 142,
+            "eVitals.07": 88
+          },
+          "eVitals.HeartRateGroup": {
+            "eVitals.10": 88
+          },
+          "eVitals.12": 98,
+          "eVitals.14": 16,
+          "eVitals.26": "3326001"
+        }
+      ]
+    },
+    "eMedications": {
+      "eMedications.MedicationGroup": [
+        {
+          "eMedications.01": "2026-11-15T14:16:00-06:00",
+          "eMedications.02": "9923001",
+          "eMedications.03": "1191",
+          "eMedications.04": "9927035",
+          "eMedications.DosageGroup": {
+            "eMedications.05": 324,
+            "eMedications.06": "3706021"
+          },
+          "eMedications.07": "9916003",
+          "eMedications.10": "9905007"
+        },
+        {
+          "eMedications.01": "2026-11-15T14:20:00-06:00",
+          "eMedications.02": "9923001",
+          "eMedications.03": "4917",
+          "eMedications.04": "9927047",
+          "eMedications.DosageGroup": {
+            "eMedications.05": 0.4,
+            "eMedications.06": "3706021"
+          },
+          "eMedications.07": "9916001",
+          "eMedications.10": "9905007"
+        }
+      ]
+    },
+    "eProcedures": {
+      "eProcedures.ProcedureGroup": [
+        {
+          "eProcedures.01": "2026-11-15T14:13:30-06:00",
+          "eProcedures.02": "9923001",
+          "eProcedures.03": "268400002",
+          "eProcedures.05": 1,
+          "eProcedures.06": "9923003",
+          "eProcedures.10": "9905007"
+        }
+      ]
+    },
+    "eDisposition": {
+      "eDisposition.DestinationGroup": {
+        "eDisposition.01": "Test Regional Medical Center"
+      },
+      "eDisposition.IncidentDispositionGroup": {
+        "eDisposition.27": "4227001",
+        "eDisposition.28": "4228001",
+        "eDisposition.29": "4229001",
+        "eDisposition.30": "4230001"
+      },
+      "eDisposition.17": "4217001",
+      "eDisposition.21": "4221003",
+      "eDisposition.32": "4232005"
+    },
+    "eNarrative": {
+      "eNarrative.01": "Synthetic test narrative. 58 y/o M c/o substernal chest pressure x 1 hr. ASA 324 mg PO, NTG 0.4 mg SL with improvement. 12-lead sinus rhythm, no STEMI. Transported emergent to ED."
+    }
+  }
+}
