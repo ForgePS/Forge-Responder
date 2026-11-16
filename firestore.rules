@@ -563,6 +563,48 @@ service cloud.firestore {
       allow write: if isPlatformCreator();
     }
 
+    // ---- Help Desk (functions/lib/helpDesk.js writes everything) ----
+    // FORGE staff (platform creators) see every request; a department's admins see
+    // their own department's; anyone else sees only the requests they opened, and
+    // never internal notes or the notification log.
+    function isHelpDeskStaff(departmentId) {
+      return isPlatformCreator() || isDepartmentAdmin(departmentId);
+    }
+    function helpDeskTicket(ticketId) {
+      return get(/databases/$(database)/documents/helpDeskTickets/$(ticketId)).data;
+    }
+    match /helpDeskTickets/{ticketId} {
+      allow read: if isAuthenticated()
+        && (resource.data.requesterUid == request.auth.uid || isHelpDeskStaff(resource.data.departmentId));
+      allow write: if false;
+      match /messages/{messageId} {
+        allow read: if isAuthenticated()
+          && exists(/databases/$(database)/documents/helpDeskTickets/$(ticketId))
+          && (isHelpDeskStaff(helpDeskTicket(ticketId).departmentId)
+            || (helpDeskTicket(ticketId).requesterUid == request.auth.uid && resource.data.visibility == "public"));
+        allow write: if false;
+      }
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated()
+          && exists(/databases/$(database)/documents/helpDeskTickets/$(ticketId))
+          && isHelpDeskStaff(helpDeskTicket(ticketId).departmentId);
+        allow write: if false;
+      }
+    }
+    // Notification lists (email addresses): the platform's for creators, each
+    // department's for its admins. Counter and rate limits are server-only.
+    match /platformHelpDesk/{document} {
+      allow read: if document == "settings" && isPlatformCreator();
+      allow write: if false;
+    }
+    match /helpDeskSettings/{departmentId} {
+      allow read: if isHelpDeskStaff(departmentId);
+      allow write: if false;
+    }
+    match /helpDeskRate/{uid} {
+      allow read, write: if false;
+    }
+
     // Platform IFC / code library (Creator-managed publications).
     match /codePublications/{publicationId} {
       allow read: if isAuthenticated();

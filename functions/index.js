@@ -1489,3 +1489,26 @@ exports.forgeAiFeedback = forgeAiCall(forgeAi.feedback, { memory: "256MiB" });
 exports.forgeAiGetSettings = forgeAiCall(forgeAi.getSettings, { memory: "256MiB" });
 exports.forgeAiSaveSettings = forgeAiCall(forgeAi.saveSettings, { memory: "256MiB" });
 exports.forgeAiUsageReport = forgeAiCall(forgeAi.usageReport, { memory: "256MiB" });
+
+// ---- Help Desk (functions/lib/helpDesk.js) ----
+// Writes go through these callables; the triggers email the designated lists
+// and requesters (logged, not sent, for forge-demo and EMAIL_DELIVERY=log).
+const helpDesk = require("./lib/helpDesk");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const helpDeskCall = (handler) => onCall({ memory: "256MiB", timeoutSeconds: 30 }, (request) => handler(admin.firestore(), request));
+exports.helpDeskCreateTicket = helpDeskCall(helpDesk.createTicket);
+exports.helpDeskAddMessage = helpDeskCall(helpDesk.addMessage);
+exports.helpDeskUpdateTicket = helpDeskCall(helpDesk.updateTicket);
+exports.helpDeskListAssignees = helpDeskCall(helpDesk.listAssignees);
+exports.helpDeskGetSettings = helpDeskCall(helpDesk.getSettings);
+exports.helpDeskSaveSettings = helpDeskCall(helpDesk.saveSettings);
+// No retry policy: each email is claimed with create() before sending, so a retry
+// would skip it anyway; failures are recorded in the notifications log.
+exports.helpDeskOnTicketCreated = onDocumentCreated(
+  { document: "helpDeskTickets/{ticketId}", secrets: EMAIL_SECRETS },
+  (event) => helpDesk.handleTicketCreated(admin.firestore(), event)
+);
+exports.helpDeskOnMessageCreated = onDocumentCreated(
+  { document: "helpDeskTickets/{ticketId}/messages/{messageId}", secrets: EMAIL_SECRETS },
+  (event) => helpDesk.handleMessageCreated(admin.firestore(), event)
+);

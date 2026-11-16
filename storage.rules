@@ -76,6 +76,54 @@ service firebase.storage {
       allow delete: if canDeleteFiles(departmentId);
     }
 
+    // Help Desk attachments: helpDesk/{departmentId}/{uid}/{uploadId}/{fileName}.
+    // Members add their own files (under 10 MB: images, PDF, text, CSV, JSON); the
+    // uploader, FORGE staff and that department's admins can read them. Files are
+    // never replaced or deleted from the app.
+    function isDepartmentAdmin(departmentId) {
+      return isDepartmentMember(departmentId)
+        && (firestore.get(/databases/(default)/documents/departments/$(departmentId)/users/$(request.auth.uid)).data.get("role", "") == "department_admin"
+          || firestore.get(/databases/(default)/documents/departments/$(departmentId)/users/$(request.auth.uid)).data.get("roleIds", []).hasAny(["fireChief", "itAdmin"]));
+    }
+    function isHelpDeskUploadType() {
+      return request.resource.contentType.matches("image/.*")
+        || request.resource.contentType in ["application/pdf", "text/plain", "text/csv", "application/json"];
+    }
+    match /helpDesk/{departmentId}/{uid}/{uploadId}/{fileName} {
+      allow read: if isAuthenticated()
+        && (request.auth.uid == uid || isPlatformCreator() || isDepartmentAdmin(departmentId));
+      allow create: if isAuthenticated() && request.auth.uid == uid
+        && canAccessDepartment(departmentId)
+        && resource == null
+        && request.resource.size < 10 * 1024 * 1024
+        && isHelpDeskUploadType();
+      allow update, delete: if false;
+    }
+    // Reply attachments: helpDeskReplies/{ticketId}/{public|internal}/{uid}/{uploadId}/{fileName}.
+    // Whoever can reply adds files; the requester reads only files on public replies.
+    function helpDeskTicketData(ticketId) {
+      return firestore.get(/databases/(default)/documents/helpDeskTickets/$(ticketId)).data;
+    }
+    function isHelpDeskTicketStaff(ticketId) {
+      return isPlatformCreator() || isDepartmentAdmin(helpDeskTicketData(ticketId).departmentId);
+    }
+    match /helpDeskReplies/{ticketId}/{visibility}/{uid}/{uploadId}/{fileName} {
+      allow read: if isAuthenticated()
+        && firestore.exists(/databases/(default)/documents/helpDeskTickets/$(ticketId))
+        && (request.auth.uid == uid
+          || isHelpDeskTicketStaff(ticketId)
+          || (visibility == "public" && helpDeskTicketData(ticketId).requesterUid == request.auth.uid));
+      allow create: if isAuthenticated() && request.auth.uid == uid
+        && visibility in ["public", "internal"]
+        && firestore.exists(/databases/(default)/documents/helpDeskTickets/$(ticketId))
+        && (isHelpDeskTicketStaff(ticketId)
+          || (visibility == "public" && helpDeskTicketData(ticketId).requesterUid == request.auth.uid))
+        && resource == null
+        && request.resource.size < 10 * 1024 * 1024
+        && isHelpDeskUploadType();
+      allow update, delete: if false;
+    }
+
     // Platform-wide branding (creator console logo uploads).
     match /platform/{allPaths=**} {
       allow read: if isAuthenticated();

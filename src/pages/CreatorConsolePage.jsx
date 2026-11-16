@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, Building2, CirclePlus, CalendarRange, Layers, Mail, ScrollText, Settings, ShieldCheck } from "lucide-react";
+import { BarChart3, Building2, CirclePlus, CalendarRange, Layers, LifeBuoy, Mail, MailCheck, ScrollText, Settings, ShieldCheck } from "lucide-react";
 import PlatformUsagePanel from "../components/platform/PlatformUsagePanel.jsx";
 import PlatformAuditLogPanel from "../components/platform/PlatformAuditLogPanel.jsx";
 import PlatformSecurityPanel from "../components/platform/PlatformSecurityPanel.jsx";
@@ -11,6 +11,9 @@ import PlatformSubscriptionsPanel from "../components/PlatformSubscriptionsPanel
 import InternalEmailBoard from "../components/InternalEmailBoard.jsx";
 import DepartmentModulesPanel from "../components/DepartmentModulesPanel.jsx";
 import PlatformConfigPanel from "../components/PlatformConfigPanel.jsx";
+import HelpDeskBoard from "../components/helpDesk/HelpDeskBoard.jsx";
+import HelpDeskSettingsPanel from "../components/helpDesk/HelpDeskSettingsPanel.jsx";
+import { ticketIdFromLocation } from "../lib/helpDesk/launch.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { readStoredWorkspaceId, writeStoredWorkspaceId } from "../lib/creatorConsoleWorkspace.js";
@@ -45,6 +48,7 @@ const PLATFORM_TABS = [
   ["usage", "Usage", BarChart3],
   ["audit", "Audit Log", ScrollText],
   ["security", "Security", ShieldCheck],
+  ["helpDesk", "Help Desk", LifeBuoy],
   ["internalEmail", "Messages", Mail]
 ];
 
@@ -52,8 +56,10 @@ export default function CreatorConsolePage() {
   const { user, membership, isCreator } = useAuth();
   const { departmentId, setDepartmentId, platformConfig, profile, refreshDepartment } = useTenant();
   const [workspaceId, setWorkspaceId] = useState(readStoredWorkspaceId);
+  // Links in help desk emails: /creator-console?helpDeskTicket=<id>
+  const [helpDeskTicketId] = useState(() => ticketIdFromLocation());
   const [tab, setTab] = useState(() => (
-    isPlatformScope(readStoredWorkspaceId()) ? "platform" : "modules"
+    helpDeskTicketId ? "helpDesk" : isPlatformScope(readStoredWorkspaceId()) ? "platform" : "modules"
   ));
   const [departments, setDepartments] = useState([]);
   const [message, setMessage] = useState("");
@@ -111,7 +117,7 @@ export default function CreatorConsolePage() {
     }
     if (departmentId === workspaceId) return;
     setWorkspaceId(departmentId);
-    setTab(isPlatformScope(departmentId) ? "platform" : "modules");
+    setTab((current) => (current === "helpDesk" ? current : isPlatformScope(departmentId) ? "platform" : "modules"));
   }, [departmentId, workspaceId]);
 
   function selectWorkspace(nextWorkspaceId) {
@@ -162,7 +168,7 @@ export default function CreatorConsolePage() {
   const visibleTabs = (inPlatformWorkspace
     ? PLATFORM_TABS.filter(([id]) => id !== "internalEmail")
     : PLATFORM_TABS.filter(([id]) => !["platform", "subscriptions", "usage", "audit", "security"].includes(id))
-  ).filter(([id]) => isCreator || !["subscriptions", "usage", "audit", "security"].includes(id));
+  ).filter(([id]) => isCreator || !["subscriptions", "usage", "audit", "security", "helpDesk"].includes(id));
 
   return (
     <div className="module-page platform-admin-page">
@@ -325,6 +331,28 @@ export default function CreatorConsolePage() {
         <Panel title="Two-factor login" icon={ShieldCheck}>
           <PlatformSecurityPanel />
         </Panel>
+      )}
+
+      {tab === "helpDesk" && isCreator && (
+        <>
+          <Panel title={inPlatformWorkspace ? "Help Desk: every department" : `Help Desk: ${activeLabel}`} icon={LifeBuoy} className="hd-console-panel">
+            {!inPlatformWorkspace ? (
+              <p className="auth-help">Requests from <strong>{activeLabel}</strong> only. Switch to the platform workspace to see every department's queue.</p>
+            ) : null}
+            <HelpDeskBoard
+              key={workspaceId}
+              mode={inPlatformWorkspace ? "platform" : "department"}
+              departmentId={inPlatformWorkspace ? "" : workspaceId}
+              departmentName={inPlatformWorkspace ? "" : activeLabel}
+              initialTicketId={helpDeskTicketId}
+              canCreate={false}
+              compact
+            />
+          </Panel>
+          <Panel title={inPlatformWorkspace ? "Platform notification list" : `${activeLabel} notification list`} icon={MailCheck}>
+            <HelpDeskSettingsPanel key={workspaceId} scope={inPlatformWorkspace ? "platform" : workspaceId} />
+          </Panel>
+        </>
       )}
 
       {tab === "internalEmail" && !inPlatformWorkspace && (

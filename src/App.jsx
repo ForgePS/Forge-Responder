@@ -68,6 +68,7 @@ import {
   Home,
   Landmark,
   LayoutList,
+  LifeBuoy,
   Mail,
   MapPin,
   Menu,
@@ -87,6 +88,8 @@ import {
   Sparkles,
 } from "lucide-react";
 const InternalEmailBoardPage = lazyPage(() => import("./pages/InternalEmailBoardPage.jsx"));
+const HelpDeskPage = lazyPage(() => import("./pages/HelpDeskPage.jsx"));
+import { rememberPageForHelpDesk } from "./lib/helpDesk/launch.js";
 const DigitalDashboardPage = lazyPage(() => import("./pages/DigitalDashboardPage.jsx"));
 import { filterNavByEnabledModules, filterNavByCodeLibraryAccess } from "./lib/navFilter.js";
 // Direct imports (not lib/inspections/index.js) so every inspection service isn't in the first download.
@@ -246,7 +249,7 @@ const navGroups = [
   },
   { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["NERIS Analytics", BarChart3], ["Heat Zone Analytics", Flame]] },
   { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Uploads", Upload]] },
-  { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay]] },
+  { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay], ["Help Desk", LifeBuoy]] },
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
 ];
 
@@ -739,6 +742,8 @@ function AppShell() {
       : (typeof window !== "undefined" && pageFromLocation(PAGE_INDEX, window.location)) || initialModule
   );
   const [schedulingTab, setSchedulingTab] = useState(null);
+  // A new help request says which page the person was on before opening the Help Desk.
+  useEffect(() => { rememberPageForHelpDesk(current); }, [current]);
   const clearSchedulingTab = useCallback(() => setSchedulingTab(null), []);
   // "Ask Forge AI" buttons on other pages open the Forge AI page.
   useEffect(() => {
@@ -1842,6 +1847,8 @@ function AppShell() {
     ) : <AccessDeniedModule name={current} />
   ) : current === "Analytics" ? (
     hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={liveCertifications} training={training} apparatus={apparatusLive} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />
+  ) : current === "Help Desk" ? (
+    <HelpDeskPage />
   ) : current === "Messages" ? (
     hasPermission(permissions, "viewInternalEmail") ? <InternalEmailBoardPage personnel={personnel} /> : <AccessDeniedModule name={current} />
   ) : current === "Digital Dashboard" ? (
