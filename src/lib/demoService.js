@@ -150,5 +150,7 @@ export async function ensureDemoAccess(user) {
   }
 
   await setDoc(userRef, payload, { merge: true });
-  return { id: user.uid, ...payload };
+  // Keep saved preferences (theme, My Dashboard quick links) on the loaded membership.
+  const preferences = existing.exists() ? existing.data()?.preferences : undefined;
+  return { id: user.uid, ...payload, ...(preferences ? { preferences } : {}) };
 }
