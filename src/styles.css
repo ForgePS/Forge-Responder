@@ -333,6 +333,10 @@ footer i, .app-footer i { width: 9px; height: 9px; border-radius: 50%; backgroun
 .platform-logo-editor { display: grid; grid-template-columns: 160px 1fr; gap: 16px; align-items: start; }
 .platform-logo-preview { display: grid; place-items: center; width: 160px; height: 160px; padding: 16px; border-radius: 12px; border: 1px solid var(--rms-border); background: rgba(15,36,56,.85); }
 .platform-logo-preview img { width: 100%; height: 100%; object-fit: contain; }
+.browser-tab-preview { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-width: 0; margin: 0 0 12px; padding: 8px 14px; border: 1px solid var(--rms-border); border-bottom: 0; border-radius: 9px 9px 0 0; background: var(--rms-bg-surface-2); color: var(--rms-text-strong); font-size: 13px; }
+.browser-tab-preview img { flex: 0 0 16px; width: 16px; height: 16px; object-fit: contain; }
+.browser-tab-preview span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field-error { display: block; margin-top: 4px; color: var(--rms-danger-text); font-size: 13px; }
 .platform-logo-actions { display: grid; gap: 10px; align-content: start; }
 .platform-logo-actions .secondary-button.active { border-color: var(--rms-accent); color: var(--rms-text-strong); background: rgba(37,99,235,.18); }
 .platform-module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }

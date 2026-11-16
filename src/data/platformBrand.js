@@ -11,6 +11,9 @@ export const defaultPlatformConfig = {
   websiteUrl: FORGE_PUBLIC_WEBSITE_URL,
   rmsAppUrl: FORGE_RMS_APP_URL,
   logoUrl: DEFAULT_PLATFORM_LOGO_PATH,
+  // Browser tab title and icon (see src/lib/browserTabBranding.js).
+  browserTitle: "FORGE Public Safety RMS",
+  faviconUrl: "/favicon.png",
   poweredByLabel: "POWERED BY",
   version: "2.5.0",
   status: "active",
