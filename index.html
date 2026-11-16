@@ -44,7 +44,12 @@
       })();
     </script>
     <script>
-      if (!window.__FORGE_FIELD__) document.documentElement.setAttribute("data-theme", "dark");
+      if (!window.__FORGE_FIELD__) {
+        // Start in the last theme picked on this browser (src/context/ThemeContext.jsx) so pages don't flash.
+        var savedTheme = "light";
+        try { savedTheme = localStorage.getItem("forge-theme") === "dark" ? "dark" : "light"; } catch (e) {}
+        document.documentElement.setAttribute("data-theme", savedTheme);
+      }
       (function () {
         var path = location.pathname.replace(/\/$/, "") || "/";
         var isAlert = path === "/alerts" || path.endsWith("/alerts");

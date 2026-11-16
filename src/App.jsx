@@ -664,6 +664,7 @@ function TopBar({
     <div className="top-bar-utilities">
       <div className="command-time"><span><CalendarDays size={15} /> {dateLabel}</span><span><Clock3 size={15} /> {timeLabel}</span></div>
       {!hideSearch && <label className="global-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search personnel, apparatus, occupancies, training, inspections..." /></label>}
+      <ThemeToggle compact className="icon-button top-bar-theme-toggle" />
       <NotificationBell departmentId={departmentId} userId={user?.uid} />
       <AccountMenu initials={initials} displayName={displayName} roleLabel={roleLabel} onSignOut={onSignOut} />
     </div>
