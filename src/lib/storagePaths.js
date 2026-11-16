@@ -15,6 +15,11 @@ export function buildDepartmentLogoPath(departmentId, fileName = "logo.png") {
   return `departments/${departmentId}/logos/department-${Date.now()}.${ext}`;
 }
 
+export function buildPlatformFaviconPath(fileName = "favicon.png") {
+  const ext = fileExtension(fileName, "png");
+  return `platform/branding/favicon-${Date.now()}.${ext}`;
+}
+
 export function buildPlatformLogoPath(fileName = "logo.png") {
   const ext = fileExtension(fileName, "png");
   return `platform/branding/logo-${Date.now()}.${ext}`;

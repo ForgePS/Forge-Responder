@@ -14,7 +14,15 @@ import {
   isForgeLogoUrl,
   resolvePlatformLogoUrl
 } from "../lib/brandAssets.js";
-import { buildPlatformLogoPath } from "../lib/storagePaths.js";
+import { buildPlatformFaviconPath, buildPlatformLogoPath } from "../lib/storagePaths.js";
+import {
+  DEFAULT_BROWSER_TITLE,
+  DEFAULT_FAVICON_PATH,
+  MAX_BROWSER_TITLE_LENGTH,
+  isSafeFaviconUrl,
+  normalizeBrowserTitle,
+  resolveTabBranding,
+} from "../lib/browserTabBranding.js";
 import PlatformBrandHero from "./PlatformBrandHero.jsx";
 import ObjectUploadField from "./ObjectUploadField.jsx";
 import { resolveAvailableModules } from "../lib/platformInheritance.js";
@@ -113,6 +121,8 @@ export default function PlatformConfigPanel({ onMessage }) {
         websiteUrl: form.websiteUrl.trim(),
         rmsAppUrl: form.rmsAppUrl.trim(),
         logoUrl,
+        browserTitle: normalizeBrowserTitle(form.browserTitle) || DEFAULT_BROWSER_TITLE,
+        faviconUrl: isSafeFaviconUrl(form.faviconUrl) ? form.faviconUrl.trim() : DEFAULT_FAVICON_PATH,
         poweredByLabel: form.poweredByLabel.trim(),
         version: form.version.trim(),
         status: form.status || "active",
@@ -137,6 +147,9 @@ export default function PlatformConfigPanel({ onMessage }) {
       setSaving(false);
     }
   }
+
+  const faviconInvalid = Boolean(String(form.faviconUrl || "").trim()) && !isSafeFaviconUrl(form.faviconUrl);
+  const tabPreview = resolveTabBranding(form);
 
   const previewConfig = {
     ...form,
@@ -268,6 +281,63 @@ export default function PlatformConfigPanel({ onMessage }) {
                   <img src={resolvePlatformLogoUrl(previewConfig.logoUrl)} alt={form.name} />
                 </div>
               )}
+            </div>
+          </div>
+        </section>
+
+        <section className="platform-config-card">
+          <header>
+            <strong>Browser tab</strong>
+            <span>The title and icon (favicon) shown on the browser tab, bookmarks and history for the RMS and sign-in pages.</span>
+          </header>
+          <div className="browser-tab-preview" aria-label="Browser tab preview">
+            <img src={tabPreview.faviconUrl} alt="" width={16} height={16} />
+            <span>{tabPreview.title}</span>
+          </div>
+          <div className="workflow-form">
+            <label className="admin-record-field-wide">
+              <span>Tab title</span>
+              <input
+                value={form.browserTitle || ""}
+                maxLength={MAX_BROWSER_TITLE_LENGTH}
+                onChange={(e) => setForm({ ...form, browserTitle: e.target.value })}
+                placeholder={DEFAULT_BROWSER_TITLE}
+              />
+            </label>
+          </div>
+          <div className="platform-logo-editor">
+            <div className="platform-logo-actions" style={{ width: "100%", gap: "12px" }}>
+              <ObjectUploadField
+                variant="logo"
+                label="Favicon"
+                buttonLabel="Upload favicon"
+                hint="Square PNG or SVG, at least 32 × 32 (192 × 192 looks sharpest)"
+                previewUrl={tabPreview.faviconUrl}
+                previewAlt="Favicon"
+                buildPath={(file) => buildPlatformFaviconPath(file.name)}
+                onUploaded={(uploaded) => {
+                  setForm((current) => ({ ...current, faviconUrl: uploaded.downloadUrl }));
+                  onMessage?.("Favicon uploaded — save settings to apply");
+                }}
+                disabled={saving}
+              />
+              <label className="admin-record-field-wide" style={{ flex: "1 1 260px", minWidth: 0 }}>
+                <span>Favicon URL (optional override)</span>
+                <input
+                  value={form.faviconUrl || ""}
+                  onChange={(e) => setForm({ ...form, faviconUrl: e.target.value })}
+                  placeholder={DEFAULT_FAVICON_PATH}
+                  aria-invalid={faviconInvalid}
+                />
+                {faviconInvalid ? <small className="field-error">Use an https:// address or a path on this site; the FORGE icon is used otherwise.</small> : null}
+              </label>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setForm((current) => ({ ...current, browserTitle: DEFAULT_BROWSER_TITLE, faviconUrl: DEFAULT_FAVICON_PATH }))}
+              >
+                <RotateCcw size={14} /> Use FORGE defaults
+              </button>
             </div>
           </div>
         </section>

@@ -1030,6 +1030,14 @@ describe("public platform look", () => {
     await assertFails(setDoc(doc(env.unauthenticatedContext().firestore(), "platformBranding/public"), { logoUrl: "x" }));
     await assertSucceeds(setDoc(doc(creator().firestore(), "platformBranding/public"), { logoUrl: "https://example.com/new.png", name: "FORGE Responder" }));
   });
+
+  it("the browser tab title and favicon can only be changed by platform creators", async () => {
+    const tab = { browserTitle: "FORGE Responder", faviconUrl: "https://example.com/favicon.png" };
+    await assertFails(setDoc(doc(adminA().firestore(), "platformBranding/public"), tab, { merge: true }));
+    await assertFails(setDoc(doc(memberA().firestore(), "platformBranding/public"), tab, { merge: true }));
+    await assertSucceeds(setDoc(doc(creator().firestore(), "platformBranding/public"), tab, { merge: true }));
+    await assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), "platformBranding/public")));
+  });
 });
 
 describe("heat zone analytics data", () => {
