@@ -244,6 +244,7 @@ export async function createInspection(departmentId, input = {}, audit = {}) {
       name: template.name,
       description: template.description,
       inspectionTypeId: template.inspectionTypeId,
+      remarksOnFail: Boolean(template.remarksOnFail),
       sections: template.sections,
     };
   }

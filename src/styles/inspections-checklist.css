@@ -155,3 +155,31 @@ textarea.checklist-input-invalid {
 .pending-citation-banner > span {
   flex: 1 1 220px;
 }
+
+/* Remarks and photos under a No/Fail answer (templates with remarksOnFail). */
+.inspection-fail-details {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--rms-danger-border);
+  border-left: 3px solid var(--rms-danger-text);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-danger-soft);
+}
+.inspection-fail-details > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rms-text-muted);
+}
+.inspection-fail-details textarea {
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
+  font: inherit;
+  font-size: 14px;
+}

@@ -89,6 +89,28 @@ Remarks are required; photos are optional.
   `manageDigitalForms` (and department admins).
 * Photos added and then removed before submitting stay in Storage, unreferenced. Browsers can't delete them.
 
+## Using a form for inspections
+
+In **Manage**, a published form has **Use for inspections** (needs `manageInspectionConfig`). It:
+
+1. copies the form's published version into an inspection template (`inspectionTemplates`, same sections, keys
+   and field types) marked `remarksOnFail` and `sourceDigitalFormId`;
+2. publishes it as an immutable template version;
+3. makes it the default template of the chosen inspection type, or of a new type named after the form.
+
+New inspections of that type then use the form as their checklist. Inspections already created keep the
+checklist they started with. Running it again after revising the form publishes the new version to the same
+template.
+
+In an inspection whose template has `remarksOnFail`, a Yes/No or Pass/Fail item answered No/Fail shows a
+required remarks box and the inspection photo field. They are stored on the inspection under companion keys
+`answers["<key>__remarks"]` and `answers["<key>__photos"]` (photos are inspection attachments, as with any
+inspection photo). **Complete** is blocked until every No/Fail item has remarks. Templates without
+`remarksOnFail` (all existing ones) are unchanged.
+
+Code: `src/lib/digitalForms/inspectionTemplateFromForm.js`, `src/lib/digitalForms/inspectionTemplateMapping.js`,
+`src/lib/inspections/inspectionFailDetails.js`.
+
 ## Data
 
 All Firestore data is under `departments/{departmentId}/` and is written only by Cloud Functions.

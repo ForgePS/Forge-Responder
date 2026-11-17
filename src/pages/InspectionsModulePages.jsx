@@ -8,6 +8,7 @@ import InspectionStatusBadge from "../components/inspections/InspectionStatusBad
 import InspectionsModuleLayout from "../components/inspections/InspectionsModuleLayout.jsx";
 import PreventionKpiGroups from "../components/inspections/PreventionKpiGroups.jsx";
 import ChecklistFieldInput from "../components/inspections/ChecklistFieldInput.jsx";
+import { failDetailFields, findMissingFailRemarks, isFailAnswer } from "../lib/inspections/inspectionFailDetails.js";
 import { findMissingRequiredFields, formatMissingFieldsMessage } from "../lib/inspections/checklistFields.js";
 import { describeNumberingFormat } from "../lib/inspections/inspectionNumbering.js";
 import {
@@ -243,6 +244,7 @@ function InspectionWorkspace({
   const sections = Array.isArray(record?.templateSnapshot?.sections)
     ? record.templateSnapshot.sections
     : [];
+  const remarksOnFail = Boolean(record?.templateSnapshot?.remarksOnFail);
   const locked = Boolean(record?.lockedAt) || record?.status === "archived";
   const editable = canEdit && !locked;
   const missingKeys = new Set(missingFields.map((item) => item.key));
@@ -264,7 +266,10 @@ function InspectionWorkspace({
   }
 
   function handleCompleteClick() {
-    const missing = findMissingRequiredFields(record?.templateSnapshot, answers);
+    const missing = [
+      ...findMissingRequiredFields(record?.templateSnapshot, answers),
+      ...findMissingFailRemarks(record?.templateSnapshot, answers),
+    ];
     setMissingFields(missing);
     if (missing.length) {
       setCompleteError(formatMissingFieldsMessage(missing));
@@ -497,6 +502,32 @@ function InspectionWorkspace({
                         onChange={(next) => setAnswer(field.key, next)}
                       />
                       {field.helpText ? <small className="occupancy-muted">{field.helpText}</small> : null}
+                      {remarksOnFail && isFailAnswer(field, answers[field.key]) ? (() => {
+                        const extra = failDetailFields(field);
+                        const remarksMissing = missingKeys.has(extra.remarks.key);
+                        return (
+                          <div className={`inspection-fail-details${remarksMissing ? " checklist-field-missing" : ""}`} data-checklist-key={extra.remarks.key}>
+                            <span>{extra.remarks.label} *{remarksMissing ? " — required" : ""}</span>
+                            <ChecklistFieldInput
+                              field={extra.remarks}
+                              value={answers[extra.remarks.key]}
+                              editable={editable}
+                              invalid={remarksMissing}
+                              onChange={(next) => setAnswer(extra.remarks.key, next)}
+                            />
+                            <span>Photos</span>
+                            <ChecklistFieldInput
+                              field={extra.photos}
+                              value={answers[extra.photos.key]}
+                              editable={editable}
+                              departmentId={departmentId}
+                              inspectionId={record.id}
+                              actor={actor}
+                              onChange={(next) => setAnswer(extra.photos.key, next)}
+                            />
+                          </div>
+                        );
+                      })() : null}
                     </div>
                   );
                 })}
