@@ -22,8 +22,9 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { assertMemberPermission, isPlatformCreator } = require("../access");
 const { isDemoDepartment } = require("../demoGuard");
-const { cleanAnswers, countFields, normalizeDefinition, validateDefinition } = require("./schema");
+const { cleanAnswers, countFields, normalizeDefinition, normalizeLinkType, validateDefinition } = require("./schema");
 const { ExtractionError, extractForm } = require("./extract");
+const { listLinkOptions, resolveLinkedRecord } = require("./links");
 
 const PERMISSIONS = Object.freeze({
   manage: "manageDigitalForms",
@@ -35,6 +36,11 @@ const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 const DAILY_CONVERSIONS_PER_DEPARTMENT = 25;
 const STALE_CONVERSION_MS = 10 * 60 * 1000;
 const FILE_TYPES = { "application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg" };
+/** Photos on a No/Fail answer, uploaded by the member before submitting. */
+const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const PHOTO_NAME = /^[A-Za-z0-9_-]{8,64}\.(jpg|png|webp)$/;
+const LINK_LABELS = { apparatus: "apparatus", occupancy: "occupancy", station: "station", personnel: "member" };
 
 const text = (v, max = 200) => (v === null || v === undefined ? "" : String(v).trim().slice(0, max));
 const nowIso = () => new Date().toISOString();
@@ -47,6 +53,7 @@ const paths = {
   versionDoc: (d, id) => `departments/${d}/formTemplateVersions/${id}`,
   submissions: (d) => `departments/${d}/formSubmissions`,
   upload: (d, importId, ext) => `formImports/${d}/${importId}/source.${ext}`,
+  photoFolder: (d, uid) => `formSubmissionPhotos/${d}/${uid}/`,
   usage: (d, day) => `platformAiUsage/${d}_${day}`,
 };
 
@@ -170,6 +177,7 @@ async function createImport(db, request) {
     contentType,
     size,
     uploadPath,
+    linkType: normalizeLinkType(request.data?.linkType),
     createdBy: caller.uid,
     createdByName: caller.name,
     createdAt: nowIso(),
@@ -258,6 +266,8 @@ async function convertImport(db, bucket, request, { getClient }) {
     await reserveDailyConversion(db, caller.departmentId);
     reserved = true;
     const result = await extractForm(client, { buffer, contentType: record.contentType, fileName: record.fileName });
+    // The record type picked on the upload screen; the model never chooses it.
+    result.definition = { ...result.definition, linkType: normalizeLinkType(record.linkType) };
     await ref.update({
       status: "review",
       draft: result.definition,
@@ -297,7 +307,7 @@ function versionRecord(templateId, version, definition, caller) {
     id: `${templateId}-v${version}`,
     templateId,
     version,
-    snapshot: { name: definition.name, description: definition.description, sections: definition.sections },
+    snapshot: { name: definition.name, description: definition.description, linkType: definition.linkType || "", sections: definition.sections },
     publishedAt: nowIso(),
     publishedBy: caller.uid,
     publishedByName: caller.name,
@@ -328,6 +338,7 @@ async function publish(db, request) {
       id: templateRef.id,
       name: def.name,
       description: def.description,
+      linkType: def.linkType || "",
       sections: def.sections,
       fieldCount: countFields(def),
       lifecycleStatus: "published",
@@ -364,6 +375,7 @@ async function reviseTemplate(db, request) {
     tx.update(templateRef, {
       name: def.name,
       description: def.description,
+      linkType: def.linkType || "",
       sections: def.sections,
       fieldCount: countFields(def),
       currentVersion: next,
@@ -409,7 +421,44 @@ async function discardImport(db, bucket, request) {
 // ---------------------------------------------------------------- fill in
 
 /** Save a member's filled-in form. Needs fillDigitalForms (or manageDigitalForms). */
-async function submit(db, request) {
+/**
+ * Photo paths the caller uploaded for this submission that really exist: under
+ * formSubmissionPhotos/{verified department}/{caller uid}/, an image, ≤ 10 MB.
+ * Anything else (another member's or department's photo, a made-up path) is left out,
+ * and cleanAnswers then refuses the answer it was attached to.
+ */
+async function verifiedPhotoPaths(bucket, departmentId, uid, rawDetails) {
+  const folder = paths.photoFolder(departmentId, uid);
+  const wanted = new Set();
+  const details = rawDetails && typeof rawDetails === "object" ? rawDetails : {};
+  for (const entry of Object.values(details)) {
+    for (const p of Array.isArray(entry?.photos) ? entry.photos : []) {
+      const value = String(p || "");
+      if (value.startsWith(folder) && PHOTO_NAME.test(value.slice(folder.length))) wanted.add(value);
+      if (wanted.size > 60) break;
+    }
+  }
+  const ok = new Set();
+  await Promise.all([...wanted].map(async (p) => {
+    try {
+      const [metadata] = await bucket.file(p).getMetadata();
+      if (PHOTO_TYPES.includes(metadata.contentType) && Number(metadata.size) <= MAX_PHOTO_BYTES) ok.add(p);
+    } catch {
+      // Missing file: not verified.
+    }
+  }));
+  return ok;
+}
+
+/** Records a member can link a submission to. Needs any Digital Forms permission. */
+async function linkOptions(db, request) {
+  const caller = await resolveCaller(db, request, [PERMISSIONS.fill, PERMISSIONS.manage, PERMISSIONS.viewSubmissions]);
+  const type = normalizeLinkType(request.data?.type);
+  if (!type) throw new HttpsError("invalid-argument", "Choose apparatus, occupancy, station or personnel.");
+  return { type, options: await listLinkOptions(db, caller.departmentId, type) };
+}
+
+async function submit(db, bucket, request) {
   const caller = await resolveCaller(db, request, [PERMISSIONS.fill, PERMISSIONS.manage]);
   const templateId = cleanDocId(request.data?.templateId, "templateId");
   const templateSnap = await db.doc(paths.templateDoc(caller.departmentId, templateId)).get();
@@ -425,7 +474,22 @@ async function submit(db, request) {
   if (askedVersion && askedVersion !== version.id) {
     throw new HttpsError("failed-precondition", "This form was updated while you were filling it in. Reload it and check your answers.");
   }
-  const { answers, problems } = cleanAnswers(version.snapshot, request.data?.answers);
+  const photoPaths = await verifiedPhotoPaths(bucket, caller.departmentId, caller.uid, request.data?.details);
+  const { answers, details, problems } = cleanAnswers(version.snapshot, request.data?.answers, {
+    details: request.data?.details,
+    isPhotoPath: (p) => photoPaths.has(p),
+  });
+  const linkType = normalizeLinkType(version.snapshot.linkType);
+  let linkedRecord = null;
+  if (linkType) {
+    const wantedId = text(request.data?.linkedRecord?.id, 200);
+    if (!wantedId) {
+      problems.unshift(`Choose the ${LINK_LABELS[linkType]} this form is for.`);
+    } else {
+      linkedRecord = await resolveLinkedRecord(db, caller.departmentId, linkType, wantedId);
+      if (!linkedRecord) problems.unshift(`That ${LINK_LABELS[linkType]} wasn't found. Choose it again.`);
+    }
+  }
   if (problems.length) throw new HttpsError("invalid-argument", problems.join(" "), { problems });
 
   const ref = db.collection(paths.submissions(caller.departmentId)).doc();
@@ -436,6 +500,11 @@ async function submit(db, request) {
     templateName: version.snapshot.name,
     templateSnapshot: version.snapshot,
     answers,
+    details,
+    linkedRecord,
+    // Flat copies so a record's page can query its submissions.
+    linkedType: linkedRecord?.type || "",
+    linkedId: linkedRecord?.id || "",
     status: "submitted",
     submittedBy: caller.uid,
     submittedByName: caller.name,
@@ -453,6 +522,7 @@ module.exports = {
   convertImport,
   createImport,
   discardImport,
+  linkOptions,
   matchesSignature,
   publish,
   reviseTemplate,

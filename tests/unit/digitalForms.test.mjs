@@ -96,7 +96,7 @@ describe("digital forms: answers", () => {
     [key("Date of damage:")]: "2026-11-02",
     [key("Unit")]: "E2",
     [key("Crew size")]: "4",
-    [key("Out of service")]: "No",
+    [key("Out of service")]: "Yes",
     [key("Damaged items")]: ["Hose"],
     [key("Officer signature")]: { name: "Capt. Example", signedAt: "1999-01-01T00:00:00Z" },
     [key("Tick if photos taken")]: true,
@@ -123,6 +123,67 @@ describe("digital forms: answers", () => {
     assert.equal(bad("Damaged items", ["Hose", "Axe"]).length, 1);
     assert.equal(bad("Tick if photos taken", "yes").length, 1);
     assert.equal(bad("Out of service", "Maybe").length, 1);
+  });
+});
+
+describe("digital forms: remarks and photos on No/Fail", () => {
+  const def = schema.normalizeDefinition({
+    name: "Engine check",
+    sections: [{ title: "Check", fields: [
+      { label: "Lights work", type: "yes_no", required: true },
+      { label: "Pump test", type: "pass_fail_na" },
+      { label: "Notes", type: "long_text" },
+    ] }],
+  });
+  const k = (label) => def.sections[0].fields.find((f) => f.label === label).key;
+  const mine = "formSubmissionPhotos/dept/uid1/abcdef12.jpg";
+  const isPhotoPath = (p) => p === mine;
+
+  it("requires remarks for a No or Fail answer, and keeps them with photos", () => {
+    const noRemarks = schema.cleanAnswers(def, { [k("Lights work")]: "No" });
+    assert.match(noRemarks.problems.join(" "), /Add remarks for "Lights work"/);
+    const ok = schema.cleanAnswers(def, { [k("Lights work")]: "No", [k("Pump test")]: "Fail" }, {
+      details: {
+        [k("Lights work")]: { remarks: "  Left tail light out ", photos: [mine, mine] },
+        [k("Pump test")]: { remarks: "Cavitating at 150 psi" },
+      },
+      isPhotoPath,
+    });
+    assert.deepEqual(ok.problems, []);
+    assert.deepEqual(ok.details[k("Lights work")], { remarks: "Left tail light out", photos: [mine] });
+    assert.deepEqual(ok.details[k("Pump test")], { remarks: "Cavitating at 150 psi", photos: [] });
+  });
+
+  it("drops remarks and photos for Yes, Pass and N/A answers and for unknown fields", () => {
+    const { details, problems } = schema.cleanAnswers(def, { [k("Lights work")]: "Yes", [k("Pump test")]: "N/A" }, {
+      details: { [k("Lights work")]: { remarks: "x", photos: [mine] }, [k("Notes")]: { remarks: "y" }, stray: { remarks: "z" } },
+      isPhotoPath,
+    });
+    assert.deepEqual(problems, []);
+    assert.deepEqual(details, {});
+  });
+
+  it("refuses photos that aren't the caller's verified uploads, and too many photos", () => {
+    const other = schema.cleanAnswers(def, { [k("Lights work")]: "No" }, {
+      details: { [k("Lights work")]: { remarks: "r", photos: ["formSubmissionPhotos/other/uid2/abcdef12.jpg"] } },
+      isPhotoPath,
+    });
+    assert.match(other.problems.join(" "), /couldn't be found/);
+    const many = Array.from({ length: schema.LIMITS.photosPerField + 1 }, (_, i) => `formSubmissionPhotos/dept/uid1/photo000${i}.jpg`);
+    const tooMany = schema.cleanAnswers(def, { [k("Lights work")]: "No" }, {
+      details: { [k("Lights work")]: { remarks: "r", photos: many } },
+      isPhotoPath: () => true,
+    });
+    assert.match(tooMany.problems.join(" "), /more than 6 photos/);
+  });
+});
+
+describe("digital forms: linked records", () => {
+  it("keeps a known link type and drops anything else", () => {
+    assert.equal(schema.normalizeDefinition({ name: "A", linkType: "Apparatus", sections: [] }).linkType, "apparatus");
+    assert.equal(schema.normalizeDefinition({ name: "A", linkType: "incident", sections: [] }).linkType, "");
+    assert.equal(schema.normalizeDefinition({ name: "A", sections: [] }).linkType, "");
+    assert.deepEqual(schema.LINK_TYPES, ["apparatus", "occupancy", "station", "personnel"]);
   });
 });
 

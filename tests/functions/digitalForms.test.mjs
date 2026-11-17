@@ -107,6 +107,8 @@ after(async () => {
 beforeEach(async () => {
   await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${PROJECT_ID}/databases/(default)/documents`, { method: "DELETE" });
   const [files] = await bucket.getFiles({ prefix: "formImports/" }).catch(() => [[]]);
+  const [photos] = await bucket.getFiles({ prefix: "formSubmissionPhotos/" }).catch(() => [[]]);
+  files.push(...photos);
   await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
   await Promise.all([
     member(A, "chief-a", ["fireChief"]),
@@ -157,7 +159,7 @@ describe("upload -> convert -> review -> publish -> fill in", () => {
 
     // A firefighter fills it in.
     const answers = { ...answersFor(saved.draft), [saved.draft.sections[0].fields.find((f) => f.label === "Notes").key]: "Coupling OK" };
-    const { submissionId } = await forms.submit(db, req("ff-a", { departmentId: A, templateId, versionId, answers }));
+    const { submissionId } = await forms.submit(db, bucket, req("ff-a", { departmentId: A, templateId, versionId, answers }));
     const submission = (await db.doc(`departments/${A}/formSubmissions/${submissionId}`).get()).data();
     assert.equal(submission.submittedBy, "ff-a");
     assert.equal(submission.templateVersionId, versionId);
@@ -167,9 +169,9 @@ describe("upload -> convert -> review -> publish -> fill in", () => {
 
   it("rejects submissions missing required answers or with bad values", async () => {
     const { templateId, draft } = await publishedForm();
-    await expectCode(forms.submit(db, req("ff-a", { departmentId: A, templateId, answers: {} })), "invalid-argument");
+    await expectCode(forms.submit(db, bucket, req("ff-a", { departmentId: A, templateId, answers: {} })), "invalid-argument");
     const bad = { ...answersFor(draft), [draft.sections[0].fields[1].key]: "3 in" };
-    await expectCode(forms.submit(db, req("ff-a", { departmentId: A, templateId, answers: bad })), "invalid-argument");
+    await expectCode(forms.submit(db, bucket, req("ff-a", { departmentId: A, templateId, answers: bad })), "invalid-argument");
   });
 
   it("publishing is blocked until review problems are fixed", async () => {
@@ -188,10 +190,10 @@ describe("upload -> convert -> review -> publish -> fill in", () => {
 
   it("revisions add a version; old submissions keep their snapshot; stale fill-ins are refused", async () => {
     const { templateId, versionId, draft } = await publishedForm();
-    const first = await forms.submit(db, req("ff-a", { departmentId: A, templateId, versionId, answers: answersFor(draft) }));
+    const first = await forms.submit(db, bucket, req("ff-a", { departmentId: A, templateId, versionId, answers: answersFor(draft) }));
     const revised = await forms.reviseTemplate(db, req("chief-a", { departmentId: A, templateId, draft: { ...draft, name: "Hose Test v2" } }));
     assert.equal(revised.versionId, `${templateId}-v2`);
-    await expectCode(forms.submit(db, req("ff-a", { departmentId: A, templateId, versionId, answers: answersFor(draft) })), "failed-precondition");
+    await expectCode(forms.submit(db, bucket, req("ff-a", { departmentId: A, templateId, versionId, answers: answersFor(draft) })), "failed-precondition");
     const old = (await db.doc(`departments/${A}/formSubmissions/${first.submissionId}`).get()).data();
     assert.equal(old.templateSnapshot.name, "Hose Test Record");
   });
@@ -199,7 +201,7 @@ describe("upload -> convert -> review -> publish -> fill in", () => {
   it("archived forms can't be filled in", async () => {
     const { templateId, draft } = await publishedForm();
     await forms.setTemplateStatus(db, req("chief-a", { departmentId: A, templateId, status: "archived" }));
-    await expectCode(forms.submit(db, req("ff-a", { departmentId: A, templateId, answers: answersFor(draft) })), "not-found");
+    await expectCode(forms.submit(db, bucket, req("ff-a", { departmentId: A, templateId, answers: answersFor(draft) })), "not-found");
   });
 
   it("discarding deletes the uploaded file", async () => {
@@ -245,8 +247,8 @@ describe("tenant isolation (release blocking)", () => {
 
   it("B can't fill in A's form, even by id", async () => {
     const { templateId, draft } = await publishedForm();
-    await expectCode(forms.submit(db, req("ff-b", { departmentId: A, templateId, answers: answersFor(draft) })), "permission-denied");
-    await expectCode(forms.submit(db, req("ff-b", { departmentId: B, templateId, answers: answersFor(draft) })), "not-found");
+    await expectCode(forms.submit(db, bucket, req("ff-b", { departmentId: A, templateId, answers: answersFor(draft) })), "permission-denied");
+    await expectCode(forms.submit(db, bucket, req("ff-b", { departmentId: B, templateId, answers: answersFor(draft) })), "not-found");
     assert.equal((await db.collection(`departments/${B}/formSubmissions`).get()).size, 0);
   });
 
@@ -280,7 +282,7 @@ describe("permissions", () => {
 
   it("read-only members can't fill in forms", async () => {
     const { templateId, draft } = await publishedForm();
-    await expectCode(forms.submit(db, req("ro-a", { departmentId: A, templateId, answers: answersFor(draft) })), "permission-denied");
+    await expectCode(forms.submit(db, bucket, req("ro-a", { departmentId: A, templateId, answers: answersFor(draft) })), "permission-denied");
   });
 
   it("forms follow the Documents module", async () => {
@@ -349,5 +351,105 @@ describe("abuse and failure cases", () => {
     const getClient = () => { throw Object.assign(new Error("Form conversion isn't set up yet (missing API key)."), { code: "failed-precondition" }); };
     await assert.rejects(forms.convertImport(db, bucket, req("chief-a", { departmentId: A, importId }), { getClient }));
     assert.equal((await db.doc(`departments/${A}/formImports/${importId}`).get()).data().status, "failed");
+  });
+});
+
+describe("linked records", () => {
+  async function seedRecords() {
+    await Promise.all([
+      db.doc(`departments/${A}/fleetAssets/asset-e1`).set({ fleetNumber: "E1", name: "Engine 1", station: "Station 1", status: "in_service" }),
+      db.doc(`departments/${A}/fleetAssets/asset-old`).set({ fleetNumber: "E9", status: "decommissioned" }),
+      db.doc(`departments/${A}/lists/hlfd-rms-apparatus`).set({ items: [{ id: "L1", unit: "Ladder 1", station: "Station 2" }] }),
+      db.doc(`departments/${A}/occupancies/occ-1`).set({ name: "Main St Bakery", address: "1 Main St", status: "Active" }),
+      db.doc(`departments/${A}/profile/main`).set({ stations: ["Station 1", "Station 2"], stationDetails: [{ name: "Station 1", address: "100 Fire Rd" }] }),
+      db.doc(`departments/${A}/lists/hlfd-rms-personnel`).set({ items: [{ id: "p-1", name: "Jane Doe", rank: "Captain" }] }),
+      db.doc(`departments/${B}/fleetAssets/asset-b1`).set({ fleetNumber: "B-E1", status: "in_service" }),
+    ]);
+  }
+
+  async function linkedForm(linkType) {
+    const started = await forms.createImport(db, req("chief-a", { departmentId: A, fileName: "check.pdf", contentType: "application/pdf", size: PDF.length, linkType }));
+    await bucket.file(started.uploadPath).save(PDF, { contentType: "application/pdf" });
+    const converted = await forms.convertImport(db, bucket, req("chief-a", { departmentId: A, importId: started.importId }), fakeClient());
+    const published = await forms.publish(db, req("chief-a", { departmentId: A, importId: started.importId, draft: converted.draft }));
+    return { ...published, draft: converted.draft };
+  }
+
+  it("the type picked at upload carries through review, publish and the published version", async () => {
+    const { templateId, versionId, draft } = await linkedForm("apparatus");
+    assert.equal(draft.linkType, "apparatus");
+    assert.equal((await db.doc(`departments/${A}/formTemplates/${templateId}`).get()).data().linkType, "apparatus");
+    assert.equal((await db.doc(`departments/${A}/formTemplateVersions/${versionId}`).get()).data().snapshot.linkType, "apparatus");
+    const bad = await forms.createImport(db, req("chief-a", { departmentId: A, fileName: "x.pdf", contentType: "application/pdf", size: 10, linkType: "incident" }));
+    assert.equal((await db.doc(`departments/${A}/formImports/${bad.importId}`).get()).data().linkType, "");
+  });
+
+  it("lists each type's records from the caller's own department only", async () => {
+    await seedRecords();
+    const labels = async (type) => (await forms.linkOptions(db, req("ff-a", { departmentId: A, type }))).options.map((o) => o.label);
+    assert.deepEqual(await labels("apparatus"), ["E1", "Ladder 1"]);
+    assert.deepEqual(await labels("occupancy"), ["Main St Bakery"]);
+    assert.deepEqual(await labels("station"), ["Station 1", "Station 2"]);
+    assert.deepEqual(await labels("personnel"), ["Jane Doe"]);
+    await expectCode(forms.linkOptions(db, req("ff-b", { departmentId: A, type: "apparatus" })), "permission-denied");
+    await expectCode(forms.linkOptions(db, req("ro-a", { departmentId: A, type: "apparatus" })), "permission-denied");
+    await expectCode(forms.linkOptions(db, req("ff-a", { departmentId: A, type: "incident" })), "invalid-argument");
+  });
+
+  it("a linked form needs a record from this department, and saves the server's label", async () => {
+    await seedRecords();
+    const { templateId, versionId, draft } = await linkedForm("apparatus");
+    const base = { departmentId: A, templateId, versionId, answers: answersFor(draft) };
+    await expectCode(forms.submit(db, bucket, req("ff-a", base)), "invalid-argument");
+    // B's apparatus id, or a made-up one, is not found in A.
+    await expectCode(forms.submit(db, bucket, req("ff-a", { ...base, linkedRecord: { id: "fleet:asset-b1" } })), "invalid-argument");
+    await expectCode(forms.submit(db, bucket, req("ff-a", { ...base, linkedRecord: { id: "fleet:asset-old" } })), "invalid-argument");
+    const { submissionId } = await forms.submit(db, bucket, req("ff-a", { ...base, linkedRecord: { id: "fleet:asset-e1", label: "Spoofed" } }));
+    const saved = (await db.doc(`departments/${A}/formSubmissions/${submissionId}`).get()).data();
+    assert.deepEqual(saved.linkedRecord, { type: "apparatus", id: "fleet:asset-e1", label: "E1", detail: "Engine 1 · Station 1" });
+    assert.equal(saved.linkedType, "apparatus");
+    assert.equal(saved.linkedId, "fleet:asset-e1");
+  });
+
+  it("an unlinked form ignores a linked record", async () => {
+    await seedRecords();
+    const { templateId, versionId, draft } = await publishedForm();
+    const { submissionId } = await forms.submit(db, bucket, req("ff-a", { departmentId: A, templateId, versionId, answers: answersFor(draft), linkedRecord: { id: "fleet:asset-e1" } }));
+    assert.equal((await db.doc(`departments/${A}/formSubmissions/${submissionId}`).get()).data().linkedRecord, null);
+  });
+});
+
+describe("remarks and photos on a Fail answer", () => {
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]);
+  const photo = async (departmentId, uid, name = "abcdef1234.jpg", contentType = "image/jpeg") => {
+    const path = `formSubmissionPhotos/${departmentId}/${uid}/${name}`;
+    await bucket.file(path).save(JPEG, { contentType });
+    return path;
+  };
+  async function failing() {
+    const { templateId, versionId, draft } = await publishedForm();
+    const answers = answersFor(draft);
+    const resultKey = draft.sections.flatMap((s) => s.fields).find((f) => f.label === "Result").key;
+    answers[resultKey] = "Fail";
+    return { resultKey, base: { departmentId: A, templateId, versionId, answers } };
+  }
+
+  it("needs remarks, and saves them with the member's own photos", async () => {
+    const { resultKey, base } = await failing();
+    await expectCode(forms.submit(db, bucket, req("ff-a", base)), "invalid-argument");
+    const mine = await photo(A, "ff-a");
+    const { submissionId } = await forms.submit(db, bucket, req("ff-a", { ...base, details: { [resultKey]: { remarks: "Burst at 200 psi", photos: [mine] } } }));
+    const saved = (await db.doc(`departments/${A}/formSubmissions/${submissionId}`).get()).data();
+    assert.deepEqual(saved.details, { [resultKey]: { remarks: "Burst at 200 psi", photos: [mine] } });
+  });
+
+  it("refuses another member's, another department's, missing or non-image photos", async () => {
+    const { resultKey, base } = await failing();
+    const send = (path) => forms.submit(db, bucket, req("ff-a", { ...base, details: { [resultKey]: { remarks: "r", photos: [path] } } }));
+    await expectCode(send(await photo(A, "officer-a")), "invalid-argument");
+    await expectCode(send(await photo(B, "ff-a")), "invalid-argument");
+    await expectCode(send(`formSubmissionPhotos/${A}/ff-a/missing0001.jpg`), "invalid-argument");
+    await expectCode(send(await photo(A, "ff-a", "notaphoto01.jpg", "application/pdf")), "invalid-argument");
+    await expectCode(send(`formImports/${A}/x/source.pdf`), "invalid-argument");
   });
 });

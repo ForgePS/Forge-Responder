@@ -1275,4 +1275,51 @@ describe("digital forms", () => {
       await assertFails(getBytes(ref(stranger().storage(), path(A))));
     });
   });
+
+  describe("photos on a No/Fail answer", () => {
+    const reviewerA = () => as("reviewer-a", { email: "reviewer@a.gov", email_verified: true });
+    const photo = (dept, uid, name = "abcdef1234.jpg") => `formSubmissionPhotos/${dept}/${uid}/${name}`;
+    const JPEG_META = { contentType: "image/jpeg" };
+
+    beforeEach(async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await setDoc(doc(db, `departments/${A}/users/reviewer-a`), membership("reviewer-a", A));
+        await setDoc(doc(db, `departments/${A}/memberGrants/reviewer-a`), { permissions: { viewDigitalFormSubmissions: true } });
+      });
+    });
+
+    it("a member who fills in forms uploads into their own folder, once per photo", async () => {
+      await assertSucceeds(uploadString(ref(fillerA().storage(), photo(A, "filler-a")), "jpeg", "raw", JPEG_META));
+      await assertFails(uploadString(ref(fillerA().storage(), photo(A, "filler-a")), "jpeg2", "raw", JPEG_META));
+      const { deleteObject } = await import("firebase/storage");
+      await assertFails(deleteObject(ref(fillerA().storage(), photo(A, "filler-a"))));
+      await assertSucceeds(uploadString(ref(clerkA().storage(), photo(A, "clerk-a")), "png", "raw", { contentType: "image/png" }));
+    });
+
+    it("refuses other folders, other departments, non-fillers, non-images and odd names", async () => {
+      await assertFails(uploadString(ref(fillerA().storage(), photo(A, "clerk-a")), "x", "raw", JPEG_META));
+      await assertFails(uploadString(ref(clerkB().storage(), photo(A, "clerk-b")), "x", "raw", JPEG_META));
+      await assertFails(uploadString(ref(fillerA().storage(), photo(B, "filler-a")), "x", "raw", JPEG_META));
+      await assertFails(uploadString(ref(memberA().storage(), photo(A, "member-a")), "x", "raw", JPEG_META));
+      await assertFails(uploadString(ref(reviewerA().storage(), photo(A, "reviewer-a")), "x", "raw", JPEG_META));
+      await assertFails(uploadString(ref(stranger().storage(), photo(A, "stranger")), "x", "raw", JPEG_META));
+      await assertFails(uploadString(ref(fillerA().storage(), photo(A, "filler-a", "page.html")), "x", "raw", { contentType: "text/html" }));
+      await assertFails(uploadString(ref(fillerA().storage(), photo(A, "filler-a", "abcdef1234.svg")), "x", "raw", { contentType: "image/svg+xml" }));
+      await assertFails(uploadString(ref(fillerA().storage(), photo(A, "filler-a", "short.jpg")), "x", "raw", JPEG_META));
+    });
+
+    it("photos are readable by the member who took them and by submission reviewers", async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await uploadString(ref(ctx.storage(), photo(A, "filler-a")), "jpeg", "raw", JPEG_META);
+      });
+      await assertSucceeds(getBytes(ref(fillerA().storage(), photo(A, "filler-a"))));
+      await assertSucceeds(getBytes(ref(reviewerA().storage(), photo(A, "filler-a"))));
+      await assertSucceeds(getBytes(ref(clerkA().storage(), photo(A, "filler-a"))));
+      await assertSucceeds(getBytes(ref(adminA().storage(), photo(A, "filler-a"))));
+      await assertFails(getBytes(ref(memberA().storage(), photo(A, "filler-a"))));
+      await assertFails(getBytes(ref(clerkB().storage(), photo(A, "filler-a"))));
+      await assertFails(getBytes(ref(stranger().storage(), photo(A, "filler-a"))));
+    });
+  });
 });

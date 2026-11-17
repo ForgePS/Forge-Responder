@@ -1,7 +1,9 @@
 // Digital Forms review editor helpers and nav access. Run: npm run test:unit
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { DIGITAL_FORM_FIELD_TYPES, draftEdits, parseOptions, reviewProblems } from "../../src/lib/digitalForms/formDraft.js";
+import {
+  DIGITAL_FORM_FIELD_TYPES, LINK_TYPE_OPTIONS, NEGATIVE_ANSWERS, detailsToSubmit, draftEdits, missingRemarks, parseOptions, reviewProblems,
+} from "../../src/lib/digitalForms/formDraft.js";
 import { canAccessNavItem } from "../../src/lib/permissions.js";
 import { createRequire } from "node:module";
 
@@ -74,5 +76,37 @@ describe("digital forms nav access", () => {
     assert.ok(canAccessNavItem("Digital Forms", { manageDigitalForms: true }));
     assert.ok(canAccessNavItem("Digital Forms", { viewDigitalFormSubmissions: true }));
     assert.ok(!canAccessNavItem("Digital Forms", { viewDocuments: true }));
+  });
+});
+
+describe("digital forms remarks and links (browser side)", () => {
+  const def = {
+    sections: [{ fields: [
+      { key: "lights", type: "yes_no", label: "Lights" },
+      { key: "pump", type: "pass_fail", label: "Pump" },
+      { key: "notes", type: "long_text", label: "Notes" },
+    ] }],
+  };
+
+  it("uses the same link types and No/Fail answers as the server", () => {
+    assert.deepEqual(LINK_TYPE_OPTIONS.map((o) => o.id).filter(Boolean), schema.LINK_TYPES);
+    assert.deepEqual(NEGATIVE_ANSWERS, schema.NEGATIVE_ANSWERS);
+  });
+
+  it("asks for remarks only on No/Fail answers without them", () => {
+    const answers = { lights: "No", pump: "Pass", notes: "No" };
+    assert.deepEqual(missingRemarks(def, answers, {}).map((m) => m.key), ["lights"]);
+    assert.deepEqual(missingRemarks(def, answers, { lights: { remarks: "Out" } }), []);
+  });
+
+  it("sends remarks and photo paths only for fields still answered No/Fail", () => {
+    const answers = { lights: "Yes", pump: "Fail" };
+    const details = {
+      lights: { remarks: "stale" },
+      pump: { remarks: "Low", photos: [{ path: "formSubmissionPhotos/d/u/aaaaaaaa.jpg", url: "https://x" }] },
+    };
+    assert.deepEqual(detailsToSubmit(def, answers, details), {
+      pump: { remarks: "Low", photos: ["formSubmissionPhotos/d/u/aaaaaaaa.jpg"] },
+    });
   });
 });

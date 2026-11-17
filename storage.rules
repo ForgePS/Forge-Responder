@@ -156,6 +156,39 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // Digital Forms photos on a No/Fail answer: formSubmissionPhotos/{departmentId}/{uid}/{name}.
+    // A member who can fill in forms uploads into their own folder only, once per
+    // name, a JPEG/PNG/WebP under 10 MB. The submit function checks each path is
+    // the caller's before saving it. Readable by the member who took it and by
+    // whoever may see everyone's submissions. Never replaced or deleted from the browser.
+    function digitalFormsGrants(departmentId) {
+      return firestore.exists(/databases/(default)/documents/departments/$(departmentId)/memberGrants/$(request.auth.uid))
+        ? firestore.get(/databases/(default)/documents/departments/$(departmentId)/memberGrants/$(request.auth.uid)).data.get("permissions", {}).keys()
+        : [];
+    }
+    function canViewDigitalFormSubmissions(departmentId) {
+      return isPlatformCreator()
+        || isDepartmentAdmin(departmentId)
+        || (isDepartmentMember(departmentId)
+            && digitalFormsGrants(departmentId).hasAny(["viewDigitalFormSubmissions", "manageDigitalForms"]));
+    }
+    match /formSubmissionPhotos/{departmentId}/{uid}/{fileName} {
+      allow read: if isAuthenticated()
+        && ((uid == request.auth.uid && isDepartmentMember(departmentId))
+          || canViewDigitalFormSubmissions(departmentId));
+      allow create: if isAuthenticated()
+        && uid == request.auth.uid
+        && resource == null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType in ["image/jpeg", "image/png", "image/webp"]
+        && fileName.matches("[A-Za-z0-9_-]{8,64}[.](jpg|png|webp)")
+        && (isPlatformCreator()
+          || isDepartmentAdmin(departmentId)
+          || (isDepartmentMember(departmentId)
+              && digitalFormsGrants(departmentId).hasAny(["fillDigitalForms", "manageDigitalForms"])));
+      allow update, delete: if false;
+    }
+
     // Platform-wide branding (creator console logo uploads).
     match /platform/{allPaths=**} {
       allow read: if isAuthenticated();

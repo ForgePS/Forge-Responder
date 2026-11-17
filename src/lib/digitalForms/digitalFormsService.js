@@ -31,12 +31,12 @@ export function checkFile(file) {
 }
 
 /** Start an import, upload the file where the server says, then convert it. */
-export async function uploadAndConvert(departmentId, file, onStage = () => {}) {
+export async function uploadAndConvert(departmentId, file, onStage = () => {}, { linkType = "" } = {}) {
   const problem = checkFile(file);
   if (problem) throw new Error(problem);
   onStage("upload");
   const { importId, uploadPath } = await call("digitalFormsCreateImport", {
-    departmentId, fileName: file.name, contentType: file.type, size: file.size,
+    departmentId, fileName: file.name, contentType: file.type, size: file.size, linkType,
   });
   await uploadFirebaseFile(uploadPath, file);
   onStage("convert");
@@ -49,8 +49,69 @@ export const publishImport = (departmentId, importId, draft) => call("digitalFor
 export const discardImport = (departmentId, importId) => call("digitalFormsDiscardImport", { departmentId, importId });
 export const reviseForm = (departmentId, templateId, draft) => call("digitalFormsRevise", { departmentId, templateId, draft });
 export const setFormStatus = (departmentId, templateId, status) => call("digitalFormsSetStatus", { departmentId, templateId, status });
-export const submitForm = (departmentId, templateId, versionId, answers) =>
-  call("digitalFormsSubmit", { departmentId, templateId, versionId, answers });
+export const submitForm = (departmentId, templateId, versionId, answers, { details = {}, linkedRecordId = "" } = {}) =>
+  call("digitalFormsSubmit", {
+    departmentId, templateId, versionId, answers, details,
+    linkedRecord: linkedRecordId ? { id: linkedRecordId } : null,
+  });
+
+/** Records of one type (apparatus, occupancy, station, personnel) a form can be linked to. */
+export const listLinkOptions = (departmentId, type) =>
+  call("digitalFormsLinkOptions", { departmentId, type }).then((r) => r.options || []);
+
+export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const PHOTO_EXT = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+/**
+ * Shrink a camera photo to at most 2000 px on its long side as a JPEG, so it
+ * uploads quickly from the field. Falls back to the original file when the
+ * browser can't read it.
+ */
+async function shrinkPhoto(file) {
+  if (typeof document === "undefined" || typeof createImageBitmap !== "function") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+    return blob ? new File([blob], "photo.jpg", { type: "image/jpeg" }) : file;
+  } catch {
+    return file;
+  }
+}
+
+function randomName() {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Upload a photo for a No/Fail answer into the member's own folder
+ * (formSubmissionPhotos/{department}/{uid}/). Returns { path, url, name }.
+ */
+export async function uploadFormPhoto(departmentId, uid, file) {
+  if (!departmentId || !uid) throw new Error("Sign in again to add photos.");
+  if (typeof navigator !== "undefined" && navigator.onLine === false) throw new Error("You're offline. Photos need a connection.");
+  const photo = await shrinkPhoto(file);
+  if (!PHOTO_TYPES.includes(photo.type)) throw new Error("Use a JPG, PNG or WebP photo.");
+  if (photo.size > MAX_PHOTO_BYTES) throw new Error("That photo is larger than 10 MB.");
+  const path = `formSubmissionPhotos/${departmentId}/${uid}/${randomName()}.${PHOTO_EXT[photo.type]}`;
+  const uploaded = await uploadFirebaseFile(path, photo);
+  return { path, url: uploaded.downloadUrl, name: file.name || "photo" };
+}
+
+/** Download link for a saved photo (the member who took it, or submission reviewers). */
+export async function photoUrl(path) {
+  const storage = getFirebaseStorage();
+  if (!storage || !path) return "";
+  return getDownloadURL(ref(storage, path));
+}
 
 const byNewest = (field) => (a, b) => String(b[field] || "").localeCompare(String(a[field] || ""));
 
