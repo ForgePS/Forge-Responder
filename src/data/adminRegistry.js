@@ -89,6 +89,7 @@ export const NAV_MODULE_MAP = {
   "QR Scan": "preplans",
   Preplans: "preplans",
   "NERIS Fire Reports": "nerisFireReports",
+  "Patient Care Reports": "ems",
   "NERIS Analytics": "nerisFireReports",
   "Heat Zone Analytics": "analytics",
   "SOGs / Policies": "documents",

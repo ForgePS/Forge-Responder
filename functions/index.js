@@ -1187,6 +1187,64 @@ exports.refreshEntitlements = onCall({ timeoutSeconds: 300 }, async (request) =>
   return { count: results.length };
 });
 
+// ---- ePCR: server-side NEMSIS check of a patient care report (XSD-level + national Schematron).
+// PHI: never log the report or findings.
+const pcrCheck = require("./lib/nemsis/pcrCheck");
+const { memberPermissions } = require("./lib/access");
+
+exports.checkPcr = onCall({ memory: "1GiB", timeoutSeconds: 120 }, async (request) => {
+  const db = admin.firestore();
+  const departmentId = String(request.data?.departmentId || "").trim();
+  const pcrId = String(request.data?.pcrId || "").trim();
+  await assertDepartmentAccess(db, departmentId, request.auth);
+  if (!pcrId || pcrId.includes("/")) throw new HttpsError("invalid-argument", "Choose a report.");
+
+  const ent = await db.doc(`platformEntitlements/${departmentId}`).get();
+  const modules = ent.data()?.modules;
+  if (Array.isArray(modules) && !modules.includes("ems")) {
+    throw new HttpsError("permission-denied", "Patient care reports aren't included in your department's plan.");
+  }
+
+  const ref = db.doc(`departments/${departmentId}/pcrs/${pcrId}`);
+  const [snap, userSnap, settingsSnap, creator] = await Promise.all([
+    ref.get(),
+    db.doc(`departments/${departmentId}/users/${request.auth.uid}`).get(),
+    db.doc(`departments/${departmentId}/settings/ems`).get(),
+    isPlatformCreator(db, request.auth),
+  ]);
+  // Same answer for "missing" and "not yours", so report ids can't be probed.
+  const denied = new HttpsError("not-found", "That report isn't available to you.");
+  if (!snap.exists) throw denied;
+  const pcr = snap.data();
+  const permissions = creator ? {} : await memberPermissions(db, departmentId, request.auth);
+  if (!pcrCheck.canReadPcr(pcr, {
+    uid: request.auth.uid,
+    permissions,
+    isAdmin: invites.isAdminMembership(userSnap.data() || {}),
+    isCreator: creator,
+  })) throw denied;
+
+  let result;
+  try {
+    result = await pcrCheck.runPcrCheck({ pcr, settings: settingsSnap.data() || {} });
+  } catch (error) {
+    console.error("checkPcr failed", error?.code || "", departmentId, pcrId);
+    throw new HttpsError("internal", "The NEMSIS check couldn't run. Try again.");
+  }
+  const at = new Date().toISOString();
+  await ref.set({ nemsisCheck: { at, ok: result.ok, errorCount: result.errorCount, warningCount: result.warningCount, byUid: request.auth.uid } }, { merge: true });
+  await db.collection(`departments/${departmentId}/auditLogs`).add({
+    action: "pcr.nemsis-check",
+    module: "ePCR",
+    recordId: pcrId,
+    summary: `NEMSIS check: ${result.errorCount} error(s), ${result.warningCount} warning(s)`,
+    actorUid: request.auth.uid,
+    actorName: request.auth.token?.email || "",
+    created_at: at,
+  }).catch(() => undefined);
+  return result;
+});
+
 // ---- AI narrative drafts for NERIS reports (Claude). Set the key with:
 // firebase functions:secrets:set ANTHROPIC_API_KEY
 const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");

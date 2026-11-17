@@ -217,6 +217,10 @@ export function canAccessNavItem(itemName, permissions = {}, options = {}) {
   if (itemName === "Time Sheets") {
     return canEditScheduleRoster(permissions, options.isCreator);
   }
+  // Crews see the reports they charted; supervisors with a read-all permission see every report.
+  if (itemName === "Patient Care Reports") {
+    return canEditPcrs(permissions, options.isCreator) || canViewAllPcrs(permissions, options.isCreator);
+  }
   const required = navPermissionMap[itemName];
   if (!required) return true;
   if (hasPermission(permissions, required)) return true;

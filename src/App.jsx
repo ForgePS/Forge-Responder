@@ -15,9 +15,12 @@ import {
   canEditPersonnel,
   canEditScheduleRoster,
   canViewPersonnelPrivateInfo,
+  canEditPcrs,
+  canViewAllPcrs,
   filterNavGroups,
   hasPermission
 } from "./lib/permissions.js";
+import { isAdminMembershipRoles } from "./lib/adminGuards.js";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import { useTenant } from "./context/TenantContext.jsx";
 import { isPlatformScope } from "./lib/tenantPaths.js";
@@ -137,6 +140,7 @@ const WaterCompanyDirectoryPage = lazyPage(() => import("./pages/WaterCompanyDir
 const WaterDistrictsPage = lazyPage(() => import("./pages/WaterDistrictsPage.jsx"));
 const HydrantDamageAnalyticsPage = lazyPage(() => import("./pages/HydrantDamageAnalyticsPage.jsx"));
 const NerisFireReportsPage = lazyPage(() => import("./pages/NerisFireReportsPage.jsx"));
+const PatientCareReportsPage = lazyPage(() => import("./pages/PatientCareReportsPage.jsx"));
 const NerisAnalyticsPage = lazyPage(() => import("./pages/NerisAnalyticsPage.jsx"));
 const HeatZoneAnalyticsPage = lazyPage(() => import("./pages/HeatZoneAnalyticsPage.jsx"));
 import { resolveInitialHydrantTab, resolveInitialAppModule, shouldOpenHydrantsModule } from "./lib/hydrantAppRouting.js";
@@ -234,7 +238,7 @@ const navGroups = [
     tree: PREVENTION_NAV_TREE,
     items: [],
   },
-  { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["NERIS Analytics", BarChart3], ["Heat Zone Analytics", Flame]] },
+  { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["Patient Care Reports", Ambulance], ["NERIS Analytics", BarChart3], ["Heat Zone Analytics", Flame]] },
   { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Uploads", Upload]] },
   { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay]] },
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
@@ -1783,6 +1787,19 @@ function AppShell() {
         preplans={preplans}
         inspections={inspections}
         scheduleDays={scheduleDays}
+      />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Patient Care Reports" ? (
+    canEditPcrs(permissions, isCreator) || canViewAllPcrs(permissions, isCreator) ? (
+      <PatientCareReportsPage
+        departmentId={departmentId}
+        uid={user?.uid || ""}
+        actor={hydrantActor}
+        query={query}
+        canViewAll={canViewAllPcrs(permissions, isCreator)}
+        canUnlock={isCreator || hasPermission(permissions, "unlockPcrs")}
+        canExport={isCreator || hasPermission(permissions, "exportPcrs")}
+        canManageSettings={isCreator || isAdminMembershipRoles(membership)}
       />
     ) : <AccessDeniedModule name={current} />
   ) : current === "NERIS Analytics" ? (

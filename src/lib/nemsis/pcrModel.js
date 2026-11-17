@@ -164,6 +164,12 @@ function inputKind(type, repeating) {
   }
 }
 
+/** NEMSIS lists not-values and pertinent negatives by name ("NV.NotRecorded"); show them as words ("Not Recorded"). */
+function plainCodeLabel(text) {
+  const m = /^(?:NV|PN)\.([A-Za-z]+)$/.exec(String(text));
+  return m ? m[1].replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z])([A-Z][a-z])/g, "$1 $2") : text;
+}
+
 /**
  * Everything a screen needs to render one NEMSIS field.
  * @returns {{ el: string, label: string, definition: string, usage: string, national: boolean, required: boolean,
@@ -177,7 +183,7 @@ export function fieldInput(schema, name) {
   const type = schema.type(node.t);
   const repeating = isRepeating(node);
   const codes = schema.codes(name, DATASET);
-  const label = (code) => ({ code, label: schema.codeLabel(name, code, DATASET) ?? code });
+  const label = (code) => ({ code, label: plainCodeLabel(schema.codeLabel(name, code, DATASET) ?? code) });
   return {
     el: name,
     label: info.name ?? name,
@@ -508,6 +514,47 @@ export function pcrXml(schema, { agency, uuid, pcr }, options) {
   const id = uuid ?? pcr?.attrs?.UUID;
   if (!id) throw new Error("pcrXml: the report has no UUID");
   return buildEmsDataSetXml(schema, { agency, reports: [{ uuid: id, data: pcr }] }, options);
+}
+
+/** Plain text for one stored field: code labels, "Not recorded" style not-values, pertinent negatives. */
+export function leafText(field, raw) {
+  const label = (list, code) => list?.find((o) => o.code === String(code))?.label ?? String(code);
+  const one = (item) => {
+    const leaf = readLeaf(item);
+    const parts = [];
+    if (leaf.value !== undefined) {
+      if (field.kind === "file") parts.push("Attached file");
+      else parts.push(field.options ? label(field.options, leaf.value) : String(leaf.value));
+    }
+    if (leaf.NV) parts.push(label(field.nv, leaf.NV));
+    if (leaf.PN) parts.push(label(field.pn, leaf.PN));
+    return parts.join(" — ");
+  };
+  return (Array.isArray(raw) ? raw : [raw]).filter((item) => !isEmptyLeaf(item)).map(one).filter(Boolean);
+}
+
+/**
+ * The filled-in part of a section for read-only review: fields with their text, and repeating groups with one
+ * entry per row. Empty fields and groups are left out.
+ * @returns {({type: "field", el: string, label: string, kind: string, values: string[]}
+ *   | {type: "group", name: string, label: string, rows: object[][]})[]}
+ */
+export function sectionReadout(schema, pcr, sectionId) {
+  const walk = (items, at) => items.flatMap((item) => {
+    if (item.type === "field") {
+      const values = leafText(item.field, getLeaf(schema, pcr, item.el ?? item.field.el, at));
+      return values.length ? [{ type: "field", el: item.field.el, label: item.field.label, kind: item.field.kind, values }] : [];
+    }
+    if (item.repeating) {
+      const rows = groupRows(schema, pcr, item.name, at)
+        .map((_, index) => walk(item.children, { ...at, [item.name]: index }))
+        .filter((row) => row.length);
+      return rows.length ? [{ type: "group", name: item.name, label: item.label, rows }] : [];
+    }
+    const inner = walk(item.children, at);
+    return inner.length ? [{ type: "group", name: item.name, label: item.label, rows: [inner] }] : [];
+  });
+  return walk(sectionLayout(schema, sectionId), {});
 }
 
 /** Essential fields filled in vs total, per section (for progress chips). */

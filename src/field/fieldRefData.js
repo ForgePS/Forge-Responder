@@ -23,6 +23,7 @@ import { listViolationCatalog } from "../lib/inspections/violationService.js";
 import { listPreplanFiles, listPreplans } from "../lib/inspections/preplanService.js";
 import { fieldCapabilities } from "./fieldSession.js";
 import { listCheckoffLists, loadFieldAppConfig } from "./fieldAdminService.js";
+import { loadEmsSettings } from "../lib/pcrService.js";
 import { localDate } from "./fieldValidation.js";
 import { isObjectVisibleInActiveList } from "../lib/objectLifecycle.js";
 import { referenceKind } from "./fieldReference.js";
@@ -344,7 +345,12 @@ export async function refreshRefData({ departmentId, snapshot, actor }) {
   const failed = [];
   // Department FORGE FIELD settings first: they decide what else is needed.
   try {
-    parts.config = { items: await loadFieldAppConfig(departmentId), fetchedAt: new Date().toISOString() };
+    const [config, ems] = await Promise.all([
+      loadFieldAppConfig(departmentId),
+      // EMS agency settings prefill new patient care reports (eResponse.01/.02).
+      snapshot?.modules?.ems === false ? null : loadEmsSettings(departmentId).catch(() => null),
+    ]);
+    parts.config = { items: { ...config, ...(ems ? { ems } : {}) }, fetchedAt: new Date().toISOString() };
   } catch (error) {
     console.warn("FORGE FIELD settings could not be refreshed", error);
     failed.push("config");

@@ -20,6 +20,7 @@
     "import:neris-xlsx": "node scripts/import-neris-xlsx.mjs",
     "sync:nemsis-schema": "node scripts/nemsis/sync-nemsis-schema.mjs",
     "compile:nemsis-schematron": "node scripts/nemsis/compile-nemsis-schematron.mjs",
+    "bundle:nemsis-functions": "node scripts/nemsis/bundle-nemsis-functions.mjs",
     "push:test-alert": "node functions/scripts/pushTestAlert.js",
     "fleet:load-smoke": "node scripts/fleet-load-smoke.mjs",
     "ifc:parse": "node scripts/ifc/parseIfcDocx.mjs",

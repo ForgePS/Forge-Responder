@@ -1120,6 +1120,15 @@ describe("patient care reports (PHI)", () => {
     await assertFails(deleteDoc(doc(ffA().firestore(), pcrPath())));
   });
 
+  it("EMS agency settings (settings/ems) are changed by admins only", async () => {
+    const settings = { stateAgencyId: "351-T0001", agencyNumber: "T0001", agencyName: "Test EMS", state: "37" };
+    await seed({ grants: { "editor-a": { viewAllPcrs: true, unlockPcrs: true, exportPcrs: true } } });
+    await assertSucceeds(setDoc(doc(adminA().firestore(), `departments/${A}/settings/ems`), settings));
+    await assertFails(setDoc(doc(editorA().firestore(), `departments/${A}/settings/ems`), { ...settings, agencyNumber: "X" }));
+    await assertFails(setDoc(doc(memberA().firestore(), `departments/${A}/settings/ems`), { ...settings, agencyNumber: "X" }));
+    await assertSucceeds(getDoc(doc(memberA().firestore(), `departments/${A}/settings/ems`)));
+  });
+
   it("nothing is readable or writable when the department's plan doesn't include ePCR", async () => {
     await seed({ report: draft(["ff-a"]), grants: { "ff-a": { editPcrs: true } }, entitlements: { modules: ["dashboard", "administration"] } });
     await assertFails(getDoc(doc(ffA().firestore(), pcrPath())));

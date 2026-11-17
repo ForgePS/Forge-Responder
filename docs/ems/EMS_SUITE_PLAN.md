@@ -90,10 +90,13 @@ Still required for compliance, outside Phase 1: StateDataSet-driven configuratio
 | Module `ems`, permissions `editPcrs` / `viewAllPcrs` / `unlockPcrs` / `exportPcrs` (off for every built-in role except platform creator) | registry, `permissions.js`, `defaultRoles.js`, field caps | done |
 | Firestore rules: crew (`crewUids`) and read-all permissions only; posted locked except `unlockPcrs`; never deleted; off when the plan excludes `ems` | `firestore.rules`, `tests/rules/firestore.rules.test.mjs` | done |
 | Field charting screen: section chips with progress and errors, essential fields first, repeating groups, NV/PN choices, "Now" times, issues list, Save / Post | `src/field/screens/PcrFormScreen.jsx`, EMS home card | done |
-| Agency number setting (eResponse.01) | read from field config `ems.agencyNumber`; no admin UI yet | next |
+| EMS agency settings (`settings/ems`: state agency ID, agency number, name, ANSI state code), admin-only; prefill new reports and fill the export header | `src/lib/nemsis/emsSettings.js`, Agency settings on the Patient Care Reports page, `fieldRefData.js` | done |
 | Defined lists with smart lookup (ICD-10 impressions, RxNorm medications, SNOMED procedures) | codes are typed for now | next |
 | Signatures, monitor files, CAD prefill, device auto-lock | | next |
-| RMS desktop: list, review, print, unlock, NEMSIS XML export; server-side Schematron on post | | next |
+| RMS Patient Care Reports page: my reports / all reports, section-by-section review, unlock with a reason, NEMSIS XML export; view, unlock and export audit-logged (report number only) | `src/pages/PatientCareReportsPage.jsx`, `src/lib/pcrService.js` | done |
+| Unlocked reports reopen on the crew's device the next time it's opened with signal | `src/field/fieldPcrReopen.js` | done |
+| Server NEMSIS check (`checkPcr` callable): the app's own NEMSIS code bundled for Functions, XSD-level checks + national (and state, once loaded) Schematron; result stamped on the report | `functions/lib/nemsis/pcrCheck.js`, `scripts/nemsis/bundle-nemsis-functions.mjs` (`npm run bundle:nemsis-functions`; a unit test fails when the bundle is stale) | done |
+| Run the server check automatically on post (Firestore trigger) and print view | | next |
 
 - New field record kind `pcr` reusing `fieldDb` / `fieldSync` (device-fixed ids, idempotent retry, needs-attention).
 - PHI on device: encrypted IndexedDB store, auto-lock, wipe on sign-out.

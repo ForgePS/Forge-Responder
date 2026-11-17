@@ -10,6 +10,7 @@ import { AlertTriangle, CheckCircle2, ChevronRight, Clock, Loader2, Lock, Plus, 
 import { version as APP_VERSION } from "../../../package.json";
 import { useField, useRecordForm } from "../fieldContext.jsx";
 import { describePcr, fieldPcrNumber, newPcrRecordData } from "../fieldPcr.js";
+import { reopenIfUnlocked } from "../fieldPcrReopen.js";
 import {
   PCR_SECTIONS,
   addGroupRow,
@@ -46,10 +47,30 @@ function useNemsisSchema() {
   return state;
 }
 
+/** Before an existing report opens, reopen it if a supervisor unlocked it in the RMS (needs signal). */
+function useUnlockCheck(localId) {
+  const { snapshot, online, toast } = useField();
+  const [done, setDone] = useState(!localId || !online);
+  useEffect(() => {
+    if (done) return undefined;
+    let active = true;
+    reopenIfUnlocked({ departmentId: snapshot.departmentId, localId }).then((reopened) => {
+      if (!active) return;
+      if (reopened) toast("A supervisor unlocked this report. You can edit it again.", "ok");
+      setDone(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []); // once, when the report is opened
+  return done;
+}
+
 export default function PcrFormScreen({ params = {} }) {
   const { back } = useField();
   const { schema, error } = useNemsisSchema();
-  if (!schema) {
+  const unlockChecked = useUnlockCheck(params.localId);
+  if (!schema || !unlockChecked) {
     return (
       <Screen title="Patient care report" onBack={back}>
         {error ? <Banner tone="warn" icon={<AlertTriangle size={22} />}>{error}</Banner> : (
