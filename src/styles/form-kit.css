@@ -242,6 +242,17 @@ html[data-theme="dark"] .app-shell .template-field-card {
   cursor: default;
 }
 
+/* Disabled text buttons looked exactly like enabled ones (e.g. Create in
+   New inspection before an occupancy is chosen). */
+:is(.primary-button, .secondary-button, .filter-button):disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.primary-button:disabled:hover {
+  background: var(--rms-primary-solid);
+}
+
 .app-shell .icon-button:is(.danger, .danger-button) {
   color: var(--rms-danger-text);
 }
