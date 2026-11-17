@@ -62,3 +62,20 @@ test("server access to a report matches the Firestore rules", () => {
   assert.equal(canReadPcr(pcr, { uid: "other", isAdmin: true }), true);
   assert.equal(canReadPcr(pcr, { uid: "other", isCreator: true }), true);
 });
+
+test("the server check runs once per posting, and its own write never triggers it again", () => {
+  const { shouldCheckOnPost, checkStamp } = require("../../functions/lib/nemsis/pcrCheck.js");
+  const draft = { status: "draft" };
+  const posted = { status: "posted", postedAt: "2026-11-17T10:00:00Z" };
+  assert.equal(shouldCheckOnPost(draft, posted), true, "draft → posted");
+  assert.equal(shouldCheckOnPost(null, posted), true, "created already posted");
+  assert.equal(shouldCheckOnPost(posted, { ...posted, nemsisCheck: { ok: true } }), false, "the check's own stamp");
+  assert.equal(shouldCheckOnPost(posted, { ...posted, postedAt: "2026-11-17T12:00:00Z" }), true, "re-posted after an unlock");
+  assert.equal(shouldCheckOnPost(posted, draft), false, "unlocked");
+  assert.equal(shouldCheckOnPost(draft, { status: "draft", nemsis: {} }), false, "draft saves");
+  assert.equal(shouldCheckOnPost(posted, null), false, "deleted");
+
+  const stamp = checkStamp({ ok: false, errorCount: 2, warningCount: 5, missingAgency: ["EMS agency number"], findings: [{ message: "PHI" }] },
+    { at: "t", trigger: "post", postedAt: posted.postedAt });
+  assert.deepEqual(stamp, { at: "t", ok: false, errorCount: 2, warningCount: 5, missingAgency: true, trigger: "post", postedAt: posted.postedAt });
+});

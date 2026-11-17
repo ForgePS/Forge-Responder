@@ -7,7 +7,7 @@
  * (report number only, never patient details). Nothing here logs report contents.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Ambulance, Download, Lock, LockOpen, RefreshCw, Search, Settings2, ShieldCheck } from "lucide-react";
+import { Ambulance, Download, Lock, LockOpen, Printer, RefreshCw, Search, Settings2, ShieldCheck } from "lucide-react";
 import { Badge, FleetSummary, Modal } from "../components/shell/ui.jsx";
 import {
   checkPcrOnServer,
@@ -15,6 +15,7 @@ import {
   listPcrs,
   loadEmsSettings,
   recordPcrExport,
+  recordPcrPrint,
   saveEmsSettings,
   unlockPcr,
 } from "../lib/pcrService.js";
@@ -24,8 +25,8 @@ function useNemsis() {
   const [state, setState] = useState({ schema: null, model: null, error: "" });
   useEffect(() => {
     let active = true;
-    Promise.all([import("../lib/nemsis/index.js"), import("../lib/nemsis/pcrModel.js")])
-      .then(([mod, model]) => active && setState({ schema: mod.nemsisSchema, model, error: "" }))
+    Promise.all([import("../lib/nemsis/index.js"), import("../lib/nemsis/pcrModel.js"), import("../lib/nemsis/pcrPrint.js")])
+      .then(([mod, model, print]) => active && setState({ schema: mod.nemsisSchema, model: { ...model, ...print }, error: "" }))
       .catch(() => active && setState({ schema: null, model: null, error: "The NEMSIS data couldn't load. Refresh the page to try again." }));
     return () => {
       active = false;
@@ -60,6 +61,15 @@ function downloadText(filename, text, type) {
 }
 
 const STATUS_LABEL = { draft: "Draft", posted: "Posted" };
+
+/** Posted, but the server NEMSIS check (run on post) found errors: a supervisor should review and unlock it. */
+const needsReview = (report) => report.status === "posted" && report.nemsisCheck?.ok === false;
+
+function statusBadge(report) {
+  if (needsReview(report)) return { tone: "critical", label: "Needs review" };
+  if (report.status === "draft" && report.unlockedAt) return { tone: "warning", label: "Unlocked" };
+  return { tone: report.status === "posted" ? "success" : "warning", label: STATUS_LABEL[report.status] || report.status };
+}
 
 export default function PatientCareReportsPage({
   departmentId,
@@ -107,7 +117,7 @@ export default function PatientCareReportsPage({
 
   const needle = `${query} ${search}`.trim().toLowerCase();
   const visible = summaries
-    .filter(({ report }) => statusFilter === "all" || report.status === statusFilter)
+    .filter(({ report }) => statusFilter === "all" || (statusFilter === "review" ? needsReview(report) : report.status === statusFilter))
     .filter(({ report, summary }) => !needle || [report.number, report.unit, report.incidentNumber, summary.patient, summary.complaint]
       .join(" ").toLowerCase().includes(needle));
 
@@ -117,6 +127,7 @@ export default function PatientCareReportsPage({
     draft: reports.filter((r) => r.status === "draft").length,
     posted: reports.filter((r) => r.status === "posted").length,
     unlocked: reports.filter((r) => r.status === "draft" && r.unlockedAt).length,
+    review: reports.filter(needsReview).length,
   };
 
   const open = async (id) => {
@@ -155,6 +166,7 @@ export default function PatientCareReportsPage({
           ["Reports", counts.all, "neutral"],
           ["Drafts", counts.draft, counts.draft ? "warning" : "neutral"],
           ["Posted", counts.posted, "success"],
+          ["Posted with NEMSIS errors", counts.review, counts.review ? "critical" : "neutral"],
           ["Unlocked for changes", counts.unlocked, counts.unlocked ? "warning" : "neutral"],
         ]}
       />
@@ -181,6 +193,7 @@ export default function PatientCareReportsPage({
                 <option value="all">All</option>
                 <option value="draft">Drafts</option>
                 <option value="posted">Posted</option>
+                <option value="review">Needs review</option>
               </select>
               <button className="secondary-button" type="button" onClick={reload} disabled={loading} title="Refresh">
                 <RefreshCw size={14} aria-hidden /> <span className="sr-only">Refresh</span>
@@ -208,9 +221,7 @@ export default function PatientCareReportsPage({
                       {[formatWhen(summary.notified) || formatWhen(report.createdAt), report.unit, summary.patient, summary.complaint].filter(Boolean).join(" · ")}
                     </small>
                   </span>
-                  <Badge tone={report.status === "posted" ? "success" : "warning"}>
-                    {report.status === "draft" && report.unlockedAt ? "Unlocked" : STATUS_LABEL[report.status] || report.status}
-                  </Badge>
+                  <Badge tone={statusBadge(report).tone}>{statusBadge(report).label}</Badge>
                 </button>
               ))}
               {!loading && !visible.length ? (
@@ -283,7 +294,7 @@ function ReportDetail({ schema, model, pcr, departmentId, actor, settings, canUn
     try {
       const result = await checkPcrOnServer(departmentId, pcr.id);
       setServerCheck(result);
-      onChange({ ...pcr, nemsisCheck: { at: new Date().toISOString(), ok: result.ok, errorCount: result.errorCount, warningCount: result.warningCount } });
+      onChange({ ...pcr, nemsisCheck: { at: new Date().toISOString(), ok: result.ok, errorCount: result.errorCount, warningCount: result.warningCount, trigger: "manual" } });
       onMessage(result.ok ? "NEMSIS check passed." : "NEMSIS check finished with issues (listed below).");
     } catch (err) {
       onError(friendlyError(err, "The NEMSIS check couldn't run. Try again in a minute."));
@@ -303,6 +314,31 @@ function ReportDetail({ schema, model, pcr, departmentId, actor, settings, canUn
       onError(friendlyError(err, "The report couldn't be exported."));
     } finally {
       setBusy("");
+    }
+  };
+
+  const print = async () => {
+    // Open the window first (in the click) so pop-up blockers allow it, then fill it.
+    const win = window.open("", "_blank");
+    if (!win) {
+      onError("The print view was blocked. Allow pop-ups for this site and try again.");
+      return;
+    }
+    try {
+      await recordPcrPrint(departmentId, pcr, actor);
+      win.document.open();
+      win.document.write(model.pcrPrintHtml(schema, pcr, {
+        agencyName: settings.agencyName,
+        printedBy: actor?.actorName,
+        printedAt: new Date().toISOString(),
+        when: formatWhen,
+      }));
+      win.document.close();
+      win.focus();
+      win.print();
+    } catch (err) {
+      win.close();
+      onError(friendlyError(err, "The print view couldn't be opened."));
     }
   };
 
@@ -344,6 +380,9 @@ function ReportDetail({ schema, model, pcr, departmentId, actor, settings, canUn
               <Download size={14} aria-hidden /> Export XML
             </button>
           ) : null}
+          <button className="secondary-button" type="button" onClick={print} disabled={Boolean(busy)}>
+            <Printer size={14} aria-hidden /> Print
+          </button>
           {canUnlock && posted ? (
             <button className="secondary-button" type="button" onClick={() => setUnlocking(true)} disabled={Boolean(busy)}>
               <LockOpen size={14} aria-hidden /> Unlock
@@ -366,9 +405,16 @@ function ReportDetail({ schema, model, pcr, departmentId, actor, settings, canUn
             {local.ok ? "no errors" : `${local.blocking.length} error${local.blocking.length === 1 ? "" : "s"}`}
             {local.warnings.length ? `, ${local.warnings.length} warning${local.warnings.length === 1 ? "" : "s"}` : ""}
           </p>
+          {needsReview(pcr) && !serverCheck ? (
+            <p className="occupancy-error" role="alert">
+              Posted with NEMSIS errors. Run the NEMSIS check to see them{canUnlock ? ", then unlock the report so the crew can fix it" : ""}.
+            </p>
+          ) : null}
           {lastCheck && !serverCheck ? (
             <p className="occupancy-muted">
-              Last NEMSIS check {formatWhen(lastCheck.at)}: {lastCheck.ok ? "passed" : `${lastCheck.errorCount} error${lastCheck.errorCount === 1 ? "" : "s"}`}
+              Last NEMSIS check{lastCheck.trigger === "post" ? " (on posting)" : ""} {formatWhen(lastCheck.at)}:{" "}
+              {lastCheck.ok ? "passed" : `${lastCheck.errorCount} error${lastCheck.errorCount === 1 ? "" : "s"}`}
+              {lastCheck.missingAgency ? " (agency settings incomplete)" : ""}
               {lastCheckStale ? " (the report changed since)" : ""}
             </p>
           ) : null}

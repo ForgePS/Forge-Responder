@@ -67,4 +67,29 @@ async function runPcrCheck({ pcr, settings = {}, extraSchematron = [] }) {
   };
 }
 
-module.exports = { runPcrCheck, canReadPcr, agencyFromSettings, PCR_READ_ALL_KEYS };
+/**
+ * Should a write to a report run the NEMSIS check? Only when it is posted (draft → posted, a new posted report,
+ * or a re-post after an unlock). The check's own write (nemsisCheck only) leaves postedAt unchanged, so it never
+ * triggers itself.
+ */
+function shouldCheckOnPost(before, after) {
+  if (!after || after.status !== "posted") return false;
+  if (!before || before.status !== "posted") return true;
+  return Boolean(after.postedAt) && after.postedAt !== before.postedAt;
+}
+
+/** What is stored on the report (counts only: findings hold patient data and go only to callers who may read it). */
+function checkStamp(result, { at, byUid = "", trigger, postedAt } = {}) {
+  return {
+    at,
+    ok: result.ok,
+    errorCount: result.errorCount,
+    warningCount: result.warningCount,
+    missingAgency: result.missingAgency.length > 0,
+    trigger,
+    ...(byUid ? { byUid } : {}),
+    ...(postedAt ? { postedAt } : {}),
+  };
+}
+
+module.exports = { runPcrCheck, canReadPcr, agencyFromSettings, shouldCheckOnPost, checkStamp, PCR_READ_ALL_KEYS };

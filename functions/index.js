@@ -1232,10 +1232,10 @@ exports.checkPcr = onCall({ memory: "1GiB", timeoutSeconds: 120 }, async (reques
     throw new HttpsError("internal", "The NEMSIS check couldn't run. Try again.");
   }
   const at = new Date().toISOString();
-  await ref.set({ nemsisCheck: { at, ok: result.ok, errorCount: result.errorCount, warningCount: result.warningCount, byUid: request.auth.uid } }, { merge: true });
+  await ref.set({ nemsisCheck: pcrCheck.checkStamp(result, { at, byUid: request.auth.uid, trigger: "manual" }) }, { merge: true });
   await db.collection(`departments/${departmentId}/auditLogs`).add({
     action: "pcr.nemsis-check",
-    module: "ePCR",
+    module: "EMS",
     recordId: pcrId,
     summary: `NEMSIS check: ${result.errorCount} error(s), ${result.warningCount} warning(s)`,
     actorUid: request.auth.uid,
@@ -1244,6 +1244,36 @@ exports.checkPcr = onCall({ memory: "1GiB", timeoutSeconds: 120 }, async (reques
   }).catch(() => undefined);
   return result;
 });
+
+// A report posted from FORGE FIELD gets the full server check (national + state Schematron) right away; the
+// result (counts only) is stamped on the report so supervisors see posted reports that need review.
+exports.checkPcrOnPost = onDocumentWritten(
+  { document: "departments/{departmentId}/pcrs/{pcrId}", memory: "1GiB", timeoutSeconds: 120 },
+  async (event) => {
+    const before = event.data?.before?.exists ? event.data.before.data() : null;
+    const after = event.data?.after?.exists ? event.data.after.data() : null;
+    if (!pcrCheck.shouldCheckOnPost(before, after)) return null;
+    const { departmentId, pcrId } = event.params;
+    const db = admin.firestore();
+    try {
+      const settingsSnap = await db.doc(`departments/${departmentId}/settings/ems`).get();
+      const result = await pcrCheck.runPcrCheck({ pcr: after, settings: settingsSnap.data() || {} });
+      const stamp = pcrCheck.checkStamp(result, { at: new Date().toISOString(), trigger: "post", postedAt: after.postedAt || "" });
+      // Only if it is still the same posting (an unlock in between makes this result stale).
+      await db.runTransaction(async (tx) => {
+        const ref = db.doc(`departments/${departmentId}/pcrs/${pcrId}`);
+        const now = await tx.get(ref);
+        const current = now.data() || {};
+        if (current.status !== "posted" || (current.postedAt || "") !== (after.postedAt || "")) return;
+        tx.set(ref, { nemsisCheck: stamp }, { merge: true });
+      });
+    } catch (error) {
+      // No report contents in logs (PHI).
+      console.error("checkPcrOnPost failed", error?.code || error?.name || "", departmentId, pcrId);
+    }
+    return null;
+  },
+);
 
 // ---- AI narrative drafts for NERIS reports (Claude). Set the key with:
 // firebase functions:secrets:set ANTHROPIC_API_KEY

@@ -70,6 +70,10 @@ export async function recordPcrExport(departmentId, pcr, actor = {}) {
   await writeAuditLog(departmentId, { ...actor, action: "pcr.export", module: AUDIT_MODULE, recordId: pcr.id, summary: `Exported NEMSIS XML for patient care report ${pcr.number || pcr.id}` });
 }
 
+export async function recordPcrPrint(departmentId, pcr, actor = {}) {
+  await writeAuditLog(departmentId, { ...actor, action: "pcr.print", module: AUDIT_MODULE, recordId: pcr.id, summary: `Printed patient care report ${pcr.number || pcr.id}` });
+}
+
 /** Server-side NEMSIS check (XSD-level checks + national and state Schematron). */
 export async function checkPcrOnServer(departmentId, pcrId) {
   const functions = getFirebaseFunctions();

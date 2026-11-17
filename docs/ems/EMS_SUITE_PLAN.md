@@ -96,7 +96,8 @@ Still required for compliance, outside Phase 1: StateDataSet-driven configuratio
 | RMS Patient Care Reports page: my reports / all reports, section-by-section review, unlock with a reason, NEMSIS XML export; view, unlock and export audit-logged (report number only) | `src/pages/PatientCareReportsPage.jsx`, `src/lib/pcrService.js` | done |
 | Unlocked reports reopen on the crew's device the next time it's opened with signal | `src/field/fieldPcrReopen.js` | done |
 | Server NEMSIS check (`checkPcr` callable): the app's own NEMSIS code bundled for Functions, XSD-level checks + national (and state, once loaded) Schematron; result stamped on the report | `functions/lib/nemsis/pcrCheck.js`, `scripts/nemsis/bundle-nemsis-functions.mjs` (`npm run bundle:nemsis-functions`; a unit test fails when the bundle is stale) | done |
-| Run the server check automatically on post (Firestore trigger) and print view | | next |
+| Server check runs automatically when a report is posted (`checkPcrOnPost` trigger); posted reports with NEMSIS errors show as "Needs review" in the RMS | `functions/index.js`, `functions/lib/nemsis/pcrCheck.js` `shouldCheckOnPost` | done |
+| Print view (all charted sections, escaped, PHI footer; printing is audit-logged) | `src/lib/nemsis/pcrPrint.js`, Print on the Patient Care Reports page | done |
 
 - New field record kind `pcr` reusing `fieldDb` / `fieldSync` (device-fixed ids, idempotent retry, needs-attention).
 - PHI on device: encrypted IndexedDB store, auto-lock, wipe on sign-out.
