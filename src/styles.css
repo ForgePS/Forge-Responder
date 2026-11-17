@@ -41,9 +41,9 @@ select option, select optgroup { background-color: var(--rms-bg-input); color: v
 .top-bar-lead { display: grid; gap: 6px; flex: 1 1 0; min-width: 0; max-width: 900px; } /* takes the space left by the utilities, wrapping inside it */
 .top-bar-lead-row { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; width: 100%; } /* wraps instead of overlapping the date/search when crowded */
 .top-bar-tagline { margin: 0; padding: 0; width: 100%; color: var(--rms-brand); font-size: 18px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.top-brand-logo-wrap { flex: 0 0 auto; height: 72px; overflow: hidden; display: flex; align-items: flex-start; }
-.top-brand-wide .top-brand-logo-wrap { height: 76px; }
-.top-brand-wide .top-brand-logo-wrap img { height: 104px; max-width: 380px; object-fit: contain; object-position: top left; }
+.top-brand-logo-wrap { flex: 0 0 auto; display: flex; align-items: center; }
+/* The whole logo shows; nothing is cropped. */
+.top-brand-wide .top-brand-logo-wrap img { height: 88px; width: auto; max-width: 380px; object-fit: contain; object-position: left center; }
 .top-bar-utilities { display: flex; align-items: center; gap: 12px; flex: 0 1 auto; min-width: 0; margin-left: auto; align-self: center; padding-top: 2px; }
 .top-bar-utilities .global-search { margin-left: 0; }
 /* Department header: the same fixed geometry for every department, whatever the
@@ -70,7 +70,9 @@ select option, select optgroup { background-color: var(--rms-bg-input); color: v
 .profile-button strong { font-size: 14px; }.profile-button small { color: var(--rms-text-muted); font-size: 14px; }
 .profile-button svg { color: var(--rms-text-muted); }
 /* .top-bar prefix: a later .icon-button rule otherwise shows it on desktop. */
-.top-bar .mobile-menu { display: none; }
+/* The menu button opens the slide-in menu, which only exists at 980px and below.
+   .app-shell beats the shared .app-shell .icon-button rule that kept it showing on desktop. */
+.app-shell .top-bar .mobile-menu { display: none; }
 .side-nav { grid-column: 1; grid-row: 2; position: relative; min-height: 0; overflow-y: auto; scrollbar-width: thin; border-right: 1px solid var(--rms-border-divider); background: var(--rms-bg-nav); }
 .side-nav nav { padding: 10px 10px 50px; }
 .side-nav nav section { display: grid; gap: 1px; margin-bottom: 8px; }
@@ -1145,7 +1147,7 @@ tbody tr:hover { background: var(--rms-bg-hover); }
   input, select, textarea { font-size: 16px !important; }
   .mobile-nav-open .side-nav { transform: translateX(0); }
   .workspace { grid-column: 1; }
-  .top-bar .mobile-menu { display: grid; position: relative; z-index: 31; flex-shrink: 0; }
+  .app-shell .top-bar .mobile-menu { display: inline-grid; position: relative; z-index: 31; flex-shrink: 0; }
   .top-bar-lead { max-width: none; }
   .top-bar-lead-row { flex-wrap: wrap; }
   .top-bar-tagline { font-size: 14px; letter-spacing: 0.08em; }
@@ -1153,8 +1155,7 @@ tbody tr:hover { background: var(--rms-bg-hover); }
   .top-brand:not(.top-brand-wide) { width: 160px; }
   .top-brand-text { display: none; }
   .top-brand-logo { width: 160px; height: 64px; }
-  .top-brand-wide .top-brand-logo-wrap { height: 64px; }
-  .top-brand-wide .top-brand-logo-wrap img { height: 88px; max-width: 280px; }
+  .top-brand-wide .top-brand-logo-wrap img { height: 72px; max-width: 280px; }
   .top-bar-tagline { font-size: 14px; letter-spacing: 0.08em; }
   .global-search { width: auto; flex: 1; }
   .profile-button div { display: none; }
@@ -1187,8 +1188,7 @@ tbody tr:hover { background: var(--rms-bg-hover); }
   .top-brand:not(.top-brand-wide) { width: 120px; }
   .top-brand-logo { width: 120px; height: 40px; }
   .top-brand-wide { max-width: 170px; }
-  .top-brand-wide .top-brand-logo-wrap { height: 40px; }
-  .top-brand-wide .top-brand-logo-wrap img { height: 56px; max-width: 170px; }
+  .top-brand-wide .top-brand-logo-wrap img { height: 48px; max-width: 170px; }
   .top-bar .department-switcher { order: 2; flex: 1 1 100%; min-width: 0; }
   .top-bar-tagline { display: none; }
   .top-bar .notification-wrap { order: 3; margin-left: auto; }

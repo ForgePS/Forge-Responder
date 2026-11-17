@@ -8,6 +8,27 @@ export const THEMES = ["light", "dark"];
 
 const ThemeContext = createContext(null);
 
+// The last choice on this browser, so the theme sticks for creators, before
+// sign-in and between accounts. A department member's saved preference wins.
+export const THEME_STORAGE_KEY = "forge-theme";
+
+function readStoredTheme() {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return stored === "dark" || stored === "light" ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeTheme(theme) {
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Storage blocked (private window): the theme still applies for this visit.
+  }
+}
+
 function applyTheme(theme) {
   if (typeof document === "undefined") return;
   const normalized = normalizeUiTheme(theme);
@@ -21,16 +42,17 @@ function applyTheme(theme) {
 export function ThemeProvider({ children }) {
   const { user, membership, patchMembership } = useAuth();
   const { departmentId } = useTenant();
-  const [theme, setThemeState] = useState("light");
+  const [theme, setThemeState] = useState(() => readStoredTheme() || "light");
 
   useEffect(() => {
     const preferred = membership?.preferences?.theme;
     if (preferred === "dark" || preferred === "light") {
       setThemeState(preferred);
+      storeTheme(preferred);
       return;
     }
     if (!user?.uid) {
-      setThemeState("light");
+      setThemeState(readStoredTheme() || "light");
     }
   }, [user?.uid, membership?.preferences?.theme]);
 
@@ -41,6 +63,7 @@ export function ThemeProvider({ children }) {
   const persistTheme = useCallback(async (nextTheme) => {
     const normalized = normalizeUiTheme(nextTheme);
     setThemeState(normalized);
+    storeTheme(normalized);
 
     const storageDepartmentId = membership?.departmentId
       || (departmentId && !isPlatformScope(departmentId) ? departmentId : null);

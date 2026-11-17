@@ -67,11 +67,11 @@
 .msg-board .msg-delete:hover:not(:disabled) { color: var(--rms-critical); border-color: rgba(239, 74, 0, 0.4); }
 .msg-board .msg-detail-head { display: grid; gap: 14px; padding: 12px 0 18px; border-bottom: 1px solid var(--rms-border-subtle); }
 .msg-board .msg-detail-head h2 { margin: 0; color: var(--rms-text-strong); font-size: 22px; font-weight: 700; line-height: 1.3; }
-.msg-board .msg-sender { display: flex; align-items: center; gap: 12px; }
-.msg-board .msg-sender > div { flex: 1; min-width: 0; display: grid; gap: 1px; }
-.msg-board .msg-sender strong { color: var(--rms-text-strong); font-size: 14.5px; }
+.msg-board .msg-sender { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.msg-board .msg-sender > div { flex: 1 1 160px; min-width: 0; display: grid; gap: 1px; }
+.msg-board .msg-sender strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rms-text-strong); font-size: 14.5px; }
 .msg-board .msg-sender span { overflow: hidden; text-overflow: ellipsis; color: var(--rms-text-muted); font-size: 13px; }
-.msg-board .msg-sender time { flex: none; color: var(--rms-text-muted); font-size: 13px; }
+.msg-board .msg-sender time { flex: 0 1 auto; min-width: 0; margin-left: auto; color: var(--rms-text-muted); font-size: 13px; }
 .msg-board .msg-to { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; color: var(--rms-text-body); font-size: 13.5px; }
 .msg-board .msg-to span { padding: 1px 7px; border-radius: 5px; background: var(--rms-bg-surface-3); color: var(--rms-text-muted); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .msg-board .msg-detail-body { padding-top: 20px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--rms-text-body); font-size: 15px; line-height: 1.7; }
