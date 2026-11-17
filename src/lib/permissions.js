@@ -97,6 +97,7 @@ const navPermissionMap = {
   "SOGs / Policies": "viewDocuments",
   "EMS Protocols": "viewDocuments",
   Forms: "viewDocuments",
+  "Digital Forms": "fillDigitalForms",
   Uploads: "viewDocuments",
   Analytics: "accessAdminRms",
   "Messages": "viewInternalEmail",
@@ -222,6 +223,13 @@ export function canAccessNavItem(itemName, permissions = {}, options = {}) {
   const required = navPermissionMap[itemName];
   if (!required) return true;
   if (hasPermission(permissions, required)) return true;
+  // Form managers and reviewers open Digital Forms even if they don't fill forms in.
+  if (
+    required === "fillDigitalForms"
+    && (hasPermission(permissions, "manageDigitalForms") || hasPermission(permissions, "viewDigitalFormSubmissions"))
+  ) {
+    return true;
+  }
   // Backward compatible: existing roles with viewInspections unlock the new shell.
   if (
     required === "viewInspectionDashboard"

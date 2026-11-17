@@ -1512,3 +1512,42 @@ exports.helpDeskOnMessageCreated = onDocumentCreated(
   { document: "helpDeskTickets/{ticketId}/messages/{messageId}", secrets: EMAIL_SECRETS },
   (event) => helpDesk.handleMessageCreated(admin.firestore(), event)
 );
+
+// ---- Digital Forms (functions/lib/digitalForms) ----
+// A department uploads a paper form (PDF/PNG/JPG); convert reads it with Claude
+// (same ANTHROPIC_API_KEY secret) into a draft that an admin reviews before
+// publishing. Every callable re-verifies membership and permissions; paths are
+// built from the verified department. In the local emulator,
+// DIGITAL_FORMS_EXTRACTOR=sample (functions/.env.demo-forge-rms) returns a fixed
+// sample instead of calling the API, so nothing is sent out and nothing is billed.
+const digitalForms = require("./lib/digitalForms/service");
+const { sampleClient: digitalFormsSampleClient } = require("./lib/digitalForms/extract");
+
+function digitalFormsClient() {
+  if (process.env.FUNCTIONS_EMULATOR === "true" && process.env.DIGITAL_FORMS_EXTRACTOR === "sample") {
+    return digitalFormsSampleClient;
+  }
+  let key = "";
+  try {
+    key = anthropicApiKey.value();
+  } catch {
+    key = "";
+  }
+  if (!key) throw new HttpsError("failed-precondition", "Form conversion isn't set up yet (missing API key).");
+  const Anthropic = require("@anthropic-ai/sdk");
+  const AnthropicClient = Anthropic.default || Anthropic;
+  return new AnthropicClient({ apiKey: key, timeout: 240_000, maxRetries: 2 });
+}
+
+const digitalFormsCall = (handler) => onCall({ memory: "256MiB", timeoutSeconds: 30 }, (request) =>
+  handler(admin.firestore(), request));
+exports.digitalFormsCreateImport = digitalFormsCall(digitalForms.createImport);
+exports.digitalFormsConvert = onCall({ secrets: [anthropicApiKey], memory: "1GiB", timeoutSeconds: 540 }, (request) =>
+  digitalForms.convertImport(admin.firestore(), admin.storage().bucket(), request, { getClient: digitalFormsClient }));
+exports.digitalFormsSaveDraft = digitalFormsCall(digitalForms.saveDraft);
+exports.digitalFormsPublish = digitalFormsCall(digitalForms.publish);
+exports.digitalFormsRevise = digitalFormsCall(digitalForms.reviseTemplate);
+exports.digitalFormsSetStatus = digitalFormsCall(digitalForms.setTemplateStatus);
+exports.digitalFormsDiscardImport = onCall({ memory: "256MiB", timeoutSeconds: 30 }, (request) =>
+  digitalForms.discardImport(admin.firestore(), admin.storage().bucket(), request));
+exports.digitalFormsSubmit = digitalFormsCall(digitalForms.submit);

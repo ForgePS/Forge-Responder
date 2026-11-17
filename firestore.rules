@@ -745,7 +745,8 @@ service cloud.firestore {
         "hydrants", "hydrantInspections", "hydrantFlowTests", "dailyActivity",
         "heatZoneAccess", "heatZoneCalls", "heatZoneEvents", "heatZoneGeocodes", "heatZoneMeta", "heatZoneSettings", "heatZoneZones",
         "forgeAiBriefings", "forgeAiConversations", "forgeAiFeedback", "forgeAiMessageSources", "forgeAiMessages",
-        "forgeAiSettings", "forgeAiUsage", "forgeAiUsageLogs"
+        "forgeAiSettings", "forgeAiUsage", "forgeAiUsageLogs",
+        "formImports", "formSubmissions", "formTemplateVersions", "formTemplates"
       ];
     }
 
@@ -939,6 +940,31 @@ service cloud.firestore {
           );
         allow delete: if canWriteModule(departmentId, "internalEmail")
           && (resource.data.get("fromUid", "") == request.auth.uid || memberCanAny(departmentId, ["manageInternalEmail"]));
+      }
+      // Digital Forms (functions/lib/digitalForms). Everything is written by Cloud
+      // Functions, which check membership and permissions; browsers only read.
+      // Uploads and drafts under review are for form managers only; published forms
+      // for anyone who fills in, manages or reviews forms; a submission for the
+      // member who sent it and those allowed to see everyone's.
+      match /formImports/{document} {
+        allow read: if canAccessDepartment(departmentId) && memberCanAny(departmentId, ["manageDigitalForms"]);
+        allow write: if false;
+      }
+      match /formTemplates/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["fillDigitalForms", "manageDigitalForms", "viewDigitalFormSubmissions"]);
+        allow write: if false;
+      }
+      match /formTemplateVersions/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["fillDigitalForms", "manageDigitalForms", "viewDigitalFormSubmissions"]);
+        allow write: if false;
+      }
+      match /formSubmissions/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && (resource.data.get("submittedBy", "") == request.auth.uid
+            || memberCanAny(departmentId, ["viewDigitalFormSubmissions", "manageDigitalForms"]));
+        allow write: if false;
       }
       // Heat Zone Analytics (functions/lib/heatZone). Everything is written by Cloud
       // Functions only; analytics are served through callables that check the

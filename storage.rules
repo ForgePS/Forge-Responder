@@ -124,6 +124,38 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // Digital Forms uploads: formImports/{departmentId}/{importId}/source.{pdf|png|jpg}.
+    // The server creates the import record (departments/{d}/formImports/{importId})
+    // and picks the path; only the form manager who started it may upload, once,
+    // a PDF/PNG/JPEG under 20 MB of the declared type. Form managers can view the
+    // original while reviewing. Files are never replaced; the server deletes them.
+    function canManageDigitalForms(departmentId) {
+      return isPlatformCreator()
+        || isDepartmentAdmin(departmentId)
+        || (isDepartmentMember(departmentId)
+            && firestore.exists(/databases/(default)/documents/departments/$(departmentId)/memberGrants/$(request.auth.uid))
+            && firestore.get(/databases/(default)/documents/departments/$(departmentId)/memberGrants/$(request.auth.uid))
+                 .data.get("permissions", {}).keys().hasAny(["manageDigitalForms"]));
+    }
+    function formImportData(departmentId, importId) {
+      return firestore.get(/databases/(default)/documents/departments/$(departmentId)/formImports/$(importId)).data;
+    }
+    match /formImports/{departmentId}/{importId}/{fileName} {
+      allow read: if isAuthenticated() && canManageDigitalForms(departmentId);
+      allow create: if isAuthenticated()
+        && canManageDigitalForms(departmentId)
+        && resource == null
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType in ["application/pdf", "image/png", "image/jpeg"]
+        && fileName.matches("source[.](pdf|png|jpg)")
+        && firestore.exists(/databases/(default)/documents/departments/$(departmentId)/formImports/$(importId))
+        && formImportData(departmentId, importId).status == "awaiting_upload"
+        && formImportData(departmentId, importId).createdBy == request.auth.uid
+        && formImportData(departmentId, importId).contentType == request.resource.contentType
+        && formImportData(departmentId, importId).uploadPath == "formImports/" + departmentId + "/" + importId + "/" + fileName;
+      allow update, delete: if false;
+    }
+
     // Platform-wide branding (creator console logo uploads).
     match /platform/{allPaths=**} {
       allow read: if isAuthenticated();

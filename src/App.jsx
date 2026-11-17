@@ -13,6 +13,7 @@ import {
   canEditApparatus,
   canEditAssets,
   canEditPersonnel,
+  canAccessNavItem,
   canEditScheduleRoster,
   canViewPersonnelPrivateInfo,
   filterNavGroups,
@@ -57,6 +58,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  ClipboardList,
   Clock3,
   DollarSign,
   ExternalLink,
@@ -144,6 +146,7 @@ const HydrantDamageAnalyticsPage = lazyPage(() => import("./pages/HydrantDamageA
 const NerisFireReportsPage = lazyPage(() => import("./pages/NerisFireReportsPage.jsx"));
 const NerisAnalyticsPage = lazyPage(() => import("./pages/NerisAnalyticsPage.jsx"));
 const HeatZoneAnalyticsPage = lazyPage(() => import("./pages/HeatZoneAnalyticsPage.jsx"));
+const DigitalFormsPage = lazyPage(() => import("./pages/DigitalFormsPage.jsx"));
 const ForgeAiPage = lazyPage(() => import("./pages/ForgeAiPage.jsx"));
 import { FORGE_AI_OPEN_EVENT, FORGE_AI_PAGE } from "./lib/forgeAi/launch.js";
 import "./styles/forge-ai-shell.css";
@@ -249,7 +252,7 @@ const navGroups = [
     items: [],
   },
   { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["NERIS Analytics", BarChart3], ["Heat Zone Analytics", Flame]] },
-  { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Uploads", Upload]] },
+  { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Digital Forms", ClipboardList], ["Uploads", Upload]] },
   { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay], ["Help Desk", LifeBuoy]] },
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
 ];
@@ -1889,6 +1892,10 @@ function AppShell() {
         permissions={permissions}
         isCreator={isCreator}
       />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Digital Forms" ? (
+    canAccessNavItem("Digital Forms", permissions, { isCreator }) || isCreator ? (
+      <DigitalFormsPage />
     ) : <AccessDeniedModule name={current} />
   ) : ["SOGs / Policies", "EMS Protocols", "Forms", "Uploads"].includes(current) ? (
     hasPermission(permissions, "viewDocuments") ? (

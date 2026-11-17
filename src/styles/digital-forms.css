@@ -1,0 +1,69 @@
+/* Digital Forms (src/pages/DigitalFormsPage.jsx). Field inputs reuse the
+   inspection checklist styles (template-section-card, config-field). */
+.digital-forms-page .panel { margin-bottom: 16px; }
+
+.df-card-list { display: grid; gap: 8px; }
+.df-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #d8dde6);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  text-align: left;
+  width: 100%;
+}
+.df-card > div:first-child { display: grid; gap: 2px; min-width: 0; }
+.df-card strong { overflow-wrap: anywhere; }
+.df-card-button { cursor: pointer; font: inherit; color: inherit; }
+.df-card-button:hover { border-color: var(--accent, #c2410c); }
+.df-card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.df-upload { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0 6px; }
+.df-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+.df-error-text { color: var(--danger, #b91c1c); display: block; }
+.df-success {
+  padding: 10px 12px;
+  margin: 8px 0;
+  border-radius: 8px;
+  background: var(--success-soft, #ecfdf5);
+  color: var(--success, #047857);
+}
+.df-note {
+  padding: 10px 12px;
+  margin: 12px 0;
+  border-radius: 8px;
+  border: 1px solid var(--warning, #d97706);
+  background: var(--warning-soft, #fffbeb);
+}
+.df-note ul { margin: 6px 0 0 18px; }
+
+.df-editor { display: grid; gap: 12px; }
+.df-editor .segmented-control { justify-self: start; }
+.df-form-meta { display: grid; gap: 10px; }
+.df-form-meta label, .df-field-row label { display: grid; gap: 4px; }
+.df-form-meta span, .df-field-row label > span { font-size: 12px; font-weight: 600; }
+.df-section { display: grid; gap: 10px; }
+.df-section-head { display: flex; gap: 6px; align-items: center; }
+.df-section-title { flex: 1; font-weight: 600; min-width: 0; }
+.df-field-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed var(--border, #d8dde6);
+  border-radius: 8px;
+}
+.df-field-main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+.df-required { display: flex !important; align-items: center; gap: 6px; white-space: nowrap; padding-bottom: 6px; }
+.df-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.df-display.df-heading > span { font-weight: 700; font-size: 15px; }
+.df-preview h3 { margin: 0 0 8px; }
+.df-fill { display: grid; gap: 12px; }
+
+@media (max-width: 640px) {
+  .df-field-main { grid-template-columns: 1fr; }
+  .df-card { flex-direction: column; align-items: stretch; }
+  .df-card-actions { justify-content: flex-start; }
+}

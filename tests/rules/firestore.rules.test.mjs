@@ -1163,3 +1163,116 @@ describe("forge ai data", () => {
     }
   });
 });
+
+describe("digital forms", () => {
+  // clerk-a: may manage forms; filler-a: may fill them in; member-a: neither.
+  const clerkA = () => as("clerk-a", { email: "clerk@a.gov", email_verified: true });
+  const fillerA = () => as("filler-a", { email: "filler@a.gov", email_verified: true });
+  const clerkB = () => as("clerk-b", { email: "clerk@b.gov", email_verified: true });
+  const importDoc = (dept, uid, extra = {}) => ({
+    id: "imp1", status: "awaiting_upload", contentType: "application/pdf", createdBy: uid,
+    uploadPath: `formImports/${dept}/imp1/source.pdf`, ...extra,
+  });
+  const PDF_META = { contentType: "application/pdf" };
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `departments/${A}/users/clerk-a`), membership("clerk-a", A));
+      await setDoc(doc(db, `departments/${A}/users/filler-a`), membership("filler-a", A));
+      await setDoc(doc(db, `departments/${B}/users/clerk-b`), membership("clerk-b", B));
+      await setDoc(doc(db, `departments/${A}/memberGrants/clerk-a`), { permissions: { manageDigitalForms: true, fillDigitalForms: true } });
+      await setDoc(doc(db, `departments/${A}/memberGrants/filler-a`), { permissions: { fillDigitalForms: true } });
+      await setDoc(doc(db, `departments/${B}/memberGrants/clerk-b`), { permissions: { manageDigitalForms: true, fillDigitalForms: true } });
+      for (const [dept, clerk] of [[A, "clerk-a"], [B, "clerk-b"]]) {
+        await setDoc(doc(db, `departments/${dept}/formImports/imp1`), importDoc(dept, clerk));
+        await setDoc(doc(db, `departments/${dept}/formTemplates/t1`), { name: "Form", lifecycleStatus: "published" });
+        await setDoc(doc(db, `departments/${dept}/formTemplateVersions/t1-v1`), { templateId: "t1", snapshot: {} });
+      }
+      await setDoc(doc(db, `departments/${A}/formSubmissions/s-filler`), { submittedBy: "filler-a", answers: { a: "1" } });
+      await setDoc(doc(db, `departments/${A}/formSubmissions/s-clerk`), { submittedBy: "clerk-a", answers: { a: "2" } });
+    });
+  });
+
+  it("uploads under review are visible to form managers of that department only", async () => {
+    await assertSucceeds(getDoc(doc(clerkA().firestore(), `departments/${A}/formImports/imp1`)));
+    await assertSucceeds(getDoc(doc(adminA().firestore(), `departments/${A}/formImports/imp1`)));
+    await assertFails(getDoc(doc(fillerA().firestore(), `departments/${A}/formImports/imp1`)));
+    await assertFails(getDoc(doc(clerkB().firestore(), `departments/${A}/formImports/imp1`)));
+    await assertFails(getDocs(collection(clerkB().firestore(), `departments/${A}/formImports`)));
+    await assertFails(getDoc(doc(stranger().firestore(), `departments/${A}/formImports/imp1`)));
+  });
+
+  it("published forms are readable by members who fill them in, not by other departments", async () => {
+    await assertSucceeds(getDoc(doc(fillerA().firestore(), `departments/${A}/formTemplates/t1`)));
+    await assertSucceeds(getDoc(doc(fillerA().firestore(), `departments/${A}/formTemplateVersions/t1-v1`)));
+    await assertFails(getDoc(doc(memberA().firestore(), `departments/${A}/formTemplates/t1`)));
+    await assertFails(getDoc(doc(clerkB().firestore(), `departments/${A}/formTemplates/t1`)));
+    await assertFails(getDoc(doc(clerkB().firestore(), `departments/${A}/formTemplateVersions/t1-v1`)));
+  });
+
+  it("members see their own submissions; managers see all of their department's", async () => {
+    const filler = fillerA().firestore();
+    await assertSucceeds(getDoc(doc(filler, `departments/${A}/formSubmissions/s-filler`)));
+    await assertFails(getDoc(doc(filler, `departments/${A}/formSubmissions/s-clerk`)));
+    await assertSucceeds(getDocs(query(collection(filler, `departments/${A}/formSubmissions`), where("submittedBy", "==", "filler-a"))));
+    await assertFails(getDocs(collection(filler, `departments/${A}/formSubmissions`)));
+    await assertSucceeds(getDocs(collection(clerkA().firestore(), `departments/${A}/formSubmissions`)));
+    await assertFails(getDocs(collection(clerkB().firestore(), `departments/${A}/formSubmissions`)));
+  });
+
+  it("no browser writes digital form data; it goes through the server", async () => {
+    for (const ctx of [clerkA(), adminA(), fillerA(), clerkB(), creator()]) {
+      const db = ctx.firestore();
+      await assertFails(setDoc(doc(db, `departments/${A}/formImports/imp2`), importDoc(A, "clerk-a")));
+      await assertFails(updateDoc(doc(db, `departments/${A}/formImports/imp1`), { status: "review" }));
+      await assertFails(setDoc(doc(db, `departments/${A}/formTemplates/t2`), { name: "x", lifecycleStatus: "published" }));
+      await assertFails(setDoc(doc(db, `departments/${A}/formTemplateVersions/t1-v2`), { templateId: "t1" }));
+      await assertFails(setDoc(doc(db, `departments/${A}/formSubmissions/s-new`), { submittedBy: "filler-a" }));
+      await assertFails(updateDoc(doc(db, `departments/${A}/formSubmissions/s-filler`), { answers: {} }));
+      await assertFails(deleteDoc(doc(db, `departments/${A}/formSubmissions/s-filler`)));
+    }
+  });
+
+  describe("upload storage", () => {
+    const path = (dept, name = "source.pdf", id = "imp1") => `formImports/${dept}/${id}/${name}`;
+
+    it("the manager who started an import uploads its file once, as the declared type", async () => {
+      await assertSucceeds(uploadString(ref(clerkA().storage(), path(A)), "%PDF-1.7", "raw", PDF_META));
+      // never replaced or deleted from the browser
+      await assertFails(uploadString(ref(clerkA().storage(), path(A)), "%PDF-1.7 again", "raw", PDF_META));
+      const { deleteObject } = await import("firebase/storage");
+      await assertFails(deleteObject(ref(clerkA().storage(), path(A))));
+    });
+
+    it("refuses other departments, non-managers, other uploaders, wrong types and wrong names", async () => {
+      await assertFails(uploadString(ref(clerkB().storage(), path(A)), "%PDF-", "raw", PDF_META));
+      await assertFails(uploadString(ref(fillerA().storage(), path(A)), "%PDF-", "raw", PDF_META));
+      await assertFails(uploadString(ref(memberA().storage(), path(A)), "%PDF-", "raw", PDF_META));
+      await assertFails(uploadString(ref(adminA().storage(), path(A)), "%PDF-", "raw", PDF_META)); // not the one who started it
+      await assertFails(uploadString(ref(clerkA().storage(), path(A)), "<html>", "raw", { contentType: "text/html" }));
+      await assertFails(uploadString(ref(clerkA().storage(), path(A)), "x", "raw", { contentType: "image/png" }));
+      await assertFails(uploadString(ref(clerkA().storage(), path(A, "evil.html")), "%PDF-", "raw", PDF_META));
+      await assertFails(uploadString(ref(clerkA().storage(), path(A, "source.pdf", "no-such-import")), "%PDF-", "raw", PDF_META));
+      await assertFails(uploadString(ref(stranger().storage(), path(A)), "%PDF-", "raw", PDF_META));
+    });
+
+    it("refuses uploads once the import has moved on", async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await updateDoc(doc(ctx.firestore(), `departments/${A}/formImports/imp1`), { status: "review" });
+      });
+      await assertFails(uploadString(ref(clerkA().storage(), path(A)), "%PDF-", "raw", PDF_META));
+    });
+
+    it("originals are readable by that department's form managers only", async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await uploadString(ref(ctx.storage(), path(A)), "%PDF-1.7", "raw", PDF_META);
+      });
+      await assertSucceeds(getBytes(ref(clerkA().storage(), path(A))));
+      await assertSucceeds(getBytes(ref(adminA().storage(), path(A))));
+      await assertFails(getBytes(ref(fillerA().storage(), path(A))));
+      await assertFails(getBytes(ref(clerkB().storage(), path(A))));
+      await assertFails(getBytes(ref(stranger().storage(), path(A))));
+    });
+  });
+});
