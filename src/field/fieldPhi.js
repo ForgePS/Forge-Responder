@@ -83,12 +83,20 @@ export async function openJson(key, sealed, aad = "") {
   }
 }
 
-const SEALED_FIELDS = ["data", "base"];
+/**
+ * Record fields that can hold PHI: the chart, the server copy it merges against, and `attention`, where a sync
+ * conflict keeps both sides of the conflicting sections and the merged report.
+ */
+export const SEALED_FIELDS = ["data", "base", "attention"];
 
 /** Seal a record's PHI fields before it is written to the device (no-op for other kinds). */
 export async function sealRecord(record) {
   if (!SEALED_KINDS.has(record?.kind)) return record;
-  const key = await deviceKey(record.scope);
+  return sealRecordWithKey(record, await deviceKey(record.scope));
+}
+
+export async function sealRecordWithKey(record, key) {
+  if (!SEALED_KINDS.has(record?.kind)) return record;
   const out = { ...record, sealedFields: SEALED_FIELDS };
   for (const field of SEALED_FIELDS) {
     if (!isSealed(record[field])) out[field] = await sealJson(key, record[field], `${record.localId}:${field}`);
@@ -99,7 +107,11 @@ export async function sealRecord(record) {
 /** Open a record read from the device (no-op for other kinds). */
 export async function openRecord(record) {
   if (!record?.sealedFields) return record;
-  const key = await deviceKey(record.scope);
+  return openRecordWithKey(record, await deviceKey(record.scope));
+}
+
+export async function openRecordWithKey(record, key) {
+  if (!record?.sealedFields) return record;
   const out = { ...record };
   for (const field of record.sealedFields) out[field] = await openJson(key, record[field], `${record.localId}:${field}`);
   delete out.sealedFields;
@@ -112,7 +124,7 @@ export async function openRecordSafe(record) {
     return await openRecord(record);
   } catch (error) {
     if (error.code !== "phi-locked") throw error;
-    const { data: _data, base: _base, sealedFields: _f, ...rest } = record;
-    return { ...rest, data: null, base: null, locked: true };
+    const { data: _data, base: _base, attention: _attention, sealedFields: _f, ...rest } = record;
+    return { ...rest, data: null, base: null, attention: null, locked: true };
   }
 }

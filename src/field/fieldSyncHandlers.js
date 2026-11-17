@@ -5,7 +5,7 @@
  *  - throws FieldConflictError / FieldRejectedError when the crew must decide
  * Record shapes match what the desktop RMS pages write.
  */
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, runTransaction } from "firebase/firestore";
 import { combineIncidentBookkeeping, incidentMergePaths } from "../lib/neris/reportMerge.js";
 import { checklistProgress } from "../lib/neris/reportModel.js";
 import { getFirestoreDb, uploadFirebaseFile } from "../lib/firebaseClient.js";
@@ -890,23 +890,29 @@ async function syncPcr(record, ctx) {
   const { nemsisSchema } = await import("../lib/nemsis/index.js");
   const db = getFirestoreDb();
   const ref = doc(db, "departments", ctx.departmentId, PCR_COLLECTION, record.data.id);
-  let server = null;
+  let plan;
   try {
-    const snap = await getDoc(ref);
-    server = snap.exists() ? snap.data() : null;
+    // Read, merge and write in one transaction: if another device writes in between, Firestore reruns this with
+    // the newer copy instead of letting a second whole-document write drop the first one's changes.
+    plan = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const next = planPcrWrite(nemsisSchema, {
+        record,
+        server: snap.exists() ? snap.data() : null,
+        uid: ctx.uid,
+        actorName: ctx.actor.actorName,
+        now: nowIso(),
+      });
+      // Whole document, not a merge: fields cleared on the device must disappear on the server too.
+      if (next.action === "write") tx.set(ref, next.doc);
+      return next;
+    });
   } catch (error) {
     if (isPermissionError(error)) {
-      throw new FieldRejectedError("You no longer have access to this patient care report (you may have been removed from the crew).");
+      throw new FieldRejectedError("The server refused this patient care report. Check that you're still on the crew and allowed to chart reports.");
     }
     throw error;
   }
-  const plan = planPcrWrite(nemsisSchema, {
-    record,
-    server,
-    uid: ctx.uid,
-    actorName: ctx.actor.actorName,
-    now: nowIso(),
-  });
   if (plan.action === "reject") throw new FieldRejectedError(plan.message);
   if (plan.action === "conflict") {
     throw new FieldConflictError("Someone else changed this report after you started editing.", {
@@ -915,18 +921,8 @@ async function syncPcr(record, ctx) {
       merged: plan.merged,
     });
   }
-  if (plan.action === "write") {
-    try {
-      // Whole document, not a merge: fields cleared on the device must disappear on the server too.
-      await setDoc(ref, plan.doc);
-    } catch (error) {
-      if (isPermissionError(error)) {
-        throw new FieldRejectedError("The server refused this patient care report. Check that you're on the crew and allowed to chart reports.");
-      }
-      throw error;
-    }
-  }
-  return { serverIds: { pcrId: record.data.id, reportNumber: record.data.number }, base: plan.base };
+  // The merged chart goes back on the device with its base, so the next save doesn't undo kept server changes.
+  return { serverIds: { pcrId: record.data.id, reportNumber: record.data.number }, base: plan.base, data: plan.data };
 }
 
 export const SYNC_HANDLERS = {

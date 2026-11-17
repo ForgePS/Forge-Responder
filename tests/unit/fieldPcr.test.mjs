@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { loadNemsisSchema, ROOT } from "./helpers/nemsisSchema.mjs";
-import { generateDeviceKey, sealJson, openJson, isSealed, SEALED_KINDS } from "../../src/field/fieldPhi.js";
+import { generateDeviceKey, sealJson, openJson, isSealed, SEALED_KINDS, SEALED_FIELDS, sealRecordWithKey, openRecordWithKey } from "../../src/field/fieldPhi.js";
 import { describePcr, fieldPcrNumber, newPcrRecordData, pcrMergePaths, planPcrWrite, stripUndefined } from "../../src/field/fieldPcr.js";
 import { setLeaf } from "../../src/lib/nemsis/pcrModel.js";
 
@@ -133,3 +133,59 @@ test("a posted report on the server is locked; changes from two devices merge by
 test("stripUndefined removes undefined values Firestore would reject, keeping everything else", () => {
   assert.deepEqual(stripUndefined({ a: undefined, b: [1, undefined, { c: undefined, d: 0 }], e: null, f: "" }), { b: [1, { d: 0 }], e: null, f: "" });
 });
+
+// --- review fixes (PR 75) -------------------------------------------------------------------------
+
+test("conflict details (record.attention) are sealed with the chart, not stored in plain text", async () => {
+  const key = await generateDeviceKey();
+  const chart = { nemsis: { ePatient: { "ePatient.02": "Doe" } } };
+  const record = {
+    kind: "pcr",
+    localId: "pc-9",
+    scope: "dept::user",
+    status: "attention",
+    data: chart,
+    base: chart,
+    attention: { type: "conflict", message: "Changed on the server too", conflicts: [{ path: "nemsis.ePatient", mine: chart.nemsis.ePatient, server: {} }], merged: chart },
+  };
+  const sealed = await sealRecordWithKey(record, key);
+  assert.ok(SEALED_FIELDS.includes("attention"));
+  assert.ok(!JSON.stringify(sealed, (k, v) => (v instanceof Uint8Array ? "<bytes>" : v)).includes("Doe"));
+  assert.equal(sealed.status, "attention", "bookkeeping stays readable");
+  const opened = await openRecordWithKey(sealed, key);
+  assert.deepEqual(opened.attention, record.attention);
+  assert.deepEqual(opened.data, chart);
+  // Records with no conflict seal a null attention and get it back.
+  assert.equal((await openRecordWithKey(await sealRecordWithKey({ ...record, attention: null }, key), key)).attention, null);
+});
+
+test("after a merge the device gets the merged chart back with its base", () => {
+  const base = newData();
+  const server = planPcrWrite(schema, { record: record(base), server: null, uid: "user-a", actorName: "A", now: NOW }).doc;
+  const mine = { ...base, nemsis: setLeaf(schema, base.nemsis, "eVitals.06", 142) };
+  const theirs = { ...server, nemsis: setLeaf(schema, server.nemsis, "eNarrative.01", "Pt found sitting."), lastWrite: "other" };
+  const plan = planPcrWrite(schema, { record: record(mine, { base, savedAt: "t2" }), server: theirs, uid: "user-a", actorName: "A", now: NOW });
+  assert.equal(plan.action, "write");
+  assert.equal(plan.data.nemsis.eNarrative["eNarrative.01"], "Pt found sitting.", "the kept server narrative is on the device");
+  assert.deepEqual(plan.data.nemsis, plan.base.nemsis, "data and base are a matching pair");
+
+  // The next save (unchanged chart) changes nothing on the server.
+  const again = planPcrWrite(schema, { record: record(plan.data, { base: plan.base, savedAt: "t3" }), server: plan.doc, uid: "user-a", actorName: "A", now: NOW });
+  assert.equal(again.doc.nemsis.eNarrative["eNarrative.01"], "Pt found sitting.");
+});
+
+test("posting validates the merged report, including server sections the author didn't touch", () => {
+  const complete = { ...newData(), nemsis: { ...fixture.data, attrs: { UUID } } };
+  const server = planPcrWrite(schema, { record: record(complete), server: null, uid: "user-a", actorName: "A", now: NOW }).doc;
+  // Someone cleared eTimes.03 (Mandatory) on the server; this device posts its otherwise unchanged copy.
+  const { "eTimes.03": _cleared, ...times } = server.nemsis.eTimes;
+  const theirs = { ...server, nemsis: { ...server.nemsis, eTimes: times }, lastWrite: "other" };
+  const posting = { ...complete, status: "posted" };
+  const plan = planPcrWrite(schema, { record: record(posting, { base: pcrBaseOf(server), savedAt: "t2" }), server: theirs, uid: "user-a", actorName: "A", now: NOW });
+  assert.equal(plan.action, "reject");
+  assert.match(plan.message, /can't be posted yet/);
+});
+
+function pcrBaseOf(doc) {
+  return { status: doc.status, crewUids: doc.crewUids, incidentNumber: doc.incidentNumber, unit: doc.unit, nemsis: doc.nemsis, updatedAt: doc.updatedAt };
+}

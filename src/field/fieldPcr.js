@@ -77,6 +77,20 @@ export function pcrBase(doc) {
   };
 }
 
+/** The device record data for a server document (after a merge, so the chart shows what was kept). */
+export function pcrDeviceData(doc) {
+  return {
+    id: doc.id,
+    uuid: doc.uuid,
+    number: doc.number,
+    status: doc.status,
+    crewUids: doc.crewUids ?? [],
+    incidentNumber: doc.incidentNumber ?? "",
+    unit: doc.unit ?? "",
+    nemsis: doc.nemsis ?? {},
+  };
+}
+
 /** Remove undefined values (Firestore rejects them) without touching anything else. */
 export function stripUndefined(value) {
   if (Array.isArray(value)) return value.filter((v) => v !== undefined).map(stripUndefined);
@@ -95,22 +109,23 @@ export function planPcrWrite(schema, { record, server, uid, actorName, now = new
   const data = record.data;
   const token = `${record.localId}:${record.savedAt}`;
   // A retry after the write landed but the reply was lost: already done.
-  if (server?.lastWrite === token) return { action: "done", base: pcrBase(server) };
+  if (server?.lastWrite === token) return { action: "done", base: pcrBase(server), data: pcrDeviceData(server) };
   if (server?.status === "posted") {
     return {
       action: "reject",
       message: "This report has been posted and is locked. Ask a supervisor to unlock it if it needs an amendment. Your changes are kept on this device.",
     };
   }
-  if (data.status === "posted") {
-    const check = postCheck(schema, data.nemsis);
+  const { merged, conflicts } = threeWayMerge(record.base, data, server, pcrMergePaths(schema));
+  if (conflicts.length) return { action: "conflict", conflicts, merged };
+  // Validate what will actually be stored: the merge can keep server sections the author didn't touch.
+  if (merged.status === "posted") {
+    const check = postCheck(schema, merged.nemsis);
     if (!check.ok) {
       const n = check.blocking.length;
       return { action: "reject", message: `This report can't be posted yet: ${n} required item${n === 1 ? " is" : "s are"} missing or invalid. Open it to see what's left.` };
     }
   }
-  const { merged, conflicts } = threeWayMerge(record.base, data, server, pcrMergePaths(schema));
-  if (conflicts.length) return { action: "conflict", conflicts, merged };
   const posting = merged.status === "posted" && server?.status !== "posted";
   const doc = stripUndefined({
     ...(server ?? {}),
@@ -129,5 +144,5 @@ export function planPcrWrite(schema, { record, server, uid, actorName, now = new
     lastWrite: token,
     ...(posting ? { postedAt: now, postedByUid: uid, postedByName: actorName } : {}),
   });
-  return { action: "write", doc, base: pcrBase(doc) };
+  return { action: "write", doc, base: pcrBase(doc), data: pcrDeviceData(doc) };
 }
