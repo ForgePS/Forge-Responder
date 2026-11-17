@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Archive, ArrowLeft, ClipboardList, FileUp, Inbox, RefreshCw, RotateCcw, Send, Settings2, Trash2, Upload,
+  Archive, ArrowLeft, ClipboardCheck, ClipboardList, FileUp, Inbox, RefreshCw, RotateCcw, Send, Settings2, Trash2, Upload,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
@@ -17,6 +17,9 @@ import {
   publishImport, reviseForm, saveImportDraft, setFormStatus, submitForm, uploadAndConvert,
   watchForms, watchImports, watchSubmissions,
 } from "../lib/digitalForms/digitalFormsService.js";
+import { listInspectionTypes } from "../lib/inspections/inspectionConfigService.js";
+import { canManageInspectionConfig } from "../lib/inspections/inspectionPermissions.js";
+import { applyFormToInspections } from "../lib/digitalForms/inspectionTemplateFromForm.js";
 import "../styles/inspections-checklist.css";
 import "../styles/digital-forms.css";
 
@@ -386,7 +389,83 @@ function ImportTab({ departmentId, signerName }) {
 
 // ---------------------------------------------------------------- manage published
 
-function ManageTab({ departmentId, forms, signerName }) {
+/** Copy a published form into an inspection template and make it an inspection type's default. */
+function UseForInspections({ departmentId, form, actor, onDone, onCancel }) {
+  const [types, setTypes] = useState(null);
+  const [typeId, setTypeId] = useState("");
+  const [newTypeName, setNewTypeName] = useState(form.name);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    listInspectionTypes(departmentId)
+      .then((rows) => {
+        if (!live) return;
+        const active = rows.filter((row) => row.lifecycleStatus !== "archived" && !row.disabled);
+        setTypes(active);
+        // Pick the type this form already feeds, or one with the same name.
+        const match = active.find((row) => row.name.trim().toLowerCase() === String(form.name).trim().toLowerCase());
+        if (match) setTypeId(match.id);
+      })
+      .catch((e) => { if (live) { setTypes([]); setError(describeError(e)); } });
+    return () => { live = false; };
+  }, [departmentId, form.name]);
+
+  async function confirm() {
+    setBusy(true);
+    setError("");
+    try {
+      const version = await loadFormVersion(departmentId, form.publishedVersionId);
+      if (!version?.snapshot) throw new Error("This form's published version couldn't be loaded.");
+      const result = await applyFormToInspections(departmentId, {
+        form, definition: version.snapshot, typeId, newTypeName,
+      }, actor);
+      onDone(result.updated
+        ? `Inspection type "${result.type.name}" now uses version ${form.currentVersion} of "${form.name}".`
+        : `"${form.name}" is now the checklist for "${result.type.name}" inspections. New inspections of that type use it.`);
+    } catch (e) {
+      setError(describeError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="df-use-inspections">
+      <strong>Use "{form.name}" for inspections</strong>
+      <p className="occupancy-muted">
+        The form becomes the checklist for an inspection type. Inspectors fill it in on each inspection, and any
+        No or Fail answer asks for remarks and photos. Inspections already started keep their old checklist.
+      </p>
+      <label className="config-field">
+        <span>Inspection type</span>
+        <select value={typeId} disabled={!types || busy} onChange={(e) => setTypeId(e.target.value)}>
+          <option value="">New inspection type…</option>
+          {(types || []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+        </select>
+      </label>
+      {!typeId ? (
+        <label className="config-field">
+          <span>New type name</span>
+          <input value={newTypeName} disabled={busy} onChange={(e) => setNewTypeName(e.target.value)} />
+        </label>
+      ) : (
+        <small className="occupancy-muted">This replaces that type's current checklist for new inspections.</small>
+      )}
+      {error ? <small className="df-error-text">{error}</small> : null}
+      <div className="df-actions">
+        <button type="button" className="secondary-button" disabled={busy} onClick={onCancel}>Cancel</button>
+        <button type="button" className="primary-button" disabled={busy || !types || (!typeId && !newTypeName.trim())} onClick={confirm}>
+          {busy ? "Saving…" : "Use for inspections"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ManageTab({ departmentId, forms, signerName, canConfigInspections, actor }) {
+  const [forInspections, setForInspections] = useState(null);
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState(null);
   const [message, setMessage] = useState(null);
@@ -439,13 +518,22 @@ function ManageTab({ departmentId, forms, signerName }) {
               <div className="df-card-actions">
                 <Badge tone={form.lifecycleStatus === "published" ? "good" : "neutral"}>{form.lifecycleStatus === "published" ? "Live" : "Archived"}</Badge>
                 <button type="button" className="secondary-button" disabled={busy}
-                  onClick={() => { setMessage(null); setEditing(form); setDraft({ name: form.name, description: form.description, sections: form.sections }); }}>Edit</button>
+                  onClick={() => { setMessage(null); setEditing(form); setDraft({ name: form.name, description: form.description, linkType: form.linkType || "", sections: form.sections }); }}>Edit</button>
                 {form.lifecycleStatus === "published" ? (
                   <button type="button" className="secondary-button" disabled={busy} onClick={() => act(() => setFormStatus(departmentId, form.id, "archived"), `"${form.name}" archived.`)}><Archive size={14} /> Archive</button>
                 ) : (
                   <button type="button" className="secondary-button" disabled={busy} onClick={() => act(() => setFormStatus(departmentId, form.id, "published"), `"${form.name}" restored.`)}><RotateCcw size={14} /> Restore</button>
                 )}
+                {canConfigInspections && form.lifecycleStatus === "published" ? (
+                  <button type="button" className="secondary-button" disabled={busy}
+                    onClick={() => { setMessage(null); setForInspections(form.id); }}><ClipboardCheck size={14} /> Use for inspections</button>
+                ) : null}
               </div>
+              {forInspections === form.id ? (
+                <UseForInspections departmentId={departmentId} form={form} actor={actor}
+                  onCancel={() => setForInspections(null)}
+                  onDone={(text) => { setForInspections(null); setMessage({ tone: "ok", text }); }} />
+              ) : null}
             </div>
           ))}
         </div>
@@ -504,7 +592,9 @@ export default function DigitalFormsPage() {
           {tab === "fill" ? <FormsTab departmentId={departmentId} uid={user?.uid} forms={forms} signerName={signerName} canFill={canFill} /> : null}
           {tab === "submissions" ? <SubmissionsTab departmentId={departmentId} uid={user?.uid} all={seeAll} /> : null}
           {tab === "import" && canManage ? <ImportTab departmentId={departmentId} signerName={signerName} /> : null}
-          {tab === "manage" && canManage ? <ManageTab departmentId={departmentId} forms={forms} signerName={signerName} /> : null}
+          {tab === "manage" && canManage ? <ManageTab departmentId={departmentId} forms={forms} signerName={signerName}
+            canConfigInspections={canManageInspectionConfig(permissions, isCreator)}
+            actor={{ actorUid: user?.uid || "system", actorName: signerName || user?.email || "User" }} /> : null}
         </>
       )}
     </div>

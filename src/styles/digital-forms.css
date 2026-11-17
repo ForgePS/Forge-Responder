@@ -134,3 +134,15 @@
 .df-photo-add { justify-self: start; cursor: pointer; }
 .df-photo-add.is-busy { opacity: 0.6; pointer-events: none; }
 .df-photo-loading { display: inline-block; padding: 24px 12px; font-size: 12px; }
+
+/* "Use for inspections" panel, opened inside a published form's card. */
+.df-card { flex-wrap: wrap; }
+.df-use-inspections {
+  flex-basis: 100%;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid var(--rms-border);
+}
+.df-use-inspections p { margin: 0; }
+.df-use-inspections .df-actions { margin-top: 4px; }
