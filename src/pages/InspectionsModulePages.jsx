@@ -86,11 +86,13 @@ function CreateInspectionModal({
   occupancies,
   types,
   saving,
+  error = "",
   defaultAssigneeId,
   defaultAssigneeName,
 }) {
+  const activeTypes = types.filter((row) => row.lifecycleStatus !== "archived");
   const [occupancyId, setOccupancyId] = useState(occupancies[0]?.id || "");
-  const [inspectionTypeId, setInspectionTypeId] = useState(types[0]?.id || "");
+  const [inspectionTypeId, setInspectionTypeId] = useState(activeTypes[0]?.id || "");
   const [scheduledStart, setScheduledStart] = useState("");
   const [priority, setPriority] = useState("normal");
   const [assignToMe, setAssignToMe] = useState(true);
@@ -99,7 +101,7 @@ function CreateInspectionModal({
   useEffect(() => {
     if (!open) return;
     setOccupancyId(occupancies[0]?.id || "");
-    setInspectionTypeId(types[0]?.id || "");
+    setInspectionTypeId(types.find((row) => row.lifecycleStatus !== "archived")?.id || "");
     setScheduledStart("");
     setPriority("normal");
     setAssignToMe(true);
@@ -127,7 +129,7 @@ function CreateInspectionModal({
           <Field label="Inspection type">
             <select value={inspectionTypeId} onChange={(e) => setInspectionTypeId(e.target.value)}>
               <option value="">Select type</option>
-              {types.filter((row) => row.lifecycleStatus !== "archived").map((row) => (
+              {activeTypes.map((row) => (
                 <option key={row.id} value={row.id}>{row.name}</option>
               ))}
             </select>
@@ -148,6 +150,18 @@ function CreateInspectionModal({
             <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </Field>
         </div>
+        {error ? (
+          <div className="inspections-error-state" role="alert">
+            <strong>Couldn't create inspection</strong>
+            <p>{error}</p>
+          </div>
+        ) : null}
+        {!occupancies.length || !activeTypes.length ? (
+          <p className="inspections-settings-hint">
+            {!occupancies.length ? "Add an occupancy first. " : ""}
+            {!activeTypes.length ? "Add or restore an inspection type first." : ""}
+          </p>
+        ) : null}
         <div className="modal-actions">
           <button className="secondary-button" type="button" onClick={onClose} disabled={saving}>Cancel</button>
           <button
@@ -588,6 +602,7 @@ function InspectionsShellPage({
   const [occupancies, setOccupancies] = useState([]);
   const [types, setTypes] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [activeId, setActiveId] = useState("");
   const [commandBoard, setCommandBoard] = useState(null);
 
@@ -697,7 +712,7 @@ function InspectionsShellPage({
 
   async function handleCreate(payload) {
     setSaving(true);
-    setError("");
+    setCreateError("");
     setMessage("");
     try {
       const created = await createInspection(departmentId, payload, actor);
@@ -706,8 +721,10 @@ function InspectionsShellPage({
       setActiveId(created.id);
       setMessage(`Created ${created.inspectionNumber}`);
       if (mode === "dashboard") onNavigate?.("Work Queue");
-    } catch (createError) {
-      setError(friendlyError(createError, "Couldn't create inspection."));
+    } catch (createFailure) {
+      // Shown inside the dialog: the page's own error slot sits behind it.
+      console.error("Failed to create inspection", createFailure);
+      setCreateError(friendlyError(createFailure, "Couldn't create inspection."));
     } finally {
       setSaving(false);
     }
@@ -737,7 +754,7 @@ function InspectionsShellPage({
         activeNavName={navName}
         onNavigate={onNavigate}
         actions={canEdit ? (
-          <button className="primary-button" type="button" onClick={() => setShowCreate(true)}>
+          <button className="primary-button" type="button" onClick={() => { setCreateError(""); setShowCreate(true); }}>
             <CirclePlus size={14} /> New inspection
           </button>
         ) : null}
@@ -969,11 +986,12 @@ function InspectionsShellPage({
 
       <CreateInspectionModal
         open={showCreate}
-        onClose={() => setShowCreate(false)}
+        onClose={() => { setCreateError(""); setShowCreate(false); }}
         onCreated={handleCreate}
         occupancies={occupancies}
         types={types}
         saving={saving}
+        error={createError}
         defaultAssigneeId={inspectorId}
         defaultAssigneeName={inspectorName}
       />
