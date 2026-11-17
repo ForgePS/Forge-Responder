@@ -44,13 +44,12 @@ export function toNemsisXml(schema, dataset, doc, options = {}) {
 
   function writeLeaf(node, raw, depth) {
     const v = readLeaf(raw);
-    const attrs = attrText(v.attrs);
+    // Written exactly as stored (even invalid NV/PN combinations); validateNemsis() is what blocks bad data.
+    const attrs = attrText(v.attrs) + attrText({ NV: v.NV, PN: v.PN });
     if (v.value !== undefined) {
-      const pn = v.PN ? ` PN="${escapeXml(v.PN)}"` : "";
-      out.push(`${pad(depth)}<${node.n}${attrs}${pn}>${escapeXml(v.value)}</${node.n}>${nl}`);
+      out.push(`${pad(depth)}<${node.n}${attrs}>${escapeXml(v.value)}</${node.n}>${nl}`);
     } else if (v.NV || v.PN) {
-      const marker = v.NV ? ` NV="${escapeXml(v.NV)}"` : ` PN="${escapeXml(v.PN)}"`;
-      out.push(`${pad(depth)}<${node.n}${attrs} xsi:nil="true"${marker}/>${nl}`);
+      out.push(`${pad(depth)}<${node.n} xsi:nil="true"${attrs}/>${nl}`);
     }
   }
 

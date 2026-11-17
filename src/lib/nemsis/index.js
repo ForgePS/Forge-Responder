@@ -17,3 +17,4 @@ export const nemsisSchema = createNemsisSchema({ structure, types, elements, enu
 export { createNemsisSchema, readLeaf, isEmptyLeaf, NV, PN } from "./schema.js";
 export { validateNemsis, summarizeNemsisIssues, checkSimpleValue } from "./validation.js";
 export { toNemsisXml, buildEmsDataSetXml, buildDemDataSetXml } from "./xmlExport.js";
+export { importNemsisTree, splitEmsDataSet, elementTreeFromDom } from "./xmlImport.js";

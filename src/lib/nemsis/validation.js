@@ -4,8 +4,9 @@
  * Checks, against the generated schema: unknown elements, cardinality, missing required elements,
  * NV / PN usage, attributes, and value types (enumerations, patterns, lengths, ranges, digits, dates).
  *
- * This mirrors what the official XSD enforces, so a document with no blocking issues exports to
- * XSD-valid XML. National/state Schematron business rules are a separate layer (server side).
+ * This mirrors what the official XSD enforces, plus every national Schematron [ERROR] rule, so a document
+ * with no blocking issues exports to XML that passes the XSD and the national Schematron errors.
+ * Schematron warnings, state rules and runtime-loaded rules run on the server (functions/lib/nemsis/schematron.js).
  *
  * Severity:
  *   error   + blocking  – the XML would be rejected (XSD) or a Mandatory element is missing
@@ -24,13 +25,24 @@ import { readLeaf, isEmptyLeaf, instancesOf, DATASET_ROOTS, NV, PN } from "./sch
 const PN_WITH_VALUE = new Set(["eSituation.10", "eMedications.03", "eProcedures.03"]);
 /** Elements where PN "Approximate" accompanies a value (nemSch_e004, e190–e192). */
 const PN_APPROXIMATE_WITH_VALUE = new Set(["ePatient.15", "eSituation.01", "eSituation.18", "eArrest.14"]);
-/** Every other pertinent negative stands in for the value: the element must be empty (nemSch_e003, e008, e188, e189). */
-function pnRequiresValue(element, pn) {
-  return PN_WITH_VALUE.has(element) || (pn === PN.Approximate && PN_APPROXIMATE_WITH_VALUE.has(element));
+/**
+ * How a pertinent negative must be used on an element, following the first-match rule order of the national
+ * pattern nemSch_eNilNvPn: exempt elements first (no assertions), then the specific rules, then the catch-all.
+ * @returns {"exempt"|"withValue"|"empty"}
+ */
+function pnUsage(element, pn, path) {
+  if (element === "eCustomResults.01" || element === "eHistory.10" || /(^|\.)eExam\.AssessmentGroup(\[|\.)/.test(path)) return "exempt";
+  if (PN_WITH_VALUE.has(element) || (pn === PN.Approximate && PN_APPROXIMATE_WITH_VALUE.has(element))) return "withValue";
+  return "empty"; // nemSch_e003, e008, e188, e189
 }
 
 const CODE_TYPE = Object.freeze({ RxNorm: "9924003", SNOMED: "9924005" });
-/** SNOMED medication codes the data dictionary allows in eMedications.03 (nemSch_e144/e145). */
+/** Medication code elements and their national rule ids (RxNorm with CodeType, SNOMED with CodeType, either). */
+const MEDICATION_CODE_RULES = {
+  "eMedications.03": ["nemSch_e143", "nemSch_e144", "nemSch_e145"],
+  "dConfiguration.09": ["nemSch_d014", "nemSch_d015", "nemSch_d016"],
+};
+/** SNOMED medication codes the data dictionary allows (nemSch_e144/e145, d015/d016). */
 const MEDICATION_SNOMED_CODES = new Set(["116762002", "116795008", "116861002", "116865006", "180208003", "33389009", "71493000"]);
 
 const regexCache = new Map();
@@ -130,11 +142,13 @@ export function checkSimpleValue(type, raw) {
  * @param {ReturnType<import("./schema.js").createNemsisSchema>} schema
  * @param {"EMSDataSet"|"DEMDataSet"} dataset
  * @param {object} doc
- * @param {{ rootName?: string }} [options]  defaults to one PatientCareReport / DemographicReport
+ * @param {{ rootName?: string, now?: number }} [options]  root defaults to one PatientCareReport / DemographicReport;
+ *   `now` (ms) is the clock for the "not in the future" rule
  * @returns {NemsisIssue[]}
  */
 export function validateNemsis(schema, dataset, doc, options = {}) {
   const rootName = options.rootName ?? DATASET_ROOTS[dataset].at(-1);
+  const now = options.now ?? Date.now();
   const root = schema.node(dataset, rootName);
   if (!root) throw new Error(`validateNemsis: unknown node ${dataset}/${rootName}`);
   /** @type {NemsisIssue[]} */
@@ -178,39 +192,69 @@ export function validateNemsis(schema, dataset, doc, options = {}) {
       if (!node.nv?.includes(v.NV)) {
         push(path, node.n, "error", "nvNotAllowed", `${label(node.n)}: this "not value" is not allowed here`);
       }
-      if (v.value !== undefined) push(path, node.n, "error", "nvWithValue", `${label(node.n)}: has both a value and a "not value"`);
-      if (v.PN) push(path, node.n, "error", "nvWithPn", `${label(node.n)}: has both a "not value" and a pertinent negative`);
+      const exempt = node.n === "eCustomResults.01";
+      if (v.value !== undefined && !exempt) push(path, node.n, "error", "nvWithValue", `${label(node.n)}: has both a value and a "not value"`, true, "nemSch_e002");
+      if (v.PN && !exempt) push(path, node.n, "error", "nvWithPn", `${label(node.n)}: has both a "not value" and a pertinent negative`);
     }
     if (v.PN) {
+      const usage = pnUsage(node.n, v.PN, path);
       if (!node.pn?.includes(v.PN)) {
         push(path, node.n, "error", "pnNotAllowed", `${label(node.n)}: this pertinent negative is not allowed here`);
-      } else if (pnRequiresValue(node.n, v.PN)) {
+      } else if (usage === "withValue") {
         if (v.value === undefined) {
           push(path, node.n, "error", "pnNeedsValue", `${label(node.n)}: this pertinent negative needs a value with it`, true, "nemSch_e004-e007,e190-e192");
         }
-      } else if (v.value !== undefined) {
+      } else if (usage === "empty" && v.value !== undefined) {
         push(path, node.n, "error", "pnWithValue", `${label(node.n)}: with this pertinent negative the field must be left empty`, true, "nemSch_e003,e008,e188,e189");
       }
     }
     if (v.value !== undefined) {
       const msg = checkSimpleValue(schema.type(node.t), v.value);
       if (msg) push(path, node.n, "error", "invalidValue", `${label(node.n)} ${msg}`);
-      else if (node.n === "eMedications.03") checkMedicationCode(node, v, path);
+      else if (MEDICATION_CODE_RULES[node.n]) checkMedicationCode(node, v, path);
     }
   }
 
-  // National Schematron nemSch_e143–e145: RxNorm (2–7 digits) or one of the allowed SNOMED codes.
+  // National Schematron nemSch_e143–e145 / d014–d016: RxNorm (2–7 digits) or one of the allowed SNOMED codes.
   function checkMedicationCode(node, v, path) {
+    const [ruleRxNorm, ruleSnomed, ruleEither] = MEDICATION_CODE_RULES[node.n];
     const code = String(v.value).trim();
     const isRxNorm = /^[0-9]{2,7}$/.test(code);
     const isSnomed = MEDICATION_SNOMED_CODES.has(code);
     const codeType = v.attrs?.CodeType;
     if (codeType === CODE_TYPE.RxNorm && !isRxNorm) {
-      push(path, node.n, "error", "nationalRule", `${label(node.n)} must be an RxNorm code of 2 to 7 digits`, true, "nemSch_e143");
+      push(path, node.n, "error", "nationalRule", `${label(node.n)} must be an RxNorm code of 2 to 7 digits`, true, ruleRxNorm);
     } else if (codeType === CODE_TYPE.SNOMED && !isSnomed) {
-      push(path, node.n, "error", "nationalRule", `${label(node.n)} must be one of the SNOMED codes the data dictionary allows`, true, "nemSch_e144");
+      push(path, node.n, "error", "nationalRule", `${label(node.n)} must be one of the SNOMED codes the data dictionary allows`, true, ruleSnomed);
     } else if (!isRxNorm && !isSnomed) {
-      push(path, node.n, "error", "nationalRule", `${label(node.n)} must be an RxNorm code or an allowed SNOMED code`, true, "nemSch_e145");
+      push(path, node.n, "error", "nationalRule", `${label(node.n)} must be an RxNorm code or an allowed SNOMED code`, true, ruleEither);
+    }
+  }
+
+  // DEM national rules that look across elements: nemSch_d004, d005, d006.
+  const demUuids = new Map();
+  function checkDemContainer(node, obj, path) {
+    if (dataset !== "DEMDataSet") return;
+    const uuid = obj.attrs?.UUID;
+    if (uuid) {
+      if (demUuids.has(uuid)) {
+        push(path, node.n, "error", "nationalRule", `${node.n}: UUID must be unique (also used at ${demUuids.get(uuid)})`, true, "nemSch_d005");
+      } else demUuids.set(uuid, path);
+    }
+    if (node.n === "DemographicReport" && obj.attrs?.timeStamp) {
+      const ts = Date.parse(obj.attrs.timeStamp);
+      if (!Number.isNaN(ts) && ts >= now + 60 * 60 * 1000) {
+        push(path, node.n, "error", "nationalRule", "The demographic report time stamp must not be in the future", true, "nemSch_d004");
+      }
+    }
+    if (node.n === "dAgency.AgencyServiceGroup") {
+      const state = readLeaf(obj["dAgency.05"]).value;
+      instancesOf(obj, "dAgency.06").forEach((raw, i) => {
+        const county = readLeaf(raw).value;
+        if (state !== undefined && county !== undefined && String(county).slice(0, 2) !== String(state)) {
+          push(`${path}.dAgency.06[${i}]`, "dAgency.06", "error", "nationalRule", `County ${county} is not in the service area state ${state}`, true, "nemSch_d006");
+        }
+      });
     }
   }
 
@@ -229,6 +273,7 @@ export function validateNemsis(schema, dataset, doc, options = {}) {
       return;
     }
     checkAttrs(node, obj.attrs, path);
+    checkDemContainer(node, obj, path);
     const known = new Set(node.ch.map((c) => c.n));
     for (const key of Object.keys(obj)) {
       if (key !== "attrs" && !known.has(key)) {

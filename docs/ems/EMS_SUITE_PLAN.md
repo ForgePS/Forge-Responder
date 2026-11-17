@@ -54,7 +54,7 @@ New permissions: `pcr.write`, `pcr.viewAll`, `pcr.unlock`, `pcr.export`, `qa.rev
 
 ### Phase 1 — NEMSIS foundation (no UI)
 
-**Status (2026-11-17): XSD layer and national Schematron done; TAC compliance cases next.**
+**Status (2026-11-17): done.** Everything NEMSIS checks automatically for Collect Data software passes against the 2026 pre-testing package. What remains for compliance needs the ePCR UI (Phase 2) and web service submission (Phase 3).
 
 | Piece | Where | State |
 |---|---|---|
@@ -65,11 +65,15 @@ New permissions: `pcr.write`, `pcr.viewAll`, `pcr.unlock`, `pcr.export`, `qa.rev
 | Tests incl. agreement with the official XSD (JDK validator) | `tests/unit/nemsis.test.mjs`, `tests/nemsis/XsdValidate.java`, `tests/fixtures/nemsis/` | done |
 | National Schematron 3.5.1 CP2, compiled with the official ISO pipeline to SaxonJS | `scripts/nemsis/compile-nemsis-schematron.mjs` → `functions/nemsis/3.5.1/schematron/compiled/` | done |
 | Server runner: SVRL + nemsisDiagnostic → findings (error/warning, location, record, elements, missing) | `functions/lib/nemsis/schematron.js` (not yet behind a callable) | done |
-| The 16 national `[ERROR]` rules (NV/PN usage, medication codes) mirrored in the browser validator; tests prove both agree | `src/lib/nemsis/validation.js`, `tests/unit/nemsisSchematron.test.mjs` | done |
+| Every national `[ERROR]` rule mirrored in the browser validator: EMS NV/PN usage (with the national exemptions) and medication codes; DEM UUID uniqueness, county-in-state, medication codes, future time stamp | `src/lib/nemsis/validation.js`, `tests/unit/nemsisSchematron.test.mjs` | done |
+| Runtime-loaded state/test Schematron (NEMSIS requires these not be built in): compiled in-process, cached by hash, findings tagged by source | `functions/lib/nemsis/schematron.js` `compileSchematron`, `extraSchematron` option | done |
+| XML import (NEMSIS XML → Forge document), for round trips and later for monitor/other-vendor imports | `src/lib/nemsis/xmlImport.js` | done |
 | State Schematron | from the first state's data manager | waiting on state |
-| NEMSIS TAC compliance test cases as fixtures | | **next** |
+| 2026 pre-testing package: all reference files round-trip unchanged, pass browser validator, XSD, national and pre-testing Schematron; fail files rejected with NEMSIS's expected messages; warnings don't block | `tests/fixtures/nemsis/tac-2026-pretesting/`, `tests/unit/nemsisTac.test.mjs` | done |
 
-- Schema sync script from the official v3.5.0 XSD + Schematron + data dictionary.
+Still required for compliance, outside Phase 1: StateDataSet-driven configuration and custom elements in the UI, NEMSIS defined lists with smart lookup, entering the six test cases by hand through the UI, errors blocking finalization in the UI, automatic DEM resubmission on change, and NEMSIS web service submission.
+
+- Schema sync script from the official v3.5.1 XSD + Schematron + data dictionary.
 - `schema.js`, `valueSets.js`, `validation.js`, `xmlExport.js` with unit tests.
 - Fixture suite built from the NEMSIS TAC compliance test cases; CI validates exported XML against the XSDs and Schematron.
 - **Done when:** a hand-built PCR fixture exports to XML that passes national XSD + Schematron.
