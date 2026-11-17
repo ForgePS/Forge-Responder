@@ -9,54 +9,100 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid var(--border, #d8dde6);
-  border-radius: 8px;
-  background: var(--surface, #fff);
+  border: 1px solid var(--rms-border);
+  border-radius: var(--rms-radius-md, 8px);
+  background: var(--rms-bg-surface-2, var(--rms-surface));
+  color: var(--rms-text);
   text-align: left;
   width: 100%;
 }
 .df-card > div:first-child { display: grid; gap: 2px; min-width: 0; }
 .df-card strong { overflow-wrap: anywhere; }
 .df-card-button { cursor: pointer; font: inherit; color: inherit; }
-.df-card-button:hover { border-color: var(--accent, #c2410c); }
+.df-card-button:hover { border-color: var(--rms-border-strong); background: var(--rms-bg-surface-3); }
 .df-card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
-.df-upload { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0 6px; }
+.df-upload { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 12px 0 6px; }
+.df-upload .df-link-type { min-width: 220px; }
+.df-upload input[type="file"] { color: var(--rms-text); padding: 6px 0; }
 .df-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
-.df-error-text { color: var(--danger, #b91c1c); display: block; }
+.df-error-text { color: var(--rms-danger-text); display: block; }
 .df-success {
   padding: 10px 12px;
   margin: 8px 0;
-  border-radius: 8px;
-  background: var(--success-soft, #ecfdf5);
-  color: var(--success, #047857);
+  border: 1px solid var(--rms-success-border);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-success-soft);
+  color: var(--rms-success-text);
 }
 .df-note {
   padding: 10px 12px;
   margin: 12px 0;
-  border-radius: 8px;
-  border: 1px solid var(--warning, #d97706);
-  background: var(--warning-soft, #fffbeb);
+  border-radius: var(--rms-radius-sm);
+  border: 1px solid color-mix(in srgb, var(--rms-warning) 55%, transparent);
+  border-left: 4px solid var(--rms-warning);
+  background: color-mix(in srgb, var(--rms-warning) 10%, transparent);
+  color: var(--rms-text);
 }
+.df-note strong { color: var(--rms-text-strong, var(--rms-text)); }
 .df-note ul { margin: 6px 0 0 18px; }
 
 .df-editor { display: grid; gap: 12px; }
 .df-editor .segmented-control { justify-self: start; }
 .df-form-meta { display: grid; gap: 10px; }
 .df-form-meta label, .df-field-row label { display: grid; gap: 4px; }
-.df-form-meta span, .df-field-row label > span { font-size: 12px; font-weight: 600; }
+.df-form-meta label > span, .df-field-row label > span, .df-options > span, .df-link-type > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rms-text-muted);
+}
+
+/* Inputs in the review editor and on the upload screen use the app's form look
+   (form-kit.css styles .config-field inputs; these aren't inside one). */
+.digital-forms-page :is(.df-editor, .df-upload, .df-negative)
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
+  font: inherit;
+  font-size: 14px;
+}
+.digital-forms-page :is(.df-editor, .df-upload, .df-negative)
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select) {
+  height: 36px;
+  padding: 0 10px;
+}
+.digital-forms-page :is(.df-editor, .df-upload, .df-negative) select { padding-right: 28px; cursor: pointer; }
+.digital-forms-page :is(.df-editor, .df-upload, .df-negative) textarea {
+  min-height: 64px;
+  padding: 8px 10px;
+  line-height: 1.45;
+  resize: vertical;
+}
+.digital-forms-page :is(.df-editor, .df-upload, .df-negative) :is(input, select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--rms-primary, var(--rms-border-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rms-primary, #0090e7) 25%, transparent);
+}
+.digital-forms-page .df-editor input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--rms-primary); }
+.digital-forms-page .df-section-title { font-weight: 600; }
 .df-section { display: grid; gap: 10px; }
 .df-section-head { display: flex; gap: 6px; align-items: center; }
 .df-section-title { flex: 1; font-weight: 600; min-width: 0; }
 .df-field-row {
   display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px dashed var(--border, #d8dde6);
-  border-radius: 8px;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--rms-border);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-surface-2, transparent);
 }
-.df-field-main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; }
-.df-required { display: flex !important; align-items: center; gap: 6px; white-space: nowrap; padding-bottom: 6px; }
+.df-field-main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr) auto; gap: 10px; align-items: end; }
+.df-required { display: flex !important; align-items: center; gap: 6px; white-space: nowrap; height: 36px; font-size: 14px; color: var(--rms-text); }
 .df-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .df-display.df-heading > span { font-weight: 700; font-size: 15px; }
 .df-preview h3 { margin: 0 0 8px; }
@@ -70,7 +116,6 @@
 
 /* Links to platform records, and remarks/photos on a No or Fail answer. */
 .df-link-type { display: grid; gap: 4px; }
-.df-link-type span { font-size: 12px; font-weight: 600; }
 .df-link-picker { margin-bottom: 12px; }
 .df-linked { margin: 0 0 12px; }
 .df-negative {
@@ -78,12 +123,13 @@
   gap: 8px;
   margin-top: 8px;
   padding: 10px 12px;
-  border-left: 3px solid var(--rms-danger-text, #b91c1c);
-  border-radius: 6px;
-  background: var(--rms-bg-surface-3, rgba(185, 28, 28, 0.05));
+  border: 1px solid var(--rms-danger-border);
+  border-left: 3px solid var(--rms-danger-text);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-danger-soft);
 }
 .df-remarks { display: grid; gap: 4px; }
-.df-negative-title { font-size: 12px; font-weight: 600; }
+.df-negative-title { font-size: 12px; font-weight: 600; color: var(--rms-text-muted); }
 .df-remarks-text { margin: 0; white-space: pre-wrap; }
 .df-photo-add { justify-self: start; cursor: pointer; }
 .df-photo-add.is-busy { opacity: 0.6; pointer-events: none; }
