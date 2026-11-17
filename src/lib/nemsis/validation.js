@@ -11,9 +11,27 @@
  *   error   + blocking  – the XML would be rejected (XSD) or a Mandatory element is missing
  *   warning             – a Required element is empty; it will be exported as NV "Not Recorded"
  */
-import { readLeaf, isEmptyLeaf, instancesOf, DATASET_ROOTS, NV } from "./schema.js";
+import { readLeaf, isEmptyLeaf, instancesOf, DATASET_ROOTS, NV, PN } from "./schema.js";
 
-/** @typedef {{ path: string, element: string, severity: "error"|"warning", code: string, message: string, blocking: boolean }} NemsisIssue */
+/** @typedef {{ path: string, element: string, severity: "error"|"warning", code: string, message: string, blocking: boolean, ruleId?: string }} NemsisIssue */
+
+// ---------------------------------------------------------------------------
+// National Schematron [ERROR] rules (3.5.1 CP2) enforced here too, so crews see them while charting.
+// The server runs the full Schematron (functions/lib/nemsis/schematron.js); tests check both agree.
+// ---------------------------------------------------------------------------
+
+/** Elements where any pertinent negative accompanies a value (nemSch_e005–e007). */
+const PN_WITH_VALUE = new Set(["eSituation.10", "eMedications.03", "eProcedures.03"]);
+/** Elements where PN "Approximate" accompanies a value (nemSch_e004, e190–e192). */
+const PN_APPROXIMATE_WITH_VALUE = new Set(["ePatient.15", "eSituation.01", "eSituation.18", "eArrest.14"]);
+/** Every other pertinent negative stands in for the value: the element must be empty (nemSch_e003, e008, e188, e189). */
+function pnRequiresValue(element, pn) {
+  return PN_WITH_VALUE.has(element) || (pn === PN.Approximate && PN_APPROXIMATE_WITH_VALUE.has(element));
+}
+
+const CODE_TYPE = Object.freeze({ RxNorm: "9924003", SNOMED: "9924005" });
+/** SNOMED medication codes the data dictionary allows in eMedications.03 (nemSch_e144/e145). */
+const MEDICATION_SNOMED_CODES = new Set(["116762002", "116795008", "116861002", "116865006", "180208003", "33389009", "71493000"]);
 
 const regexCache = new Map();
 function xsdRegex(pattern) {
@@ -122,8 +140,8 @@ export function validateNemsis(schema, dataset, doc, options = {}) {
   /** @type {NemsisIssue[]} */
   const issues = [];
 
-  const push = (path, element, severity, code, message, blocking = severity === "error") =>
-    issues.push({ path, element, severity, code, message, blocking });
+  const push = (path, element, severity, code, message, blocking = severity === "error", ruleId) =>
+    issues.push({ path, element, severity, code, message, blocking, ...(ruleId ? { ruleId } : {}) });
 
   const label = (name) => {
     const el = schema.element(name, dataset);
@@ -154,7 +172,6 @@ export function validateNemsis(schema, dataset, doc, options = {}) {
   }
 
   function checkLeafValue(node, raw, path) {
-    const el = schema.element(node.n, dataset);
     const v = readLeaf(raw);
     if (v.attrs) checkAttrs(node, v.attrs, path);
     if (v.NV) {
@@ -167,13 +184,33 @@ export function validateNemsis(schema, dataset, doc, options = {}) {
     if (v.PN) {
       if (!node.pn?.includes(v.PN)) {
         push(path, node.n, "error", "pnNotAllowed", `${label(node.n)}: this pertinent negative is not allowed here`);
-      } else if (v.value === undefined && !v.NV && !(el?.pnNil ?? node.nil)) {
-        push(path, node.n, "error", "pnNeedsValue", `${label(node.n)}: this pertinent negative needs a value with it`);
+      } else if (pnRequiresValue(node.n, v.PN)) {
+        if (v.value === undefined) {
+          push(path, node.n, "error", "pnNeedsValue", `${label(node.n)}: this pertinent negative needs a value with it`, true, "nemSch_e004-e007,e190-e192");
+        }
+      } else if (v.value !== undefined) {
+        push(path, node.n, "error", "pnWithValue", `${label(node.n)}: with this pertinent negative the field must be left empty`, true, "nemSch_e003,e008,e188,e189");
       }
     }
     if (v.value !== undefined) {
       const msg = checkSimpleValue(schema.type(node.t), v.value);
       if (msg) push(path, node.n, "error", "invalidValue", `${label(node.n)} ${msg}`);
+      else if (node.n === "eMedications.03") checkMedicationCode(node, v, path);
+    }
+  }
+
+  // National Schematron nemSch_e143–e145: RxNorm (2–7 digits) or one of the allowed SNOMED codes.
+  function checkMedicationCode(node, v, path) {
+    const code = String(v.value).trim();
+    const isRxNorm = /^[0-9]{2,7}$/.test(code);
+    const isSnomed = MEDICATION_SNOMED_CODES.has(code);
+    const codeType = v.attrs?.CodeType;
+    if (codeType === CODE_TYPE.RxNorm && !isRxNorm) {
+      push(path, node.n, "error", "nationalRule", `${label(node.n)} must be an RxNorm code of 2 to 7 digits`, true, "nemSch_e143");
+    } else if (codeType === CODE_TYPE.SNOMED && !isSnomed) {
+      push(path, node.n, "error", "nationalRule", `${label(node.n)} must be one of the SNOMED codes the data dictionary allows`, true, "nemSch_e144");
+    } else if (!isRxNorm && !isSnomed) {
+      push(path, node.n, "error", "nationalRule", `${label(node.n)} must be an RxNorm code or an allowed SNOMED code`, true, "nemSch_e145");
     }
   }
 

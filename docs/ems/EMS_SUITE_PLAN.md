@@ -54,7 +54,7 @@ New permissions: `pcr.write`, `pcr.viewAll`, `pcr.unlock`, `pcr.export`, `qa.rev
 
 ### Phase 1 — NEMSIS foundation (no UI)
 
-**Status (2026-11-16): XSD layer done; Schematron not started.**
+**Status (2026-11-17): XSD layer and national Schematron done; TAC compliance cases next.**
 
 | Piece | Where | State |
 |---|---|---|
@@ -63,7 +63,10 @@ New permissions: `pcr.write`, `pcr.viewAll`, `pcr.unlock`, `pcr.export`, `qa.rev
 | XSD-level validation (cardinality, required, NV/PN, codes, patterns, ranges, dates) | `src/lib/nemsis/validation.js` | done |
 | XML export (EMSDataSet, DEMDataSet, XSD order, NV Not Recorded fill) | `src/lib/nemsis/xmlExport.js` | done |
 | Tests incl. agreement with the official XSD (JDK validator) | `tests/unit/nemsis.test.mjs`, `tests/nemsis/XsdValidate.java`, `tests/fixtures/nemsis/` | done |
-| National Schematron (business rules) | needs an XSLT 2.0 engine (Saxon) | **next** |
+| National Schematron 3.5.1 CP2, compiled with the official ISO pipeline to SaxonJS | `scripts/nemsis/compile-nemsis-schematron.mjs` → `functions/nemsis/3.5.1/schematron/compiled/` | done |
+| Server runner: SVRL + nemsisDiagnostic → findings (error/warning, location, record, elements, missing) | `functions/lib/nemsis/schematron.js` (not yet behind a callable) | done |
+| The 16 national `[ERROR]` rules (NV/PN usage, medication codes) mirrored in the browser validator; tests prove both agree | `src/lib/nemsis/validation.js`, `tests/unit/nemsisSchematron.test.mjs` | done |
+| State Schematron | from the first state's data manager | waiting on state |
 | NEMSIS TAC compliance test cases as fixtures | | **next** |
 
 - Schema sync script from the official v3.5.0 XSD + Schematron + data dictionary.

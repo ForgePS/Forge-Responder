@@ -19,6 +19,7 @@
     "sync:neris-schema": "node scripts/sync-neris-schema.mjs",
     "import:neris-xlsx": "node scripts/import-neris-xlsx.mjs",
     "sync:nemsis-schema": "node scripts/nemsis/sync-nemsis-schema.mjs",
+    "compile:nemsis-schematron": "node scripts/nemsis/compile-nemsis-schematron.mjs",
     "push:test-alert": "node functions/scripts/pushTestAlert.js",
     "fleet:load-smoke": "node scripts/fleet-load-smoke.mjs",
     "ifc:parse": "node scripts/ifc/parseIfcDocx.mjs",
@@ -64,7 +65,8 @@
     "firebase-admin": "^13.4.0",
     "firebase-tools": "15.22.4",
     "globals": "15.15.0",
-    "vite": "8.0.16"
+    "vite": "8.0.16",
+    "xslt3": "2.7.0"
   },
   "engines": {
     "node": ">=22 <23"
