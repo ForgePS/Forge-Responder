@@ -13,6 +13,8 @@ import { describePcr, fieldPcrNumber, newPcrRecordData } from "../fieldPcr.js";
 import { reopenIfUnlocked } from "../fieldPcrReopen.js";
 import {
   PCR_SECTIONS,
+  SIGNATURE_FILE_FIELDS,
+  SIGNATURE_GROUP,
   addGroupRow,
   composeLeaf,
   fieldPath,
@@ -31,6 +33,7 @@ import {
 import { readLeaf } from "../../lib/nemsis/schema.js";
 import { Banner, Field, PickerButton, PickerSheet, Screen, Section, TextArea, TextInput, cx } from "../ui.jsx";
 import { UnitField } from "./common.jsx";
+import SignaturePad from "./SignaturePad.jsx";
 
 /** The NEMSIS schema is large (≈1 MB of JSON): load it when a report is opened, not with the app. */
 function useNemsisSchema() {
@@ -248,6 +251,8 @@ function IssuesPanel({ check, open, onToggle, onGo }) {
 function LayoutItems({ items, ctx, at, showAll }) {
   return items
     .filter((item) => showAll || item.essential)
+    // A signature row's file fields are drawn as one signature pad (RepeatGroup).
+    .filter((item) => !(item.type === "field" && SIGNATURE_FILE_FIELDS.includes(item.field.el)))
     .map((item) => {
       if (item.type === "field") return <LeafEditor key={item.field.el} field={item.field} ctx={ctx} at={at} />;
       if (item.repeating) return <RepeatGroup key={item.name} item={item} ctx={ctx} at={at} showAll={showAll} />;
@@ -287,6 +292,7 @@ function RepeatGroup({ item, ctx, at, showAll }) {
               ) : null}
             </legend>
             <LayoutItems items={item.children} ctx={ctx} at={here} showAll={showAll} />
+            {item.name === SIGNATURE_GROUP ? <SignaturePad ctx={ctx} at={here} /> : null}
           </fieldset>
         );
       })}
@@ -382,7 +388,7 @@ function LeafEditor({ field, ctx, at }) {
       input = <TextArea disabled={disabled} value={single.value ?? ""} onChange={setValue} rows={field.el === "eNarrative.01" ? 10 : 3} />;
       break;
     case "file":
-      input = <p className="fa-hint">Files and signatures are added from the RMS for now.</p>;
+      input = <p className="fa-hint">File attachments aren't supported on the phone yet.</p>;
       break;
     default:
       input = field.repeating

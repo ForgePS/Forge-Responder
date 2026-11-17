@@ -475,7 +475,10 @@ function ReadoutItems({ items }) {
       {items.map((item, i) => (item.type === "field" ? (
         <div key={`${item.el}-${i}`} className="pcr-readout-field">
           <dt>{item.label}</dt>
-          <dd>{(item.kind === "datetime" ? item.values.map(formatWhen) : item.values).join(", ")}</dd>
+          <dd>
+            {item.image ? <img className="pcr-signature" src={item.image} alt={item.label} />
+              : (item.kind === "datetime" ? item.values.map(formatWhen) : item.values).join(", ")}
+          </dd>
         </div>
       ) : (
         <div key={`${item.name}-${i}`} className="pcr-readout-group">

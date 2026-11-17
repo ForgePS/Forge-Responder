@@ -20,7 +20,9 @@ function itemsHtml(items, when) {
   return items.map((item) => {
     if (item.type === "field") {
       const values = item.kind === "datetime" ? item.values.map(when) : item.values;
-      return `<div class="f"><dt>${escapeHtml(item.label)}</dt><dd>${values.map(escapeHtml).join(", ")}</dd></div>`;
+      // item.image is a data: URL built only from a safe image type and base64 characters (graphicDataUrl).
+      const value = item.image ? `<img class="sig" src="${escapeHtml(item.image)}" alt="${escapeHtml(item.label)}">` : values.map(escapeHtml).join(", ");
+      return `<div class="f"><dt>${escapeHtml(item.label)}</dt><dd>${value}</dd></div>`;
     }
     const rows = item.rows.map((row, i) => `<div class="row">${item.rows.length > 1 ? `<span class="n">#${i + 1}</span>` : ""}<dl>${itemsHtml(row, when)}</dl></div>`);
     return `<div class="g"><dt>${escapeHtml(item.label)}</dt><dd>${rows.join("")}</dd></div>`;
@@ -68,6 +70,7 @@ export function pcrPrintHtml(schema, pcr, options = {}) {
   .g > dd { padding-left: 10px; border-left: 2px solid #ccc; }
   .row + .row { margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ccc; }
   .n { color: #666; font-size: 11px; }
+  .sig { width: 240px; height: 80px; object-fit: contain; border-bottom: 1px solid #333; }
   .draft { color: #a00; font-weight: 700; }
   footer { margin-top: 18px; color: #555; font-size: 11px; }
   @page { margin: 14mm; }

@@ -32,3 +32,11 @@ test("charted text is escaped and drafts are marked", () => {
   assert.match(html, /&lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt; &amp; more/);
   assert.match(html, /class="draft"><b>Status:<\/b> DRAFT — not posted/);
 });
+
+test("signatures print as images", async () => {
+  const { setSignature, SIGNATURE_GROUP } = await import("../../src/lib/nemsis/pcrModel.js");
+  const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const nemsis = setSignature(schema, {}, { [SIGNATURE_GROUP]: 0 }, { dataUrl: `data:image/png;base64,${PNG}`, signedAt: "2026-11-17T10:00:00-06:00" });
+  const html = pcrPrintHtml(schema, { number: "P-3", status: "draft", nemsis }, { when });
+  assert.ok(html.includes(`<img class="sig" src="data:image/png;base64,${PNG}" alt="Signature Graphic">`));
+});

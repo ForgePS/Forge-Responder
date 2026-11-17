@@ -92,7 +92,8 @@ Still required for compliance, outside Phase 1: StateDataSet-driven configuratio
 | Field charting screen: section chips with progress and errors, essential fields first, repeating groups, NV/PN choices, "Now" times, issues list, Save / Post | `src/field/screens/PcrFormScreen.jsx`, EMS home card | done |
 | EMS agency settings (`settings/ems`: state agency ID, agency number, name, ANSI state code), admin-only; prefill new reports and fill the export header | `src/lib/nemsis/emsSettings.js`, Agency settings on the Patient Care Reports page, `fieldRefData.js` | done |
 | Defined lists with smart lookup (ICD-10 impressions, RxNorm medications, SNOMED procedures) | codes are typed for now | next |
-| Signatures, monitor files, CAD prefill, device auto-lock | | next |
+| Signatures: pad in each NEMSIS signature row (eOther.16–.19, 600×200 PNG, size-capped), status set to Signed / Signed-Not Patient; shown in the RMS review and print (safe raster images only) | `src/field/screens/SignaturePad.jsx`, `pcrModel.js` `setSignature` | done |
+| Monitor files, CAD prefill, device auto-lock | | next |
 | RMS Patient Care Reports page: my reports / all reports, section-by-section review, unlock with a reason, NEMSIS XML export; view, unlock and export audit-logged (report number only) | `src/pages/PatientCareReportsPage.jsx`, `src/lib/pcrService.js` | done |
 | Unlocked reports reopen on the crew's device the next time it's opened with signal | `src/field/fieldPcrReopen.js` | done |
 | Server NEMSIS check (`checkPcr` callable): the app's own NEMSIS code bundled for Functions, XSD-level checks + national (and state, once loaded) Schematron; result stamped on the report | `functions/lib/nemsis/pcrCheck.js`, `scripts/nemsis/bundle-nemsis-functions.mjs` (`npm run bundle:nemsis-functions`; a unit test fails when the bundle is stale) | done |

@@ -4083,3 +4083,4 @@ html[data-theme="light"] .apparatus-check-card { background: #fff; border-color:
 @media (max-width: 640px) {
   .pcr-readout-field { grid-template-columns: 1fr; gap: 2px; }
 }
+.pcr-signature { display: block; width: 100%; max-width: 300px; aspect-ratio: 3 / 1; object-fit: contain; background: #fff; border: 1px solid var(--rms-border); border-radius: 6px; }

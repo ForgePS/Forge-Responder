@@ -533,6 +533,69 @@ export function leafText(field, raw) {
   return (Array.isArray(raw) ? raw : [raw]).filter((item) => !isEmptyLeaf(item)).map(one).filter(Boolean);
 }
 
+/* ------------------------------------------------------------------------------------------------------------
+ * Signatures (eOther.SignatureGroup). The drawn signature is stored as NEMSIS asks: file name (eOther.16), graphic
+ * type (eOther.17) and base64 image (eOther.18), with the time (eOther.19). Charting screens draw these three
+ * file fields as one signature pad.
+ * ---------------------------------------------------------------------------------------------------------- */
+
+export const SIGNATURE_GROUP = "eOther.SignatureGroup";
+export const SIGNATURE_FILE_FIELDS = Object.freeze(["eOther.16", "eOther.17", "eOther.18"]);
+const SIGNED = "4515031";
+const SIGNED_NOT_PATIENT = "4515033";
+const PATIENT = "4512015";
+/** Largest stored signature image (base64 characters): keeps a report well under Firestore's 1 MB document limit. */
+export const MAX_SIGNATURE_BASE64 = 120_000;
+
+// Images that may be shown inline: graphic field → its type field. Never SVG (it can carry script).
+const GRAPHIC_FIELDS = { "eOther.18": "eOther.17", "eOther.11": "eOther.10" };
+const SAFE_IMAGE_TYPE = /^image\/(png|jpeg|gif|webp)$/;
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/** A data: URL for a stored graphic, or null when it isn't a safe inline image. */
+export function graphicDataUrl(type, base64) {
+  const t = String(type ?? "").trim().toLowerCase();
+  const b = String(base64 ?? "").replace(/\s+/g, "");
+  if (!SAFE_IMAGE_TYPE.test(t) || !b || !BASE64.test(b)) return null;
+  return `data:${t};base64,${b}`;
+}
+
+/**
+ * Store a drawn signature (a PNG data: URL from a canvas) in a signature row. Sets the status to Signed
+ * (or Signed-Not Patient when someone other than the patient signs) unless a status was already chosen.
+ * @returns {object} the new PCR
+ */
+export function setSignature(schema, pcr, at, { dataUrl, signedAt }) {
+  const m = /^data:(image\/png);base64,(.+)$/.exec(String(dataUrl ?? ""));
+  if (!m || !BASE64.test(m[2])) throw new Error("pcrModel: a signature must be a PNG data URL");
+  if (m[2].length > MAX_SIGNATURE_BASE64) throw new Error("pcrModel: the signature image is too large");
+  const index = at?.[SIGNATURE_GROUP] ?? 0;
+  let next = setLeaf(schema, pcr, "eOther.16", `signature-${index + 1}.png`, at);
+  next = setLeaf(schema, next, "eOther.17", m[1], at);
+  next = setLeaf(schema, next, "eOther.18", m[2], at);
+  next = setLeaf(schema, next, "eOther.19", signedAt ?? nemsisDateTime(), at);
+  if (getValue(schema, next, "eOther.15", at) === undefined) {
+    const who = getValue(schema, next, "eOther.12", at);
+    next = setLeaf(schema, next, "eOther.15", who && who !== PATIENT ? SIGNED_NOT_PATIENT : SIGNED, at);
+  }
+  return next;
+}
+
+/**
+ * Remove the drawn signature from a row. Keeps who signed and the reason; a "Signed" status goes too (it would no
+ * longer be true), any other status the crew chose stays.
+ */
+export function clearSignature(schema, pcr, at) {
+  const status = getValue(schema, pcr, "eOther.15", at);
+  const fields = [...SIGNATURE_FILE_FIELDS, "eOther.19", ...(status === SIGNED || status === SIGNED_NOT_PATIENT ? ["eOther.15"] : [])];
+  return fields.reduce((next, el) => setLeaf(schema, next, el, undefined, at), pcr);
+}
+
+/** The stored signature image of a row as a data: URL, or null. */
+export function signatureImage(schema, pcr, at) {
+  return graphicDataUrl(getValue(schema, pcr, "eOther.17", at), getValue(schema, pcr, "eOther.18", at));
+}
+
 /**
  * The filled-in part of a section for read-only review: fields with their text, and repeating groups with one
  * entry per row. Empty fields and groups are left out.
@@ -542,8 +605,11 @@ export function leafText(field, raw) {
 export function sectionReadout(schema, pcr, sectionId) {
   const walk = (items, at) => items.flatMap((item) => {
     if (item.type === "field") {
-      const values = leafText(item.field, getLeaf(schema, pcr, item.el ?? item.field.el, at));
-      return values.length ? [{ type: "field", el: item.field.el, label: item.field.label, kind: item.field.kind, values }] : [];
+      const el = item.field.el;
+      const values = leafText(item.field, getLeaf(schema, pcr, el, at));
+      if (!values.length) return [];
+      const image = GRAPHIC_FIELDS[el] ? graphicDataUrl(getValue(schema, pcr, GRAPHIC_FIELDS[el], at), getValue(schema, pcr, el, at)) : null;
+      return [{ type: "field", el, label: item.field.label, kind: item.field.kind, values, ...(image ? { image } : {}) }];
     }
     if (item.repeating) {
       const rows = groupRows(schema, pcr, item.name, at)
