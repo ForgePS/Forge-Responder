@@ -201,3 +201,57 @@ test("official XSD: reference and Forge-exported files pass, XSD-fail files fail
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- Review fixes (PR 74) ------------------------------------------------------------------------
+
+test("pertinent negative without a value is blocked on non-nillable elements (eHistory.10, exam findings)", () => {
+  const { doc } = importFile(REFERENCE.find((f) => f.includes("full") && f.includes("EMS-1")));
+  const pcr = doc.Header[0].PatientCareReport[0];
+  pcr.eHistory = { ...(pcr.eHistory ?? {}), "eHistory.ImmunizationsGroup": [{ "eHistory.10": { PN: "8801025" } }] };
+  pcr.eExam = { ...(pcr.eExam ?? {}), "eExam.AssessmentGroup": [{ "eExam.07": [{ PN: "8801005" }] }] };
+  const blocked = (issues) => issues.filter((i) => i.blocking && i.code === "pnNeedsValue").map((i) => i.element).sort();
+  assert.deepEqual(blocked(validateWhole("EMSDataSet", doc)), ["eExam.07", "eHistory.10"]);
+
+  // With a value the same pertinent negatives are fine (the national rules exempt these elements).
+  pcr.eHistory["eHistory.ImmunizationsGroup"][0]["eHistory.10"] = { value: "9910001", PN: "8801025" };
+  pcr.eExam["eExam.AssessmentGroup"][0]["eExam.07"] = [{ value: "3507001", PN: "8801005" }];
+  assert.deepEqual(blocked(validateWhole("EMSDataSet", doc)), []);
+});
+
+test("import recognizes xsi:nil under any prefix bound to the XML Schema instance namespace", () => {
+  const xml = read(REFERENCE.find((f) => f.includes("full") && f.includes("EMS-1")))
+    .replace(/xmlns:xsi=/, "xmlns:i=")
+    .replace(/\bxsi:/g, "i:");
+  assert.match(xml, /i:nil="true"/);
+  const tree = parseXmlTree(xml);
+  const { dataset, doc, problems } = importNemsisTree(schema, tree);
+  assert.deepEqual(problems, []);
+  const out = toNemsisXml(schema, dataset, doc);
+  assert.doesNotMatch(out, /\bi:nil/);
+  assert.equal(firstDifference(canonical(parseXmlTree(read(REFERENCE.find((f) => f.includes("full") && f.includes("EMS-1"))))), canonical(parseXmlTree(out))), null);
+
+  // Resolution is by namespace URI: "xsi" rebound to another namespace is not the nil marker.
+  const rebound = importNemsisTree(schema, {
+    name: "EMSDataSet",
+    attrs: { xmlns: "http://www.nemsis.org", "xmlns:xsi": "urn:example:other" },
+    children: [{ name: "Header", attrs: {}, text: "", children: [{ name: "DemographicGroup", attrs: {}, text: "", children: [
+      { name: "dAgency.01", attrs: { "xsi:nil": "true" }, children: [], text: "351-T0495" },
+    ] }] }],
+    text: "",
+  });
+  assert.deepEqual(rebound.doc.Header[0].DemographicGroup["dAgency.01"], { value: "351-T0495", attrs: { "xsi:nil": "true" } });
+});
+
+test("DEM UUIDs must be unique within a DemographicReport, not across reports", () => {
+  const { doc } = importFile(REFERENCE.find((f) => f.includes("full") && f.includes("DEM-1")));
+  doc.DemographicReport.push(structuredClone(doc.DemographicReport[0]));
+  const dupes = (d) => validateWhole("DEMDataSet", d).filter((i) => i.ruleId === "nemSch_d005");
+  assert.deepEqual(dupes(doc), []);
+
+  const people = doc.DemographicReport[1].dPersonnel?.["dPersonnel.PersonnelGroup"] ?? [];
+  assert.ok(people.length >= 1 && people[0].attrs?.UUID, "DEM test case has personnel with UUIDs");
+  people.push(structuredClone(people[0]));
+  const found = dupes(doc);
+  assert.ok(found.length > 0);
+  assert.ok(found.every((i) => i.path.startsWith("DEMDataSet.DemographicReport[1].")), JSON.stringify(found.map((i) => i.path)));
+});

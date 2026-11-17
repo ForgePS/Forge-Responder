@@ -204,6 +204,10 @@ export function validateNemsis(schema, dataset, doc, options = {}) {
         if (v.value === undefined) {
           push(path, node.n, "error", "pnNeedsValue", `${label(node.n)}: this pertinent negative needs a value with it`, true, "nemSch_e004-e007,e190-e192");
         }
+      } else if (v.value === undefined && !node.nil) {
+        // Exempt from the PN business rules (eHistory.10, exam findings) but not nillable in the XSD,
+        // so a pertinent negative there still needs a value (e.g. "no injury" on a body area).
+        push(path, node.n, "error", "pnNeedsValue", `${label(node.n)}: this pertinent negative needs a value with it`);
       } else if (usage === "empty" && v.value !== undefined) {
         push(path, node.n, "error", "pnWithValue", `${label(node.n)}: with this pertinent negative the field must be left empty`, true, "nemSch_e003,e008,e188,e189");
       }
@@ -232,9 +236,11 @@ export function validateNemsis(schema, dataset, doc, options = {}) {
   }
 
   // DEM national rules that look across elements: nemSch_d004, d005, d006.
+  // UUIDs must be unique within each DemographicReport (nemSch_d005 checks ancestor::DemographicReport).
   const demUuids = new Map();
   function checkDemContainer(node, obj, path) {
     if (dataset !== "DEMDataSet") return;
+    if (node.n === "DemographicReport") demUuids.clear();
     const uuid = obj.attrs?.UUID;
     if (uuid) {
       if (demUuids.has(uuid)) {

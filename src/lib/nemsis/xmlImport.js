@@ -12,8 +12,27 @@ import { DATASET_ROOTS } from "./schema.js";
 
 /** @typedef {{ name: string, attrs: Record<string,string>, children: XmlTree[], text: string }} XmlTree */
 
-const XSI_NIL = "xsi:nil";
-const IGNORED_ATTR = (name) => name === "xmlns" || name.startsWith("xmlns:") || name.startsWith("xsi:");
+const XSI = "http://www.w3.org/2001/XMLSchema-instance";
+const prefixOf = (name) => (name.includes(":") ? name.slice(0, name.indexOf(":")) : "");
+
+/**
+ * Prefixes bound to the XML Schema instance namespace in scope at `el`, resolved by namespace URI
+ * (a file may use i:nil or any other prefix). "xsi" counts unless the document rebinds it.
+ */
+function xsiPrefixesAt(el, inherited) {
+  let prefixes = inherited;
+  for (const [k, v] of Object.entries(el.attrs ?? {})) {
+    if (!k.startsWith("xmlns:")) continue;
+    const p = k.slice(6);
+    if (v === XSI && !prefixes.has(p)) prefixes = new Set(prefixes).add(p);
+    else if (v !== XSI && prefixes.has(p)) (prefixes = new Set(prefixes)).delete(p);
+  }
+  return prefixes;
+}
+
+/** Namespace declarations and xsi:* attributes are XML plumbing, not NEMSIS data. */
+const isIgnoredAttr = (name, xsi) => name === "xmlns" || name.startsWith("xmlns:") || xsi.has(prefixOf(name));
+const isNil = (el, xsi) => Object.entries(el.attrs ?? {}).some(([k, v]) => xsi.has(prefixOf(k)) && localName(k) === "nil" && (v === "true" || v === "1"));
 
 const localName = (name) => (name.includes(":") ? name.slice(name.indexOf(":") + 1) : name);
 
@@ -27,16 +46,17 @@ export function importNemsisTree(schema, root) {
   if (!DATASET_ROOTS[dataset]) throw new Error(`importNemsisTree: unsupported root element ${root.name}`);
   const problems = [];
 
-  function readLeaf(node, el, path) {
+  function readLeaf(node, el, path, inheritedXsi) {
+    const xsi = xsiPrefixesAt(el, inheritedXsi);
     const attrs = {};
     let NV;
     let PN;
     for (const [k, v] of Object.entries(el.attrs ?? {})) {
       if (k === "NV") NV = v;
       else if (k === "PN") PN = v;
-      else if (!IGNORED_ATTR(k)) attrs[k] = v;
+      else if (!isIgnoredAttr(k, xsi)) attrs[k] = v;
     }
-    const nil = el.attrs?.[XSI_NIL] === "true";
+    const nil = isNil(el, xsi);
     if (el.children?.length) problems.push({ path, message: `${node.n} should not contain child elements` });
     const value = nil ? undefined : el.text ?? "";
     const hasAttrs = Object.keys(attrs).length > 0;
@@ -49,10 +69,11 @@ export function importNemsisTree(schema, root) {
     return out;
   }
 
-  function readContainer(node, el, path) {
+  function readContainer(node, el, path, inheritedXsi) {
+    const xsi = xsiPrefixesAt(el, inheritedXsi);
     const obj = {};
     const attrs = {};
-    for (const [k, v] of Object.entries(el.attrs ?? {})) if (!IGNORED_ATTR(k)) attrs[k] = v;
+    for (const [k, v] of Object.entries(el.attrs ?? {})) if (!isIgnoredAttr(k, xsi)) attrs[k] = v;
     if (Object.keys(attrs).length) obj.attrs = attrs;
 
     const childDefs = new Map(node.ch.map((c) => [c.n, c]));
@@ -64,7 +85,7 @@ export function importNemsisTree(schema, root) {
         problems.push({ path: childPath, message: `${name} is not part of ${node.n} in NEMSIS ${schema.version}` });
         continue;
       }
-      const value = def.k === "l" ? readLeaf(def, child, childPath) : readContainer(def, child, childPath);
+      const value = def.k === "l" ? readLeaf(def, child, childPath, xsi) : readContainer(def, child, childPath, xsi);
       const repeating = def.max === null || def.max > 1;
       if (repeating) (obj[name] ??= []).push(value);
       else if (name in obj) problems.push({ path: childPath, message: `${name} appears more than once` });
@@ -73,7 +94,7 @@ export function importNemsisTree(schema, root) {
     return obj;
   }
 
-  const doc = readContainer(schema.node(dataset), root, dataset);
+  const doc = readContainer(schema.node(dataset), root, dataset, new Set(["xsi"]));
   return { dataset, doc, problems };
 }
 
