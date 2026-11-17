@@ -39,6 +39,7 @@ import DailyLogScreen from "./screens/DailyLogScreen.jsx";
 import DailyLogFormScreen from "./screens/DailyLogFormScreen.jsx";
 import IncidentsScreen from "./screens/IncidentsScreen.jsx";
 import IncidentFormScreen from "./screens/IncidentFormScreen.jsx";
+import PcrFormScreen from "./screens/PcrFormScreen.jsx";
 import { CheckoffFormScreen, CheckoffListsScreen } from "./screens/CheckoffScreens.jsx";
 import { InspectionFormScreen, InspectionsScreen } from "./screens/InspectionScreens.jsx";
 import { PlanEditScreen, PlanUpdateScreen, PlanViewScreen, PlansScreen } from "./screens/PlanScreens.jsx";
@@ -65,6 +66,7 @@ const SCREENS = {
   dailyLogForm: DailyLogFormScreen,
   incidents: IncidentsScreen,
   incidentForm: IncidentFormScreen,
+  pcrForm: PcrFormScreen,
   checkoffs: CheckoffListsScreen,
   checkoffForm: CheckoffFormScreen,
   inspections: InspectionsScreen,

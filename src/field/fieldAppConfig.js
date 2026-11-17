@@ -21,6 +21,7 @@ export const FIELD_WORKFLOWS = [
   { key: "damageForm", label: "Damage form" },
   { key: "dailyLog", label: "Daily log" },
   { key: "incident", label: "Incident report" },
+  { key: "pcr", label: "Patient care report (ePCR)", hint: "NEMSIS 3.5.1 charting. Patient data is encrypted on the device and removed at sign-out." },
   { key: "inspections", label: "Inspections", hint: "Assigned fire/prevention inspections; checklist items come from inspection templates." },
   { key: "preFirePlans", label: "Pre-fire plans", hint: "Everyone allowed can view and send updates; 'Can create & edit' roles edit plans directly.", hasEditRoles: true },
 ];

@@ -79,6 +79,22 @@ Still required for compliance, outside Phase 1: StateDataSet-driven configuratio
 - **Done when:** a hand-built PCR fixture exports to XML that passes national XSD + Schematron.
 
 ### Phase 2 — ePCR on the field app (offline-first)
+
+**Status (2026-11-17): first slice built** on `feat/epcr-field` (stacked on `feat/nemsis-foundation`).
+
+| Piece | Where | State |
+|---|---|---|
+| Charting model: plain-English sections over the NEMSIS document, field descriptors from the schema, read/write by element + group row, new report prefill, post gate | `src/lib/nemsis/pcrModel.js`, `tests/unit/nemsisPcrModel.test.mjs` (every reference PCR re-charted field by field exports identically) | done |
+| Field record kind `pcr`: on-device drafts, sync to `departments/{id}/pcrs/{uuid}` with retry token, section-level merge, posted = locked, posting refused while NEMSIS errors remain | `src/field/fieldPcr.js`, `fieldSyncHandlers.js`, `tests/unit/fieldPcr.test.mjs` | done |
+| PHI on device: AES-GCM with a non-extractable per-user key; records sealed at rest; wiped (records + key) at sign-out; no plain-file export | `src/field/fieldPhi.js`, `fieldRecords.js`, `SettingsScreen.jsx` | done |
+| Module `ems`, permissions `editPcrs` / `viewAllPcrs` / `unlockPcrs` / `exportPcrs` (off for every built-in role except platform creator) | registry, `permissions.js`, `defaultRoles.js`, field caps | done |
+| Firestore rules: crew (`crewUids`) and read-all permissions only; posted locked except `unlockPcrs`; never deleted; off when the plan excludes `ems` | `firestore.rules`, `tests/rules/firestore.rules.test.mjs` | done |
+| Field charting screen: section chips with progress and errors, essential fields first, repeating groups, NV/PN choices, "Now" times, issues list, Save / Post | `src/field/screens/PcrFormScreen.jsx`, EMS home card | done |
+| Agency number setting (eResponse.01) | read from field config `ems.agencyNumber`; no admin UI yet | next |
+| Defined lists with smart lookup (ICD-10 impressions, RxNorm medications, SNOMED procedures) | codes are typed for now | next |
+| Signatures, monitor files, CAD prefill, device auto-lock | | next |
+| RMS desktop: list, review, print, unlock, NEMSIS XML export; server-side Schematron on post | | next |
+
 - New field record kind `pcr` reusing `fieldDb` / `fieldSync` (device-fixed ids, idempotent retry, needs-attention).
 - PHI on device: encrypted IndexedDB store, auto-lock, wipe on sign-out.
 - Tablet-first charting: times bar, vitals grid, quick-add procedures/meds, body map, narrative, signatures (patient, crew, receiving facility).

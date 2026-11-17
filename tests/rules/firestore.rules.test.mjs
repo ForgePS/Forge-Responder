@@ -1072,3 +1072,57 @@ describe("heat zone analytics data", () => {
     }
   });
 });
+
+describe("patient care reports (PHI)", () => {
+  const pcrPath = (id = "pcr-1") => `departments/${A}/pcrs/${id}`;
+  const draft = (crewUids, extra = {}) => ({ id: "pcr-1", uuid: "pcr-1", status: "draft", crewUids, nemsis: { ePatient: { "ePatient.02": "Doe" } }, ...extra });
+  async function seed({ report, grants = {}, entitlements } = {}) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const [uid, permissions] of Object.entries(grants)) {
+        await setDoc(doc(db, `departments/${A}/memberGrants/${uid}`), { permissions });
+      }
+      if (report) await setDoc(doc(db, pcrPath(report.id)), report);
+      if (entitlements) await setDoc(doc(db, `platformEntitlements/${A}`), entitlements);
+    });
+  }
+
+  it("crew members who may chart create reports they're on, nobody else does", async () => {
+    await seed({ grants: { "ff-a": { editPcrs: true } } });
+    await assertSucceeds(setDoc(doc(ffA().firestore(), pcrPath()), draft(["ff-a"])));
+    await assertFails(setDoc(doc(ffA().firestore(), pcrPath("pcr-2")), { ...draft(["member-a"]), id: "pcr-2" }));
+    await assertFails(setDoc(doc(memberA().firestore(), pcrPath("pcr-3")), { ...draft(["member-a"]), id: "pcr-3" }));
+    await assertFails(setDoc(doc(ffA().firestore(), pcrPath("pcr-4")), { ...draft(["ff-a"]), id: "not-the-doc-id" }));
+  });
+
+  it("only the crew and members allowed to read every report can read one", async () => {
+    await seed({ report: draft(["ff-a"]), grants: { "ff-a": { editPcrs: true }, "editor-a": { viewAllPcrs: true } } });
+    await assertSucceeds(getDoc(doc(ffA().firestore(), pcrPath())));
+    await assertSucceeds(getDoc(doc(editorA().firestore(), pcrPath())));
+    await assertSucceeds(getDoc(doc(adminA().firestore(), pcrPath())));
+    await assertFails(getDoc(doc(memberA().firestore(), pcrPath())));
+    await assertFails(getDoc(doc(memberB().firestore(), pcrPath())));
+    // Listing: the crew's own reports only, unless allowed to read all.
+    await assertSucceeds(getDocs(query(collection(ffA().firestore(), `departments/${A}/pcrs`), where("crewUids", "array-contains", "ff-a"))));
+    await assertFails(getDocs(collection(memberA().firestore(), `departments/${A}/pcrs`)));
+    await assertSucceeds(getDocs(collection(editorA().firestore(), `departments/${A}/pcrs`)));
+    // Checking whether a report exists yet (the field app's first send) is allowed.
+    await assertSucceeds(getDoc(doc(ffA().firestore(), pcrPath("not-there"))));
+  });
+
+  it("posted reports are locked except for members who may unlock them; nothing is deleted", async () => {
+    await seed({ report: draft(["ff-a"], { status: "posted" }), grants: { "ff-a": { editPcrs: true }, "editor-a": { unlockPcrs: true } } });
+    await assertFails(updateDoc(doc(ffA().firestore(), pcrPath()), { status: "draft" }));
+    await assertSucceeds(updateDoc(doc(editorA().firestore(), pcrPath()), { status: "draft", unlockedBy: "editor-a" }));
+    await assertSucceeds(updateDoc(doc(ffA().firestore(), pcrPath()), { "nemsis.eNarrative": { "eNarrative.01": "Addendum" } }));
+    await assertFails(updateDoc(doc(ffA().firestore(), pcrPath()), { crewUids: ["member-a"] }));
+    await assertFails(deleteDoc(doc(adminA().firestore(), pcrPath())));
+    await assertFails(deleteDoc(doc(ffA().firestore(), pcrPath())));
+  });
+
+  it("nothing is readable or writable when the department's plan doesn't include ePCR", async () => {
+    await seed({ report: draft(["ff-a"]), grants: { "ff-a": { editPcrs: true } }, entitlements: { modules: ["dashboard", "administration"] } });
+    await assertFails(getDoc(doc(ffA().firestore(), pcrPath())));
+    await assertFails(setDoc(doc(ffA().firestore(), pcrPath("pcr-2")), { ...draft(["ff-a"]), id: "pcr-2" }));
+  });
+});

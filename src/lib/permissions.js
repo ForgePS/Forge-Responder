@@ -565,3 +565,13 @@ export function canViewBranchSubscription(permissions = {}, isCreator = false) {
 export function canEditNerisReports(permissions = {}, isCreator = false) {
   return Boolean(isCreator || hasPermission(permissions, "editNerisReports"));
 }
+
+/** Chart patient care reports (ePCR). PHI: off by default for every built-in role. */
+export function canEditPcrs(permissions = {}, isCreator = false) {
+  return Boolean(isCreator || hasPermission(permissions, "editPcrs"));
+}
+
+/** Read every patient care report, not only the calls this person was on. */
+export function canViewAllPcrs(permissions = {}, isCreator = false) {
+  return Boolean(isCreator || ["viewAllPcrs", "unlockPcrs", "exportPcrs"].some((key) => hasPermission(permissions, key)));
+}

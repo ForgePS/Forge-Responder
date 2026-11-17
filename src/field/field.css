@@ -2620,3 +2620,113 @@ a.fa-tile:visited {
   font-weight: 700;
   font-size: 0.9rem;
 }
+
+/* ------------------------------ patient care report ------------------------------ */
+
+.fa-pcr-sections {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scrollbar-width: thin;
+}
+
+.fa-pcr-sections .fa-chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.fa-chip.has-error {
+  border-color: var(--fa-bad);
+}
+
+.fa-pcr-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--fa-muted-bg);
+  color: var(--fa-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.fa-pcr-badge.is-error {
+  background: var(--fa-bad-bg);
+  color: var(--fa-bad);
+}
+
+.fa-pcr-group {
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1.5px solid var(--fa-border);
+  border-radius: var(--fa-radius);
+  min-width: 0;
+}
+
+.fa-pcr-group > legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+  font-weight: 700;
+}
+
+.fa-pcr-repeat {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.fa-pcr-not {
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--fa-muted);
+}
+
+.fa-pcr-attr {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--fa-muted);
+  font-size: 15px;
+}
+
+.fa-pcr-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.fa-pcr-issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fa-pcr-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--fa-border);
+  border-radius: 10px;
+  background: var(--fa-surface);
+  color: var(--fa-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fa-pcr-issue.is-error {
+  border-color: var(--fa-bad);
+  color: var(--fa-bad);
+}
