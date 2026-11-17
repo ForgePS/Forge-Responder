@@ -67,3 +67,24 @@
   .df-card { flex-direction: column; align-items: stretch; }
   .df-card-actions { justify-content: flex-start; }
 }
+
+/* Links to platform records, and remarks/photos on a No or Fail answer. */
+.df-link-type { display: grid; gap: 4px; }
+.df-link-type span { font-size: 12px; font-weight: 600; }
+.df-link-picker { margin-bottom: 12px; }
+.df-linked { margin: 0 0 12px; }
+.df-negative {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--rms-danger-text, #b91c1c);
+  border-radius: 6px;
+  background: var(--rms-bg-surface-3, rgba(185, 28, 28, 0.05));
+}
+.df-remarks { display: grid; gap: 4px; }
+.df-negative-title { font-size: 12px; font-weight: 600; }
+.df-remarks-text { margin: 0; white-space: pre-wrap; }
+.df-photo-add { justify-self: start; cursor: pointer; }
+.df-photo-add.is-busy { opacity: 0.6; pointer-events: none; }
+.df-photo-loading { display: inline-block; padding: 24px 12px; font-size: 12px; }

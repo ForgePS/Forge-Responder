@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import FormFillView from "./FormFillView.jsx";
 import {
-  DIGITAL_FORM_FIELD_TYPES, DISPLAY_FIELD_TYPES, OPTION_FIELD_TYPES, draftEdits, parseOptions,
+  DIGITAL_FORM_FIELD_TYPES, DISPLAY_FIELD_TYPES, LINK_TYPE_LABELS, LINK_TYPE_OPTIONS, OPTION_FIELD_TYPES, draftEdits, parseOptions,
 } from "../../lib/digitalForms/formDraft.js";
 
 function OptionsEditor({ options, onChange }) {
@@ -68,6 +68,7 @@ function FieldRow({ field, onChange, onRemove, onMove, canMoveUp, canMoveDown })
 export default function FormEditor({ value, onChange, problems = [], warnings = [], signerName = "" }) {
   const [mode, setMode] = useState("edit");
   const [previewAnswers, setPreviewAnswers] = useState({});
+  const [previewDetails, setPreviewDetails] = useState({});
   const draft = value || { name: "", description: "", sections: [] };
   const sections = draft.sections || [];
   const lastSection = sections.length - 1;
@@ -95,11 +96,20 @@ export default function FormEditor({ value, onChange, problems = [], warnings = 
       {mode === "preview" ? (
         <div className="df-preview">
           <h3>{draft.name}</h3>
+          {draft.linkType ? (
+            <label className="config-field df-link-picker">
+              <span>{LINK_TYPE_LABELS[draft.linkType]} *</span>
+              <select disabled><option>Members choose one here</option></select>
+            </label>
+          ) : null}
           <FormFillView
             definition={draft}
             answers={previewAnswers}
+            details={previewDetails}
             signerName={signerName}
+            allowPhotos={false}
             onChange={(key, next) => setPreviewAnswers((prev) => ({ ...prev, [key]: next }))}
+            onDetailChange={(key, next) => setPreviewDetails((prev) => ({ ...prev, [key]: next }))}
           />
           <small className="occupancy-muted">Preview only. Answers here aren't saved.</small>
         </div>
@@ -114,6 +124,14 @@ export default function FormEditor({ value, onChange, problems = [], warnings = 
               <span>Description</span>
               <textarea rows={2} value={draft.description || ""} onChange={(e) => onChange(draftEdits.setForm(draft, { description: e.target.value }))} />
             </label>
+            <label>
+              <span>Each submission is for</span>
+              <select value={draft.linkType || ""} onChange={(e) => onChange(draftEdits.setForm(draft, { linkType: e.target.value }))}>
+                {LINK_TYPE_OPTIONS.map((o) => <option key={o.id || "none"} value={o.id}>{o.label}</option>)}
+              </select>
+              <small className="occupancy-muted">Members pick the record when they fill the form in, and the submission is saved against it.</small>
+            </label>
+            <small className="occupancy-muted">Any Yes/No or Pass/Fail item answered No or Fail asks for remarks, and lets the member take or add photos.</small>
           </div>
 
           {sections.map((section, si) => (

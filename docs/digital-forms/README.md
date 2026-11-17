@@ -56,6 +56,39 @@ Not used:
    `templateSnapshot`. If the form changed while the member was filling it in, the save is refused with
    "reload".
 
+## Linking a form to platform records
+
+On **Convert a form**, the manager picks what each submission is for: nothing, an **apparatus**, an
+**occupancy**, a **station** or a **member** (personnel). They can change it while reviewing, and it is
+published with the form (`linkType` on the definition, template and version snapshot). When a member fills
+in a linked form, they must choose the record first.
+
+* `digitalFormsLinkOptions` lists the records of that type, from the caller's verified department only:
+  * apparatus: `fleetAssets` (decommissioned ones left out), plus units that are only on the classic
+    Apparatus list;
+  * occupancy: `occupancies`;
+  * station: the station names in `profile/main`;
+  * personnel: the personnel list (name and rank only).
+* `digitalFormsSubmit` looks the chosen id up again in the same department and saves
+  `linkedRecord { type, id, label, detail }`, plus flat `linkedType` and `linkedId` copies for querying.
+  The label always comes from the server; a label sent by the browser is ignored. An id from another
+  department, or a removed record, is refused.
+
+## Remarks and photos on No / Fail
+
+Any Yes/No, Pass/Fail or Pass/Fail/N/A item answered **No** or **Fail** opens a remarks box underneath it,
+with a **Take or add photo** button (the phone camera opens directly; up to 6 photos per item, 40 per form).
+Remarks are required; photos are optional.
+
+* Photos are shrunk in the browser (2000 px, JPEG) and uploaded before submitting, to
+  `formSubmissionPhotos/{departmentId}/{uid}/{random}.jpg`.
+* On submit, the server keeps a photo only if it is under the caller's own folder in the verified
+  department, exists, and is a JPEG/PNG/WebP image of 10 MB or less. Otherwise it refuses the submission.
+* Saved as `details[field.key] = { remarks, photos: [path] }`, only for items still answered No/Fail.
+* Readable by the member who took them, and by holders of `viewDigitalFormSubmissions` or
+  `manageDigitalForms` (and department admins).
+* Photos added and then removed before submitting stay in Storage, unreferenced. Browsers can't delete them.
+
 ## Data
 
 All Firestore data is under `departments/{departmentId}/` and is written only by Cloud Functions.
@@ -65,8 +98,9 @@ All Firestore data is under `departments/{departmentId}/` and is written only by
 | `formImports/{importId}` | file name/type/size, `uploadPath`, `status` (`awaiting_upload`, `converting`, `review`, `failed`, `published`, `discarded`), `draft`, `warnings`, `error`, `templateId` | form managers |
 | `formTemplates/{templateId}` | current `name, description, sections`, `lifecycleStatus` (`published`/`archived`), `currentVersion`, `publishedVersionId`, `sourceImportId` | members who fill in, manage or review forms |
 | `formTemplateVersions/{templateId}-v{N}` | immutable `snapshot` of each published version | same as above |
-| `formSubmissions/{id}` | `templateId, templateVersionId, templateName, templateSnapshot, answers, submittedBy, submittedByName, submittedAt` | the submitter; holders of `viewDigitalFormSubmissions` or `manageDigitalForms` |
+| `formSubmissions/{id}` | `templateId, templateVersionId, templateName, templateSnapshot, answers, details` (remarks/photos), `linkedRecord, linkedType, linkedId, submittedBy, submittedByName, submittedAt` | the submitter; holders of `viewDigitalFormSubmissions` or `manageDigitalForms` |
 | Storage `formImports/{d}/{importId}/source.*` | the uploaded original | form managers |
+| Storage `formSubmissionPhotos/{d}/{uid}/*` | photos on No/Fail answers | the member who took them; submission reviewers |
 
 Answers use the inspection checklist shapes: text and numbers as strings, dates as `YYYY-MM-DD`, checkboxes
 as booleans, choices as strings, `multi_select` as a string list, and signatures as `{ name, signedAt }` (a

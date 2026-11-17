@@ -7,13 +7,19 @@
  * so the app renders it with ChecklistFieldInput and checks answers with
  * src/lib/inspections/checklistFields.js:
  *
- *   { name, description,
+ *   { name, description, linkType,
  *     sections: [{ id, title, sortOrder,
  *       fields: [{ id, key, type, label, helpText, placeholder, required, options, sortOrder }] }] }
  *
  * Answers are stored as answers[field.key], with the same shapes as inspections:
  * text/number as strings, date "YYYY-MM-DD", checkbox boolean, choices string,
  * multi_select string[], signature { name, signedAt } (a typed name).
+ *
+ * linkType ("" or one of LINK_TYPES) asks members to pick the record the
+ * submission is about (an apparatus, occupancy, station or member).
+ *
+ * A Yes/No or Pass/Fail answer of No/Fail opens remarks (required) and photos
+ * (optional): details[field.key] = { remarks, photos: [storage path] }.
  */
 
 /** Field types a converted paper form may use (a subset of TEMPLATE_FIELD_TYPES). */
@@ -26,6 +32,10 @@ const FIELD_TYPES = [
 ];
 const DISPLAY_TYPES = new Set(["heading", "instruction"]);
 const OPTION_TYPES = new Set(["single_select", "dropdown", "multi_select"]);
+/** Records a form can be linked to. */
+const LINK_TYPES = ["apparatus", "occupancy", "station", "personnel"];
+/** The answer that opens remarks and photos, per field type. */
+const NEGATIVE_ANSWERS = { yes_no: "No", pass_fail: "Fail", pass_fail_na: "Fail" };
 const FIXED_CHOICES = {
   yes_no: ["Yes", "No"],
   pass_fail: ["Pass", "Fail"],
@@ -58,6 +68,9 @@ const LIMITS = Object.freeze({
   shortTextChars: 2000,
   longTextChars: 20000,
   signatureNameChars: 200,
+  remarksChars: 4000,
+  photosPerField: 6,
+  photosPerSubmission: 40,
 });
 
 const clean = (value, max) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -159,8 +172,19 @@ function normalizeDefinition(raw = {}) {
   return {
     name: clean(data.name, LIMITS.nameChars) || "Untitled form",
     description: cleanMultiline(data.description, LIMITS.descriptionChars),
+    linkType: normalizeLinkType(data.linkType),
     sections,
   };
+}
+
+function normalizeLinkType(value) {
+  const type = String(value || "").trim().toLowerCase();
+  return LINK_TYPES.includes(type) ? type : "";
+}
+
+/** True when this answer should open remarks and photos. */
+function isNegativeAnswer(field, value) {
+  return Boolean(NEGATIVE_ANSWERS[field?.type]) && value === NEGATIVE_ANSWERS[field.type];
 }
 
 /** Problems that stop a definition from being published (empty list = OK). */
@@ -202,10 +226,13 @@ function isFilled(field, value) {
  * Unknown keys are dropped. Returns { answers, problems } where problems name
  * fields that are invalid or required and empty (in form order).
  */
-function cleanAnswers(definition, rawAnswers = {}, { now = new Date().toISOString() } = {}) {
+function cleanAnswers(definition, rawAnswers = {}, { now = new Date().toISOString(), details: rawDetails = {}, isPhotoPath = () => false } = {}) {
   const input = rawAnswers && typeof rawAnswers === "object" && !Array.isArray(rawAnswers) ? rawAnswers : {};
+  const detailInput = rawDetails && typeof rawDetails === "object" && !Array.isArray(rawDetails) ? rawDetails : {};
   const answers = {};
+  const details = {};
   const problems = [];
+  let photoCount = 0;
   for (const section of definition?.sections || []) {
     for (const field of section.fields || []) {
       if (DISPLAY_TYPES.has(field.type)) continue;
@@ -246,9 +273,25 @@ function cleanAnswers(definition, rawAnswers = {}, { now = new Date().toISOStrin
       }
       if (cleaned !== undefined) answers[field.key] = cleaned;
       if (field.required && !isFilled(field, cleaned)) problems.push(`"${field.label}" is required.`);
+      // Remarks and photos are kept only for a No/Fail answer, and remarks are then required.
+      if (isNegativeAnswer(field, cleaned)) {
+        const raw = detailInput[field.key] && typeof detailInput[field.key] === "object" ? detailInput[field.key] : {};
+        const remarks = typeof raw.remarks === "string" ? cleanMultiline(raw.remarks, LIMITS.remarksChars) : "";
+        const rawPhotos = Array.isArray(raw.photos) ? raw.photos : [];
+        const photos = [...new Set(rawPhotos.map((p) => String(p || "")))];
+        if (photos.length > LIMITS.photosPerField) {
+          problems.push(`"${field.label}" has more than ${LIMITS.photosPerField} photos.`);
+        } else if (photos.some((p) => !isPhotoPath(p))) {
+          problems.push(`A photo on "${field.label}" couldn't be found. Remove it and add it again.`);
+        }
+        photoCount += photos.length;
+        if (!remarks) problems.push(`Add remarks for "${field.label}".`);
+        details[field.key] = { remarks, photos };
+      }
     }
   }
-  return { answers, problems };
+  if (photoCount > LIMITS.photosPerSubmission) problems.push(`A form can have at most ${LIMITS.photosPerSubmission} photos.`);
+  return { answers, details, problems };
 }
 
 function countFields(definition) {
@@ -257,10 +300,14 @@ function countFields(definition) {
 
 module.exports = {
   FIELD_TYPES,
+  LINK_TYPES,
   LIMITS,
+  NEGATIVE_ANSWERS,
   cleanAnswers,
   countFields,
   fieldOptions,
+  isNegativeAnswer,
+  normalizeLinkType,
   normalizeDefinition,
   normalizeType,
   validateDefinition,

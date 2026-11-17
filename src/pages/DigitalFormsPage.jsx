@@ -9,9 +9,11 @@ import FormEditor from "../components/digitalForms/FormEditor.jsx";
 import FormFillView from "../components/digitalForms/FormFillView.jsx";
 import { findMissingRequiredFields } from "../lib/inspections/checklistFields.js";
 import { PLATFORM_SCOPE_ID } from "../lib/tenantPaths.js";
-import { IMPORT_STATUS_LABELS, answerableCount, reviewProblems } from "../lib/digitalForms/formDraft.js";
 import {
-  ACCEPTED_TYPES, checkFile, convertImport, describeError, discardImport, loadFormVersion, originalFileUrl,
+  IMPORT_STATUS_LABELS, LINK_TYPE_LABELS, LINK_TYPE_OPTIONS, answerableCount, detailsToSubmit, missingRemarks, reviewProblems,
+} from "../lib/digitalForms/formDraft.js";
+import {
+  ACCEPTED_TYPES, checkFile, convertImport, describeError, discardImport, listLinkOptions, loadFormVersion, originalFileUrl,
   publishImport, reviseForm, saveImportDraft, setFormStatus, submitForm, uploadAndConvert,
   watchForms, watchImports, watchSubmissions,
 } from "../lib/digitalForms/digitalFormsService.js";
@@ -31,10 +33,41 @@ function Message({ message }) {
 
 // ---------------------------------------------------------------- fill in
 
-function FillForm({ departmentId, form, signerName, onDone, onBack }) {
+/** Pick the apparatus, occupancy, station or member a submission is about. */
+function LinkPicker({ departmentId, type, value, onChange, missing }) {
+  const [options, setOptions] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    setOptions(null);
+    setError("");
+    listLinkOptions(departmentId, type)
+      .then((rows) => { if (live) setOptions(rows); })
+      .catch((e) => { if (live) { setOptions([]); setError(describeError(e)); } });
+    return () => { live = false; };
+  }, [departmentId, type]);
+  const label = LINK_TYPE_LABELS[type] || "Record";
+  return (
+    <label className={`config-field df-link-picker${missing ? " checklist-field-missing" : ""}`}>
+      <span>{label} *{missing ? " (required)" : ""}</span>
+      <select value={value} disabled={!options} onChange={(e) => onChange(e.target.value)} aria-invalid={missing || undefined}>
+        <option value="">{options ? `Choose ${label.toLowerCase()}` : "Loading…"}</option>
+        {(options || []).map((o) => <option key={o.id} value={o.id}>{o.detail ? `${o.label} — ${o.detail}` : o.label}</option>)}
+      </select>
+      {options && !options.length && !error ? <small className="occupancy-muted">No {label.toLowerCase()} records yet. Add them first.</small> : null}
+      {error ? <small className="df-error-text">{error}</small> : null}
+    </label>
+  );
+}
+
+function FillForm({ departmentId, uid, form, signerName, onDone, onBack }) {
   const [version, setVersion] = useState(null);
   const [answers, setAnswers] = useState({});
+  const [details, setDetails] = useState({});
+  const [linkedId, setLinkedId] = useState("");
   const [missingKeys, setMissingKeys] = useState(new Set());
+  const [missingRemarkKeys, setMissingRemarkKeys] = useState(new Set());
+  const [linkMissing, setLinkMissing] = useState(false);
   const [message, setMessage] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -46,17 +79,30 @@ function FillForm({ departmentId, form, signerName, onDone, onBack }) {
     return () => { live = false; };
   }, [departmentId, form.publishedVersionId]);
 
+  const linkType = version?.snapshot?.linkType || "";
+
   async function submit() {
     const missing = findMissingRequiredFields(version.snapshot, answers);
+    const remarks = missingRemarks(version.snapshot, answers, details);
+    const noLink = Boolean(linkType) && !linkedId;
     setMissingKeys(new Set(missing.map((m) => m.key)));
-    if (missing.length) {
-      setMessage({ tone: "error", text: `Answer the required fields: ${missing.map((m) => m.label).join(", ")}.` });
+    setMissingRemarkKeys(new Set(remarks.map((m) => m.key)));
+    setLinkMissing(noLink);
+    const problems = [];
+    if (noLink) problems.push(`Choose the ${(LINK_TYPE_LABELS[linkType] || "record").toLowerCase()} this form is for.`);
+    if (missing.length) problems.push(`Answer the required fields: ${missing.map((m) => m.label).join(", ")}.`);
+    if (remarks.length) problems.push(`Add remarks for: ${remarks.map((m) => m.label).join(", ")}.`);
+    if (problems.length) {
+      setMessage({ tone: "error", text: problems.join(" ") });
       return;
     }
     setSaving(true);
     setMessage(null);
     try {
-      await submitForm(departmentId, form.id, version.id, answers);
+      await submitForm(departmentId, form.id, version.id, answers, {
+        details: detailsToSubmit(version.snapshot, answers, details),
+        linkedRecordId: linkedId,
+      });
       onDone(`"${version.snapshot.name}" was saved.`);
     } catch (error) {
       setMessage({ tone: "error", text: describeError(error) });
@@ -74,12 +120,21 @@ function FillForm({ departmentId, form, signerName, onDone, onBack }) {
       <Message message={message} />
       {!version ? <p className="occupancy-muted">Loading form…</p> : (
         <>
+          {linkType ? (
+            <LinkPicker departmentId={departmentId} type={linkType} value={linkedId} missing={linkMissing}
+              onChange={(id) => { setLinkedId(id); setLinkMissing(false); }} />
+          ) : null}
           <FormFillView
             definition={version.snapshot}
             answers={answers}
+            details={details}
             missingKeys={missingKeys}
+            missingRemarkKeys={missingRemarkKeys}
             signerName={signerName}
+            departmentId={departmentId}
+            uid={uid}
             onChange={(key, next) => setAnswers((prev) => ({ ...prev, [key]: next }))}
+            onDetailChange={(key, next) => setDetails((prev) => ({ ...prev, [key]: next }))}
           />
           <div className="df-actions">
             <button type="button" className="primary-button" disabled={saving} onClick={submit}><Send size={14} /> {saving ? "Saving…" : "Submit"}</button>
@@ -90,13 +145,13 @@ function FillForm({ departmentId, form, signerName, onDone, onBack }) {
   );
 }
 
-function FormsTab({ departmentId, forms, signerName, canFill }) {
+function FormsTab({ departmentId, uid, forms, signerName, canFill }) {
   const [open, setOpen] = useState(null);
   const [message, setMessage] = useState(null);
   const live = forms.filter((f) => f.lifecycleStatus === "published");
 
   if (open) {
-    return <FillForm departmentId={departmentId} form={open} signerName={signerName}
+    return <FillForm departmentId={departmentId} uid={uid} form={open} signerName={signerName}
       onBack={() => setOpen(null)}
       onDone={(text) => { setOpen(null); setMessage({ tone: "ok", text }); }} />;
   }
@@ -110,7 +165,10 @@ function FormsTab({ departmentId, forms, signerName, canFill }) {
               <div>
                 <strong>{form.name}</strong>
                 {form.description ? <small className="occupancy-muted">{form.description}</small> : null}
-                <small className="occupancy-muted">{form.fieldCount || answerableCount(form)} fields · version {form.currentVersion}</small>
+                <small className="occupancy-muted">
+                  {form.fieldCount || answerableCount(form)} fields · version {form.currentVersion}
+                  {form.linkType ? ` · one per ${(LINK_TYPE_LABELS[form.linkType] || "").toLowerCase()}` : ""}
+                </small>
               </div>
               {canFill ? <button type="button" className="primary-button" onClick={() => { setMessage(null); setOpen(form); }}>Fill in</button> : null}
             </div>
@@ -134,7 +192,13 @@ function SubmissionsTab({ departmentId, uid, all }) {
       <Panel title={open.templateName} icon={Inbox}
         action={<button type="button" className="secondary-button" onClick={() => setOpen(null)}><ArrowLeft size={14} /> Back</button>}>
         <p className="occupancy-muted">Submitted by {open.submittedByName || open.submittedBy} on {formatWhen(open.submittedAt)}</p>
-        <FormFillView definition={open.templateSnapshot} answers={open.answers || {}} editable={false} />
+        {open.linkedRecord ? (
+          <p className="df-linked">
+            <strong>{LINK_TYPE_LABELS[open.linkedRecord.type] || "Linked to"}:</strong> {open.linkedRecord.label}
+            {open.linkedRecord.detail ? ` — ${open.linkedRecord.detail}` : ""}
+          </p>
+        ) : null}
+        <FormFillView definition={open.templateSnapshot} answers={open.answers || {}} details={open.details || {}} editable={false} />
       </Panel>
     );
   }
@@ -147,7 +211,9 @@ function SubmissionsTab({ departmentId, uid, all }) {
             <button key={row.id} type="button" className="df-card df-card-button" onClick={() => setOpen(row)}>
               <div>
                 <strong>{row.templateName}</strong>
-                <small className="occupancy-muted">{all ? `${row.submittedByName || row.submittedBy} · ` : ""}{formatWhen(row.submittedAt)}</small>
+                <small className="occupancy-muted">
+                  {row.linkedRecord ? `${row.linkedRecord.label} · ` : ""}{all ? `${row.submittedByName || row.submittedBy} · ` : ""}{formatWhen(row.submittedAt)}
+                </small>
               </div>
             </button>
           ))}
@@ -222,6 +288,7 @@ function ReviewImport({ departmentId, record, signerName, onBack, onPublished })
 function ImportTab({ departmentId, signerName }) {
   const [imports, setImports] = useState([]);
   const [file, setFile] = useState(null);
+  const [linkType, setLinkType] = useState("");
   const [stage, setStage] = useState("");
   const [message, setMessage] = useState(null);
   const [reviewing, setReviewing] = useState(null);
@@ -233,7 +300,7 @@ function ImportTab({ departmentId, signerName }) {
   async function start() {
     setMessage(null);
     try {
-      const result = await uploadAndConvert(departmentId, file, setStage);
+      const result = await uploadAndConvert(departmentId, file, setStage, { linkType });
       setFile(null);
       setReviewing(result.id);
     } catch (error) {
@@ -269,6 +336,12 @@ function ImportTab({ departmentId, signerName }) {
           that already contain patient or personal information.
         </p>
         <div className="df-upload">
+          <label className="df-link-type">
+            <span>Each submission is for</span>
+            <select value={linkType} disabled={Boolean(stage)} onChange={(e) => setLinkType(e.target.value)}>
+              {LINK_TYPE_OPTIONS.map((o) => <option key={o.id || "none"} value={o.id}>{o.label}</option>)}
+            </select>
+          </label>
           <input type="file" accept={ACCEPTED_TYPES.join(",")} disabled={Boolean(stage)}
             onChange={(e) => setFile(e.target.files?.[0] || null)} aria-label="Form file" />
           <button type="button" className="primary-button" disabled={!file || Boolean(fileProblem) || Boolean(stage)} onClick={start}>
@@ -428,7 +501,7 @@ export default function DigitalFormsPage() {
             </div>
           </section>
           {error ? <Message message={{ tone: "error", text: error }} /> : null}
-          {tab === "fill" ? <FormsTab departmentId={departmentId} forms={forms} signerName={signerName} canFill={canFill} /> : null}
+          {tab === "fill" ? <FormsTab departmentId={departmentId} uid={user?.uid} forms={forms} signerName={signerName} canFill={canFill} /> : null}
           {tab === "submissions" ? <SubmissionsTab departmentId={departmentId} uid={user?.uid} all={seeAll} /> : null}
           {tab === "import" && canManage ? <ImportTab departmentId={departmentId} signerName={signerName} /> : null}
           {tab === "manage" && canManage ? <ManageTab departmentId={departmentId} forms={forms} signerName={signerName} /> : null}

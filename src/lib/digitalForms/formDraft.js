@@ -118,6 +118,53 @@ export function answerableCount(definition) {
   return (definition?.sections || []).reduce((n, s) => n + (s.fields || []).filter((f) => !DISPLAY_FIELD_TYPES.has(f.type)).length, 0);
 }
 
+/** Platform records a form can be linked to (matches functions/lib/digitalForms/schema.js LINK_TYPES). */
+export const LINK_TYPE_OPTIONS = [
+  { id: "", label: "Nothing (not linked)" },
+  { id: "apparatus", label: "Apparatus" },
+  { id: "occupancy", label: "Occupancy" },
+  { id: "station", label: "Station" },
+  { id: "personnel", label: "Personnel (a member)" },
+];
+export const LINK_TYPE_LABELS = { apparatus: "Apparatus", occupancy: "Occupancy", station: "Station", personnel: "Member" };
+
+/** The answer that opens remarks and photos, per field type. */
+export const NEGATIVE_ANSWERS = { yes_no: "No", pass_fail: "Fail", pass_fail_na: "Fail" };
+export const MAX_PHOTOS_PER_FIELD = 6;
+
+export function isNegativeAnswer(field, value) {
+  return Boolean(NEGATIVE_ANSWERS[field?.type]) && value === NEGATIVE_ANSWERS[field.type];
+}
+
+/** Fields answered No/Fail that still need remarks: [{ key, label }]. */
+export function missingRemarks(definition, answers = {}, details = {}) {
+  const missing = [];
+  for (const section of definition?.sections || []) {
+    for (const field of section.fields || []) {
+      if (isNegativeAnswer(field, answers[field.key]) && !String(details[field.key]?.remarks || "").trim()) {
+        missing.push({ key: field.key, label: field.label });
+      }
+    }
+  }
+  return missing;
+}
+
+/** Remarks and photos to send: only for fields currently answered No/Fail. */
+export function detailsToSubmit(definition, answers = {}, details = {}) {
+  const out = {};
+  for (const section of definition?.sections || []) {
+    for (const field of section.fields || []) {
+      if (!isNegativeAnswer(field, answers[field.key])) continue;
+      const entry = details[field.key] || {};
+      out[field.key] = {
+        remarks: String(entry.remarks || ""),
+        photos: (entry.photos || []).map((photo) => photo.path).filter(Boolean),
+      };
+    }
+  }
+  return out;
+}
+
 export const IMPORT_STATUS_LABELS = {
   awaiting_upload: "Uploading",
   converting: "Converting",

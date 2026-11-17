@@ -1550,4 +1550,6 @@ exports.digitalFormsRevise = digitalFormsCall(digitalForms.reviseTemplate);
 exports.digitalFormsSetStatus = digitalFormsCall(digitalForms.setTemplateStatus);
 exports.digitalFormsDiscardImport = onCall({ memory: "256MiB", timeoutSeconds: 30 }, (request) =>
   digitalForms.discardImport(admin.firestore(), admin.storage().bucket(), request));
-exports.digitalFormsSubmit = digitalFormsCall(digitalForms.submit);
+exports.digitalFormsSubmit = onCall({ memory: "256MiB", timeoutSeconds: 60 }, (request) =>
+  digitalForms.submit(admin.firestore(), admin.storage().bucket(), request));
+exports.digitalFormsLinkOptions = digitalFormsCall(digitalForms.linkOptions);
