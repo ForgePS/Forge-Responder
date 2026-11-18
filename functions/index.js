@@ -1014,6 +1014,127 @@ exports.refreshEntitlements = onCall({ timeoutSeconds: 300 }, async (request) =>
   return { count: results.length };
 });
 
+// ---- ePCR: server-side NEMSIS check of a patient care report (XSD-level + national Schematron).
+// PHI: never log the report or findings.
+const pcrCheck = require("./lib/nemsis/pcrCheck");
+const nemsisCore = require("./lib/nemsis/generated/nemsisCore.cjs");
+const { memberPermissions } = require("./lib/access");
+
+exports.checkPcr = onCall({ memory: "1GiB", timeoutSeconds: 120 }, async (request) => {
+  const db = admin.firestore();
+  const departmentId = String(request.data?.departmentId || "").trim();
+  const pcrId = String(request.data?.pcrId || "").trim();
+  await assertDepartmentAccess(db, departmentId, request.auth);
+  if (!pcrId || pcrId.includes("/")) throw new HttpsError("invalid-argument", "Choose a report.");
+
+  const ent = await db.doc(`platformEntitlements/${departmentId}`).get();
+  const modules = ent.data()?.modules;
+  if (Array.isArray(modules) && !modules.includes("ems")) {
+    throw new HttpsError("permission-denied", "Patient care reports aren't included in your department's plan.");
+  }
+
+  const ref = db.doc(`departments/${departmentId}/pcrs/${pcrId}`);
+  const [snap, userSnap, settingsSnap, creator] = await Promise.all([
+    ref.get(),
+    db.doc(`departments/${departmentId}/users/${request.auth.uid}`).get(),
+    db.doc(`departments/${departmentId}/settings/ems`).get(),
+    isPlatformCreator(db, request.auth),
+  ]);
+  // Same answer for "missing" and "not yours", so report ids can't be probed.
+  const denied = new HttpsError("not-found", "That report isn't available to you.");
+  if (!snap.exists) throw denied;
+  const pcr = snap.data();
+  const permissions = creator ? {} : await memberPermissions(db, departmentId, request.auth);
+  if (!pcrCheck.canReadPcr(pcr, {
+    uid: request.auth.uid,
+    permissions,
+    isAdmin: invites.isAdminMembership(userSnap.data() || {}),
+    isCreator: creator,
+  })) throw denied;
+
+  let result;
+  try {
+    result = await pcrCheck.runPcrCheck({ pcr, settings: settingsSnap.data() || {} });
+  } catch (error) {
+    console.error("checkPcr failed", error?.code || "", departmentId, pcrId);
+    throw new HttpsError("internal", "The NEMSIS check couldn't run. Try again.");
+  }
+  const at = new Date().toISOString();
+  await ref.set({ nemsisCheck: pcrCheck.checkStamp(result, { at, byUid: request.auth.uid, trigger: "manual" }) }, { merge: true });
+  await db.collection(`departments/${departmentId}/auditLogs`).add({
+    action: "pcr.nemsis-check",
+    module: "EMS",
+    recordId: pcrId,
+    summary: `NEMSIS check: ${result.errorCount} error(s), ${result.warningCount} warning(s)`,
+    actorUid: request.auth.uid,
+    actorName: request.auth.token?.email || "",
+    created_at: at,
+  }).catch(() => undefined);
+  return result;
+});
+
+// A report posted from FORGE FIELD gets the full server check (national + state Schematron) right away; the
+// result (counts only) is stamped on the report so supervisors see posted reports that need review.
+async function recordPosting(db, departmentId, pcrId, after) {
+  const ref = db.doc(`departments/${departmentId}/pcrs/${pcrId}`);
+  // Same value as the browser's contentHash (SHA-256 of the canonical JSON), with Node's crypto.
+  const postedHash = require("node:crypto").createHash("sha256").update(nemsisCore.canonicalJson(after.nemsis || {})).digest("hex");
+  const open = after.amendment?.open && after.amendment.revisionId ? after.amendment : null;
+  let changes = null;
+  if (open) {
+    const revision = await ref.collection("revisions").doc(String(open.revisionId)).get();
+    if (revision.exists) changes = nemsisCore.diffPcr(revision.data().nemsis || {}, after.nemsis || {});
+  }
+  await db.runTransaction(async (tx) => {
+    const current = (await tx.get(ref)).data() || {};
+    if (current.status !== "posted" || (current.postedAt || "") !== (after.postedAt || "")) return;
+    const patch = { postedHash };
+    if (open && current.amendment?.open) {
+      const count = Number(current.amendments || 0) + 1;
+      tx.set(ref.collection("revisions").doc(`amendment-${count}`), pcrCheck.amendmentRevision({
+        count, open, changes: changes || [], after: current, at: new Date().toISOString(),
+      }));
+      Object.assign(patch, { amendments: count, lastAmendedAt: current.postedAt || "", amendment: require("firebase-admin/firestore").FieldValue.delete() });
+    }
+    tx.set(ref, patch, { merge: true });
+  });
+}
+
+exports.checkPcrOnPost = onDocumentWritten(
+  { document: "departments/{departmentId}/pcrs/{pcrId}", memory: "1GiB", timeoutSeconds: 120 },
+  async (event) => {
+    const before = event.data?.before?.exists ? event.data.before.data() : null;
+    const after = event.data?.after?.exists ? event.data.after.data() : null;
+    if (!pcrCheck.shouldCheckOnPost(before, after)) return null;
+    const { departmentId, pcrId } = event.params;
+    const db = admin.firestore();
+    // Tamper check and amendments: every posting stores a hash of its content; a re-post after an unlock records
+    // what changed against the posted version kept when it was unlocked (pcrs/{id}/revisions, never edited).
+    try {
+      await recordPosting(db, departmentId, pcrId, after);
+    } catch (error) {
+      console.error("checkPcrOnPost amendment record failed", error?.code || error?.name || "", departmentId, pcrId);
+    }
+    try {
+      const settingsSnap = await db.doc(`departments/${departmentId}/settings/ems`).get();
+      const result = await pcrCheck.runPcrCheck({ pcr: after, settings: settingsSnap.data() || {} });
+      const stamp = pcrCheck.checkStamp(result, { at: new Date().toISOString(), trigger: "post", postedAt: after.postedAt || "" });
+      // Only if it is still the same posting (an unlock in between makes this result stale).
+      await db.runTransaction(async (tx) => {
+        const ref = db.doc(`departments/${departmentId}/pcrs/${pcrId}`);
+        const now = await tx.get(ref);
+        const current = now.data() || {};
+        if (current.status !== "posted" || (current.postedAt || "") !== (after.postedAt || "")) return;
+        tx.set(ref, { nemsisCheck: stamp }, { merge: true });
+      });
+    } catch (error) {
+      // No report contents in logs (PHI).
+      console.error("checkPcrOnPost failed", error?.code || error?.name || "", departmentId, pcrId);
+    }
+    return null;
+  },
+);
+
 // ---- AI narrative drafts for NERIS reports (Claude). Set the key with:
 // firebase functions:secrets:set ANTHROPIC_API_KEY
 const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
@@ -1085,6 +1206,93 @@ exports.draftNerisNarrative = onCall(
         throw new HttpsError("internal", "The AI service had a problem. Try again.");
       }
       console.error("draftNerisNarrative failed", error);
+      throw new HttpsError("internal", "Couldn't draft the narrative. Try again.");
+    }
+  }
+);
+
+// ---- AI narrative drafts for patient care reports. The model gets de-identified clinical facts built here from
+// the saved report (never the report sent by the browser), and only when the department switched the writer on.
+const pcrNarrative = require("./lib/pcrNarrative");
+
+exports.draftPcrNarrative = onCall(
+  { secrets: [anthropicApiKey], timeoutSeconds: 120, memory: "1GiB" },
+  async (request) => {
+    const db = admin.firestore();
+    const departmentId = String(request.data?.departmentId || "").trim();
+    const pcrId = String(request.data?.pcrId || "").trim();
+    await assertDepartmentAccess(db, departmentId, request.auth);
+    if (!pcrId || pcrId.includes("/")) throw new HttpsError("invalid-argument", "Save the report first.");
+
+    const ent = await db.doc(`platformEntitlements/${departmentId}`).get();
+    const modules = ent.data()?.modules;
+    if (Array.isArray(modules) && !modules.includes("ems")) {
+      throw new HttpsError("permission-denied", "Patient care reports aren't included in your department's plan.");
+    }
+    const [snap, userSnap, formSnap, creator] = await Promise.all([
+      db.doc(`departments/${departmentId}/pcrs/${pcrId}`).get(),
+      db.doc(`departments/${departmentId}/users/${request.auth.uid}`).get(),
+      db.doc(`departments/${departmentId}/settings/emsForm`).get(),
+      isPlatformCreator(db, request.auth),
+    ]);
+    if (formSnap.data()?.aiNarrative !== true) {
+      throw new HttpsError("failed-precondition", "The AI narrative writer is switched off for your department. An administrator can switch it on in Form settings.");
+    }
+    const denied = new HttpsError("not-found", "That report isn't available to you.");
+    if (!snap.exists) throw denied;
+    const pcr = snap.data();
+    const permissions = creator ? {} : await memberPermissions(db, departmentId, request.auth);
+    const isAdmin = invites.isAdminMembership(userSnap.data() || {});
+    if (!pcrCheck.canReadPcr(pcr, { uid: request.auth.uid, permissions, isAdmin, isCreator: creator })) throw denied;
+    if (!(creator || isAdmin || permissions.editPcrs === true || permissions.unlockPcrs === true)) {
+      throw new HttpsError("permission-denied", "Your role can't chart patient care reports.");
+    }
+    const key = anthropicApiKey.value();
+    if (!key) throw new HttpsError("failed-precondition", "AI narratives aren't set up yet (missing API key).");
+
+    const style = Object.keys(pcrNarrative.STYLES).includes(request.data?.style) ? request.data.style : "chronological";
+    const facts = nemsisCore.pcrNarrativeFacts(nemsisCore.nemsisSchema, pcr.nemsis || {});
+    await nerisNarrative.reserveDailyUse(db, departmentId);
+
+    const Anthropic = require("@anthropic-ai/sdk");
+    const AnthropicClient = Anthropic.default || Anthropic;
+    const client = new AnthropicClient({ apiKey: key, timeout: 90_000, maxRetries: 2 });
+    try {
+      const result = await pcrNarrative.draftPcrNarrative(client, {
+        facts,
+        notes: String(request.data?.notes || ""),
+        style,
+      });
+      await db.collection(`departments/${departmentId}/auditLogs`).add({
+        action: "pcr.ai-narrative-draft",
+        module: "EMS",
+        recordId: pcrId,
+        summary: `AI narrative draft for patient care report ${String(pcr.number || pcrId)}`,
+        actorUid: request.auth.uid,
+        actorName: request.auth.token?.email || "",
+        model: result.model,
+        created_at: new Date().toISOString(),
+      }).catch(() => undefined);
+      return result;
+    } catch (error) {
+      await nerisNarrative.releaseDailyUse(db, departmentId).catch(() => undefined);
+      if (error instanceof HttpsError) throw error;
+      if (error instanceof AnthropicClient.RateLimitError) {
+        throw new HttpsError("resource-exhausted", "The AI service is busy. Try again in a minute.");
+      }
+      if (error instanceof AnthropicClient.AuthenticationError || error instanceof AnthropicClient.PermissionDeniedError) {
+        console.error("draftPcrNarrative: API key rejected", error.status);
+        throw new HttpsError("failed-precondition", "AI narratives aren't set up correctly. Contact FORGE Public Safety.");
+      }
+      if (error instanceof AnthropicClient.APIConnectionError) {
+        throw new HttpsError("unavailable", "Couldn't reach the AI service. Try again.");
+      }
+      if (error instanceof AnthropicClient.APIError) {
+        // Status only: the error text could echo report content.
+        console.error("draftPcrNarrative: API error", error.status);
+        throw new HttpsError("internal", "The AI service had a problem. Try again.");
+      }
+      console.error("draftPcrNarrative failed", error?.name || "");
       throw new HttpsError("internal", "Couldn't draft the narrative. Try again.");
     }
   }

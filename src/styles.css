@@ -4013,3 +4013,5 @@ html[data-theme="light"] .apparatus-check-card { background: #fff; border-color:
 .combo-field-list li.is-selected {
   font-weight: 700;
 }
+
+/* Patient care reports: src/styles/pcr-desktop.css */

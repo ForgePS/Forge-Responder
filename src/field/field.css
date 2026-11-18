@@ -2737,3 +2737,11 @@ a.fa-tile:visited {
   border-color: var(--fa-bad);
   color: var(--fa-bad);
 }
+
+/* ePCR signature pad (SignaturePad.jsx) */
+.fa-sig { display: grid; gap: 8px; margin-top: 4px; }
+.fa-sig-label { font-weight: 600; }
+.fa-sig-image { width: 100%; max-width: 420px; aspect-ratio: 3 / 1; background: #fff; border: 1px solid var(--fa-border); border-radius: 10px; object-fit: contain; }
+.fa-sig-dialog { max-width: 640px; }
+.fa-sig-canvas { display: block; width: 100%; aspect-ratio: 3 / 1; background: #fff; border: 2px dashed var(--fa-border); border-radius: 12px; touch-action: none; cursor: crosshair; margin: 8px 0 14px; }
+.fa-sig-canvas.is-empty { background: #fff linear-gradient(transparent calc(75% - 1px), #c8ccd2 calc(75% - 1px), #c8ccd2 75%, transparent 75%); }

@@ -1,5 +1,7 @@
 # Forge EMS Suite — Build Plan (draft)
 
+Current implementation status against the full ePCR brief: [EPCR_STATUS.md](EPCR_STATUS.md).
+
 Status: draft for owner review · 2026-11-16
 
 Scope: a NEMSIS v3.5 compliant ePCR, an AI QA/QI reviewer, EMS analytics, Zoll and Lifepak monitor import,
@@ -90,10 +92,22 @@ Still required for compliance, outside Phase 1: StateDataSet-driven configuratio
 | Module `ems`, permissions `editPcrs` / `viewAllPcrs` / `unlockPcrs` / `exportPcrs` (off for every built-in role except platform creator) | registry, `permissions.js`, `defaultRoles.js`, field caps | done |
 | Firestore rules: crew (`crewUids`) and read-all permissions only; posted locked except `unlockPcrs`; never deleted; off when the plan excludes `ems` | `firestore.rules`, `tests/rules/firestore.rules.test.mjs` | done |
 | Field charting screen: section chips with progress and errors, essential fields first, repeating groups, NV/PN choices, "Now" times, issues list, Save / Post | `src/field/screens/PcrFormScreen.jsx`, EMS home card | done |
-| Agency number setting (eResponse.01) | read from field config `ems.agencyNumber`; no admin UI yet | next |
+| EMS agency settings (`settings/ems`: state agency ID, agency number, name, ANSI state code), admin-only; prefill new reports and fill the export header | `src/lib/nemsis/emsSettings.js`, Agency settings on the Patient Care Reports page, `fieldRefData.js` | done |
 | Defined lists with smart lookup (ICD-10 impressions, RxNorm medications, SNOMED procedures) | codes are typed for now | next |
-| Signatures, monitor files, CAD prefill, device auto-lock | | next |
-| RMS desktop: list, review, print, unlock, NEMSIS XML export; server-side Schematron on post | | next |
+| Signatures: pad in each NEMSIS signature row (eOther.16–.19, 600×200 PNG, size-capped), status set to Signed / Signed-Not Patient; shown in the RMS review and print (safe raster images only) | `src/field/screens/SignaturePad.jsx`, `pcrModel.js` `setSignature` | done |
+| Start a new report from a recent Active911 dispatch: unit notified time (eTimes.03), scene address (eScene.15), GPS (eScene.11), ANSI state code (eScene.18) | `src/field/fieldDispatch.js`, dispatch picker in `PcrFormScreen.jsx`, `dispatches` ref-data part | done |
+| Prefill from a CAD with incident numbers and unit times (en route / on scene), crew from Scheduling | needs a CAD integration that sends them | next |
+| Monitor files, device auto-lock | | next |
+| RMS Patient Care Reports page: my reports / all reports, section-by-section review, unlock with a reason, NEMSIS XML export; view, unlock and export audit-logged (report number only) | `src/pages/PatientCareReportsPage.jsx`, `src/lib/pcrService.js` | done |
+| Unlocked reports reopen on the crew's device the next time it's opened with signal | `src/field/fieldPcrReopen.js` | done |
+| Server NEMSIS check (`checkPcr` callable): the app's own NEMSIS code bundled for Functions, XSD-level checks + national (and state, once loaded) Schematron; result stamped on the report | `functions/lib/nemsis/pcrCheck.js`, `scripts/nemsis/bundle-nemsis-functions.mjs` (`npm run bundle:nemsis-functions`; a unit test fails when the bundle is stale) | done |
+| Server check runs automatically when a report is posted (`checkPcrOnPost` trigger); posted reports with NEMSIS errors show as "Needs review" in the RMS | `functions/index.js`, `functions/lib/nemsis/pcrCheck.js` `shouldCheckOnPost` | done |
+| Print view (all charted sections, escaped, PHI footer; printing is audit-logged) | `src/lib/nemsis/pcrPrint.js`, Print on the Patient Care Reports page | done |
+| Desktop charting in the RMS: start a report (from a CAD call or blank, with a unit), full editor in the NERIS look (steps, NEMSIS drop-downs, repeating rows, autosave with three-way merge and conflict banner, issues rail, Post) | `src/components/pcr/PcrEditor.jsx`, `PcrFields.jsx`, `src/lib/pcrService.js` `createPcr` / `savePcr` | done |
+| Department form settings (`settings/emsForm`, admins): field labels and help, which codes a drop-down offers and which are pinned first, drop-down choices for text fields, defaults, department-required fields (block posting), hidden fields and sections (never NEMSIS Mandatory/Required); applied in the RMS and FORGE FIELD | `src/lib/pcr/pcrForm.js`, `src/components/pcr/PcrFormSettings.jsx`, `PcrFormScreen.jsx` | done |
+| CAD import and refresh: incident number, call/unit times (the unit's own times), address, GPS, state from Active911 alerts or a CAD export; "Refresh from CAD" offers newer CAD values but keeps anything typed by hand; pasted CAD records | `src/lib/pcr/pcrCad.js`, `src/components/pcr/PcrCadDialogs.jsx` | done |
+| AI narrative writer (`draftPcrNarrative` callable): department opt-in, facts built on the server from the saved report and de-identified (no names, dates, addresses or record numbers; clock times only; ages 90+ grouped), notes scrubbed, shared daily limit, crew must confirm before posting; quick draft without AI | `functions/lib/pcrNarrative.js`, `src/lib/nemsis/pcrNarrativeFacts.js`, `src/components/pcr/PcrNarrativePanel.jsx` | built, not tested against the live AI (needs `ANTHROPIC_API_KEY` and a BAA before real PHI) |
+| Crew list and signatures on the desktop | crew comes from FIELD; signatures are FIELD only | next |
 
 - New field record kind `pcr` reusing `fieldDb` / `fieldSync` (device-fixed ids, idempotent retry, needs-attention).
 - PHI on device: encrypted IndexedDB store, auto-lock, wipe on sign-out.

@@ -189,3 +189,24 @@ test("posting validates the merged report, including server sections the author 
 function pcrBaseOf(doc) {
   return { status: doc.status, crewUids: doc.crewUids, incidentNumber: doc.incidentNumber, unit: doc.unit, nemsis: doc.nemsis, updatedAt: doc.updatedAt };
 }
+
+// --- reopening a report a supervisor unlocked ---------------------------------------------------
+
+test("a posted, synced report on the device is reopened only when the server copy went back to draft", async () => {
+  const { mayBeUnlocked, reopenPatch } = await import("../../src/field/fieldPcr.js");
+  const data = { id: UUID, uuid: UUID, number: "P-1", status: "posted", crewUids: ["u1"], nemsis: {} };
+  assert.equal(mayBeUnlocked({ kind: "pcr", status: "synced", data }), true);
+  assert.equal(mayBeUnlocked({ kind: "pcr", status: "queued", data }), false, "unsent changes stay as they are");
+  assert.equal(mayBeUnlocked({ kind: "pcr", status: "synced", data: { ...data, status: "draft" } }), false);
+  assert.equal(mayBeUnlocked({ kind: "dailyLog", status: "synced", data }), false);
+
+  assert.equal(reopenPatch({ ...data, status: "posted" }), null);
+  assert.equal(reopenPatch(null), null);
+  const server = { ...data, status: "draft", unlockedAt: "2026-11-17T10:00:00Z", nemsis: { eRecord: { "eRecord.01": "P-1" } }, updatedAt: "2026-11-17T10:00:00Z" };
+  const patch = reopenPatch(server);
+  assert.equal(patch.status, "draft");
+  assert.equal(patch.data.status, "draft");
+  assert.deepEqual(patch.data.nemsis, server.nemsis, "the device chart becomes the server copy");
+  assert.deepEqual(patch.base.nemsis, server.nemsis, "and so does the merge base, so the next save has no false conflicts");
+  assert.equal(patch.attention, null);
+});

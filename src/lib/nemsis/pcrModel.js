@@ -164,6 +164,12 @@ function inputKind(type, repeating) {
   }
 }
 
+/** NEMSIS lists not-values and pertinent negatives by name ("NV.NotRecorded"); show them as words ("Not Recorded"). */
+function plainCodeLabel(text) {
+  const m = /^(?:NV|PN)\.([A-Za-z]+)$/.exec(String(text));
+  return m ? m[1].replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z])([A-Z][a-z])/g, "$1 $2") : text;
+}
+
 /**
  * Everything a screen needs to render one NEMSIS field.
  * @returns {{ el: string, label: string, definition: string, usage: string, national: boolean, required: boolean,
@@ -177,7 +183,7 @@ export function fieldInput(schema, name) {
   const type = schema.type(node.t);
   const repeating = isRepeating(node);
   const codes = schema.codes(name, DATASET);
-  const label = (code) => ({ code, label: schema.codeLabel(name, code, DATASET) ?? code });
+  const label = (code) => ({ code, label: plainCodeLabel(schema.codeLabel(name, code, DATASET) ?? code) });
   return {
     el: name,
     label: info.name ?? name,
@@ -428,7 +434,8 @@ export function fromLocalInput(value) {
  *   unit?: { vehicleNumber?: string, callSign?: string },
  *   incidentNumber?: string, responseNumber?: string,
  *   crew?: { id: string, level?: string, roles?: string[] }[],
- *   cad?: { id?: string, notified?: string, enRoute?: string, onScene?: string, dispatchReason?: string } }} input
+ *   cad?: { id?: string, notified?: string, enRoute?: string, onScene?: string, dispatchReason?: string,
+ *     address?: string, gps?: string, stateCode?: string } }} input
  */
 export function newPcr(schema, input) {
   if (!input?.uuid) throw new Error("newPcr: uuid is required (PatientCareReport/@UUID, fixed on the device)");
@@ -451,6 +458,9 @@ export function newPcr(schema, input) {
   set("eTimes.03", input.cad?.notified);
   set("eTimes.05", input.cad?.enRoute);
   set("eTimes.06", input.cad?.onScene);
+  set("eScene.11", input.cad?.gps);
+  set("eScene.15", input.cad?.address);
+  set("eScene.18", input.cad?.stateCode);
   (input.crew ?? []).forEach((member, index) => {
     const at = { "eCrew.CrewGroup": index };
     set("eCrew.01", member.id, at);
@@ -508,6 +518,113 @@ export function pcrXml(schema, { agency, uuid, pcr }, options) {
   const id = uuid ?? pcr?.attrs?.UUID;
   if (!id) throw new Error("pcrXml: the report has no UUID");
   return buildEmsDataSetXml(schema, { agency, reports: [{ uuid: id, data: pcr }] }, options);
+}
+
+/** Plain text for one stored field: code labels, "Not recorded" style not-values, pertinent negatives. */
+export function leafText(field, raw) {
+  const label = (list, code) => list?.find((o) => o.code === String(code))?.label ?? String(code);
+  const one = (item) => {
+    const leaf = readLeaf(item);
+    const parts = [];
+    if (leaf.value !== undefined) {
+      if (field.kind === "file") parts.push("Attached file");
+      else parts.push(field.options ? label(field.options, leaf.value) : String(leaf.value));
+    }
+    if (leaf.NV) parts.push(label(field.nv, leaf.NV));
+    if (leaf.PN) parts.push(label(field.pn, leaf.PN));
+    return parts.join(" — ");
+  };
+  return (Array.isArray(raw) ? raw : [raw]).filter((item) => !isEmptyLeaf(item)).map(one).filter(Boolean);
+}
+
+/* ------------------------------------------------------------------------------------------------------------
+ * Signatures (eOther.SignatureGroup). The drawn signature is stored as NEMSIS asks: file name (eOther.16), graphic
+ * type (eOther.17) and base64 image (eOther.18), with the time (eOther.19). Charting screens draw these three
+ * file fields as one signature pad.
+ * ---------------------------------------------------------------------------------------------------------- */
+
+export const SIGNATURE_GROUP = "eOther.SignatureGroup";
+export const SIGNATURE_FILE_FIELDS = Object.freeze(["eOther.16", "eOther.17", "eOther.18"]);
+const SIGNED = "4515031";
+const SIGNED_NOT_PATIENT = "4515033";
+const PATIENT = "4512015";
+/** Largest stored signature image (base64 characters): keeps a report well under Firestore's 1 MB document limit. */
+export const MAX_SIGNATURE_BASE64 = 120_000;
+
+// Images that may be shown inline: graphic field → its type field. Never SVG (it can carry script).
+const GRAPHIC_FIELDS = { "eOther.18": "eOther.17", "eOther.11": "eOther.10" };
+const SAFE_IMAGE_TYPE = /^image\/(png|jpeg|gif|webp)$/;
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/** A data: URL for a stored graphic, or null when it isn't a safe inline image. */
+export function graphicDataUrl(type, base64) {
+  const t = String(type ?? "").trim().toLowerCase();
+  const b = String(base64 ?? "").replace(/\s+/g, "");
+  if (!SAFE_IMAGE_TYPE.test(t) || !b || !BASE64.test(b)) return null;
+  return `data:${t};base64,${b}`;
+}
+
+/**
+ * Store a drawn signature (a PNG data: URL from a canvas) in a signature row. Sets the status to Signed
+ * (or Signed-Not Patient when someone other than the patient signs) unless a status was already chosen.
+ * @returns {object} the new PCR
+ */
+export function setSignature(schema, pcr, at, { dataUrl, signedAt }) {
+  const m = /^data:(image\/png);base64,(.+)$/.exec(String(dataUrl ?? ""));
+  if (!m || !BASE64.test(m[2])) throw new Error("pcrModel: a signature must be a PNG data URL");
+  if (m[2].length > MAX_SIGNATURE_BASE64) throw new Error("pcrModel: the signature image is too large");
+  const index = at?.[SIGNATURE_GROUP] ?? 0;
+  let next = setLeaf(schema, pcr, "eOther.16", `signature-${index + 1}.png`, at);
+  next = setLeaf(schema, next, "eOther.17", m[1], at);
+  next = setLeaf(schema, next, "eOther.18", m[2], at);
+  next = setLeaf(schema, next, "eOther.19", signedAt ?? nemsisDateTime(), at);
+  if (getValue(schema, next, "eOther.15", at) === undefined) {
+    const who = getValue(schema, next, "eOther.12", at);
+    next = setLeaf(schema, next, "eOther.15", who && who !== PATIENT ? SIGNED_NOT_PATIENT : SIGNED, at);
+  }
+  return next;
+}
+
+/**
+ * Remove the drawn signature from a row. Keeps who signed and the reason; a "Signed" status goes too (it would no
+ * longer be true), any other status the crew chose stays.
+ */
+export function clearSignature(schema, pcr, at) {
+  const status = getValue(schema, pcr, "eOther.15", at);
+  const fields = [...SIGNATURE_FILE_FIELDS, "eOther.19", ...(status === SIGNED || status === SIGNED_NOT_PATIENT ? ["eOther.15"] : [])];
+  return fields.reduce((next, el) => setLeaf(schema, next, el, undefined, at), pcr);
+}
+
+/** The stored signature image of a row as a data: URL, or null. */
+export function signatureImage(schema, pcr, at) {
+  return graphicDataUrl(getValue(schema, pcr, "eOther.17", at), getValue(schema, pcr, "eOther.18", at));
+}
+
+/**
+ * The filled-in part of a section for read-only review: fields with their text, and repeating groups with one
+ * entry per row. Empty fields and groups are left out.
+ * @returns {({type: "field", el: string, label: string, kind: string, values: string[]}
+ *   | {type: "group", name: string, label: string, rows: object[][]})[]}
+ */
+export function sectionReadout(schema, pcr, sectionId) {
+  const walk = (items, at) => items.flatMap((item) => {
+    if (item.type === "field") {
+      const el = item.field.el;
+      const values = leafText(item.field, getLeaf(schema, pcr, el, at));
+      if (!values.length) return [];
+      const image = GRAPHIC_FIELDS[el] ? graphicDataUrl(getValue(schema, pcr, GRAPHIC_FIELDS[el], at), getValue(schema, pcr, el, at)) : null;
+      return [{ type: "field", el, label: item.field.label, kind: item.field.kind, values, ...(image ? { image } : {}) }];
+    }
+    if (item.repeating) {
+      const rows = groupRows(schema, pcr, item.name, at)
+        .map((_, index) => walk(item.children, { ...at, [item.name]: index }))
+        .filter((row) => row.length);
+      return rows.length ? [{ type: "group", name: item.name, label: item.label, rows }] : [];
+    }
+    const inner = walk(item.children, at);
+    return inner.length ? [{ type: "group", name: item.name, label: item.label, rows: [inner] }] : [];
+  });
+  return walk(sectionLayout(schema, sectionId), {});
 }
 
 /** Essential fields filled in vs total, per section (for progress chips). */
