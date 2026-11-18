@@ -979,6 +979,10 @@ service cloud.firestore {
         allow create: if canAccessDepartment(departmentId);
         allow update, delete: if canAccessDepartment(departmentId)
           && memberCanAny(departmentId, ["manageDropdowns", "manageSystemSettings"]);
+        // Training editors add classes and outside instructors from the training forms.
+        allow update: if canAccessDepartment(departmentId)
+          && dropdownId in ["trainingClasses", "trainingInstructors"]
+          && memberCanAny(departmentId, trainingEditKeys());
       }
       // Messages: read by the sender, the recipients (toAll / recipientUids, filled
       // in by the internalMessageAudience function) and message managers. Sent as

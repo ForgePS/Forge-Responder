@@ -74,7 +74,7 @@ function TrainingModule({ tab, setTab, focus, go, legacy, onNavigate, onDutyIds 
   if (!t.flags.canView) return <ErrorNote error="You don't have access to training. Ask your training officer for the View training permission." />;
   const loadErrors = Object.keys(t.errors || {});
 
-  const legacyLog = <LegacyTrainingLog query={legacy.query || ""} records={legacy.records} setRecords={legacy.setRecords} canEdit={legacy.canEditLegacy} />;
+  const legacyLog = <LegacyTrainingLog query={legacy.query || ""} records={legacy.records} setRecords={legacy.setRecords} canEdit={legacy.canEditLegacy} personnel={legacy.personnel} />;
   const body = {
     dashboard: <TrainingDashboard go={go} compliance={compliance} />,
     calendar: <TrainingCalendar focus={focus} />,

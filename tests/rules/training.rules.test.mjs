@@ -272,3 +272,15 @@ describe("task book final authorization", () => {
     await assertSucceeds(setDoc(doc(db("bc"), `${tba}y`), { personId: "P-FF2", status: "authorized" }));
   });
 });
+
+describe("training dropdown lists", () => {
+  it("training editors add classes and outside instructors; other lists and plain members are refused", async () => {
+    for (const id of ["trainingClasses", "trainingInstructors", "leaveTypes"]) await seed(`departments/${A}/dropdowns/${id}`, { id, options: [] });
+    const opt = { options: [{ id: "x", label: "Ladder ops", active: true }] };
+    await assertSucceeds(updateDoc(doc(db("officer"), `departments/${A}/dropdowns/trainingClasses`), opt));
+    await assertSucceeds(updateDoc(doc(db("officer"), `departments/${A}/dropdowns/trainingInstructors`), opt));
+    await assertFails(updateDoc(doc(db("officer"), `departments/${A}/dropdowns/leaveTypes`), opt));
+    await assertFails(updateDoc(doc(db("ff"), `departments/${A}/dropdowns/trainingClasses`), opt));
+    await assertFails(deleteDoc(doc(db("officer"), `departments/${A}/dropdowns/trainingClasses`)));
+  });
+});
