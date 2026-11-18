@@ -91,6 +91,8 @@ export function normalizeInspectionWorkflowRecord(raw = {}, departmentId = "") {
     reinspectionRequired: Boolean(data.reinspectionRequired),
     nextReinspectionAt: data.nextReinspectionAt || "",
     attachments: Array.isArray(data.attachments) ? data.attachments : [],
+    emailDeliveries: Array.isArray(data.emailDeliveries) ? data.emailDeliveries : [],
+    lastEmailedAt: data.lastEmailedAt || "",
     feeTotal: Number(data.feeTotal) || 0,
     balanceDue: Number(data.balanceDue) || 0,
     recordVersion: Number(data.recordVersion) || 1,

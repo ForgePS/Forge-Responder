@@ -8,6 +8,7 @@ import InspectionStatusBadge from "../components/inspections/InspectionStatusBad
 import InspectionsModuleLayout from "../components/inspections/InspectionsModuleLayout.jsx";
 import PreventionKpiGroups from "../components/inspections/PreventionKpiGroups.jsx";
 import ChecklistFieldInput from "../components/inspections/ChecklistFieldInput.jsx";
+import InspectionEmailPanel from "../components/inspections/InspectionEmailPanel.jsx";
 import { failDetailFields, findMissingFailRemarks, isFailAnswer } from "../lib/inspections/inspectionFailDetails.js";
 import { findMissingRequiredFields, formatMissingFieldsMessage } from "../lib/inspections/checklistFields.js";
 import { describeNumberingFormat } from "../lib/inspections/inspectionNumbering.js";
@@ -419,6 +420,10 @@ function InspectionWorkspace({
             </button>
           ) : null}
         </div>
+
+        {canEdit && record.status === "completed" ? (
+          <InspectionEmailPanel record={record} occupancy={occupancy} departmentId={departmentId} />
+        ) : null}
 
         {pendingCitation && editable ? (
           <div className="pending-citation-banner" role="status">
