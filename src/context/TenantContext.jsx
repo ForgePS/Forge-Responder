@@ -22,7 +22,7 @@ import {
   getCustomerSubscription,
   isSubscriptionAccessAllowed,
 } from "../lib/platformSubscriptionService.js";
-import { activateDemoMode, isDemoModeActive } from "../lib/demoMode.js";
+import { activateDemoMode, DEMO_RELEASED_EVENT, isDemoAccountEmail, isDemoModeActive } from "../lib/demoMode.js";
 import { demoDepartmentProfile, demoDepartmentSettings, mapDemoDepartmentProfile } from "../data/demoDepartment.js";
 import {
   isCreatorConsolePath,
@@ -68,6 +68,22 @@ export function TenantProvider({ children }) {
     if (typeof window === "undefined") return PLATFORM_SCOPE_ID;
     return resolveActiveDepartmentId();
   });
+  // Signed in with someone's own account (not the shared demo account)?
+  const ownAccountRef = useRef(false);
+  ownAccountRef.current = Boolean(user) && !isDemoAccountEmail(user?.email);
+  const [demoReleased, setDemoReleased] = useState(0);
+
+  // Demo mode was switched off because someone signed in as themselves
+  // (AuthContext → releaseDemoModeFor): work out the department again from the
+  // address, which demo mode had skipped.
+  useEffect(() => {
+    const onReleased = () => {
+      setDepartmentId(resolveActiveDepartmentId());
+      setDemoReleased((n) => n + 1);
+    };
+    window.addEventListener(DEMO_RELEASED_EVENT, onReleased);
+    return () => window.removeEventListener(DEMO_RELEASED_EVENT, onReleased);
+  }, []);
 
   useEffect(() => {
     if (isDemoModeActive()) {
@@ -82,7 +98,7 @@ export function TenantProvider({ children }) {
     if (membership?.departmentId && !membership?.isPlatformCreator) {
       setDepartmentId(membership.departmentId);
     }
-  }, [gatewayRecord?.departmentId, membership?.departmentId, membership?.isPlatformCreator]);
+  }, [gatewayRecord?.departmentId, membership?.departmentId, membership?.isPlatformCreator, demoReleased]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,7 +142,9 @@ export function TenantProvider({ children }) {
           persistGatewayContext(nextGatewayDepartmentId, "");
           return;
         }
-        if (isDemoDepartment(record.departmentId)) {
+        // The demo link runs as the shared demo account. Someone signed in as
+        // themselves (a platform creator) opens the demo department normally.
+        if (isDemoDepartment(record.departmentId) && !ownAccountRef.current) {
           activateDemoMode();
         }
         setGatewayRecord(record);
@@ -149,7 +167,7 @@ export function TenantProvider({ children }) {
       cancelled = true;
       window.removeEventListener("popstate", resolveFromPath);
     };
-  }, []);
+  }, [demoReleased]);
 
   const [profile, setProfile] = useState(() => {
     const initialId = typeof window !== "undefined" ? resolveActiveDepartmentId() : PLATFORM_SCOPE_ID;
