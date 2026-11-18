@@ -18,7 +18,7 @@
  * linkType ("" or one of LINK_TYPES) asks members to pick the record the
  * submission is about (an apparatus, occupancy, station or member).
  *
- * A Yes/No or Pass/Fail answer of No/Fail opens remarks (required) and photos
+ * A Yes/No or Pass/Fail answer of No/Fail (or a dropdown answered No/Fail/Noncompliant) opens remarks (required) and photos
  * (optional): details[field.key] = { remarks, photos: [storage path] }.
  */
 
@@ -183,7 +183,12 @@ function normalizeLinkType(value) {
 }
 
 /** True when this answer should open remarks and photos. */
+// Dropdowns too: uploaded forms often turn a Yes/No question into a dropdown.
+const NEGATIVE_SELECT_TYPES = new Set(["dropdown", "single_select"]);
+const NEGATIVE_SELECT_VALUES = new Set(["no", "fail", "failed", "noncompliant", "non compliant", "not compliant", "unsatisfactory", "deficient"]);
+const negativeKey = (value) => String(value ?? "").toLowerCase().replace(/[^a-z]+/g, " ").trim();
 function isNegativeAnswer(field, value) {
+  if (NEGATIVE_SELECT_TYPES.has(field?.type)) return NEGATIVE_SELECT_VALUES.has(negativeKey(value));
   return Boolean(NEGATIVE_ANSWERS[field?.type]) && value === NEGATIVE_ANSWERS[field.type];
 }
 

@@ -504,7 +504,7 @@ function InspectionWorkspace({
                       />
                       {field.helpText ? <small className="occupancy-muted">{field.helpText}</small> : null}
                       {isFailAnswer(field, answers[field.key]) ? (() => {
-                        const extra = failDetailFields(field);
+                        const extra = failDetailFields(field, answers[field.key]);
                         const remarksMissing = missingKeys.has(extra.remarks.key);
                         return (
                           <div className={`inspection-fail-details${remarksMissing ? " checklist-field-missing" : ""}`} data-checklist-key={extra.remarks.key}>
