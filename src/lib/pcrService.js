@@ -227,10 +227,12 @@ export async function createPcr(departmentId, data, actor = {}) {
  * save merges section by section against the copy it started from (`base`): sections only this person changed are
  * written. Sections changed on both sides are conflicts: nothing is written and they are returned with the other
  * copy, unless `keepMine` (then this person's version of those sections wins).
- * @param {{ base: object, mine: object, mergePaths: string[], actor: object, post?: boolean, keepMine?: boolean }} input
- * @returns {Promise<{ saved: object|null, server: object|null, conflicts: string[] }>}
+ * When posting, `postGate(merged)` returns what still has to be fixed in the merged chart (other devices' sections
+ * included); if anything does, the merge is saved without posting and returned as `blocked`.
+ * @param {{ base: object, mine: object, mergePaths: string[], actor: object, post?: boolean, keepMine?: boolean, postGate?: (record: object) => object[] }} input
+ * @returns {Promise<{ saved: object|null, server: object|null, conflicts: string[], blocked?: object[] }>}
  */
-export async function savePcr(departmentId, { base, mine, mergePaths, actor = {}, post = false, keepMine = false }) {
+export async function savePcr(departmentId, { base, mine, mergePaths, actor = {}, post = false, keepMine = false, postGate }) {
   const db = getFirestoreDb();
   const ref = doc(db, "departments", departmentId, PCR_COLLECTION, mine.id);
   const now = new Date().toISOString();
@@ -243,6 +245,8 @@ export async function savePcr(departmentId, { base, mine, mergePaths, actor = {}
     let { merged, conflicts } = threeWayMerge(base, mine, server, mergePaths);
     if (conflicts.length && !keepMine) return { saved: null, server, conflicts: conflicts.map((c) => c.path) };
     for (const conflict of conflicts) merged = setPath(merged, conflict.path, getPath(mine, conflict.path));
+    const blocked = post && postGate ? postGate({ ...(server || {}), ...merged }) : [];
+    const posting = post && !blocked.length;
     const saved = stripUndefined({
       ...(server || {}),
       ...merged,
@@ -250,23 +254,23 @@ export async function savePcr(departmentId, { base, mine, mergePaths, actor = {}
       updatedAt: now,
       updatedByUid: actor.actorUid || "",
       updatedByName: actor.actorName || "",
-      ...(post ? { status: "posted", postedAt: now, postedByUid: actor.actorUid || "", postedByName: actor.actorName || "" } : {}),
+      ...(posting ? { status: "posted", postedAt: now, postedByUid: actor.actorUid || "", postedByName: actor.actorName || "" } : {}),
     });
     tx.set(ref, saved);
-    return { saved, server, conflicts: [] };
+    return { saved, server, conflicts: [], ...(blocked.length ? { blocked } : {}) };
   });
-  if (post && result.saved) {
+  if (post && result.saved && !result.blocked) {
     await writeAuditLog(departmentId, { ...actor, action: "pcr.post", module: AUDIT_MODULE, recordId: mine.id, summary: `Posted patient care report ${mine.number || mine.id}` });
   }
   return result;
 }
 
 /** The AI narrative writer (draftPcrNarrative callable). The server reads the saved report itself. */
-export async function requestPcrNarrative({ departmentId, pcrId, notes = "", style = "chronological", existingNarrative = "" }) {
+export async function requestPcrNarrative({ departmentId, pcrId, notes = "", style = "chronological" }) {
   const functions = getFirebaseFunctions();
   if (!functions) throw new Error("AI drafting needs a connection to FORGE.");
   try {
-    const result = await httpsCallable(functions, "draftPcrNarrative", { timeout: 130000 })({ departmentId, pcrId, notes, style, existingNarrative });
+    const result = await httpsCallable(functions, "draftPcrNarrative", { timeout: 130000 })({ departmentId, pcrId, notes, style });
     return result.data;
   } catch (error) {
     const message = String(error?.message || "");

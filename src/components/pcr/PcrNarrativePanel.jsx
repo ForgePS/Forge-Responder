@@ -42,7 +42,8 @@ export default function PcrNarrativePanel({ schema, report, editable, online, ai
     try {
       // The server drafts from the saved report.
       if (!(await onSaveFirst())) throw new Error("Save the report first, then try again.");
-      const result = await requestDraft({ notes, style, existingNarrative: body });
+      // The current narrative is never sent (free text can't be reliably de-identified); the AI drafts again.
+      const result = await requestDraft({ notes, style });
       if (!result?.narrative) throw new Error("The AI didn't return a draft. Try again.");
       setPrevious(body);
       setMissing(result.missing || []);
@@ -87,7 +88,7 @@ export default function PcrNarrativePanel({ schema, report, editable, online, ai
           </div>
           {aiEnabled ? (
             <button type="button" className="nr-btn nr-btn-ai" disabled={!editable || busy || !online} onClick={writeWithAi}>
-              {busy ? <><Loader2 size={16} className="nr-spin" /> Writing…</> : <><Wand2 size={16} /> {body ? "Rewrite with AI" : "Write with AI"}</>}
+              {busy ? <><Loader2 size={16} className="nr-spin" /> Writing…</> : <><Wand2 size={16} /> {body ? "Draft again with AI" : "Write with AI"}</>}
             </button>
           ) : null}
         </div>
@@ -97,9 +98,10 @@ export default function PcrNarrativePanel({ schema, report, editable, online, ai
         {aiEnabled && !online ? <p className="nr-note"><TriangleAlert size={14} /> You're offline. AI drafting needs a connection. You can still write it yourself or use a quick draft.</p> : null}
         {error ? <p className="nr-error" role="alert"><TriangleAlert size={14} /> {error}</p> : null}
         <p className="nr-privacy">
-          <ShieldCheck size={14} /> The AI never sees the patient's name, date of birth, address, phone numbers, record numbers or dates; only
-          clinical details, clock times and age. Phone numbers, emails, dates of birth and names after words like "patient" are
-          removed from your notes, but leave names out of your notes anyway.
+          <ShieldCheck size={14} /> The AI drafts from the charted clinical details, clock times and age, plus your notes. It gets no
+          name, date of birth, address or record number from the chart, and your current narrative is never sent. Dates,
+          addresses, phone and record numbers, and names after words like &ldquo;patient&rdquo; are removed from your notes, but
+          that can&rsquo;t catch everything: keep names and other identifiers out of your notes.
         </p>
         {editable ? <button type="button" className="nr-link" onClick={quickDraft} disabled={busy}>Quick draft without AI</button> : null}
       </div>

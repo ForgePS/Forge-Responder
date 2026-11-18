@@ -247,3 +247,21 @@ test("the server prompt carries the facts, and notes are scrubbed before they ar
   assert.doesNotMatch(user, /John Smith|555-123-4567|1968/);
   assert.match(user, /\[Medications\]/);
 });
+
+test("the current narrative is never sent to the AI; notes lose dates, addresses and record numbers", async () => {
+  const { draftPcrNarrative, scrubPcrNotes } = require("../../functions/lib/pcrNarrative.js");
+  let sent = null;
+  const client = { beta: { messages: { create: async (req) => {
+    sent = req;
+    return { stop_reason: "end_turn", model: "test", content: [{ type: "text", text: JSON.stringify({ narrative: "Draft.", missing: [] }) }] };
+  } } } };
+  const facts = pcrNarrativeFacts(schema, fixture.data);
+  await draftPcrNarrative(client, { facts, notes: "Pain 8/10.", existingNarrative: "Found Jane Doe at 123 Main Street. MRN 123456.", style: "soap" });
+  const user = sent.messages[0].content;
+  assert.doesNotMatch(user, /Jane Doe|Main Street|123456|current_draft/);
+  assert.equal(
+    scrubPcrNotes("Found pt at 123 Main Street on 11/17/2026 and Nov 17, 2026. MRN 123456, incident #26-004456."),
+    "Found pt at [address removed] on [date removed] and [date removed]. MRN [number removed], incident [number removed].",
+  );
+  assert.equal(scrubPcrNotes("BP 142/88 at 14:32, HR 96, SpO2 94%, 324 mg ASA, pain 8/10, 12-lead"), "BP 142/88 at 14:32, HR 96, SpO2 94%, 324 mg ASA, pain 8/10, 12-lead");
+});

@@ -1435,7 +1435,6 @@ exports.draftPcrNarrative = onCall(
         facts,
         notes: String(request.data?.notes || ""),
         style,
-        existingNarrative: String(request.data?.existingNarrative || ""),
       });
       await db.collection(`departments/${departmentId}/auditLogs`).add({
         action: "pcr.ai-narrative-draft",

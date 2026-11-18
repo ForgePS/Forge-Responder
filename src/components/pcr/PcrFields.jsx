@@ -22,6 +22,7 @@ import {
   toLocalInput,
 } from "../../lib/nemsis/pcrModel.js";
 import { readLeaf } from "../../lib/nemsis/schema.js";
+import { countHidden } from "../../lib/pcr/pcrEditing.js";
 
 /** New rows of these groups start with the time filled in. */
 const PREFILL_NOW = { "eVitals.VitalGroup": "eVitals.01", "eMedications.MedicationGroup": "eMedications.01", "eProcedures.ProcedureGroup": "eProcedures.01" };
@@ -33,7 +34,7 @@ const PREFILL_NOW = { "eVitals.VitalGroup": "eVitals.01", "eMedications.Medicati
 export function PcrSectionCard({ section, layout, ctx, icon: Icon, blocking = 0 }) {
   const [showAll, setShowAll] = useState(false);
   const hasEssential = layout.some((item) => item.essential);
-  const hidden = layout.filter((item) => !item.essential).length;
+  const hidden = countHidden(layout);
   return (
     <section className={`nr-section pcr-section${blocking ? " nr-section-missing" : ""}`} id={`pcr-section-${section.id}`}>
       <header>

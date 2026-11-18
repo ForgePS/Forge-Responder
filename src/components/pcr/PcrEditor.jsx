@@ -23,6 +23,7 @@ import { documentationSuggestions, openSuggestions } from "../../lib/pcr/pcrQual
 import { qaStatus, reportStatus, submissionStatus } from "../../lib/pcr/pcrLifecycle.js";
 import { fieldPath, getValue, postCheck, sectionForPath, sectionLayout, sectionProgress, setLeaf } from "../../lib/nemsis/pcrModel.js";
 import { pcrMergePaths } from "../../field/fieldPcr.js";
+import { postIssues, rebaseEdits } from "../../lib/pcr/pcrEditing.js";
 import { customizeLayout, visibleSections, withDepartmentIssues } from "../../lib/pcr/pcrForm.js";
 import { applyCadChanges, cadLink, cadRefresh } from "../../lib/pcr/pcrCad.js";
 import { requestPcrNarrative, savePcr } from "../../lib/pcrService.js";
@@ -89,7 +90,9 @@ export default function PcrEditor({
     const startedAt = revision.current;
     const mine = reportRef.current;
     setSave((s) => ({ ...s, state: "saving" }));
-    const run = savePcr(departmentId, { base: baseRef.current, mine, mergePaths, actor, post, keepMine });
+    // Posting re-checks the merged chart, which can include changes saved elsewhere since this screen checked it.
+    const postGate = post ? (record) => postIssues(schema, form, record.nemsis || {}, record.aiNarrative).blocking : undefined;
+    const run = savePcr(departmentId, { base: baseRef.current, mine, mergePaths, actor, post, keepMine, postGate });
     saving.current = run;
     try {
       const result = await run;
@@ -99,11 +102,24 @@ export default function PcrEditor({
       }
       savedRevision.current = startedAt;
       setBase(result.saved);
-      // Nothing typed while saving: show exactly what was stored (includes sections changed elsewhere).
+      // Show what was stored (it can include sections changed elsewhere). Anything typed while the save was running
+      // is kept on top of it, so the next save doesn't mistake the stored sections for edits and write them back.
       if (revision.current === startedAt) setReport(result.saved);
-      else if (post) setReport((current) => ({ ...current, status: "posted", postedAt: result.saved.postedAt }));
-      setSave({ state: revision.current === startedAt ? "saved" : "dirty", at: result.saved.updatedAt });
+      else {
+        setReport((current) => {
+          const next = rebaseEdits(mine, current, result.saved, mergePaths);
+          next.incidentNumber = String(getValue(schema, next.nemsis || {}, "eResponse.03") ?? next.incidentNumber ?? "");
+          return next;
+        });
+      }
       onSaved(result.saved);
+      if (result.blocked) {
+        // Saved, not posted: the merged chart (with another device's changes) has problems to fix first.
+        const n = result.blocked.length;
+        setSave({ state: "error", message: `This report changed on another device and now has ${n} ${n === 1 ? "problem" : "problems"} to fix before posting. Your changes were saved; it wasn't posted.` });
+        return false;
+      }
+      setSave({ state: revision.current === startedAt ? "saved" : "dirty", at: result.saved.updatedAt });
       return true;
     } catch (err) {
       setSave({ state: "error", message: friendlyError(err, "Couldn't save. Check your connection; your changes are still here.") });
@@ -111,7 +127,7 @@ export default function PcrEditor({
     } finally {
       saving.current = null;
     }
-  }, [actor, departmentId, mergePaths, onSaved, readOnly]);
+  }, [actor, departmentId, form, mergePaths, onSaved, readOnly, schema]);
 
   useEffect(() => {
     if (save.state !== "dirty" || readOnly) return undefined;
@@ -131,21 +147,19 @@ export default function PcrEditor({
     return () => window.removeEventListener("beforeunload", warn);
   }, [save.state]);
 
+  // Leaving: anything not stored yet (typing, a failed save, a conflict, a save still running) is saved first, and
+  // if that doesn't work the person has to choose to discard it.
   const close = async () => {
-    if (save.state === "dirty" && !(await doSave())) return;
+    if (saving.current) await saving.current.catch(() => undefined);
+    const unsaved = !readOnly && (revision.current !== savedRevision.current || save.state === "conflict" || save.state === "error");
+    if (unsaved && !(await doSave())
+      && !window.confirm("Your latest changes aren't saved. Leave this report and discard them?")) return;
     onClose();
   };
 
   // ---- checks -------------------------------------------------------------------------------------------------
   const deferredNemsis = useDeferredValue(report.nemsis || {});
-  const check = useMemo(() => {
-    let result = withDepartmentIssues(postCheck(schema, deferredNemsis), schema, deferredNemsis, form);
-    if (report.aiNarrative?.generated && !report.aiNarrative?.reviewedAt) {
-      const issue = { path: fieldPath(schema, "eNarrative.01"), element: "eNarrative.01", code: "ai-review", severity: "error", blocking: true, message: "Read the AI-written narrative and confirm it's accurate." };
-      result = { ...result, ok: false, blocking: [...result.blocking, issue], issues: [...result.issues, issue] };
-    }
-    return result;
-  }, [schema, deferredNemsis, form, report.aiNarrative]);
+  const check = useMemo(() => postIssues(schema, form, deferredNemsis, report.aiNarrative), [schema, deferredNemsis, form, report.aiNarrative]);
   const allSuggestions = useMemo(() => documentationSuggestions(schema, deferredNemsis, form.vitalRanges ? { ranges: form.vitalRanges } : {}), [schema, deferredNemsis, form.vitalRanges]);
   const suggestions = useMemo(() => openSuggestions(allSuggestions, report.qualityDismissed), [allSuggestions, report.qualityDismissed]);
   const dismissSuggestion = (id) => update((current) => ({ qualityDismissed: [...new Set([...(current.qualityDismissed || []), id])] }));
