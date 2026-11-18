@@ -1,5 +1,6 @@
 /**
- * Offline demo only: switch the EMS patient care reports on for the Riverside demo.
+ * Offline demo only: switch the EMS patient care reports on for the Riverside demo. The roles, settings and sample
+ * reports are shared with the online demo (src/data/demoEms.js, src/lib/demoEms.js).
  *
  *   - report permissions for the demo roles (Fire Chief: all; Battalion Chief: all; Captain: chart + review;
  *     Firefighter: chart)
@@ -18,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createNemsisSchema } from "../../src/lib/nemsis/schema.js";
-import { getValue, newPcr, setLeaf } from "../../src/lib/nemsis/pcrModel.js";
+import { DEMO_EMS_FORM as EMS_FORM, DEMO_EMS_SETTINGS as EMS_SETTINGS, DEMO_PCR_ROLE_GRANTS as ROLE_GRANTS, buildDemoPcrs } from "../../src/data/demoEms.js";
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -26,111 +27,15 @@ const DEPARTMENT_ID = "forge-demo";
 const PROJECT_ID = "demo-forge-rms";
 const ACTIVE911_LIST = "hlfd-rms-active911-alerts";
 
-// Demo-only grants: production roles keep these off until a department chooses who sees patient data.
-const ROLE_GRANTS = {
-  fireChief: ["editPcrs", "viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"],
-  battalionChief: ["editPcrs", "viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"],
-  companyOfficer: ["editPcrs", "viewAllPcrs"],
-  firefighter: ["editPcrs"],
-};
-
-/** Demo form settings: the AI narrator on, and a department drop-down for destinations (all invented). */
-const EMS_FORM = {
-  aiNarrative: true,
-  sections: {},
-  fields: {
-    "eDisposition.01": { label: "Destination", choices: ["Riverside Regional Medical Center", "St. Mary's Hospital", "Riverside Children's Hospital"] },
-    "eNarrative.01": { help: "Write it yourself or use the AI narrator." },
-  },
-};
-
-const EMS_SETTINGS = { stateAgencyId: "37-DEMO-0001", agencyNumber: "DEMO01", agencyName: "Riverside Fire & EMS", state: "37" };
-
 function loadSchema() {
   const dir = path.join(ROOT, "src", "data", "nemsis", "3.5.1");
   const read = (name) => JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
   return createNemsisSchema({ structure: read("structure.json"), types: read("types.json"), elements: read("elements.json"), enumerations: read("enumerations.json"), meta: read("meta.json") });
 }
 
-/** "2026-11-15T14:03:05-06:00" moved by `days` (keeps the written offset). */
-function shiftDays(value, days) {
-  const m = /^(.*)([+-]\d{2}:\d{2})$/.exec(String(value));
-  if (!m) return value;
-  const t = new Date(`${m[1]}Z`);
-  t.setUTCDate(t.getUTCDate() + days);
-  return `${t.toISOString().slice(0, 19)}${m[2]}`;
-}
-
-function shiftAllTimes(node, days) {
-  if (Array.isArray(node)) return node.map((n) => shiftAllTimes(n, days));
-  if (node && typeof node === "object") return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, shiftAllTimes(v, days)]));
-  return typeof node === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/.test(node) ? shiftDays(node, days) : node;
-}
-
-function daysBetween(fromIso, to = new Date()) {
-  return Math.max(0, Math.floor((to.getTime() - Date.parse(fromIso)) / 86_400_000));
-}
-
 function sampleReports(schema, crewUid, crewName) {
-  const fixture = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "fixtures", "nemsis", "pcr-chest-pain.json"), "utf8"));
-  // Move the sample call to yesterday (and two days ago), keeping its times of day.
-  const base = daysBetween("2026-11-15T12:00:00Z");
-  const reports = [];
-  const make = ({ uuid, number, days, status, edit = (p) => p, patient }) => {
-    let nemsis = edit(shiftAllTimes({ ...fixture.data, attrs: { UUID: uuid } }, base + days));
-    nemsis = setLeaf(schema, nemsis, "eRecord.01", number);
-    nemsis = setLeaf(schema, nemsis, "eResponse.01", EMS_SETTINGS.agencyNumber);
-    nemsis = setLeaf(schema, nemsis, "eResponse.02", EMS_SETTINGS.agencyName);
-    if (patient) {
-      nemsis = setLeaf(schema, nemsis, "ePatient.02", patient.last);
-      nemsis = setLeaf(schema, nemsis, "ePatient.03", patient.first);
-    }
-    const notified = getValue(schema, nemsis, "eTimes.03") || getValue(schema, nemsis, "eTimes.01") || new Date(Date.now() - 3 * 3600_000).toISOString();
-    const at = new Date(Date.parse(notified) + 90 * 60_000).toISOString();
-    reports.push({
-      id: uuid,
-      uuid,
-      number,
-      status,
-      crewUids: [crewUid],
-      incidentNumber: getValue(schema, nemsis, "eResponse.03") || "",
-      unit: "Medic 1",
-      nemsis,
-      createdAt: at,
-      createdByUid: crewUid,
-      createdByName: crewName,
-      updatedAt: at,
-      updatedByUid: crewUid,
-      updatedByName: crewName,
-      source: "offline-demo",
-      ...(status === "posted" ? { postedAt: at, postedByUid: crewUid, postedByName: crewName } : {}),
-    });
-  };
-  make({ uuid: "0d3e8f1a-5b7c-4a1e-9c2d-000000000001", number: "DEMO-PCR-0001", days: -1, status: "posted" });
-  // Posted with errors the server check will find: the unit-notified time is missing.
-  make({
-    uuid: "0d3e8f1a-5b7c-4a1e-9c2d-000000000002", number: "DEMO-PCR-0002", days: 0, status: "posted",
-    patient: { first: "Jordan", last: "Samplecase" },
-    edit: (p) => {
-      const { eTimes, ...rest } = p;
-      const { "eTimes.03": _notified, ...times } = eTimes;
-      return { ...rest, eTimes: times };
-    },
-  });
-  // A draft the crew is still charting: dispatch and times only.
-  const draftUuid = "0d3e8f1a-5b7c-4a1e-9c2d-000000000003";
-  const draft = newPcr(schema, {
-    uuid: draftUuid, number: "DEMO-PCR-0003", softwareVersion: "demo",
-    agency: { number: EMS_SETTINGS.agencyNumber, name: EMS_SETTINGS.agencyName },
-    unit: { callSign: "MEDIC 1", vehicleNumber: "M1" },
-    cad: { notified: shiftDays("2026-11-15T09:12:00-06:00", base), address: "220 River Rd", stateCode: "37" },
-  });
-  reports.push({
-    id: draftUuid, uuid: draftUuid, number: "DEMO-PCR-0003", status: "draft", crewUids: [crewUid], incidentNumber: "", unit: "Medic 1",
-    nemsis: draft, createdAt: new Date().toISOString(), createdByUid: crewUid, createdByName: crewName,
-    updatedAt: new Date().toISOString(), updatedByUid: crewUid, updatedByName: crewName, source: "offline-demo",
-  });
-  return reports;
+  const sample = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "data", "demoPcrSample.json"), "utf8"));
+  return buildDemoPcrs(schema, { sample, crewUid, crewName, source: "offline-demo" });
 }
 
 function sampleDispatches(now = new Date()) {

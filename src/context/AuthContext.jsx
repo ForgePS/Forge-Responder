@@ -179,11 +179,13 @@ export function AuthProvider({ children }) {
 
   async function hydrateAccess(nextUser) {
     if (isDemoModeActive()) {
-      const [nextMembership, nextRoles] = await Promise.all([
+      // Roles after the demo setup: a reseed changes them (e.g. the EMS report permissions), and loading them at
+      // the same time showed the old roles until the next page load.
+      const [nextMembership] = await Promise.all([
         ensureDemoAccess(nextUser),
-        loadRolesMap(DEMO_DEPARTMENT_ID),
         ensurePlatformConfig()
       ]);
+      const nextRoles = await loadRolesMap(DEMO_DEPARTMENT_ID);
       setIsCreator(false);
       await applyMembership(nextUser, DEMO_DEPARTMENT_ID, nextMembership, nextRoles, false);
       return;
@@ -333,10 +335,8 @@ export function AuthProvider({ children }) {
         console.error("Failed to load department membership", error);
         if (isDemoModeActive()) {
           try {
-            const [nextMembership, nextRoles] = await Promise.all([
-              ensureDemoAccess(nextUser),
-              loadRolesMap(DEMO_DEPARTMENT_ID)
-            ]);
+            const nextMembership = await ensureDemoAccess(nextUser);
+            const nextRoles = await loadRolesMap(DEMO_DEPARTMENT_ID);
             setIsCreator(false);
             setMembership(nextMembership);
             setRolesById(nextRoles);
