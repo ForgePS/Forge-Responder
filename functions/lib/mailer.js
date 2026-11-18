@@ -10,6 +10,20 @@
  */
 const DEFAULT_FROM = "Forge Public Safety <noreply@forgeresponder.com>";
 
+/** A display name safe for a From header ("" = none). */
+function cleanFromName(value) {
+  return String(value || "").replace(/["<>\\\r\n\t]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+/** The From header: the configured address, under fromName when one is given. */
+function fromHeader(fromName = "") {
+  const base = String(process.env.EMAIL_FROM || DEFAULT_FROM).trim();
+  const name = cleanFromName(fromName);
+  if (!name) return base;
+  const address = (base.match(/<([^>]+)>/) || [null, base])[1].trim();
+  return `"${name}" <${address}>`;
+}
+
 function cleanList(list = []) {
   return [...new Set(list.map((e) => String(e || "").trim().toLowerCase()).filter(Boolean))];
 }
@@ -39,7 +53,7 @@ async function sendViaResend({ apiKey, from, to, cc, replyTo, subject, text, att
   return "sent";
 }
 
-async function sendViaSendGrid({ apiKey, fromEmail, to, cc, replyTo, subject, text, attachments = [] }) {
+async function sendViaSendGrid({ apiKey, fromEmail, fromName = "", to, cc, replyTo, subject, text, attachments = [] }) {
   const personalization = { to: to.map((email) => ({ email })) };
   if (cc.length) personalization.cc = cc.map((email) => ({ email }));
   const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -47,7 +61,7 @@ async function sendViaSendGrid({ apiKey, fromEmail, to, cc, replyTo, subject, te
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       personalizations: [personalization],
-      from: { email: fromEmail, name: "Forge Public Safety" },
+      from: { email: fromEmail, name: cleanFromName(fromName) || "Forge Public Safety" },
       subject,
       content: [{ type: "text/plain", value: text }],
       ...(replyTo ? { reply_to: { email: replyTo } } : {}),
@@ -63,14 +77,14 @@ async function sendViaSendGrid({ apiKey, fromEmail, to, cc, replyTo, subject, te
   return "sent";
 }
 
-async function sendTextEmail({ to = [], cc = [], replyTo = "", subject, text, attachments = [] }) {
+async function sendTextEmail({ to = [], cc = [], replyTo = "", fromName = "", subject, text, attachments = [] }) {
   const toList = cleanList(to);
   const ccList = cleanList(cc).filter((e) => !toList.includes(e));
   if (!toList.length) return "no_recipient";
 
   // Staging (functions/.env.forge-rms-staging): log instead of emailing anyone.
   if (process.env.EMAIL_DELIVERY === "log") {
-    console.log("[email not sent: EMAIL_DELIVERY=log]", JSON.stringify({ to: toList, cc: ccList, subject, text: String(text || "").slice(0, 2000), attachments: attachments.map((a) => a.filename) }));
+    console.log("[email not sent: EMAIL_DELIVERY=log]", JSON.stringify({ from: fromHeader(fromName), replyTo, to: toList, cc: ccList, subject, text: String(text || "").slice(0, 2000), attachments: attachments.map((a) => a.filename) }));
     return "logged";
   }
 
@@ -79,11 +93,11 @@ async function sendTextEmail({ to = [], cc = [], replyTo = "", subject, text, at
   const sendGridFrom = String(process.env.SENDGRID_FROM_EMAIL || "").trim();
   try {
     if (resendKey) {
-      const from = String(process.env.EMAIL_FROM || DEFAULT_FROM).trim();
+      const from = fromHeader(fromName);
       return await sendViaResend({ apiKey: resendKey, from, to: toList, cc: ccList, replyTo, subject, text, attachments });
     }
     if (sendGridKey && sendGridFrom) {
-      return await sendViaSendGrid({ apiKey: sendGridKey, fromEmail: sendGridFrom, to: toList, cc: ccList, replyTo, subject, text, attachments });
+      return await sendViaSendGrid({ apiKey: sendGridKey, fromEmail: sendGridFrom, fromName, to: toList, cc: ccList, replyTo, subject, text, attachments });
     }
     return "not_configured";
   } catch (error) {
@@ -92,4 +106,4 @@ async function sendTextEmail({ to = [], cc = [], replyTo = "", subject, text, at
   }
 }
 
-module.exports = { DEFAULT_FROM, sendTextEmail };
+module.exports = { DEFAULT_FROM, fromHeader, sendTextEmail };

@@ -9,6 +9,7 @@ import {
   INSPECTION_SETTINGS_DOC_ID,
 } from "./paths.js";
 import { writeInspectionAuditLog } from "./inspectionAudit.js";
+import { normalizeReportEmailSettings } from "./reportEmailSettings.js";
 
 /**
  * @param {Partial<import("./types.js").InspectionSettings>|null|undefined} remote
@@ -40,6 +41,7 @@ export function normalizeInspectionSettings(remote = {}, departmentId = "") {
       ? data.priorityLevels
       : defaults.priorityLevels,
     terminology: { ...defaults.terminology, ...(data.terminology || {}) },
+    reportEmail: normalizeReportEmailSettings(data.reportEmail),
   };
 }
 

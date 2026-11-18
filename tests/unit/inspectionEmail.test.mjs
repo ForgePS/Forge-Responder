@@ -4,9 +4,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { occupancyEmails, parseRecipients } from "../../src/lib/inspections/inspectionEmailRecipients.js";
+import { normalizeReportEmailSettings, reportEmailSettingsProblems } from "../../src/lib/inspections/reportEmailSettings.js";
 
 const require = createRequire(import.meta.url);
-const { buildEmailText, buildReport, cleanRecipients, emailInspectionReport, renderPdf } = require("../../functions/lib/inspectionEmail.js");
+const { buildEmailText, buildReport, cleanRecipients, emailInspectionReport, renderPdf, reportEmailSettings } = require("../../functions/lib/inspectionEmail.js");
+const { fromHeader } = require("../../functions/lib/mailer.js");
 
 const inspection = {
   id: "INS-1",
@@ -145,5 +147,65 @@ describe("emailInspectionReport callable", () => {
     const result = await emailInspectionReport(db, request("forge-demo"));
     assert.equal(result.status, "logged");
     assert.match(result.message, /demo/);
+  });
+});
+
+describe("each department's report email settings", () => {
+  it("are checked before saving in Configuration Studio", () => {
+    assert.deepEqual(reportEmailSettingsProblems({ senderName: "Springfield Fire Prevention", replyTo: "fp@springfield.gov", copyTo: "records@springfield.gov" }), []);
+    assert.match(reportEmailSettingsProblems({ replyTo: "nope" })[0], /Reply-to/);
+    assert.match(reportEmailSettingsProblems({ copyTo: "a@x.com, b@x.com, c@x.com, d@x.com" })[0], /3 addresses or fewer/);
+    assert.deepEqual(normalizeReportEmailSettings({ senderName: 'Bad "Name" <x@y.com>', copyTo: "A@x.com; a@x.com" }), {
+      senderName: "Bad Name x@y.com", replyTo: "", copyTo: ["a@x.com"], signature: "",
+    });
+  });
+
+  it("are re-checked on the server; bad addresses are dropped", () => {
+    assert.deepEqual(reportEmailSettings({ senderName: "FP\r\nBcc: x@y.com", replyTo: "bad", copyTo: ["ok@x.com", "bad", "b@x.com", "c@x.com", "d@x.com"] }), {
+      senderName: "FP Bcc: x@y.com", replyTo: "", copyTo: ["ok@x.com", "b@x.com", "c@x.com"], signature: "",
+    });
+  });
+
+  it("put the department's name on the platform's sending address", () => {
+    const before = process.env.EMAIL_FROM;
+    delete process.env.EMAIL_FROM;
+    try {
+      assert.equal(fromHeader("Springfield Fire Prevention"), '"Springfield Fire Prevention" <noreply@forgeresponder.com>');
+      assert.equal(fromHeader(""), "Forge Public Safety <noreply@forgeresponder.com>");
+      process.env.EMAIL_FROM = "reports@forgeresponder.com";
+      assert.equal(fromHeader("FP"), '"FP" <reports@forgeresponder.com>');
+    } finally {
+      if (before === undefined) delete process.env.EMAIL_FROM; else process.env.EMAIL_FROM = before;
+    }
+  });
+
+  it("are used when a report is sent", async () => {
+    const before = process.env.EMAIL_DELIVERY;
+    process.env.EMAIL_DELIVERY = "log";
+    const logged = [];
+    const log = console.log;
+    console.log = (...args) => { logged.push(args.join(" ")); };
+    try {
+      const db = fakeDb({
+        "platformCreators/u1": { status: "active" },
+        "departments/dept-1/inspections/INS-1": inspection,
+        "departments/dept-1/profile/main": { name: "Springfield FD" },
+        "departments/dept-1/inspectionSettings/main": { reportEmail: {
+          senderName: "Springfield Fire Prevention",
+          replyTo: "fp@springfield.gov",
+          copyTo: ["records@springfield.gov"],
+          signature: "Fire Prevention Bureau\n(555) 010-0100",
+        } },
+      });
+      await emailInspectionReport(db, { auth: { uid: "u1", token: { name: "Lt. Rivera", email: "rivera@springfieldfd.gov" } }, data: { departmentId: "dept-1", inspectionId: "INS-1", to: ["owner@diner.com"] } });
+      const sent = JSON.parse(logged.find((line) => line.startsWith("[email not sent")).replace(/^\[email not sent: EMAIL_DELIVERY=log\] /, ""));
+      assert.equal(sent.from, '"Springfield Fire Prevention" <noreply@forgeresponder.com>');
+      assert.equal(sent.replyTo, "fp@springfield.gov");
+      assert.deepEqual(sent.cc, ["records@springfield.gov"]);
+      assert.match(sent.text, /Lt\. Rivera\nFire Prevention Bureau\n\(555\) 010-0100$/);
+    } finally {
+      console.log = log;
+      if (before === undefined) delete process.env.EMAIL_DELIVERY; else process.env.EMAIL_DELIVERY = before;
+    }
   });
 });
