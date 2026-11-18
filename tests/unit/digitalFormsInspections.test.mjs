@@ -8,6 +8,7 @@ import { TEMPLATE_FIELD_TYPES } from "../../src/lib/inspections/configDefaults.j
 import { findMissingRequiredFields } from "../../src/lib/inspections/checklistFields.js";
 import { failDetailFields, findMissingFailRemarks, isFailAnswer } from "../../src/lib/inspections/inspectionFailDetails.js";
 import { templateFromDefinition } from "../../src/lib/digitalForms/inspectionTemplateMapping.js";
+import { validateInspectionForm } from "../../src/field/inspectionValidation.js";
 
 const require = createRequire(import.meta.url);
 const schema = require("../../functions/lib/digitalForms/schema.js");
@@ -74,9 +75,30 @@ describe("remarks and photos on No/Fail in an inspection", () => {
     assert.deepEqual(findMissingFailRemarks(snapshot, { [lanes]: "Yes" }), []);
   });
 
-  it("only applies to templates marked remarksOnFail (existing templates unchanged)", () => {
-    assert.deepEqual(findMissingFailRemarks({ ...snapshot, remarksOnFail: false }, { [lanes]: "No" }), []);
+  it("applies to every inspection template, not only ones made from a digital form", () => {
+    const builtIn = { sections: [{ fields: [
+      { key: "extinguishers", label: "Extinguishers serviced", type: "pass_fail" },
+      { key: "egress", label: "Egress", type: "compliant" },
+    ] }] };
+    assert.deepEqual(
+      findMissingFailRemarks(builtIn, { extinguishers: "Fail", egress: "Noncompliant" }).map((m) => m.key),
+      ["extinguishers__remarks", "egress__remarks"],
+    );
+    assert.deepEqual(findMissingFailRemarks({ ...snapshot, remarksOnFail: false }, { [lanes]: "No" }).length, 1);
     assert.deepEqual(findMissingFailRemarks(null, { [lanes]: "No" }), []);
+  });
+
+  it("FORGE FIELD blocks Complete until a No/Fail item has remarks", () => {
+    const data = {
+      finish: true,
+      result: "Failed",
+      inspection: { templateSnapshot: snapshot },
+      answers: { [lanes]: "No" },
+    };
+    const rules = { required: () => false };
+    assert.ok(validateInspectionForm(data, rules)[`a:${lanes}__remarks`]);
+    const fixed = { ...data, answers: { ...data.answers, [`${lanes}__remarks`]: "Blocked" } };
+    assert.equal(validateInspectionForm(fixed, rules)[`a:${lanes}__remarks`], undefined);
   });
 
   it("the extra inputs are a required remarks box and an optional photo field", () => {

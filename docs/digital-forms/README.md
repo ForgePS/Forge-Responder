@@ -102,11 +102,13 @@ New inspections of that type then use the form as their checklist. Inspections a
 checklist they started with. Running it again after revising the form publishes the new version to the same
 template.
 
-In an inspection whose template has `remarksOnFail`, a Yes/No or Pass/Fail item answered No/Fail shows a
-required remarks box and the inspection photo field. They are stored on the inspection under companion keys
-`answers["<key>__remarks"]` and `answers["<key>__photos"]` (photos are inspection attachments, as with any
-inspection photo). **Complete** is blocked until every No/Fail item has remarks. Templates without
-`remarksOnFail` (all existing ones) are unchanged.
+In every inspection (any template, including inspections already open), a Yes/No, Pass/Fail or
+Compliant item answered No/Fail/Noncompliant shows a required remarks box and a photo field. They are
+stored on the inspection under companion keys `answers["<key>__remarks"]` and `answers["<key>__photos"]`
+(photos are inspection attachments, as with any inspection photo). **Complete** is blocked until every such
+item has remarks, in the RMS, in FORGE FIELD (`src/field/inspectionValidation.js`) and in
+`completeInspection`. In FORGE FIELD, photos go in the inspection's Photos section. Templates made from a
+digital form still carry `remarksOnFail`, but it no longer changes anything.
 
 Code: `src/lib/digitalForms/inspectionTemplateFromForm.js`, `src/lib/digitalForms/inspectionTemplateMapping.js`,
 `src/lib/inspections/inspectionFailDetails.js`.

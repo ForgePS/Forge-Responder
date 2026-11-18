@@ -244,7 +244,6 @@ function InspectionWorkspace({
   const sections = Array.isArray(record?.templateSnapshot?.sections)
     ? record.templateSnapshot.sections
     : [];
-  const remarksOnFail = Boolean(record?.templateSnapshot?.remarksOnFail);
   const locked = Boolean(record?.lockedAt) || record?.status === "archived";
   const editable = canEdit && !locked;
   const missingKeys = new Set(missingFields.map((item) => item.key));
@@ -502,7 +501,7 @@ function InspectionWorkspace({
                         onChange={(next) => setAnswer(field.key, next)}
                       />
                       {field.helpText ? <small className="occupancy-muted">{field.helpText}</small> : null}
-                      {remarksOnFail && isFailAnswer(field, answers[field.key]) ? (() => {
+                      {isFailAnswer(field, answers[field.key]) ? (() => {
                         const extra = failDetailFields(field);
                         const remarksMissing = missingKeys.has(extra.remarks.key);
                         return (
