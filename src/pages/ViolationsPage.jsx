@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CirclePlus, FileText, Save, ShieldAlert } from "lucide-react";
+import { AlertTriangle, Camera, CirclePlus, FileText, Save, ShieldAlert } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import InspectionEmptyState from "../components/inspections/InspectionEmptyState.jsx";
@@ -20,6 +20,9 @@ import {
   listViolations,
 } from "../lib/inspections/index.js";
 import { friendlyError } from "../lib/friendlyError.js";
+import ViolationPhotoPicker from "../components/inspections/ViolationPhotoPicker.jsx";
+import { uploadViolationPhotos } from "../lib/inspections/violationPhotos.js";
+import { violationPhotosOf } from "../lib/inspections/violationPhotoRules.js";
 
 function Field({ label, children }) {
   return (
@@ -56,6 +59,9 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
   const [showCreate, setShowCreate] = useState(false);
   const [createCatalogId, setCreateCatalogId] = useState("");
   const [createLocation, setCreateLocation] = useState("");
+  const [createPhotos, setCreatePhotos] = useState([]);
+  const [photoProblem, setPhotoProblem] = useState("");
+  const [addingPhotos, setAddingPhotos] = useState(false);
   const [evidenceNotes, setEvidenceNotes] = useState("");
   const [extensionDueAt, setExtensionDueAt] = useState("");
   const [extensionReason, setExtensionReason] = useState("");
@@ -129,11 +135,20 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
         inspectionId: inspectionId || undefined,
         locationOnProperty: createLocation,
       }, actor);
-      upsert(created);
+      let issued = created;
+      let photoNote = "";
+      if (createPhotos.length) {
+        const { violation, failed } = await uploadViolationPhotos(departmentId, created.id, createPhotos, actor);
+        if (violation) issued = violation;
+        if (failed) photoNote = ` ${failed} photo${failed === 1 ? "" : "s"} didn't upload; add ${failed === 1 ? "it" : "them"} under Evidence.`;
+      }
+      upsert(issued);
       setShowCreate(false);
       setCreateLocation("");
-      setMessage("Violation issued.");
-      onChanged?.(created);
+      setCreatePhotos([]);
+      setPhotoProblem("");
+      setMessage(`Violation issued.${photoNote}`);
+      onChanged?.(issued);
       if (!inspectionId) await reload();
     } catch (createError) {
       setError(friendlyError(createError, "Couldn't create violation."));
@@ -159,6 +174,27 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
       setError(friendlyError(extendError, "Couldn't extend deadline."));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAddPhotos(fileList) {
+    const files = Array.from(fileList || []);
+    if (!selected || !files.length) return;
+    setAddingPhotos(true);
+    setError("");
+    setMessage("");
+    try {
+      const { violation, failed } = await uploadViolationPhotos(departmentId, selected.id, files, actor);
+      if (violation) {
+        upsert(violation);
+        onChanged?.(violation);
+      }
+      if (failed) setError(`${failed} photo${failed === 1 ? "" : "s"} couldn't be added. Photos must be images under 20 MB.`);
+      else setMessage(`Added ${files.length} photo${files.length === 1 ? "" : "s"}.`);
+    } catch (photoError) {
+      setError(friendlyError(photoError, "Couldn't add photos."));
+    } finally {
+      setAddingPhotos(false);
     }
   }
 
@@ -389,12 +425,45 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
                   ) : null}
 
                   <section className="occupancy-section">
+                    <header><div><strong>Photos</strong></div></header>
+                    {violationPhotosOf(selected).length ? (
+                      <ul className="checklist-photo-list">
+                        {violationPhotosOf(selected).map((photo) => (
+                          <li key={photo.id}>
+                            <a href={photo.url} target="_blank" rel="noreferrer" title={`${photo.addedBy || ""} ${photo.addedAt ? new Date(photo.addedAt).toLocaleString() : ""}`.trim()}>
+                              <img src={photo.url} alt={photo.fileName || "Violation photo"} />
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="occupancy-muted">No photos yet.</p>
+                    )}
+                    {canEdit ? (
+                      <label className={`secondary-button checklist-photo-add${addingPhotos ? " is-busy" : ""}`}>
+                        <Camera size={14} /> {addingPhotos ? "Uploading..." : "Add photo"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          multiple
+                          disabled={addingPhotos}
+                          onChange={(event) => {
+                            handleAddPhotos(event.target.files);
+                            event.target.value = "";
+                          }}
+                        />
+                      </label>
+                    ) : null}
+                  </section>
+
+                  <section className="occupancy-section">
                     <header><div><strong>Evidence</strong></div></header>
-                    {(selected.evidence || []).length === 0 ? (
+                    {(selected.evidence || []).filter((item) => item.type !== "photo").length === 0 ? (
                       <p className="occupancy-muted">No evidence yet.</p>
                     ) : (
                       <ul className="occupancy-timeline">
-                        {selected.evidence.map((item) => (
+                        {selected.evidence.filter((item) => item.type !== "photo").map((item) => (
                           <li key={item.id}>
                             <strong>{item.label}</strong>
                             <small>
@@ -432,7 +501,7 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
             <section className="workflow-modal">
               <header>
                 <strong>Issue violation</strong>
-                <button type="button" onClick={() => setShowCreate(false)}>×</button>
+                <button type="button" onClick={() => { setShowCreate(false); setCreatePhotos([]); setPhotoProblem(""); }}>×</button>
               </header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Catalog item">
@@ -448,10 +517,19 @@ export default function ViolationsPage({ query = "", inspectionId = "", embedded
                   <input value={createLocation} onChange={(e) => setCreateLocation(e.target.value)} />
                 </Field>
               </div>
+              <div className="modal-content">
+                <span className="occupancy-muted">Photos (visual proof, optional)</span>
+                <ViolationPhotoPicker
+                  files={createPhotos}
+                  disabled={saving}
+                  onChange={(files, problem) => { setCreatePhotos(files); setPhotoProblem(problem || ""); }}
+                />
+                {photoProblem ? <small className="checklist-field-error" role="alert">{photoProblem}</small> : null}
+              </div>
               <div className="modal-actions">
-                <button className="secondary-button" type="button" onClick={() => setShowCreate(false)}>Cancel</button>
+                <button className="secondary-button" type="button" onClick={() => { setShowCreate(false); setCreatePhotos([]); setPhotoProblem(""); }}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !createCatalogId} onClick={handleCreate}>
-                  Issue
+                  {saving && createPhotos.length ? "Issuing and uploading..." : "Issue"}
                 </button>
               </div>
             </section>
