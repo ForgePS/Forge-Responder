@@ -262,6 +262,7 @@ export const ADMIN_PERMISSION_LABELS = {
   viewAllPcrs: "View every patient care report (not only calls they were on)",
   unlockPcrs: "Unlock posted patient care reports for amendment",
   exportPcrs: "Export patient care reports (NEMSIS XML)",
+  reviewPcrs: "QA review patient care reports (comments, return to the crew; never edits the chart)",
   viewHeatZoneAnalytics: "View Heat Zone Analytics",
   viewHeatZoneMarkers: "View individual incidents on the heat map",
   viewHeatZoneAllDistricts: "View Heat Zone analytics for all districts",
@@ -423,7 +424,7 @@ export const ADMIN_PERMISSION_GROUPS = [
   },
   {
     label: "EMS patient care reports (PHI)",
-    keys: ["editPcrs", "viewAllPcrs", "unlockPcrs", "exportPcrs"]
+    keys: ["editPcrs", "viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"]
   },
   {
     label: "Heat Zone Analytics",

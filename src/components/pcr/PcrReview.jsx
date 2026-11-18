@@ -2,12 +2,21 @@
  * Review step of a patient care report in the RMS: what's left before posting, the server NEMSIS check, export,
  * print and unlock. PHI: opening, printing, exporting and unlocking are written to the audit log (report number only).
  */
-import { useState } from "react";
-import { AlertTriangle, CheckCircle2, Download, Loader2, LockOpen, Printer, ShieldCheck, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Download, EyeOff, Lightbulb, Loader2, LockOpen, Printer, ShieldCheck, X } from "lucide-react";
 import { PCR_SECTIONS, pcrXml, sectionForPath } from "../../lib/nemsis/pcrModel.js";
 import { pcrPrintHtml } from "../../lib/nemsis/pcrPrint.js";
 import { emsSettingsAgency, missingEmsSettings } from "../../lib/nemsis/emsSettings.js";
 import { checkPcrOnServer, recordPcrExport, recordPcrPrint, unlockPcr } from "../../lib/pcrService.js";
+import { FEEDBACK_KINDS, feedbackKind } from "../../lib/pcr/pcrQuality.js";
+import { handoffHtml, handoffSummary } from "../../lib/pcr/pcrHandoff.js";
+import { verifyPosted } from "../../lib/pcr/pcrLifecycle.js";
+import PcrQaPanel from "./PcrQaPanel.jsx";
+
+/** Which of the three kinds of feedback an issue is: NEMSIS, department, or a suggestion. */
+export function KindTag({ kind }) {
+  return <span className={`pcr-kind pcr-kind-${kind}`}>{FEEDBACK_KINDS[kind]?.label || kind}</span>;
+}
 
 export function formatWhen(value) {
   if (!value) return "";
@@ -37,8 +46,12 @@ function downloadText(filename, text, type) {
 /** Posted, but the server NEMSIS check (run on post) found errors. */
 export const needsReview = (report) => report.status === "posted" && report.nemsisCheck?.ok === false;
 
-export default function PcrReview({ schema, report, check, settings, departmentId, actor, canUnlock, canExport, onChange, onMessage, onError, onGoTo }) {
+export default function PcrReview({
+  schema, report, check, settings, departmentId, actor, uid, canUnlock, canExport, canReview = false,
+  suggestions = [], dismissedCount = 0, onDismiss = null, onChange, onMessage, onError, onGoTo,
+}) {
   const [busy, setBusy] = useState("");
+  const [intact, setIntact] = useState(null);
   const [serverCheck, setServerCheck] = useState(null);
   const [unlocking, setUnlocking] = useState(false);
   const nemsis = report.nemsis || {};
@@ -46,6 +59,35 @@ export default function PcrReview({ schema, report, check, settings, departmentI
   const missingAgency = missingEmsSettings(settings);
   const lastCheck = report.nemsisCheck;
   const lastCheckStale = lastCheck?.at && report.updatedAt && lastCheck.at < report.updatedAt;
+
+  // Tamper check: does the posted content still match the hash stored when it was posted?
+  useEffect(() => {
+    let live = true;
+    if (!posted || !report.postedHash) {
+      setIntact(null);
+      return undefined;
+    }
+    verifyPosted(report).then((ok) => { if (live) setIntact(ok); }).catch(() => { if (live) setIntact(null); });
+    return () => { live = false; };
+  }, [posted, report]);
+
+  const handoff = async () => {
+    const win = window.open("", "_blank");
+    if (!win) {
+      onError("The handoff view was blocked. Allow pop-ups for this site and try again.");
+      return;
+    }
+    try {
+      await recordPcrPrint(departmentId, report, actor);
+      win.document.open();
+      win.document.write(handoffHtml(handoffSummary(schema, report), { agencyName: settings.agencyName, printedBy: actor?.actorName, printedAt: formatWhen(new Date().toISOString()) }));
+      win.document.close();
+      win.focus();
+    } catch (err) {
+      win.close();
+      onError(friendlyError(err, "The handoff view couldn't be opened."));
+    }
+  };
 
   const runCheck = async () => {
     setBusy("check");
@@ -136,13 +178,47 @@ export default function PcrReview({ schema, report, check, settings, departmentI
                 <button type="button" onClick={() => onGoTo(sectionForPath(issue.path))}>
                   <span className="nr-dot nr-dot-bad" />
                   <span><strong>{sectionLabel(issue.path)}:</strong> {issue.message}</span>
+                  <KindTag kind={feedbackKind(issue)} />
                 </button>
               </li>
             ))}
           </ul>
         ) : null}
         {report.unlockReason ? <p className="nr-muted">Unlocked {formatWhen(report.unlockedAt)} by {report.unlockedBy || "a supervisor"}: {report.unlockReason}</p> : null}
+        {posted && intact !== null ? (
+          <p className={`nr-muted pcr-tamper ${intact ? "ok" : "bad"}`}>
+            <ShieldCheck size={14} /> {intact ? "The content matches what was posted." : "The content no longer matches what was posted. Tell your administrator."}
+          </p>
+        ) : null}
       </section>
+
+      {suggestions.length || dismissedCount ? (
+        <section className="nr-section">
+          <header>
+            <div className="nr-section-title">
+              <span className="nr-section-icon"><Lightbulb size={16} /></span>
+              <div>
+                <h3>Documentation suggestions</h3>
+                <p>Optional checks on what&apos;s charted. They never block posting and never change the report.{dismissedCount ? ` ${dismissedCount} dismissed.` : ""}</p>
+              </div>
+            </div>
+          </header>
+          {suggestions.length ? (
+            <ul className="pcr-suggestions">
+              {suggestions.map((item) => (
+                <li key={item.id}>
+                  <KindTag kind="suggestion" />
+                  <span>{item.message}</span>
+                  <div>
+                    {item.path ? <button type="button" className="nr-btn nr-btn-soft nr-small" onClick={() => onGoTo(sectionForPath(item.path))}>Go to it</button> : null}
+                    {onDismiss ? <button type="button" className="nr-btn nr-btn-ghost nr-small" onClick={() => onDismiss(item.id)} title="Hide this suggestion on this report"><EyeOff size={14} /> Dismiss</button> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="nr-muted">No open suggestions.</p>}
+        </section>
+      ) : null}
 
       <section className="nr-section">
         <header>
@@ -164,6 +240,7 @@ export default function PcrReview({ schema, report, check, settings, departmentI
             </button>
           ) : null}
           <button className="nr-btn nr-btn-soft" type="button" onClick={print} disabled={Boolean(busy)}><Printer size={15} /> Print</button>
+          <button className="nr-btn nr-btn-soft" type="button" onClick={handoff} disabled={Boolean(busy)} title="A one-page summary for the receiving facility"><ClipboardList size={15} /> Hospital handoff</button>
           {canUnlock && posted ? (
             <button className="nr-btn nr-btn-ghost" type="button" onClick={() => setUnlocking(true)} disabled={Boolean(busy)}><LockOpen size={15} /> Unlock</button>
           ) : null}
@@ -182,6 +259,18 @@ export default function PcrReview({ schema, report, check, settings, departmentI
         ) : null}
         {serverCheck ? <ServerCheckResult result={serverCheck} /> : null}
       </section>
+
+      <PcrQaPanel
+        schema={schema}
+        report={report}
+        departmentId={departmentId}
+        actor={actor}
+        uid={uid}
+        canReview={canReview}
+        onChange={onChange}
+        onMessage={onMessage}
+        onError={onError}
+      />
 
       {unlocking ? <UnlockDialog busy={busy === "unlock"} onClose={() => setUnlocking(false)} onConfirm={unlock} /> : null}
     </>
@@ -219,7 +308,7 @@ function UnlockDialog({ busy, onClose, onConfirm }) {
           <h2>Unlock this report?</h2>
           <button type="button" className="nr-icon-btn" aria-label="Close" onClick={onClose}><X size={18} /></button>
         </header>
-        <p className="nr-muted">The report goes back to draft so it can be amended, then posted again. This is recorded in the audit log.</p>
+        <p className="nr-muted">The posted version is kept unchanged in the report&apos;s history. The report goes back to draft so it can be amended; when it&apos;s posted again, every change is recorded with this reason.</p>
         <div className="nr-field nr-wide">
           <span className="nr-label">Reason</span>
           <textarea className="nr-input nr-textarea" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="e.g. Add the second set of vitals" />

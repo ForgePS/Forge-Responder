@@ -129,6 +129,7 @@ export const defaultRoles = [
       viewAllPcrs: true,
       unlockPcrs: true,
       exportPcrs: true,
+      reviewPcrs: true,
       accessAdminRms: true,
       viewHeatZoneAnalytics: true,
       viewHeatZoneMarkers: true,

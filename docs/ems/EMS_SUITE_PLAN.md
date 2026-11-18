@@ -1,5 +1,7 @@
 # Forge EMS Suite — Build Plan (draft)
 
+Current implementation status against the full ePCR brief: [EPCR_STATUS.md](EPCR_STATUS.md).
+
 Status: draft for owner review · 2026-11-16
 
 Scope: a NEMSIS v3.5 compliant ePCR, an AI QA/QI reviewer, EMS analytics, Zoll and Lifepak monitor import,

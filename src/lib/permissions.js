@@ -577,5 +577,10 @@ export function canEditPcrs(permissions = {}, isCreator = false) {
 
 /** Read every patient care report, not only the calls this person was on. */
 export function canViewAllPcrs(permissions = {}, isCreator = false) {
-  return Boolean(isCreator || ["viewAllPcrs", "unlockPcrs", "exportPcrs"].some((key) => hasPermission(permissions, key)));
+  return Boolean(isCreator || ["viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"].some((key) => hasPermission(permissions, key)));
+}
+
+/** QA review patient care reports: comments and return to the crew (never edits the chart). */
+export function canReviewPcrs(permissions = {}, isCreator = false) {
+  return Boolean(isCreator || hasPermission(permissions, "reviewPcrs"));
 }

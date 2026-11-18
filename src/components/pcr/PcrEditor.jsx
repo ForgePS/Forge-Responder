@@ -10,13 +10,17 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertTriangle, Ambulance, ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, Clock, Download,
-  HeartPulse, Loader2, Lock, MapPin, Radio, RefreshCw, ShieldCheck, Sparkles, Stethoscope, Syringe, TriangleAlert,
+  HeartPulse, Lightbulb, Loader2, Lock, MapPin, Radio, RefreshCw, ShieldCheck, Sparkles, Stethoscope, Syringe, TriangleAlert, User,
+  Wifi, WifiOff,
 } from "lucide-react";
 import { Field, ProgressRing, TextInput } from "../neris/NerisControls.jsx";
 import { PcrSectionCard } from "./PcrFields.jsx";
 import PcrNarrativePanel from "./PcrNarrativePanel.jsx";
 import PcrReview, { formatWhen, friendlyError } from "./PcrReview.jsx";
 import { PcrCadImportDialog } from "./PcrCadDialogs.jsx";
+import PcrVitalsTrend from "./PcrVitalsTrend.jsx";
+import { documentationSuggestions, openSuggestions } from "../../lib/pcr/pcrQuality.js";
+import { qaStatus, reportStatus, submissionStatus } from "../../lib/pcr/pcrLifecycle.js";
 import { fieldPath, getValue, postCheck, sectionForPath, sectionLayout, sectionProgress, setLeaf } from "../../lib/nemsis/pcrModel.js";
 import { pcrMergePaths } from "../../field/fieldPcr.js";
 import { customizeLayout, visibleSections, withDepartmentIssues } from "../../lib/pcr/pcrForm.js";
@@ -24,13 +28,14 @@ import { applyCadChanges, cadLink, cadRefresh } from "../../lib/pcr/pcrCad.js";
 import { requestPcrNarrative, savePcr } from "../../lib/pcrService.js";
 
 export const STEPS = [
-  { id: "call", label: "Call", description: "Dispatch, response, crew and times", icon: Radio, sections: ["dispatch", "response", "crew", "times"] },
-  { id: "scene", label: "Scene and patient", description: "Where, who and their history", icon: MapPin, sections: ["scene", "patient", "history"] },
-  { id: "assessment", label: "Assessment", description: "Complaint, impression, vitals, exam", icon: Stethoscope, sections: ["situation", "injury", "arrest", "vitals", "exam", "labs"] },
+  { id: "call", label: "Incident", description: "Dispatch, response, crew, times and scene", icon: Radio, sections: ["dispatch", "response", "crew", "times", "scene"] },
+  { id: "patient", label: "Patient", description: "Who the patient is and their history", icon: User, sections: ["patient", "history"] },
+  { id: "assessment", label: "Assessment", description: "Complaint, impression, injury, arrest, exam", icon: Stethoscope, sections: ["situation", "injury", "arrest", "exam", "labs"] },
+  { id: "vitals", label: "Vitals", description: "Every set of vital signs, with the trend", icon: HeartPulse, sections: ["vitals"] },
   { id: "treatment", label: "Treatment", description: "Protocols, medications, procedures", icon: Syringe, sections: ["protocols", "medications", "procedures", "airway", "devices"] },
-  { id: "disposition", label: "Disposition", description: "Transport, destination, billing", icon: Ambulance, sections: ["disposition", "payment", "outcome"] },
+  { id: "disposition", label: "Transport", description: "Disposition, destination, billing", icon: Ambulance, sections: ["disposition", "payment", "outcome"] },
   { id: "narrative", label: "Narrative", description: "Written with the AI narrator", icon: Sparkles, sections: ["narrative"] },
-  { id: "review", label: "Sign and post", description: "Signatures, checks, posting", icon: ClipboardCheck, sections: ["other", "record"] },
+  { id: "review", label: "Review and sign", description: "Signatures, checks, posting", icon: ClipboardCheck, sections: ["other", "record"] },
 ];
 
 const SECTION_ICONS = { vitals: HeartPulse, times: Clock, scene: MapPin, situation: Activity, medications: Syringe, procedures: Syringe, disposition: Ambulance, dispatch: Radio };
@@ -40,7 +45,7 @@ const CAD_POLL_MS = 60_000;
 export const stepForSection = (sectionId) => STEPS.find((s) => s.sections.includes(sectionId))?.id || "review";
 
 export default function PcrEditor({
-  schema, form, settings, initial, departmentId, uid, actor, canEdit, canUnlock, canExport, online,
+  schema, form, settings, initial, departmentId, uid, actor, canEdit, canUnlock, canExport, canReview = false, online,
   cadRecords, cadLoading, onReloadCad, onSaved, onClose, onMessage, onError,
 }) {
   const [report, setReport] = useState(initial);
@@ -52,7 +57,7 @@ export default function PcrEditor({
   const savedRevision = useRef(0);
   const saving = useRef(null);
 
-  const mergePaths = useMemo(() => [...pcrMergePaths(schema), "cad", "aiNarrative"], [schema]);
+  const mergePaths = useMemo(() => [...pcrMergePaths(schema), "cad", "aiNarrative", "qualityDismissed"], [schema]);
   const posted = report.status === "posted";
   const onCrew = (report.crewUids || []).includes(uid);
   const editable = !posted && ((canEdit && onCrew) || canUnlock);
@@ -141,6 +146,9 @@ export default function PcrEditor({
     }
     return result;
   }, [schema, deferredNemsis, form, report.aiNarrative]);
+  const allSuggestions = useMemo(() => documentationSuggestions(schema, deferredNemsis, form.vitalRanges ? { ranges: form.vitalRanges } : {}), [schema, deferredNemsis, form.vitalRanges]);
+  const suggestions = useMemo(() => openSuggestions(allSuggestions, report.qualityDismissed), [allSuggestions, report.qualityDismissed]);
+  const dismissSuggestion = (id) => update((current) => ({ qualityDismissed: [...new Set([...(current.qualityDismissed || []), id])] }));
   const progress = useMemo(() => sectionProgress(schema, deferredNemsis), [schema, deferredNemsis]);
   const sections = useMemo(() => visibleSections(schema, form), [schema, form]);
   const shownIds = useMemo(() => new Set(sections.map((s) => s.id)), [sections]);
@@ -217,11 +225,14 @@ export default function PcrEditor({
             {report.unit ? <span><Ambulance size={13} /> {report.unit}</span> : null}
             {report.incidentNumber ? <span>Incident {report.incidentNumber}</span> : null}
             {report.cad?.description ? <span><Radio size={13} /> {report.cad.description}</span> : null}
+            {settings?.agencyName ? <span>{settings.agencyName}</span> : null}
+            {report.createdByName ? <span><User size={13} /> {report.createdByName}</span> : null}
+            {report.createdAt ? <span>{formatWhen(report.createdAt)}</span> : null}
             <span>NEMSIS 3.5.1</span>
           </p>
         </div>
         <div className="nr-editor-status">
-          {posted ? <span className="nr-pill"><Lock size={12} /> Posted</span> : <span className="nr-status nr-status-draft">Draft</span>}
+          <StatusChips report={report} check={check} online={online} />
           <SaveState save={save} readOnly={readOnly} onRetry={() => doSave()} />
           {!readOnly ? (
             <button type="button" className={`nr-btn ${check.ok ? "nr-btn-primary" : "nr-btn-soft"}`} onClick={post} disabled={save.state === "saving" || save.state === "conflict"} title={check.ok ? "Post the report" : "Go to the first thing left to do"}>
@@ -337,9 +348,12 @@ export default function PcrEditor({
               requestDraft={(input) => requestPcrNarrative({ departmentId, pcrId: report.id, ...input })}
             />
           ) : (
-            stepSections.map((section) => (
+            <>
+              {step.id === "vitals" ? <PcrVitalsTrend schema={schema} pcr={report.nemsis || {}} /> : null}
+              {stepSections.map((section) => (
               <PcrSectionCard key={section.id} section={section} layout={layouts[section.id]} ctx={ctx} icon={SECTION_ICONS[section.id]} blocking={blockingBySection[section.id] || 0} />
-            ))
+              ))}
+            </>
           )}
 
           {step.id === "review" ? (
@@ -352,6 +366,11 @@ export default function PcrEditor({
               actor={actor}
               canUnlock={canUnlock}
               canExport={canExport}
+              canReview={canReview}
+              uid={uid}
+              suggestions={suggestions}
+              dismissedCount={allSuggestions.length - suggestions.length}
+              onDismiss={editable ? dismissSuggestion : null}
               onGoTo={goToSection}
               onMessage={onMessage}
               onError={onError}
@@ -396,6 +415,23 @@ export default function PcrEditor({
               </ul>
             ) : !posted ? <p className="nr-rail-done"><CheckCircle2 size={16} /> Everything required is charted.</p> : null}
           </div>
+          {suggestions.length ? (
+            <div className="nr-rail-card">
+              <strong className="pcr-rail-title"><Lightbulb size={15} /> {suggestions.length} suggestion{suggestions.length === 1 ? "" : "s"}</strong>
+              <small className="nr-muted">Optional. They don&apos;t block posting.</small>
+              <ul className="nr-rail-list">
+                {suggestions.slice(0, 5).map((s) => (
+                  <li key={s.id}>
+                    <button type="button" onClick={() => goToSection(sectionForPath(s.path))}>
+                      <span className="nr-dot nr-dot-warn" />
+                      {s.message}
+                    </button>
+                  </li>
+                ))}
+                {suggestions.length > 5 ? <li className="nr-rail-more">+{suggestions.length - 5} more on Review and sign</li> : null}
+              </ul>
+            </div>
+          ) : null}
         </aside>
       </div>
 
@@ -411,6 +447,25 @@ export default function PcrEditor({
         />
       ) : null}
     </div>
+  );
+}
+
+/** Report, QA and submission status, kept apart (src/lib/pcr/pcrLifecycle.js), plus online/offline. */
+function StatusChips({ report, check, online }) {
+  const r = reportStatus(report);
+  const qa = qaStatus(report);
+  const sub = submissionStatus(report);
+  const tone = (t) => (t === "good" ? "nr-status-done" : t === "bad" ? "nr-status-returned" : t === "warn" ? "nr-status-review" : "nr-status-draft");
+  return (
+    <span className="pcr-status-chips">
+      <span className={`nr-status ${tone(r.tone)}`} title={r.detail}>{r.id === "posted" || r.id === "amended" ? <Lock size={11} /> : null} {r.label}</span>
+      {report.status !== "posted" ? (
+        <span className={`nr-status ${check.ok ? "nr-status-done" : "nr-status-review"}`}>{check.ok ? "Checks pass" : `${check.blocking.length} to fix`}</span>
+      ) : null}
+      {qa.id !== "none" ? <span className={`nr-status ${tone(qa.tone)}`}>{qa.label}</span> : null}
+      <span className="nr-status nr-status-draft" title={sub.detail}>{sub.label}</span>
+      <span className={`nr-pill ${online ? "nr-pill-ok" : "nr-pill-warn"}`}>{online ? <Wifi size={12} /> : <WifiOff size={12} />} {online ? "Online" : "Offline"}</span>
+    </span>
   );
 }
 

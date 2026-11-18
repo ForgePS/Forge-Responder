@@ -20,7 +20,7 @@ const SCENE_ALLOW = new Set(["eScene.01", "eScene.06", "eScene.07", "eScene.08",
 /** Free-text fields allowed through (codes or short clinical text). */
 const TEXT_ALLOW = new Set(["eSituation.04", "eMedications.03", "eProcedures.03"]);
 /** Names for common EMS medication (RxNorm) and procedure (SNOMED CT) codes, so drafts read as words. */
-const CODE_NAMES = {
+export const CODE_NAMES = {
   "eMedications.03": {
     161: "acetaminophen", 296: "adenosine", 435: "albuterol", 703: "amiodarone", 1191: "aspirin", 1223: "atropine",
     1901: "calcium chloride", 3322: "diazepam", 3498: "diphenhydramine", 3992: "epinephrine", 4337: "fentanyl",

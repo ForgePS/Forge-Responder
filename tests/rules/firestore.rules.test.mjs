@@ -1131,6 +1131,43 @@ describe("patient care reports (PHI)", () => {
     await assertFails(deleteDoc(doc(ffA().firestore(), pcrPath())));
   });
 
+  it("QA reviewers read every report and change only its QA status, never the chart", async () => {
+    await seed({ report: draft(["ff-a"], { status: "posted" }), grants: { "ff-a": { editPcrs: true }, "editor-a": { reviewPcrs: true } } });
+    await assertSucceeds(getDoc(doc(editorA().firestore(), pcrPath())));
+    await assertSucceeds(getDocs(collection(editorA().firestore(), `departments/${A}/pcrs`)));
+    await assertSucceeds(updateDoc(doc(editorA().firestore(), pcrPath()), { qa: { status: "returned", note: "Add 2nd vitals" }, updatedAt: "t" }));
+    await assertFails(updateDoc(doc(editorA().firestore(), pcrPath()), { "nemsis.eNarrative": { "eNarrative.01": "Changed" } }));
+    await assertFails(updateDoc(doc(editorA().firestore(), pcrPath()), { status: "draft" }));
+  });
+
+  it("saved versions are kept: created by whoever unlocks, never changed or deleted", async () => {
+    await seed({ report: draft(["ff-a"], { status: "posted" }), grants: { "ff-a": { editPcrs: true }, "editor-a": { unlockPcrs: true }, "member-a": { reviewPcrs: true } } });
+    const rev = (uid) => ({ kind: "posted-version", version: 1, nemsis: {}, createdByUid: uid });
+    const revPath = `${pcrPath()}/revisions/posted-1`;
+    await assertSucceeds(setDoc(doc(editorA().firestore(), revPath), rev("editor-a")));
+    await assertFails(setDoc(doc(editorA().firestore(), `${pcrPath()}/revisions/posted-2`), rev("ff-a")), "must be the writer's own uid");
+    await assertFails(setDoc(doc(memberA().firestore(), `${pcrPath()}/revisions/posted-3`), rev("member-a")), "reviewers can't write versions");
+    await assertFails(updateDoc(doc(editorA().firestore(), revPath), { nemsis: { changed: true } }));
+    await assertFails(deleteDoc(doc(editorA().firestore(), revPath)));
+    await assertSucceeds(getDoc(doc(ffA().firestore(), revPath)));
+    await assertSucceeds(getDoc(doc(memberA().firestore(), revPath)));
+    await assertFails(getDoc(doc(memberB().firestore(), revPath)));
+  });
+
+  it("QA notes are append-only; the crew can only reply", async () => {
+    await seed({ report: draft(["ff-a"], { status: "posted" }), grants: { "ff-a": { editPcrs: true }, "editor-a": { reviewPcrs: true } } });
+    const note = (uid, action) => ({ action, note: "x", createdByUid: uid, createdAt: "t" });
+    const qa = (id) => `${pcrPath()}/qaReviews/${id}`;
+    await assertSucceeds(setDoc(doc(editorA().firestore(), qa("1")), note("editor-a", "returned")));
+    await assertSucceeds(setDoc(doc(ffA().firestore(), qa("2")), note("ff-a", "reply")));
+    await assertFails(setDoc(doc(ffA().firestore(), qa("3")), note("ff-a", "reviewed")), "the crew can't review its own report");
+    await assertFails(setDoc(doc(memberA().firestore(), qa("4")), note("member-a", "reply")), "not on the crew");
+    await assertFails(updateDoc(doc(editorA().firestore(), qa("1")), { note: "changed" }));
+    await assertFails(deleteDoc(doc(editorA().firestore(), qa("1"))));
+    await assertSucceeds(getDoc(doc(ffA().firestore(), qa("1"))));
+    await assertFails(getDoc(doc(memberA().firestore(), qa("1"))));
+  });
+
   it("EMS agency settings (settings/ems) are changed by admins only", async () => {
     const settings = { stateAgencyId: "351-T0001", agencyNumber: "T0001", agencyName: "Test EMS", state: "37" };
     await seed({ grants: { "editor-a": { viewAllPcrs: true, unlockPcrs: true, exportPcrs: true } } });

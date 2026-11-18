@@ -17,6 +17,7 @@ import {
   canViewPersonnelPrivateInfo,
   canEditPcrs,
   canViewAllPcrs,
+  canReviewPcrs,
   filterNavGroups,
   hasPermission
 } from "./lib/permissions.js";
@@ -1800,6 +1801,7 @@ function AppShell() {
         canEdit={canEditPcrs(permissions, isCreator)}
         canUnlock={isCreator || hasPermission(permissions, "unlockPcrs")}
         canExport={isCreator || hasPermission(permissions, "exportPcrs")}
+        canReview={canReviewPcrs(permissions, isCreator)}
         canManageSettings={isCreator || isAdminMembershipRoles(membership)}
       />
     ) : <AccessDeniedModule name={current} />

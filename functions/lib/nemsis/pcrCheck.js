@@ -9,7 +9,7 @@ const core = require("./generated/nemsisCore.cjs");
 const { runNemsisSchematron } = require("./schematron");
 
 /** Permissions that read every report (firestore.rules pcrReadAllKeys). */
-const PCR_READ_ALL_KEYS = ["viewAllPcrs", "unlockPcrs", "exportPcrs"];
+const PCR_READ_ALL_KEYS = ["viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"];
 
 /** Same access as firestore.rules match /pcrs: the crew on it, read-all permission holders, admins, creators. */
 function canReadPcr(pcr, { uid, permissions = {}, isAdmin = false, isCreator = false }) {
@@ -92,4 +92,27 @@ function checkStamp(result, { at, byUid = "", trigger, postedAt } = {}) {
   };
 }
 
-module.exports = { runPcrCheck, canReadPcr, agencyFromSettings, shouldCheckOnPost, checkStamp, PCR_READ_ALL_KEYS };
+/**
+ * The amendment record written when an unlocked report is posted again: what changed (element paths, old and new
+ * stored values), why (the unlock reason), and who unlocked and re-posted it. Clinical values are kept because the
+ * amendment history is part of the record; it is readable only by those who can read the report.
+ */
+function amendmentRevision({ count, open, changes, after, at }) {
+  return {
+    kind: "amendment",
+    version: count,
+    fromRevision: String(open.revisionId || ""),
+    reason: String(open.reason || ""),
+    unlockedAt: String(open.openedAt || ""),
+    unlockedByName: String(open.openedByName || ""),
+    amendedAt: String(after.postedAt || at),
+    amendedByUid: String(after.postedByUid || ""),
+    amendedByName: String(after.postedByName || ""),
+    changes: (changes || []).slice(0, 2000),
+    changeCount: (changes || []).length,
+    createdAt: at,
+    createdByUid: "system",
+  };
+}
+
+module.exports = { amendmentRevision, runPcrCheck, canReadPcr, agencyFromSettings, shouldCheckOnPost, checkStamp, PCR_READ_ALL_KEYS };

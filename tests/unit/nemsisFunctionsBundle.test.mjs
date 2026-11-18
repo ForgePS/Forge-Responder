@@ -56,7 +56,7 @@ test("server access to a report matches the Firestore rules", () => {
   assert.equal(canReadPcr(pcr, { uid: "crew-1" }), true);
   assert.equal(canReadPcr(pcr, { uid: "other" }), false);
   assert.equal(canReadPcr(pcr, { uid: "other", permissions: { editPcrs: true } }), false, "charting alone doesn't read others' reports");
-  for (const key of ["viewAllPcrs", "unlockPcrs", "exportPcrs"]) {
+  for (const key of ["viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"]) {
     assert.equal(canReadPcr(pcr, { uid: "other", permissions: { [key]: true } }), true, key);
   }
   assert.equal(canReadPcr(pcr, { uid: "other", isAdmin: true }), true);

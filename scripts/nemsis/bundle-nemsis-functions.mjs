@@ -6,7 +6,7 @@
  *
  * Output: functions/lib/nemsis/generated/nemsisCore.cjs, with a header holding a hash of every source file.
  * tests/unit/nemsisFunctionsBundle.test.mjs fails when the sources change and the bundle wasn't rebuilt.
- * Re-run after changing anything in src/lib/nemsis/ or src/data/nemsis/.
+ * Re-run after changing anything in src/lib/nemsis/, src/data/nemsis/ or src/lib/pcr/pcrLifecycle.js.
  */
 import fs from "node:fs/promises";
 import path from "node:path";

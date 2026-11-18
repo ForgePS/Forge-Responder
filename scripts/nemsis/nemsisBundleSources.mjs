@@ -8,6 +8,8 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 export const ENTRY = path.join(ROOT, "scripts", "nemsis", "functions-entry.js");
 export const OUT_FILE = path.join(ROOT, "functions", "lib", "nemsis", "generated", "nemsisCore.cjs");
 const SOURCE_DIRS = [path.join(ROOT, "src", "lib", "nemsis"), path.join(ROOT, "src", "data", "nemsis", "3.5.1")];
+/** Single files bundled from outside those folders. */
+const SOURCE_FILES = [path.join(ROOT, "src", "lib", "pcr", "pcrLifecycle.js")];
 
 async function listFiles(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -17,7 +19,7 @@ async function listFiles(dir) {
 
 /** sha256 over the entry and every source file (path + contents, line endings normalised). */
 export async function nemsisBundleSourceHash() {
-  const files = [ENTRY, ...(await Promise.all(SOURCE_DIRS.map(listFiles))).flat()]
+  const files = [ENTRY, ...SOURCE_FILES, ...(await Promise.all(SOURCE_DIRS.map(listFiles))).flat()]
     .filter((f) => /\.(js|json)$/.test(f))
     .sort();
   const hash = crypto.createHash("sha256");

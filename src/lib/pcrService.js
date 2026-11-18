@@ -2,10 +2,10 @@
  * RMS reads and actions on patient care reports (departments/{id}/pcrs) and EMS agency settings.
  *
  * PHI: reports hold patient data. Nothing here logs report contents; audit entries name the report number only.
- * Access is enforced by firestore.rules (crew on the report, or viewAllPcrs / unlockPcrs / exportPcrs) and, for
+ * Access is enforced by firestore.rules (crew on the report, or viewAllPcrs / unlockPcrs / exportPcrs / reviewPcrs) and, for
  * the NEMSIS check, by the checkPcr callable.
  */
-import { doc, getDoc, runTransaction, setDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, getDocs, runTransaction, setDoc, updateDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { getFirebaseFunctions, getFirestoreDb } from "./firebaseClient.js";
 import { getRecord, listRecentRecords, updateRecord } from "./firestoreService.js";
@@ -58,19 +58,105 @@ export async function getPcr(departmentId, pcrId, actor = {}) {
   return pcr;
 }
 
-/** Re-open a posted report for changes (unlockPcrs). */
+/**
+ * Re-open a posted report for an amendment (unlockPcrs). The posted version is kept first as an immutable revision
+ * (pcrs/{id}/revisions/posted-{n}); when the report is posted again the server records what changed against it.
+ */
 export async function unlockPcr(departmentId, pcr, actor = {}, reason = "") {
+  const db = getFirestoreDb();
+  const ref = doc(db, "departments", departmentId, PCR_COLLECTION, pcr.id);
   const now = new Date().toISOString();
-  const patch = { status: "draft", unlockedAt: now, unlockedBy: actor.actorName || actor.actorUid || "", unlockReason: reason, id: pcr.id };
-  await updateRecord(departmentId, PCR_COLLECTION, pcr.id, patch);
+  const by = actor.actorName || actor.actorUid || "";
+  const updated = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const current = snap.exists() ? snap.data() : null;
+    if (!current || current.status !== "posted") {
+      throw Object.assign(new Error("This report isn't posted, so there's nothing to unlock."), { code: "failed-precondition" });
+    }
+    const version = Number(current.versions || 0) + 1;
+    const revisionId = `posted-${version}`;
+    tx.set(doc(ref, "revisions", revisionId), stripUndefined({
+      kind: "posted-version",
+      version,
+      number: current.number || "",
+      nemsis: current.nemsis || {},
+      postedAt: current.postedAt || "",
+      postedByName: current.postedByName || "",
+      postedHash: current.postedHash || "",
+      unlockReason: reason,
+      createdAt: now,
+      createdByUid: actor.actorUid || "",
+      createdByName: actor.actorName || "",
+    }));
+    const patch = {
+      id: pcr.id,
+      status: "draft",
+      versions: version,
+      unlockedAt: now,
+      unlockedBy: by,
+      unlockReason: reason,
+      amendment: { open: true, reason, revisionId, openedAt: now, openedByName: by },
+      updatedAt: now,
+    };
+    tx.update(ref, patch);
+    return { ...current, ...patch };
+  });
   await writeAuditLog(departmentId, {
     ...actor,
     action: "pcr.unlock",
     module: AUDIT_MODULE,
     recordId: pcr.id,
-    summary: `Unlocked patient care report ${pcr.number || pcr.id}${reason ? `: ${reason}` : ""}`,
+    summary: `Unlocked patient care report ${pcr.number || pcr.id} for amendment${reason ? `: ${reason}` : ""}`,
   });
-  return { ...pcr, ...patch };
+  return updated;
+}
+
+/** Saved versions and amendments of a report, oldest first. */
+export async function listPcrRevisions(departmentId, pcrId) {
+  const db = getFirestoreDb();
+  const snap = await getDocs(collection(db, "departments", departmentId, PCR_COLLECTION, pcrId, "revisions"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+}
+
+// ---------------------------------------------------------------------------
+// QA review (reviewPcrs). Reviewers comment, return a report to the crew, or mark it reviewed. They never change
+// the chart: the rules let them write only report.qa and the append-only pcrs/{id}/qaReviews history.
+// ---------------------------------------------------------------------------
+
+export async function listQaReviews(departmentId, pcrId) {
+  const db = getFirestoreDb();
+  const snap = await getDocs(collection(db, "departments", departmentId, PCR_COLLECTION, pcrId, "qaReviews"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+}
+
+/**
+ * @param {"comment"|"returned"|"reviewed"|"reply"} action reply = the crew answering a reviewer
+ */
+export async function addQaReview(departmentId, pcr, { action, note = "", checklist = null }, actor = {}) {
+  const db = getFirestoreDb();
+  const now = new Date().toISOString();
+  const entry = stripUndefined({
+    action,
+    note: String(note || "").slice(0, 4000),
+    checklist: checklist || undefined,
+    createdAt: now,
+    createdByUid: actor.actorUid || "",
+    createdByName: actor.actorName || "",
+  });
+  await addDoc(collection(db, "departments", departmentId, PCR_COLLECTION, pcr.id, "qaReviews"), entry);
+  let qa = pcr.qa || null;
+  if (action === "returned" || action === "reviewed") {
+    qa = { status: action, note: entry.note, at: now, byName: entry.createdByName, byUid: entry.createdByUid };
+    await updateDoc(doc(db, "departments", departmentId, PCR_COLLECTION, pcr.id), { qa, updatedAt: now });
+  }
+  await writeAuditLog(departmentId, {
+    ...actor,
+    action: `pcr.qa-${action}`,
+    module: AUDIT_MODULE,
+    recordId: pcr.id,
+    summary: `QA ${action === "reply" ? "reply on" : action} patient care report ${pcr.number || pcr.id}`,
+  });
+  return { entry, qa };
 }
 
 export async function recordPcrExport(departmentId, pcr, actor = {}) {

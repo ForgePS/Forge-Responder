@@ -28,8 +28,8 @@ const ACTIVE911_LIST = "hlfd-rms-active911-alerts";
 
 // Demo-only grants: production roles keep these off until a department chooses who sees patient data.
 const ROLE_GRANTS = {
-  fireChief: ["editPcrs", "viewAllPcrs", "unlockPcrs", "exportPcrs"],
-  battalionChief: ["editPcrs", "viewAllPcrs", "unlockPcrs", "exportPcrs"],
+  fireChief: ["editPcrs", "viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"],
+  battalionChief: ["editPcrs", "viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"],
   companyOfficer: ["editPcrs", "viewAllPcrs"],
   firefighter: ["editPcrs"],
 };

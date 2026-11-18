@@ -3,7 +3,8 @@
  *
  *   - list: crews see the reports they were on; supervisors (viewAllPcrs / unlockPcrs / exportPcrs) see every report
  *   - start a report from a CAD call (Active911, CAD records) or blank, and chart it on the desktop (PcrEditor)
- *   - review: NEMSIS checks, export, print, unlock (PcrReview)
+ *   - review: NEMSIS checks, documentation suggestions, export, print, handoff, unlock, QA and history (PcrReview)
+ *   - supervisors: queues (overdue, awaiting QA, returned) and EMS analytics (totals only, small counts hidden)
  *   - admins: EMS agency settings and the department's form settings (PcrFormSettings)
  *
  * PHI: every report holds patient data. Opening, unlocking, printing and exporting a report is written to the audit
@@ -11,13 +12,15 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Ambulance, ChevronRight, CirclePlus, ClipboardList, Loader2, RefreshCw, Search, Settings2, SlidersHorizontal, Sparkles, Wifi, WifiOff, X,
+  Ambulance, BarChart3, ChevronRight, CirclePlus, ClipboardList, Loader2, RefreshCw, Search, Settings2, SlidersHorizontal, Sparkles, Wifi, WifiOff, X,
 } from "lucide-react";
 import { version as APP_VERSION } from "../../package.json";
 import { ProgressRing } from "../components/neris/NerisControls.jsx";
 import PcrEditor from "../components/pcr/PcrEditor.jsx";
 import PcrFormSettings from "../components/pcr/PcrFormSettings.jsx";
 import { PcrStartDialog } from "../components/pcr/PcrCadDialogs.jsx";
+import PcrAnalytics from "../components/pcr/PcrAnalytics.jsx";
+import { qaStatus, reportStatus } from "../lib/pcr/pcrLifecycle.js";
 import { formatWhen, friendlyError, needsReview } from "../components/pcr/PcrReview.jsx";
 import {
   createPcr, getPcr, listPcrs, loadCadRecords, loadEmsSettings, loadPcrForm, rmsPcrNumber, saveEmsSettings, savePcrForm,
@@ -61,20 +64,30 @@ function useOnline() {
 const GROUPS = [
   { id: "all", label: "All" },
   { id: "draft", label: "Drafts" },
-  { id: "review", label: "Needs review" },
+  { id: "overdue", label: "Overdue" },
+  { id: "review", label: "NEMSIS errors" },
+  { id: "qa", label: "Awaiting QA", supervisors: true },
+  { id: "returned", label: "Returned" },
   { id: "posted", label: "Posted" },
 ];
-const inGroup = (report, group) => group === "all"
-  || (group === "review" ? needsReview(report) : group === "posted" ? report.status === "posted" && !needsReview(report) : report.status === group);
+function inGroup(report, group) {
+  if (group === "all") return true;
+  if (group === "review") return needsReview(report);
+  if (group === "posted") return report.status === "posted" && !needsReview(report);
+  if (group === "overdue") return reportStatus(report).id === "overdue";
+  if (group === "qa") return report.status === "posted" && qaStatus(report).id === "none";
+  if (group === "returned") return qaStatus(report).id === "returned";
+  return report.status === group;
+}
 
+const TONES = { good: "done", bad: "returned", warn: "review", muted: "draft" };
 function statusOf(report) {
-  if (needsReview(report)) return { tone: "returned", label: "Needs review" };
-  if (report.status === "draft" && report.unlockedAt) return { tone: "review", label: "Unlocked" };
-  return report.status === "posted" ? { tone: "done", label: "Posted" } : { tone: "draft", label: "Draft" };
+  const r = reportStatus(report);
+  return { tone: TONES[r.tone] || "draft", label: r.label };
 }
 
 export default function PatientCareReportsPage({
-  departmentId, uid, actor, query = "", canViewAll = false, canEdit = false, canUnlock = false, canExport = false, canManageSettings = false,
+  departmentId, uid, actor, query = "", canViewAll = false, canEdit = false, canUnlock = false, canExport = false, canReview = false, canManageSettings = false,
 }) {
   const { schema, error: schemaError } = useNemsisSchema();
   const online = useOnline();
@@ -161,6 +174,7 @@ export default function PatientCareReportsPage({
     .filter(({ report }) => inGroup(report, group))
     .filter(({ report, summary }) => !needle || [report.number, report.unit, report.incidentNumber, summary.patient, summary.complaint, report.cad?.description]
       .join(" ").toLowerCase().includes(needle));
+  const groups = GROUPS.filter((g) => !g.supervisors || canViewAll || canReview);
   const counts = Object.fromEntries(GROUPS.map((g) => [g.id, reports.filter((r) => inGroup(r, g.id)).length]));
   const missingAgency = missingEmsSettings(settings);
 
@@ -250,6 +264,7 @@ export default function PatientCareReportsPage({
           canEdit={canEdit}
           canUnlock={canUnlock}
           canExport={canExport}
+          canReview={canReview}
           online={online}
           cadRecords={cad.records}
           cadLoading={cad.loading}
@@ -259,6 +274,14 @@ export default function PatientCareReportsPage({
           onError={fail}
           onClose={() => { setView("list"); setSelected(null); setMessage(""); }}
         />
+      </div>
+    );
+  }
+
+  if (view === "analytics" && canViewAll) {
+    return (
+      <div className="module-page nr-page pcr-page">
+        <PcrAnalytics schema={schema} reports={reports} onClose={() => setView("list")} />
       </div>
     );
   }
@@ -292,6 +315,7 @@ export default function PatientCareReportsPage({
         </div>
         <div className="nr-hero-actions">
           <span className={`nr-pill ${online ? "nr-pill-ok" : "nr-pill-warn"}`}>{online ? <Wifi size={12} /> : <WifiOff size={12} />} {online ? "Online" : "Offline"}</span>
+          {canViewAll ? <button type="button" className="nr-btn nr-btn-ghost" onClick={() => setView("analytics")}><BarChart3 size={16} /> Analytics</button> : null}
           {canManageSettings ? (
             <>
               <button type="button" className="nr-btn nr-btn-ghost" onClick={() => setView("form")}><SlidersHorizontal size={16} /> Form settings</button>
@@ -316,7 +340,9 @@ export default function PatientCareReportsPage({
       <section className="nr-stats">
         {[
           ["draft", "Drafts", "nr-stat-draft"],
+          ["overdue", "Overdue drafts", "nr-stat-review"],
           ["review", "Posted with NEMSIS errors", "nr-stat-review"],
+          ...(canViewAll || canReview ? [["qa", "Awaiting QA", "nr-stat-draft"]] : []),
           ["posted", "Posted", "nr-stat-submitted"],
         ].map(([id, label, tone]) => (
           <button key={id} type="button" className={`nr-stat ${tone}${group === id ? " active" : ""}`} onClick={() => setGroup(group === id ? "all" : id)}>
@@ -333,7 +359,7 @@ export default function PatientCareReportsPage({
       <section className="nr-list-card">
         <div className="nr-toolbar">
           <div className="nr-segmented nr-small" role="tablist">
-            {GROUPS.map((g) => (
+            {groups.map((g) => (
               <button key={g.id} type="button" role="tab" aria-selected={group === g.id} className={group === g.id ? "active" : ""} onClick={() => setGroup(g.id)}>
                 {g.label} <span className="nr-count-badge">{counts[g.id]}</span>
               </button>
@@ -366,6 +392,7 @@ export default function PatientCareReportsPage({
                     </span>
                     <span className="nr-report-side">
                       {report.aiNarrative?.generated && !report.aiNarrative?.reviewedAt ? <span className="nr-pill nr-pill-warn nr-hide-sm"><Sparkles size={11} /> AI draft to review</span> : null}
+                      {qaStatus(report).id !== "none" ? <span className={`nr-status nr-status-${TONES[qaStatus(report).tone]} nr-hide-sm`}>{qaStatus(report).label}</span> : null}
                       <span className={`nr-status nr-status-${status.tone}`}>{status.label}</span>
                       <ProgressRing percent={percent} size={38} stroke={4} />
                       <ChevronRight size={18} className="nr-chevron" />

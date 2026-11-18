@@ -1248,6 +1248,31 @@ exports.checkPcr = onCall({ memory: "1GiB", timeoutSeconds: 120 }, async (reques
 
 // A report posted from FORGE FIELD gets the full server check (national + state Schematron) right away; the
 // result (counts only) is stamped on the report so supervisors see posted reports that need review.
+async function recordPosting(db, departmentId, pcrId, after) {
+  const ref = db.doc(`departments/${departmentId}/pcrs/${pcrId}`);
+  // Same value as the browser's contentHash (SHA-256 of the canonical JSON), with Node's crypto.
+  const postedHash = require("node:crypto").createHash("sha256").update(nemsisCore.canonicalJson(after.nemsis || {})).digest("hex");
+  const open = after.amendment?.open && after.amendment.revisionId ? after.amendment : null;
+  let changes = null;
+  if (open) {
+    const revision = await ref.collection("revisions").doc(String(open.revisionId)).get();
+    if (revision.exists) changes = nemsisCore.diffPcr(revision.data().nemsis || {}, after.nemsis || {});
+  }
+  await db.runTransaction(async (tx) => {
+    const current = (await tx.get(ref)).data() || {};
+    if (current.status !== "posted" || (current.postedAt || "") !== (after.postedAt || "")) return;
+    const patch = { postedHash };
+    if (open && current.amendment?.open) {
+      const count = Number(current.amendments || 0) + 1;
+      tx.set(ref.collection("revisions").doc(`amendment-${count}`), pcrCheck.amendmentRevision({
+        count, open, changes: changes || [], after: current, at: new Date().toISOString(),
+      }));
+      Object.assign(patch, { amendments: count, lastAmendedAt: current.postedAt || "", amendment: require("firebase-admin/firestore").FieldValue.delete() });
+    }
+    tx.set(ref, patch, { merge: true });
+  });
+}
+
 exports.checkPcrOnPost = onDocumentWritten(
   { document: "departments/{departmentId}/pcrs/{pcrId}", memory: "1GiB", timeoutSeconds: 120 },
   async (event) => {
@@ -1256,6 +1281,13 @@ exports.checkPcrOnPost = onDocumentWritten(
     if (!pcrCheck.shouldCheckOnPost(before, after)) return null;
     const { departmentId, pcrId } = event.params;
     const db = admin.firestore();
+    // Tamper check and amendments: every posting stores a hash of its content; a re-post after an unlock records
+    // what changed against the posted version kept when it was unlocked (pcrs/{id}/revisions, never edited).
+    try {
+      await recordPosting(db, departmentId, pcrId, after);
+    } catch (error) {
+      console.error("checkPcrOnPost amendment record failed", error?.code || error?.name || "", departmentId, pcrId);
+    }
     try {
       const settingsSnap = await db.doc(`departments/${departmentId}/settings/ems`).get();
       const result = await pcrCheck.runPcrCheck({ pcr: after, settings: settingsSnap.data() || {} });

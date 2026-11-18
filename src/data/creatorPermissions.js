@@ -111,6 +111,7 @@ export const CREATOR_PERMISSIONS = {
   viewAllPcrs: true,
   unlockPcrs: true,
   exportPcrs: true,
+  reviewPcrs: true,
   accessAdminRms: true,
   viewHeatZoneAnalytics: true,
   viewHeatZoneMarkers: true,
