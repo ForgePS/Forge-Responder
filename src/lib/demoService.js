@@ -10,6 +10,7 @@ import { refreshDemoPreventionRecords } from "./demoPrevention.js";
 import { refreshDemoPreventionExtras } from "./demoPreventionExtras.js";
 import { refreshDemoFleetRecords } from "./demoFleet.js";
 import { refreshDemoHydrantRecords } from "./demoHydrants.js";
+import { refreshDemoEms } from "./demoEms.js";
 import { sanitizeItemsForFirestore } from "./firestoreSanitize.js";
 import { DEMO_DEPARTMENT_ID, departmentListSegments } from "./tenantPaths.js";
 import { readTenantList, replaceTenantList } from "./tenantListStore.js";
@@ -97,7 +98,9 @@ export async function resetDemoData(user) {
   const db = getFirestoreDb();
   if (!db || !user?.uid) return false;
   await Promise.all([
-    bootstrapDemoLists(user.uid),
+    // EMS patient care reports go after the lists, which write the roles they add permissions to.
+    bootstrapDemoLists(user.uid).then(() => refreshDemoEms(user)
+      .catch((error) => console.warn("Demo EMS refresh skipped", error))),
     seedInternalEmailsForScope(DEMO_DEPARTMENT_ID, user),
     // Preplans and systems link to the buildings, so they go after the buildings are refreshed.
     refreshDemoPreventionRecords()
@@ -123,12 +126,6 @@ export async function ensureDemoAccess(user) {
     getDoc(profileRef).catch(() => null),
   ]);
 
-  // Reseeding takes several seconds, so only do it when the sample data is
-  // missing, out of date, or hasn't been reset for a while.
-  if (!demoSeedIsFresh(profileSnap?.exists() ? profileSnap.data() : null)) {
-    await resetDemoData(user);
-  }
-
   const now = new Date().toISOString();
   const payload = {
     uid: user.uid,
@@ -149,7 +146,16 @@ export async function ensureDemoAccess(user) {
     payload.createdAt = now;
   }
 
+  // Membership first: reseeding writes the roles, which only department admins may do, so on a
+  // fresh project (no demo membership yet) reseeding before this was denied and the demo never opened.
   await setDoc(userRef, payload, { merge: true });
+
+  // Reseeding takes several seconds, so only do it when the sample data is
+  // missing, out of date, or hasn't been reset for a while.
+  if (!demoSeedIsFresh(profileSnap?.exists() ? profileSnap.data() : null)) {
+    await resetDemoData(user);
+  }
+
   // Keep saved preferences (theme, My Dashboard quick links) on the loaded membership.
   const preferences = existing.exists() ? existing.data()?.preferences : undefined;
   return { id: user.uid, ...payload, ...(preferences ? { preferences } : {}) };
