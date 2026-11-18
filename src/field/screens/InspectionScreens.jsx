@@ -238,7 +238,7 @@ export function InspectionFormScreen({ params = {} }) {
                   <AnswerInput field={field} value={value} onChange={(next) => setAnswer(field.key, next)} disabled={readOnly} />
                   {errors[`a:${field.key}`] ? <div className="fa-error-text">{errors[`a:${field.key}`]}</div> : null}
                   {isFailAnswer(field, value) ? (() => {
-                    const remarks = failDetailFields(field).remarks;
+                    const remarks = failDetailFields(field, value).remarks;
                     return (
                       <div className="fa-fail-details" data-error={errors[`a:${remarks.key}`] ? "1" : undefined}>
                         <Field label={remarks.label} required error={errors[`a:${remarks.key}`]}>

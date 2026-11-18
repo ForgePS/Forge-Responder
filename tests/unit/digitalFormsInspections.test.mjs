@@ -101,6 +101,29 @@ describe("remarks and photos on No/Fail in an inspection", () => {
     assert.equal(validateInspectionForm(fixed, rules)[`a:${lanes}__remarks`], undefined);
   });
 
+  it("a dropdown answered No/Fail opens remarks too (forms often make Yes/No a dropdown)", () => {
+    const dropdown = { key: "access", label: "Fire Department access is unobstructed", type: "dropdown", options: ["Yes", "No", "N/A"] };
+    assert.ok(isFailAnswer(dropdown, "No"));
+    assert.ok(isFailAnswer({ ...dropdown, options: ["Satisfactory", "Unsatisfactory"] }, "Unsatisfactory"));
+    assert.ok(isFailAnswer({ ...dropdown, type: "single_select" }, "Non-Compliant"));
+    assert.ok(!isFailAnswer(dropdown, "Yes"));
+    assert.ok(!isFailAnswer(dropdown, "N/A"));
+    assert.ok(!isFailAnswer(dropdown, ""));
+    const tmpl = { sections: [{ fields: [dropdown] }] };
+    assert.deepEqual(findMissingFailRemarks(tmpl, { access: "No" }).map((m) => m.key), ["access__remarks"]);
+    assert.equal(failDetailFields(dropdown, "No").remarks.label, "Remarks for No");
+    assert.equal(failDetailFields({ ...dropdown, options: ["Pass", "Fail"] }, "Fail").remarks.label, "Remarks for Fail");
+  });
+
+  it("digital form submissions require remarks for a dropdown answered No", () => {
+    const form = schema.normalizeDefinition({ name: "Walkthrough", sections: [{ title: "A", fields: [
+      { label: "Exits clear", type: "dropdown", options: ["Yes", "No"] },
+    ] }] });
+    const field = form.sections[0].fields[0];
+    assert.ok(schema.isNegativeAnswer(field, "No"));
+    assert.ok(!schema.isNegativeAnswer(field, "Yes"));
+  });
+
   it("the extra inputs are a required remarks box and an optional photo field", () => {
     const extra = failDetailFields({ id: "f1", key: lanes, type: "yes_no", label: "Fire lanes clear" });
     assert.equal(extra.remarks.key, `${lanes}__remarks`);

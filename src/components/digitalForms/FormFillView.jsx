@@ -27,11 +27,11 @@ function PhotoThumb({ photo, onRemove }) {
  * Remarks (required) and photos (optional) for an answer of No or Fail.
  * Read-only when showing a saved submission.
  */
-function NegativeDetails({ field, detail = {}, editable, missing, departmentId, uid, allowPhotos = true, onChange }) {
+function NegativeDetails({ field, value, detail = {}, editable, missing, departmentId, uid, allowPhotos = true, onChange }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const photos = Array.isArray(detail.photos) ? detail.photos : [];
-  const answer = NEGATIVE_ANSWERS[field.type];
+  const answer = NEGATIVE_ANSWERS[field.type] || String(value || "No").trim();
 
   async function addPhotos(fileList) {
     const files = Array.from(fileList || []).slice(0, MAX_PHOTOS_PER_FIELD - photos.length);
@@ -160,6 +160,7 @@ export default function FormFillView({
                   {field.helpText ? <small className="occupancy-muted">{field.helpText}</small> : null}
                   {negative ? (
                     <NegativeDetails
+                      value={answers[field.key]}
                       field={field}
                       detail={details[field.key]}
                       editable={editable && Boolean(onDetailChange)}
