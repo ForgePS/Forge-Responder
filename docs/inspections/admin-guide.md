@@ -9,6 +9,17 @@ Prevention data lives under `departments/{departmentId}/…`.
 - Reports, offline & sync, automation & integrations
 - Import & hardening (CSV + readiness)
 
+## Default inspection form
+
+Every department starts with starter inspection types (Annual fire inspection, Complaint inspection, and others).
+A platform creator can pick the checklist those starter types use for every department: open Digital Forms → Manage
+in the department that has the form and choose **Make platform default** on a published form. Re-publishing that
+form shows **Update platform default to vN**.
+
+A department keeps the platform default until it changes the starter form itself: edits or publishes it in
+Configuration Studio, or uses one of its own forms for that type (Digital Forms → Use for inspections). Changed forms
+are never overwritten. Inspections already started keep the checklist they began with.
+
 ## Permissions
 
 Grant paired `view*` / `edit*` (or `manage*`) keys per area. Export the matrix from **Import & Hardening**.
