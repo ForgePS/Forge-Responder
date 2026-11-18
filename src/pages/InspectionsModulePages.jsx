@@ -53,6 +53,7 @@ import {
 } from "../lib/inspections/index.js";
 import { friendlyError } from "../lib/friendlyError.js";
 import { labelFromKey } from "../lib/labelFromKey.js";
+import { answersWithOccupancy } from "../lib/inspections/occupancyPrefill.js";
 
 // Stored lowercase ("normal"); shown capitalized.
 function formatPriority(value) {
@@ -212,8 +213,9 @@ function InspectionWorkspace({
   onViolationChanged,
   departmentId,
   actor,
+  occupancy = null,
 }) {
-  const [answers, setAnswers] = useState(record?.answers || {});
+  const [answers, setAnswers] = useState(() => answersWithOccupancy(record, occupancy));
   const [summary, setSummary] = useState(record?.summary || "");
   const [internalNotes, setInternalNotes] = useState(record?.internalNotes || "");
   const [result, setResult] = useState(record?.result || "");
@@ -230,7 +232,7 @@ function InspectionWorkspace({
   // Reset local edits only when a different inspection is opened. Refreshes of the same
   // record (a violation added, a photo uploaded) must not wipe unsaved answers.
   useEffect(() => {
-    setAnswers(record?.answers || {});
+    setAnswers(answersWithOccupancy(record, occupancy));
     setSummary(record?.summary || "");
     setInternalNotes(record?.internalNotes || "");
     setResult(record?.result || "");
@@ -884,6 +886,7 @@ function InspectionsShellPage({
         {activeRecord ? (
           <InspectionWorkspace
             record={activeRecord}
+            occupancy={occupancies.find((row) => row.id === activeRecord?.occupancyId) || null}
             canEdit={canEdit}
             canApprove={canApprove}
             canCreatePreplan={canCreatePreplan}

@@ -18,6 +18,7 @@ import {
   listTemplateVersions,
 } from "./inspectionConfigService.js";
 import { listOccupancyRecords } from "./occupancyService.js";
+import { occupancySnapshotFor, prefillAnswersFromOccupancy } from "./occupancyPrefill.js";
 import { INSPECTIONS_COLLECTION } from "./paths.js";
 
 const OPEN_STATUSES = new Set([
@@ -275,15 +276,7 @@ export async function createInspection(departmentId, input = {}, audit = {}) {
     occupancyId: occupancy.id,
     occupancyName: occupancy.name,
     address: occupancy.address || "",
-    occupancySnapshot: {
-      id: occupancy.id,
-      name: occupancy.name,
-      address: occupancy.address,
-      occupancyType: occupancy.occupancyType || occupancy.type,
-      hazard: occupancy.hazard || occupancy.riskLevel,
-      primaryContactName: occupancy.primaryContactName,
-      primaryContactPhone: occupancy.primaryContactPhone,
-    },
+    occupancySnapshot: occupancySnapshotFor(occupancy),
     status: input.scheduledStart ? "scheduled" : "draft",
     workflowStage: input.scheduledStart ? "scheduled" : "draft",
     priority: input.priority || "normal",
@@ -293,7 +286,7 @@ export async function createInspection(departmentId, input = {}, audit = {}) {
     scheduledStart: input.scheduledStart || "",
     scheduledEnd: input.scheduledEnd || "",
     dueAt: input.dueAt || input.scheduledStart || "",
-    answers: buildEmptyAnswers(templateSnapshot),
+    answers: prefillAnswersFromOccupancy(templateSnapshot, occupancy, buildEmptyAnswers(templateSnapshot), { inspectionType }).answers,
     feeTotal: Number(inspectionType.feeAmount) || 0,
     balanceDue: Number(inspectionType.feeAmount) || 0,
     createdAt: stamp,
