@@ -1,0 +1,49 @@
+{
+  "_about": "Synthetic test agency (DEMDataSet) with the NEMSIS 3.5.1 Mandatory elements filled.",
+  "timeStamp": "2026-11-15T08:00:00-06:00",
+  "report": {
+    "dAgency": {
+      "dAgency.01": "TEST-AGENCY-01",
+      "dAgency.02": "TEST001",
+      "dAgency.03": "Test Fire Department",
+      "dAgency.04": "28",
+      "dAgency.AgencyServiceGroup": [
+        {
+          "attrs": { "UUID": "0b6f3d2e-1c4a-4f8b-9a7e-2d3c4b5a6f70" },
+          "dAgency.05": "28",
+          "dAgency.06": ["28033"]
+        }
+      ],
+      "dAgency.09": "9920001",
+      "dAgency.11": "9917007",
+      "dAgency.12": "1016003",
+      "dAgency.13": "9912001",
+      "dAgency.14": "1018003"
+    },
+    "dConfiguration": {
+      "dConfiguration.ConfigurationGroup": [
+        {
+          "attrs": { "UUID": "1c7a4e3f-2d5b-4a9c-8b1f-3e4d5c6b7a81" },
+          "dConfiguration.01": "28",
+          "dConfiguration.ProcedureGroup": [
+            {
+              "attrs": { "UUID": "2d8b5f4a-3e6c-4b0d-9c2a-4f5e6d7c8b92" },
+              "dConfiguration.06": "9917007",
+              "dConfiguration.07": ["268400002"]
+            }
+          ],
+          "dConfiguration.MedicationGroup": [
+            {
+              "attrs": { "UUID": "3e9c6a5b-4f7d-4c1e-8d3b-5a6f7e8d9ca3" },
+              "dConfiguration.08": "9917007",
+              "dConfiguration.09": ["1191", "4917"]
+            }
+          ],
+          "dConfiguration.10": ["9914001"],
+          "dConfiguration.13": "1213003",
+          "dConfiguration.16": ["MEDIC 1"]
+        }
+      ]
+    }
+  }
+}

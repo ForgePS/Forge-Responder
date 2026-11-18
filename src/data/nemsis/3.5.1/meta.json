@@ -1,0 +1,44 @@
+{
+  "version": "3.5.1",
+  "source": "local:nemsis-dl",
+  "files": {
+    "xsdZip": "XSDs/NEMSIS_XSDs.zip",
+    "details": "DataDictionary/Ancillary/DEMEMS/Combined_ElementDetails_Full.txt",
+    "enumerations": "DataDictionary/Ancillary/DEMEMS/Combined_ElementEnumerations.txt",
+    "attributes": "DataDictionary/Ancillary/DEMEMS/Combined_ElementAttributes.txt",
+    "emsSchematron": "Schematron/rules/EMSDataSet.sch.xml",
+    "demSchematron": "Schematron/rules/DEMDataSet.sch.xml"
+  },
+  "namespace": "http://www.nemsis.org",
+  "notValues": {
+    "7701001": "NV.NotApplicable",
+    "7701003": "NV.NotRecorded",
+    "7701005": "NV.NotReporting",
+    "8801001": "PN.ContraindicationNoted",
+    "8801003": "PN.DeniedByOrder",
+    "8801005": "PN.ExamFindingNotPresent",
+    "8801007": "PN.MedicationAllergy",
+    "8801009": "PN.MedicationAlreadyTaken",
+    "8801013": "PN.NoKnownDrugAllergy",
+    "8801015": "PN.NoneReported",
+    "8801017": "PN.NotPerformedByEMS",
+    "8801019": "PN.Refused",
+    "8801021": "PN.Unresponsive",
+    "8801023": "PN.UnableToComplete",
+    "8801025": "PN.NotImmunized",
+    "8801027": "PN.OrderCriteriaNotMet",
+    "8801029": "PN.Approximate",
+    "8801031": "PN.SymptomNotPresent"
+  },
+  "counts": {
+    "EMSDataSet": {
+      "elements": 453,
+      "enumeratedElements": 205
+    },
+    "DEMDataSet": {
+      "elements": 157,
+      "enumeratedElements": 50
+    }
+  },
+  "generatedBy": "scripts/nemsis/sync-nemsis-schema.mjs"
+}
