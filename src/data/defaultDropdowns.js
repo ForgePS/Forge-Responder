@@ -95,6 +95,18 @@ export const defaultDropdowns = [
     ]
   },
   {
+    id: "trainingClasses",
+    label: "Training Classes",
+    module: "Training",
+    options: []
+  },
+  {
+    id: "trainingInstructors",
+    label: "Training Instructors (outside)",
+    module: "Training",
+    options: []
+  },
+  {
     id: "leaveTypes",
     label: "Leave Types",
     module: "Scheduling",

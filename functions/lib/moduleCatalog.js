@@ -92,6 +92,7 @@ const COLLECTION_PREFIX_MODULES = [
   ["inspection", "inspections"],
   ["fps", "inspections"],
   ["preplan", "preplans"],
+  ["training", "training"],
 ];
 
 /** Module for a collection under departments/<id>/, or "" when it isn't gated. */

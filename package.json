@@ -25,7 +25,7 @@
     "fleet:load-smoke": "node scripts/fleet-load-smoke.mjs",
     "ifc:parse": "node scripts/ifc/parseIfcDocx.mjs",
     "ifc:publish": "node scripts/ifc/publishIfcLibrary.mjs",
-    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-forge-rms \"node --test --test-concurrency=1 tests/rules/firestore.rules.test.mjs tests/rules/helpDesk.rules.test.mjs\"",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-forge-rms \"node --test --test-concurrency=1 tests/rules/firestore.rules.test.mjs tests/rules/helpDesk.rules.test.mjs tests/rules/training.rules.test.mjs\"",
     "build:staging": "vite build --mode staging",
     "build:forge-ai": "node scripts/build-forge-ai-neris-rules.mjs && node scripts/build-forge-ai-knowledge.mjs",
     "deploy:staging:rules": "firebase deploy --only firestore:rules,storage --project staging",
