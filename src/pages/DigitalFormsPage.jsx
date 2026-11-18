@@ -21,6 +21,7 @@ import { listInspectionTypes } from "../lib/inspections/inspectionConfigService.
 import { canManageInspectionConfig } from "../lib/inspections/inspectionPermissions.js";
 import { applyFormToInspections } from "../lib/digitalForms/inspectionTemplateFromForm.js";
 import { clearPlatformDefaultForm, loadPlatformDefaultForm, setPlatformDefaultForm } from "../lib/inspections/platformDefaultFormService.js";
+import { loadPlatformCreator } from "../lib/platformService.js";
 import "../styles/inspections-checklist.css";
 import "../styles/digital-forms.css";
 
@@ -592,6 +593,18 @@ export default function DigitalFormsPage() {
   const canFill = has("fillDigitalForms") || canManage;
   const seeAll = canManage || has("viewDigitalFormSubmissions");
   const signerName = user?.displayName || "";
+  // Demo mode switches creator access off in the app, but an owner viewing the
+  // demo is still a platform creator (Firestore rules check platformCreators/{uid},
+  // which is what this reads), so they can set the platform default form from here.
+  const [creatorRecordActive, setCreatorRecordActive] = useState(false);
+  useEffect(() => {
+    if (isCreator || !user?.uid) return undefined;
+    let live = true;
+    loadPlatformCreator(user.uid)
+      .then((row) => { if (live) setCreatorRecordActive(String(row?.status || "").toLowerCase() === "active"); })
+      .catch(() => { if (live) setCreatorRecordActive(false); });
+    return () => { live = false; };
+  }, [isCreator, user?.uid]);
 
   const tabs = [
     { id: "fill", label: "Forms", icon: ClipboardList },
@@ -634,7 +647,7 @@ export default function DigitalFormsPage() {
           {tab === "import" && canManage ? <ImportTab departmentId={departmentId} signerName={signerName} /> : null}
           {tab === "manage" && canManage ? <ManageTab departmentId={departmentId} forms={forms} signerName={signerName}
             canConfigInspections={canManageInspectionConfig(permissions, isCreator)}
-            canSetPlatformDefault={isCreator}
+            canSetPlatformDefault={isCreator || creatorRecordActive}
             actor={{ actorUid: user?.uid || "system", actorName: signerName || user?.email || "User" }} /> : null}
         </>
       )}
