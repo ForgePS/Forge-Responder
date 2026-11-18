@@ -1,7 +1,9 @@
-import { buildDepartmentGatewayPath, DEMO_ENTRY_PATH, persistGatewayContext } from "./gatewayRouting.js";
+import { buildDepartmentGatewayPath, DEMO_ENTRY_PATH, getPersistedGatewayDepartmentId, persistGatewayContext } from "./gatewayRouting.js";
 import { DEMO_DEPARTMENT_ID } from "./tenantPaths.js";
 
 export const DEMO_MODE_KEY = "rms-demo-mode";
+/** Fired on window when demo mode is switched off for someone's own account. */
+export const DEMO_RELEASED_EVENT = "rms-demo-released";
 export { DEMO_ENTRY_PATH };
 
 export function isDemoEntryPath(pathname = window.location.pathname) {
@@ -24,6 +26,29 @@ export function activateDemoMode() {
   } catch (error) {
     console.warn("Unable to persist demo mode", error);
   }
+}
+
+/** Whether this is the shared demo account (the only account demo mode is for). */
+export function isDemoAccountEmail(email = "") {
+  return Boolean(email) && String(email).trim().toLowerCase() === getDemoCredentials().email.toLowerCase();
+}
+
+/**
+ * Demo mode is only for the shared demo account. When someone signs in with
+ * their own account (e.g. the owner opening the Creator Console or the demo
+ * department from the workspace menu), switch it off for this tab so they keep
+ * their own access. Returns true when demo mode was on.
+ */
+export function releaseDemoModeFor(user) {
+  if (!user || isDemoAccountEmail(user.email) || !isDemoModeActive()) return false;
+  clearDemoMode();
+  try {
+    if (getPersistedGatewayDepartmentId() === DEMO_DEPARTMENT_ID) persistGatewayContext("", "");
+    window.dispatchEvent(new Event(DEMO_RELEASED_EVENT));
+  } catch {
+    // ignore
+  }
+  return true;
 }
 
 export function getDemoGatewayPath() {

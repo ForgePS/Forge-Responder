@@ -33,7 +33,7 @@ import {
   loadPlatformCreator
 } from "../lib/platformService.js";
 import { loadRolesMap } from "../lib/roleService.js";
-import { isDemoModeActive } from "../lib/demoMode.js";
+import { isDemoModeActive, releaseDemoModeFor } from "../lib/demoMode.js";
 import { ensureDemoAccess } from "../lib/demoService.js";
 import { applyDemoPersona } from "../lib/demoPersona.js";
 import {
@@ -178,6 +178,8 @@ export function AuthProvider({ children }) {
   }
 
   async function hydrateAccess(nextUser) {
+    // Your own account never runs as the demo, even in a tab that was in the demo.
+    releaseDemoModeFor(nextUser);
     if (isDemoModeActive()) {
       // Roles after the demo setup: a reseed changes them (e.g. the EMS report permissions), and loading them at
       // the same time showed the old roles until the next page load.
