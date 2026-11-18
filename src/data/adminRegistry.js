@@ -124,6 +124,7 @@ export const ADMIN_MODULE_OPTIONS = [
   { key: "nerisFireReports", label: "NERIS Fire Reports" },
   { key: "internalEmail", label: "Messages (department inbox)" },
   { key: "digitalDashboard", label: "Digital Dashboard (signage)" },
+  { key: "ems", label: "EMS Patient Care Reports" },
   { key: "administration", label: "System Admin" }
 ];
 
@@ -265,6 +266,10 @@ export const ADMIN_PERMISSION_LABELS = {
   escalateHydrantDamageReports: "Escalate overdue hydrant damage reports",
   viewNerisReports: "View NERIS fire reports",
   editNerisReports: "Edit NERIS fire reports",
+  editPcrs: "Chart patient care reports (ePCR)",
+  viewAllPcrs: "View every patient care report (not only calls they were on)",
+  unlockPcrs: "Unlock posted patient care reports for amendment",
+  exportPcrs: "Export patient care reports (NEMSIS XML)",
   viewHeatZoneAnalytics: "View Heat Zone Analytics",
   viewHeatZoneMarkers: "View individual incidents on the heat map",
   viewHeatZoneAllDistricts: "View Heat Zone analytics for all districts",
@@ -431,6 +436,10 @@ export const ADMIN_PERMISSION_GROUPS = [
       "viewNerisReports",
       "editNerisReports",
     ]
+  },
+  {
+    label: "EMS patient care reports (PHI)",
+    keys: ["editPcrs", "viewAllPcrs", "unlockPcrs", "exportPcrs"]
   },
   {
     label: "Heat Zone Analytics",

@@ -5,7 +5,7 @@
  * records sync, so a stale snapshot can't grant anything on the server.
  */
 import { kvDelete, kvGet, kvSet } from "./fieldDb.js";
-import { canAccessNavItem, canEditNerisReports, hasPermission } from "../lib/permissions.js";
+import { canAccessNavItem, canEditNerisReports, canEditPcrs, hasPermission } from "../lib/permissions.js";
 import { canConductFleetChecks } from "../lib/fleet/fleetPermissions.js";
 import { normalizeRoleIds } from "../lib/permissions.js";
 import {
@@ -25,6 +25,7 @@ export const FIELD_MODULE_KEYS = [
   "maintenance",
   "dailyLog",
   "nerisFireReports",
+  "ems",
   "internalEmail",
   "inspections",
   "preplans",
@@ -111,6 +112,7 @@ export function fieldCapabilities(snapshot, config = null) {
     dailyLogView: allowed("dailyLog") && on("dailyLog") && (isCreator || hasPermission(permissions, "viewDailyLog")),
     dailyLogEdit: allowed("dailyLog") && on("dailyLog") && (isCreator || hasPermission(permissions, "editDailyLog") || hasPermission(permissions, "editSchedule")),
     incidents: allowed("incident") && on("nerisFireReports") && canEditNerisReports(permissions, isCreator),
+    pcr: allowed("pcr") && on("ems") && canEditPcrs(permissions, isCreator),
     inspections: allowed("inspections") && on("inspections") && canEditInspectionsModule(permissions, isCreator),
     // EMS protocols / HazMat documents (Documents permission).
     referenceDocs: isCreator || hasPermission(permissions, "viewDocuments"),

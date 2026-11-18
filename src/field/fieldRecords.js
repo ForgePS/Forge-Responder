@@ -11,7 +11,18 @@
  *  attention - the server refused it or someone else changed the same record;
  *              kept on the device until the crew decides
  */
-import { blobDelete, blobPut, recordDelete, recordGet, recordPut, recordsForScope } from "./fieldDb.js";
+import { blobDelete, blobPut, recordDelete, recordGet as rawRecordGet, recordPut as rawRecordPut, recordsForScope } from "./fieldDb.js";
+import { SEALED_KINDS, forgetDeviceKey, openRecordSafe, sealRecord } from "./fieldPhi.js";
+
+// Patient care reports (SEALED_KINDS) are encrypted on the device: seal on every write, open on every read.
+async function recordGet(localId) {
+  return openRecordSafe(await rawRecordGet(localId));
+}
+
+async function recordPut(record) {
+  await rawRecordPut(await sealRecord(record));
+  return record;
+}
 
 const listeners = new Set();
 const HISTORY_LIMIT = 12;
@@ -49,7 +60,7 @@ function withHistory(record, status, note = "") {
 }
 
 export async function listRecords(departmentId, uid) {
-  const rows = await recordsForScope(scopeKey(departmentId, uid));
+  const rows = await Promise.all((await recordsForScope(scopeKey(departmentId, uid))).map(openRecordSafe));
   return rows.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
 
@@ -75,6 +86,9 @@ export async function saveFieldRecord({
 }) {
   const now = new Date().toISOString();
   const existing = localId ? await recordGet(localId) : null;
+  if (existing?.locked) {
+    throw new Error("This report was locked on this device and can't be changed.");
+  }
   if (existing && existing.status === "syncing") {
     throw new Error("This record is being sent right now. Try again in a moment.");
   }
@@ -115,19 +129,21 @@ export async function saveFieldRecord({
 
 /** Update sync bookkeeping (used by the sync engine). */
 export async function patchRecord(localId, patch = {}, note = "") {
-  const existing = await recordGet(localId);
+  // Read and write the stored (possibly sealed) row so bookkeeping never needs to decrypt; new PHI fields in the
+  // patch (e.g. the server copy in `base`) are sealed before they're written.
+  const existing = await rawRecordGet(localId);
   if (!existing) return null;
   const next = { ...existing, ...patch };
   if (patch.status && patch.status !== existing.status) {
     next.history = withHistory(existing, patch.status, note);
   }
-  await recordPut(next);
+  await rawRecordPut(await sealRecord(next));
   emit();
-  return next;
+  return openRecordSafe(next);
 }
 
 export async function discardRecord(localId) {
-  const existing = await recordGet(localId);
+  const existing = await rawRecordGet(localId);
   if (!existing) return;
   for (const attachment of existing.attachments || []) {
     await blobDelete(attachment.id).catch(() => null);
@@ -182,8 +198,33 @@ export function summarizeRecords(records = []) {
   return counts;
 }
 
+/**
+ * Delete this person's patient care reports from the device and forget the key they were sealed with.
+ * Used at sign-out: PHI must not stay on a shared or lost device.
+ * @returns {Promise<number>} how many reports were removed
+ */
+export async function wipeSealedRecords(departmentId, uid) {
+  const scope = scopeKey(departmentId, uid);
+  const rows = await recordsForScope(scope);
+  let removed = 0;
+  for (const row of rows) {
+    if (!SEALED_KINDS.has(row.kind)) continue;
+    await discardRecord(row.localId);
+    removed += 1;
+  }
+  await forgetDeviceKey(scope);
+  emit();
+  return removed;
+}
+
+/** Records with PHI can't be saved as plain files (they'd leave the device unencrypted). */
+export function canExportRecord(record) {
+  return !SEALED_KINDS.has(record?.kind);
+}
+
 /** Everything about a record as a downloadable JSON file (last-resort export). */
 export function recordExportJson(record) {
+  if (!canExportRecord(record)) throw new Error("Patient care reports can't be saved as files.");
   const { history, ...rest } = record;
   return JSON.stringify({ exportedAt: new Date().toISOString(), record: rest, history }, null, 2);
 }

@@ -1,13 +1,12 @@
 /**
- * Remarks and photos on a No/Fail answer in an inspection, for templates with
- * remarksOnFail (templates made from a digital form). They live in the
- * inspection's own answers under companion keys, so saving, offline sync and
- * the template snapshot all work unchanged:
+ * Remarks and photos on a No/Fail answer in every inspection (RMS and FORGE FIELD).
+ * They live in the inspection's own answers under companion keys, so saving,
+ * offline sync and the template snapshot all work unchanged:
  *
  *   answers[`${key}__remarks`]  string   required when answers[key] is No/Fail
  *   answers[`${key}__photos`]   photo[]  optional (the inspection photo field: attachments)
  */
-export const NEGATIVE_ANSWERS = { yes_no: "No", pass_fail: "Fail", pass_fail_na: "Fail" };
+export const NEGATIVE_ANSWERS = { yes_no: "No", pass_fail: "Fail", pass_fail_na: "Fail", compliant: "Noncompliant" };
 export const REMARKS_SUFFIX = "__remarks";
 export const PHOTOS_SUFFIX = "__photos";
 
@@ -41,9 +40,8 @@ export function failDetailFields(field) {
 
 /** No/Fail items still missing remarks: [{ key, label }] (key is the remarks key). */
 export function findMissingFailRemarks(templateSnapshot, answers = {}) {
-  if (!templateSnapshot?.remarksOnFail) return [];
   const missing = [];
-  for (const section of templateSnapshot.sections || []) {
+  for (const section of templateSnapshot?.sections || []) {
     for (const field of section.fields || []) {
       if (!isFailAnswer(field, answers[field.key])) continue;
       const key = `${field.key}${REMARKS_SUFFIX}`;

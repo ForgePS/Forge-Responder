@@ -210,6 +210,8 @@ async function syncOne(record, ctx) {
       warnings: result?.warnings || [],
       serverIds: { ...(working.serverIds || {}), ...(result?.serverIds || {}) },
       base: result?.base ?? working.base ?? null,
+      // A merge that kept someone else's changes returns the merged record, so data and base stay a matching pair.
+      ...(result?.data ? { data: result.data } : {}),
       steps: result?.keepSteps ? working.steps : {},
     }, result?.warnings?.length ? `Sent (${result.warnings.join("; ")})` : "Sent to the server");
   } catch (error) {

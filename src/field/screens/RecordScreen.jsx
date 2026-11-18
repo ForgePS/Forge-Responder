@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Download, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useField } from "../fieldContext.jsx";
 import { FORM_FOR_KIND, KIND_LABELS } from "../fieldKinds.js";
-import { discardRecord, getRecord, patchRecord, recordExportJson, subscribeRecords } from "../fieldRecords.js";
+import { canExportRecord, discardRecord, getRecord, patchRecord, recordExportJson, subscribeRecords } from "../fieldRecords.js";
 import { setPath } from "../fieldMerge.js";
 import { syncNow } from "../fieldSync.js";
 import { downloadTextFile } from "../../lib/downloadTextFile.js";
@@ -145,7 +145,7 @@ export default function RecordScreen({ params = {} }) {
 
       {attention && attention.type !== "conflict" ? (
         <Banner tone="warn" icon={<AlertTriangle size={22} />} title="The server didn't accept this record">
-          {attention.message} Your entry is kept on this device. Fix it and send again, or download a copy for your officer.
+          {attention.message} Your entry is kept on this device. Fix it and send again{canExportRecord(record) ? ", or download a copy for your officer" : ""}.
         </Banner>
       ) : null}
 
@@ -175,7 +175,9 @@ export default function RecordScreen({ params = {} }) {
         {record.status === "queued" ? (
           <button type="button" className="fa-btn fa-btn-ghost fa-btn-block" onClick={retry}><RefreshCw size={20} /> Send now</button>
         ) : null}
-        <button type="button" className="fa-btn fa-btn-ghost fa-btn-block" onClick={exportCopy}><Download size={20} /> Download a copy</button>
+        {canExportRecord(record) ? (
+          <button type="button" className="fa-btn fa-btn-ghost fa-btn-block" onClick={exportCopy}><Download size={20} /> Download a copy</button>
+        ) : null}
         {record.status !== "syncing" ? (
           <button type="button" className="fa-btn fa-btn-danger-ghost fa-btn-block" onClick={() => setConfirmDiscard(true)}>
             <Trash2 size={20} /> {record.status === "synced" ? "Remove from this device" : "Discard"}

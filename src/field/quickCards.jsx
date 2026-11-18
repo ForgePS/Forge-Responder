@@ -70,6 +70,7 @@ export function useQuickCards() {
     ...records.filter((record) => record.kind === "incident").map((record) => record.data?.id),
   ].filter(Boolean));
   const unsentIncidents = records.filter((record) => record.kind === "incident" && record.status !== "synced").length;
+  const openPcrs = records.filter((record) => record.kind === "pcr" && record.status !== "synced");
 
   // Quick cards. Daily log and supply check-offs stay in the RMS.
   const cards = [
@@ -115,6 +116,22 @@ export function useQuickCards() {
       title: "EMS",
       tone: "blue",
       items: [
+        caps.pcr && {
+          key: "pcr-new",
+          icon: <Plus size={24} />,
+          title: "New patient care report",
+          detail: openPcrs.length
+            ? `${openPcrs.length} on this device not sent or posted yet`
+            : "NEMSIS ePCR · works offline, encrypted on this phone",
+          onClick: () => navigate("pcrForm"),
+        },
+        caps.pcr && openPcrs.length > 0 && {
+          key: "pcr-open",
+          icon: <Stethoscope size={24} />,
+          title: "Continue a report",
+          detail: openPcrs[0].title,
+          onClick: () => navigate("record", { localId: openPcrs[0].localId }),
+        },
         caps.emsCheckoff && emsLists.length > 0 && {
           key: "ems-check",
           icon: <ClipboardCheck size={24} />,
