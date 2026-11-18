@@ -5,7 +5,7 @@
  *  - throws FieldConflictError / FieldRejectedError when the crew must decide
  * Record shapes match what the desktop RMS pages write.
  */
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, runTransaction } from "firebase/firestore";
 import { combineIncidentBookkeeping, incidentMergePaths } from "../lib/neris/reportMerge.js";
 import { checklistProgress } from "../lib/neris/reportModel.js";
 import { getFirestoreDb, uploadFirebaseFile } from "../lib/firebaseClient.js";
@@ -37,6 +37,7 @@ import { isDailyLogLocked, resolveAutoLockAt } from "../lib/dailyLogLock.js";
 import { NERIS_FORM_MODULES } from "../lib/nerisSchema.js";
 import { blobGet } from "./fieldDb.js";
 import { FieldConflictError, FieldRejectedError } from "./fieldErrors.js";
+import { PCR_COLLECTION, planPcrWrite } from "./fieldPcr.js";
 import { threeWayMerge, isSameOrNewerDate } from "./fieldMerge.js";
 import { refItems } from "./fieldRefData.js";
 import { summarizeCheckoff } from "./checkoffModel.js";
@@ -882,7 +883,50 @@ async function syncHydrantEdit(record, ctx) {
   return { serverIds: { hydrantId: hydrantFirebaseDocId(data.hydrant.location_id, data.hydrant.hydrant_id) }, base: { fields } };
 }
 
+/* ---------------------------- patient care reports ----------------------------- */
+
+async function syncPcr(record, ctx) {
+  // The NEMSIS schema is large: load it only when a report is sent.
+  const { nemsisSchema } = await import("../lib/nemsis/index.js");
+  const db = getFirestoreDb();
+  const ref = doc(db, "departments", ctx.departmentId, PCR_COLLECTION, record.data.id);
+  let plan;
+  try {
+    // Read, merge and write in one transaction: if another device writes in between, Firestore reruns this with
+    // the newer copy instead of letting a second whole-document write drop the first one's changes.
+    plan = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const next = planPcrWrite(nemsisSchema, {
+        record,
+        server: snap.exists() ? snap.data() : null,
+        uid: ctx.uid,
+        actorName: ctx.actor.actorName,
+        now: nowIso(),
+      });
+      // Whole document, not a merge: fields cleared on the device must disappear on the server too.
+      if (next.action === "write") tx.set(ref, next.doc);
+      return next;
+    });
+  } catch (error) {
+    if (isPermissionError(error)) {
+      throw new FieldRejectedError("The server refused this patient care report. Check that you're still on the crew and allowed to chart reports.");
+    }
+    throw error;
+  }
+  if (plan.action === "reject") throw new FieldRejectedError(plan.message);
+  if (plan.action === "conflict") {
+    throw new FieldConflictError("Someone else changed this report after you started editing.", {
+      conflicts: plan.conflicts,
+      server: Object.fromEntries(plan.conflicts.map((conflict) => [conflict.path, conflict.server])),
+      merged: plan.merged,
+    });
+  }
+  // The merged chart goes back on the device with its base, so the next save doesn't undo kept server changes.
+  return { serverIds: { pcrId: record.data.id, reportNumber: record.data.number }, base: plan.base, data: plan.data };
+}
+
 export const SYNC_HANDLERS = {
+  pcr: syncPcr,
   hydrantEdit: syncHydrantEdit,
   planUpdate: syncPlanUpdate,
   planCreate: syncPlanCreate,

@@ -3,6 +3,8 @@ import { CheckCircle2, CircleDashed, ExternalLink, LogOut, MonitorSmartphone, Re
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useField } from "../fieldContext.jsx";
 import { refItems } from "../fieldRefData.js";
+import { wipeSealedRecords } from "../fieldRecords.js";
+import { SEALED_KINDS } from "../fieldPhi.js";
 import { storageEstimate } from "../fieldDb.js";
 import { isOfflineReady } from "../registerFieldSW.js";
 import { canPromptInstall, isIos, isStandalone, promptInstall, subscribeInstall } from "../fieldInstall.js";
@@ -17,7 +19,7 @@ function formatBytes(bytes) {
 }
 
 export default function SettingsScreen() {
-  const { snapshot, refData, refresh, refLoading, refError, online, counts, navigate } = useField();
+  const { snapshot, refData, refresh, refLoading, refError, online, counts, navigate, records = [] } = useField();
   const { signOut } = useAuth();
   const [theme, setTheme] = useState(readThemePref);
   const [offlineReady, setOfflineReady] = useState(null);
@@ -32,6 +34,8 @@ export default function SettingsScreen() {
   }, []);
 
   const unsent = counts.queued + counts.syncing + counts.attention + counts.draft;
+  // Patient care reports are wiped at sign-out (PHI must not stay on the device), so unsent ones would be lost.
+  const unsentPcrs = records.filter((row) => SEALED_KINDS.has(row.kind) && row.status !== "synced").length;
   const parts = [
     ["Apparatus", refItems(refData, "assets").length],
     ["Checklists", refItems(refData, "templates").length],
@@ -106,13 +110,21 @@ export default function SettingsScreen() {
       <Confirm
         open={confirmSignOut}
         title="Sign out?"
-        body={unsent
-          ? `${unsent} record${unsent === 1 ? " hasn't" : "s haven't"} been sent yet. They stay on this device and send after you sign in again with this account.`
-          : "You'll need a connection to sign back in."}
-        confirmLabel="Sign out"
+        body={[
+          unsentPcrs
+            ? `${unsentPcrs} patient care report${unsentPcrs === 1 ? " hasn't" : "s haven't"} been sent. Signing out deletes ${unsentPcrs === 1 ? "it" : "them"} from this device for good. Send ${unsentPcrs === 1 ? "it" : "them"} first if you can.`
+            : "",
+          unsent - unsentPcrs > 0
+            ? `${unsent - unsentPcrs} other record${unsent - unsentPcrs === 1 ? " hasn't" : "s haven't"} been sent yet. They stay on this device and send after you sign in again with this account.`
+            : "",
+          "Patient care reports are removed from this device when you sign out.",
+          !unsent ? "You'll need a connection to sign back in." : "",
+        ].filter(Boolean).join(" ")}
+        confirmLabel={unsentPcrs ? "Delete unsent reports and sign out" : "Sign out"}
         onCancel={() => setConfirmSignOut(false)}
         onConfirm={async () => {
           setConfirmSignOut(false);
+          await wipeSealedRecords(snapshot.departmentId, snapshot.uid).catch(() => null);
           await signOut();
         }}
       />
