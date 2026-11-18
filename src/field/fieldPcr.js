@@ -91,6 +91,21 @@ export function pcrDeviceData(doc) {
   };
 }
 
+/* A supervisor can unlock a posted report in the RMS (fieldPcrReopen.js reopens it on the device). */
+/** Should this device record be checked against the server? */
+export function mayBeUnlocked(record) {
+  return Boolean(record && record.kind === PCR_KIND && record.status === "synced" && record.data?.status === "posted" && record.data?.id);
+}
+
+/**
+ * The patch that reopens a device record from an unlocked server copy, or null when the server copy is still posted.
+ * The server copy becomes both the chart and the merge base, so nothing is reported as a conflict on the next save.
+ */
+export function reopenPatch(server) {
+  if (!server || server.status !== "draft") return null;
+  return { status: "draft", data: pcrDeviceData(server), base: pcrBase(server), attention: null };
+}
+
 /** Remove undefined values (Firestore rejects them) without touching anything else. */
 export function stripUndefined(value) {
   if (Array.isArray(value)) return value.filter((v) => v !== undefined).map(stripUndefined);

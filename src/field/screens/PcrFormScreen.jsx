@@ -10,8 +10,13 @@ import { AlertTriangle, CheckCircle2, ChevronRight, Clock, Loader2, Lock, Plus, 
 import { version as APP_VERSION } from "../../../package.json";
 import { useField, useRecordForm } from "../fieldContext.jsx";
 import { describePcr, fieldPcrNumber, newPcrRecordData } from "../fieldPcr.js";
+import { reopenIfUnlocked } from "../fieldPcrReopen.js";
+import { dispatchPrefill, recentDispatches } from "../fieldDispatch.js";
+import { refItems } from "../fieldRefData.js";
 import {
   PCR_SECTIONS,
+  SIGNATURE_FILE_FIELDS,
+  SIGNATURE_GROUP,
   addGroupRow,
   composeLeaf,
   fieldPath,
@@ -28,8 +33,10 @@ import {
   toLocalInput,
 } from "../../lib/nemsis/pcrModel.js";
 import { readLeaf } from "../../lib/nemsis/schema.js";
-import { Banner, Field, PickerButton, PickerSheet, Screen, Section, TextArea, TextInput, cx } from "../ui.jsx";
+import { applyFormDefaults, customizeLayout, normalizePcrForm, visibleSections, withDepartmentIssues } from "../../lib/pcr/pcrForm.js";
+import { Banner, Field, PickerButton, PickerSheet, Screen, Section, TextArea, TextInput, cx, formatWhen } from "../ui.jsx";
 import { UnitField } from "./common.jsx";
+import SignaturePad from "./SignaturePad.jsx";
 
 /** The NEMSIS schema is large (≈1 MB of JSON): load it when a report is opened, not with the app. */
 function useNemsisSchema() {
@@ -46,10 +53,34 @@ function useNemsisSchema() {
   return state;
 }
 
+/** Before an existing report opens, reopen it if a supervisor unlocked it in the RMS (needs signal). */
+function useUnlockCheck(localId) {
+  const { snapshot, online, toast } = useField();
+  const [done, setDone] = useState(!localId || !online);
+  useEffect(() => {
+    if (done) return undefined;
+    let active = true;
+    reopenIfUnlocked({ departmentId: snapshot.departmentId, localId }).then((reopened) => {
+      if (!active) return;
+      if (reopened) toast("A supervisor unlocked this report. You can edit it again.", "ok");
+      setDone(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []); // once, when the report is opened
+  return done;
+}
+
 export default function PcrFormScreen({ params = {} }) {
   const { back } = useField();
   const { schema, error } = useNemsisSchema();
-  if (!schema) {
+  const unlockChecked = useUnlockCheck(params.localId);
+  const { refData } = useField();
+  // A new report can start from a recent dispatch (Active911): times, address and location filled in.
+  const dispatches = useMemo(() => (params.localId ? [] : recentDispatches(refItems(refData, "dispatches"))), [params.localId, refData]);
+  const [start, setStart] = useState(params.localId ? { chosen: true } : null);
+  if (!schema || !unlockChecked) {
     return (
       <Screen title="Patient care report" onBack={back}>
         {error ? <Banner tone="warn" icon={<AlertTriangle size={22} />}>{error}</Banner> : (
@@ -58,22 +89,52 @@ export default function PcrFormScreen({ params = {} }) {
       </Screen>
     );
   }
-  return <PcrEditor schema={schema} params={params} />;
+  if (!start && dispatches.length) {
+    return <DispatchPicker dispatches={dispatches} onPick={(dispatch) => setStart({ chosen: true, dispatch })} onBlank={() => setStart({ chosen: true })} />;
+  }
+  return <PcrEditor schema={schema} params={params} dispatch={start?.dispatch ?? null} />;
+}
+
+function DispatchPicker({ dispatches, onPick, onBlank }) {
+  const { back } = useField();
+  return (
+    <Screen title="New patient care report" onBack={back}>
+      <Section title="Start from a dispatch" hint="Fills in when your unit was notified, the scene address and location. You can change them.">
+        <div className="fa-list">
+          {dispatches.map((dispatch) => (
+            <button key={dispatch.id} type="button" className="fa-row" onClick={() => onPick(dispatch)}>
+              <span className="fa-row-text">
+                <strong>{dispatch.description}</strong>
+                <small>{[formatWhen(dispatch.sentAt), dispatch.address, dispatch.city, dispatch.units && `Units: ${dispatch.units}`].filter(Boolean).join(" · ")}</small>
+              </span>
+              <ChevronRight size={20} aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      </Section>
+      <button type="button" className="fa-btn fa-btn-secondary fa-btn-block" onClick={onBlank}>Start a blank report</button>
+    </Screen>
+  );
 }
 
 const PREFILL_NOW = { "eVitals.VitalGroup": "eVitals.01", "eMedications.MedicationGroup": "eMedications.01", "eProcedures.ProcedureGroup": "eProcedures.01" };
 
-function PcrEditor({ schema, params }) {
+function PcrEditor({ schema, params, dispatch = null }) {
   const { snapshot, back, caps, online, config, recent } = useField();
-  const [initial] = useState(() => newPcrRecordData(schema, {
+  // The department's form settings (RMS Patient Care Reports → Form settings).
+  const pcrForm = useMemo(() => normalizePcrForm(config?.emsForm), [config]);
+  const [initial] = useState(() => {
+    const record = newPcrRecordData(schema, {
     uuid: globalThis.crypto.randomUUID(),
     number: fieldPcrNumber(),
     softwareVersion: APP_VERSION,
     uid: snapshot.uid,
     agency: { number: config?.ems?.agencyNumber || "", name: config?.ems?.agencyName || snapshot.departmentName || "" },
     unit: recent.unit ? { callSign: recent.unit, vehicleNumber: recent.unit } : undefined,
-    cad: { notified: params.notified || "" },
-  }));
+    cad: { notified: params.notified || "", ...dispatchPrefill(dispatch) },
+    });
+    return { ...record, nemsis: applyFormDefaults(schema, record.nemsis, normalizePcrForm(config?.emsForm)) };
+  });
   const form = useRecordForm({ kind: "pcr", localId: params.localId, initialData: initial, describe: describePcr, validate: () => ({}) });
   const { data, update, submit, saving, existingStatus, loaded } = form;
   const [sectionId, setSectionId] = useState(params.section || "dispatch");
@@ -82,9 +143,10 @@ function PcrEditor({ schema, params }) {
 
   const pcr = data.nemsis || {};
   const deferredPcr = useDeferredValue(pcr);
-  const check = useMemo(() => postCheck(schema, deferredPcr), [schema, deferredPcr]);
+  const check = useMemo(() => withDepartmentIssues(postCheck(schema, deferredPcr), schema, deferredPcr, pcrForm), [schema, deferredPcr, pcrForm]);
   const progress = useMemo(() => sectionProgress(schema, deferredPcr), [schema, deferredPcr]);
-  const layout = useMemo(() => sectionLayout(schema, sectionId), [schema, sectionId]);
+  const sections = useMemo(() => visibleSections(schema, pcrForm), [schema, pcrForm]);
+  const layout = useMemo(() => customizeLayout(sectionLayout(schema, sectionId), pcrForm), [schema, sectionId, pcrForm]);
   const hasEssential = layout.some((item) => item.essential);
 
   const posted = data.status === "posted";
@@ -92,8 +154,8 @@ function PcrEditor({ schema, params }) {
   const setPcr = (fn) => update((current) => ({ nemsis: fn(current.nemsis || {}) }));
   const ctx = { schema, pcr, setPcr, issues: check.issues, readOnly };
 
-  const sectionIndex = PCR_SECTIONS.findIndex((s) => s.id === sectionId);
-  const nextSection = PCR_SECTIONS[sectionIndex + 1];
+  const sectionIndex = sections.findIndex((s) => s.id === sectionId);
+  const nextSection = sections[sectionIndex + 1];
   const blockingBySection = useMemo(() => {
     const out = {};
     for (const issue of check.blocking) out[sectionForPath(issue.path)] = (out[sectionForPath(issue.path)] || 0) + 1;
@@ -145,7 +207,7 @@ function PcrEditor({ schema, params }) {
       {!caps.pcr ? <Banner tone="info" title="View only">Your role can't chart patient care reports.</Banner> : null}
 
       <nav className="fa-pcr-sections" aria-label="Report sections">
-        {PCR_SECTIONS.map((section) => {
+        {sections.map((section) => {
           const p = progress[section.id];
           const blocking = blockingBySection[section.id] || 0;
           return (
@@ -177,7 +239,7 @@ function PcrEditor({ schema, params }) {
         </Section>
       ) : null}
 
-      <Section title={PCR_SECTIONS[sectionIndex]?.label}>
+      <Section title={sections[sectionIndex]?.label || PCR_SECTIONS.find((s) => s.id === sectionId)?.label}>
         <LayoutItems items={layout} ctx={ctx} at={{}} showAll={showAll || !hasEssential} />
         {hasEssential ? (
           <button type="button" className="fa-btn fa-btn-ghost fa-btn-block" onClick={() => setShowAll((v) => !v)}>
@@ -227,6 +289,8 @@ function IssuesPanel({ check, open, onToggle, onGo }) {
 function LayoutItems({ items, ctx, at, showAll }) {
   return items
     .filter((item) => showAll || item.essential)
+    // A signature row's file fields are drawn as one signature pad (RepeatGroup).
+    .filter((item) => !(item.type === "field" && SIGNATURE_FILE_FIELDS.includes(item.field.el)))
     .map((item) => {
       if (item.type === "field") return <LeafEditor key={item.field.el} field={item.field} ctx={ctx} at={at} />;
       if (item.repeating) return <RepeatGroup key={item.name} item={item} ctx={ctx} at={at} showAll={showAll} />;
@@ -266,6 +330,7 @@ function RepeatGroup({ item, ctx, at, showAll }) {
               ) : null}
             </legend>
             <LayoutItems items={item.children} ctx={ctx} at={here} showAll={showAll} />
+            {item.name === SIGNATURE_GROUP ? <SignaturePad ctx={ctx} at={here} /> : null}
           </fieldset>
         );
       })}
@@ -307,7 +372,7 @@ function LeafEditor({ field, ctx, at }) {
     else if (kind === "NV") write({ NV: code });
     else write(composeLeaf(raw, { PN: code, NV: undefined }));
   };
-  const hint = field.definition && field.definition.length < 160 ? field.definition : "";
+  const hint = field.help || (field.definition && field.definition.length < 160 ? field.definition : "");
   const disabled = readOnly || Boolean(notValue);
 
   let input;
@@ -361,18 +426,23 @@ function LeafEditor({ field, ctx, at }) {
       input = <TextArea disabled={disabled} value={single.value ?? ""} onChange={setValue} rows={field.el === "eNarrative.01" ? 10 : 3} />;
       break;
     case "file":
-      input = <p className="fa-hint">Files and signatures are added from the RMS for now.</p>;
+      input = <p className="fa-hint">File attachments aren't supported on the phone yet.</p>;
       break;
     default:
       input = field.repeating
         ? <TextInput disabled={disabled} value={plainValues.join(", ")} onChange={(value) => setValue(value.split(",").map((v) => v.trim()).filter(Boolean))} />
-        : <TextInput disabled={disabled} value={single.value ?? ""} maxLength={field.maxLength} onChange={setValue} />;
+        : (
+          <>
+            <TextInput disabled={disabled} value={single.value ?? ""} maxLength={field.maxLength} onChange={setValue} list={field.choices?.length ? `pcr-choices-${field.el}` : undefined} />
+            {field.choices?.length ? <datalist id={`pcr-choices-${field.el}`}>{field.choices.map((c) => <option key={c} value={c} />)}</datalist> : null}
+          </>
+        );
   }
 
   const notOptions = [...field.nv.map((o) => ({ ...o, kind: "NV" })), ...field.pn.map((o) => ({ ...o, kind: "PN" }))];
   const attrDefs = (field.attrs || []).filter((a) => a.codes?.length && !field.repeating);
   return (
-    <Field label={`${field.label} (${field.el})`} required={field.usage === "Mandatory"} error={error} hint={hint}>
+    <Field label={`${field.label} (${field.el})`} required={field.usage === "Mandatory" || field.departmentRequired} error={error} hint={hint}>
       {input}
       {attrDefs.map((def) => (
         <label key={def.n} className="fa-pcr-attr">

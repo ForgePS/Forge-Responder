@@ -243,3 +243,51 @@ test("composeLeaf keeps the simplest stored form", () => {
   assert.deepEqual(composeLeaf("7052", { attrs: { CodeType: "9924003" } }), { value: "7052", attrs: { CodeType: "9924003" } });
   assert.equal(composeLeaf({ value: "7052", attrs: { CodeType: "9924003" } }, { attrs: { CodeType: "" } }), "7052");
 });
+
+test("signatures are stored as NEMSIS asks, validate, export, and only safe images are shown", async () => {
+  const model = await import("../../src/lib/nemsis/pcrModel.js");
+  const { SIGNATURE_GROUP, setSignature, clearSignature, signatureImage, graphicDataUrl, sectionReadout, MAX_SIGNATURE_BASE64 } = model;
+  const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const at = { [SIGNATURE_GROUP]: 0 };
+  let pcr = setLeaf(schema, {}, "eOther.12", "4512015", at); // patient
+  pcr = setSignature(schema, pcr, at, { dataUrl: `data:image/png;base64,${PNG}`, signedAt: "2026-11-17T10:00:00-06:00" });
+  assert.equal(getValue(schema, pcr, "eOther.16", at), "signature-1.png");
+  assert.equal(getValue(schema, pcr, "eOther.17", at), "image/png");
+  assert.equal(getValue(schema, pcr, "eOther.18", at), PNG);
+  assert.equal(getValue(schema, pcr, "eOther.19", at), "2026-11-17T10:00:00-06:00");
+  assert.equal(getValue(schema, pcr, "eOther.15", at), "4515031", "patient signed → Signed");
+  assert.equal(signatureImage(schema, pcr, at), `data:image/png;base64,${PNG}`);
+
+  // A representative signing → Signed-Not Patient; a status the crew already chose is kept.
+  const rep = { [SIGNATURE_GROUP]: 1 };
+  let two = setLeaf(schema, pcr, "eOther.12", "4512017", rep);
+  two = setSignature(schema, two, rep, { dataUrl: `data:image/png;base64,${PNG}` });
+  assert.equal(getValue(schema, two, "eOther.15", rep), "4515033");
+  assert.equal(getValue(schema, two, "eOther.16", rep), "signature-2.png");
+  const kept = setSignature(schema, setLeaf(schema, {}, "eOther.15", "4515027", at), at, { dataUrl: `data:image/png;base64,${PNG}` });
+  assert.equal(getValue(schema, kept, "eOther.15", at), "4515027");
+
+  // No validation issues on the signature fields, and the XML carries the image.
+  const issues = postCheck(schema, two).issues.filter((i) => i.element?.startsWith("eOther."));
+  assert.deepEqual(issues, []);
+  const xml = pcrXml(schema, { agency: { "dAgency.01": "1", "dAgency.02": "1", "dAgency.04": "37" }, uuid: "0b6f6d1e-1c1a-4d55-9a57-3f1f3b7f0c11", pcr: two });
+  assert.match(xml, new RegExp(`<eOther\.18>${PNG.replace(/[+/=]/g, "\$&")}</eOther\.18>`));
+
+  // The RMS readout carries the image; clearing keeps who signed and drops the automatic Signed status.
+  const readout = JSON.stringify(sectionReadout(schema, two, "other"));
+  assert.ok(readout.includes(`"image":"data:image/png;base64,${PNG}"`));
+  const cleared = clearSignature(schema, two, at);
+  assert.equal(getValue(schema, cleared, "eOther.18", at), undefined);
+  assert.equal(getValue(schema, cleared, "eOther.19", at), undefined);
+  assert.equal(getValue(schema, cleared, "eOther.12", at), "4512015");
+  assert.equal(getValue(schema, cleared, "eOther.15", at), undefined, "no longer signed");
+  const paper = clearSignature(schema, kept, at);
+  assert.equal(getValue(schema, paper, "eOther.15", at), "4515027", "a status the crew chose stays");
+
+  // Only PNG data URLs are accepted, within the size limit; only safe raster types are shown inline.
+  assert.throws(() => setSignature(schema, {}, at, { dataUrl: "data:image/svg+xml;base64,PHN2Zz4=" }));
+  assert.throws(() => setSignature(schema, {}, at, { dataUrl: `data:image/png;base64,${"A".repeat(MAX_SIGNATURE_BASE64 + 4)}` }));
+  assert.equal(graphicDataUrl("image/svg+xml", "PHN2Zz4="), null);
+  assert.equal(graphicDataUrl("image/png", 'abc" onerror="x'), null);
+  assert.equal(graphicDataUrl("IMAGE/PNG", PNG), `data:image/png;base64,${PNG}`);
+});
