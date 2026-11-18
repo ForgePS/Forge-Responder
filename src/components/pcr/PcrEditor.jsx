@@ -113,13 +113,13 @@ export default function PcrEditor({
         });
       }
       onSaved(result.saved);
+      setSave({ state: revision.current === startedAt ? "saved" : "dirty", at: result.saved.updatedAt });
       if (result.blocked) {
         // Saved, not posted: the merged chart (with another device's changes) has problems to fix first.
         const n = result.blocked.length;
-        setSave({ state: "error", message: `This report changed on another device and now has ${n} ${n === 1 ? "problem" : "problems"} to fix before posting. Your changes were saved; it wasn't posted.` });
+        onMessage(`Not posted: this report was changed on another device and now has ${n} ${n === 1 ? "thing" : "things"} to fix before posting. Your changes were saved.`);
         return false;
       }
-      setSave({ state: revision.current === startedAt ? "saved" : "dirty", at: result.saved.updatedAt });
       return true;
     } catch (err) {
       setSave({ state: "error", message: friendlyError(err, "Couldn't save. Check your connection; your changes are still here.") });
@@ -127,7 +127,7 @@ export default function PcrEditor({
     } finally {
       saving.current = null;
     }
-  }, [actor, departmentId, form, mergePaths, onSaved, readOnly, schema]);
+  }, [actor, departmentId, form, mergePaths, onMessage, onSaved, readOnly, schema]);
 
   useEffect(() => {
     if (save.state !== "dirty" || readOnly) return undefined;
