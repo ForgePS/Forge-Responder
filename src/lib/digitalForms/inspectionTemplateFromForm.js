@@ -7,9 +7,9 @@
  * the default template of an inspection type. New inspections of that type then
  * snapshot it (inspectionWorkflow.createInspection).
  *
- * The template is marked remarksOnFail: a Yes/No or Pass/Fail item answered
- * No/Fail asks for remarks and photos in the inspection, stored in the
- * inspection's answers under companion keys (see inspectionFailDetails.js).
+ * Like every inspection, a Yes/No or Pass/Fail item answered No/Fail asks for
+ * remarks and photos, stored in the inspection's answers under companion keys
+ * (see inspectionFailDetails.js). The template is also marked remarksOnFail.
  *
  * Running it again for the same form publishes the form's current version as the
  * next version of the same template, so revising a form can be pushed to inspections.

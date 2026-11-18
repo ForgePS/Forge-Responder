@@ -4,6 +4,10 @@ import { Building2, CalendarClock, ClipboardCheck, Plus, Trash2 } from "lucide-r
 import { useField, useRecordForm } from "../fieldContext.jsx";
 import { refItems } from "../fieldRefData.js";
 import { localDate } from "../fieldValidation.js";
+import { failDetailFields, isFailAnswer } from "../../lib/inspections/inspectionFailDetails.js";
+import { inspectionFields, validateInspectionForm } from "../inspectionValidation.js";
+
+export { inspectionFields, validateInspectionForm };
 import {
   Banner, Chips, ErrorSummary, Field, PhotoStrip, PickerButton, PickerSheet, Screen, Section, Segmented, StatusChip, TextArea, TextInput, cx, formatDay,
 } from "../ui.jsx";
@@ -35,30 +39,6 @@ const CHOICE_TYPES = {
 };
 
 const FAIL_VALUES = new Set(["fail", "failed", "noncompliant", "no"]);
-
-export function inspectionFields(template) {
-  return (template?.sections || []).flatMap((section) => (section.fields || []).map((field) => ({ ...field, sectionId: section.id })));
-}
-
-export function validateInspectionForm(data, rules) {
-  const errors = {};
-  if (data.finish) {
-    for (const field of inspectionFields(data.inspection?.templateSnapshot)) {
-      if (["heading", "instruction", "photo", "signature"].includes(field.type)) continue;
-      const value = data.answers?.[field.key];
-      if (field.required && (value === undefined || value === null || value === "" || (Array.isArray(value) && !value.length))) {
-        errors[`a:${field.key}`] = "Answer this item.";
-      }
-    }
-    if (!data.result) errors.result = "Pick the result.";
-    if (/reinspection/i.test(data.result || "") && !data.nextReinspectionAt) errors.nextReinspectionAt = "Pick the reinspection date.";
-    if (rules?.required("summary") && !String(data.summary || "").trim()) errors.summary = "Add a summary.";
-  }
-  (data.violations || []).forEach((violation, index) => {
-    if (!String(violation.name || "").trim()) errors[`v:${index}`] = "Name the violation.";
-  });
-  return errors;
-}
 
 export function InspectionsScreen() {
   const { refData, records, navigate, back } = useField();
@@ -256,6 +236,17 @@ export function InspectionFormScreen({ params = {} }) {
                   </div>
                   <AnswerInput field={field} value={value} onChange={(next) => setAnswer(field.key, next)} disabled={readOnly} />
                   {errors[`a:${field.key}`] ? <div className="fa-error-text">{errors[`a:${field.key}`]}</div> : null}
+                  {isFailAnswer(field, value) ? (() => {
+                    const remarks = failDetailFields(field).remarks;
+                    return (
+                      <div className="fa-fail-details" data-error={errors[`a:${remarks.key}`] ? "1" : undefined}>
+                        <Field label={remarks.label} required error={errors[`a:${remarks.key}`]}>
+                          <TextArea value={data.answers[remarks.key] || ""} onChange={(next) => setAnswer(remarks.key, next)} rows={2} placeholder={remarks.placeholder} disabled={readOnly} />
+                        </Field>
+                        {rules.show("photos") ? <small className="fa-hint">Add photos of this in the Photos section below.</small> : null}
+                      </div>
+                    );
+                  })() : null}
                 </div>
               );
             })}
