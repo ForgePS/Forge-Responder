@@ -548,11 +548,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--rms-border-subtle);
-  border-radius: 8px;
-  background: var(--rms-bg-surface);
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
   color: var(--rms-text-body);
   cursor: pointer;
   transition: background var(--rms-transition), border-color var(--rms-transition), color var(--rms-transition);
@@ -560,64 +562,81 @@
 
 .dd-icon-button:hover {
   background: var(--rms-bg-hover);
-  border-color: var(--rms-border);
-  color: var(--rms-text-strong);
+  border-color: var(--rms-primary);
+  color: var(--rms-primary);
+}
+
+.dd-icon-button.danger {
+  color: var(--rms-danger-text);
 }
 
 .dd-icon-button.danger:hover {
-  background: rgba(220, 38, 38, 0.1);
-  border-color: rgba(220, 38, 38, 0.35);
-  color: var(--rms-critical);
+  background: var(--rms-danger-soft);
+  border-color: var(--rms-danger-border);
+  color: var(--rms-danger-text);
 }
 
+/* Same look as .secondary-button / .primary-button in the form kit. */
 .dd-action-button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  min-height: 32px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid var(--rms-border);
-  background: var(--rms-bg-surface-2);
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--rms-radius-sm);
+  border: 1px solid var(--rms-border-strong);
+  background: var(--rms-bg-input);
   color: var(--rms-text-body);
-  font-size: 0.82rem;
+  font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition: background var(--rms-transition), border-color var(--rms-transition), color var(--rms-transition);
 }
 
-.dd-action-button:hover {
+.dd-action-button:hover:not(:disabled) {
   background: var(--rms-bg-hover);
+  border-color: var(--rms-primary);
   color: var(--rms-text-strong);
 }
 
-.dd-action-button.primary {
-  border: none;
-  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+.dd-action-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
+.dd-action-button.compact {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.dd-action-button.primary,
 .digital-dashboard .dd-action-button.primary,
 .digital-dashboard-page .dd-action-button.primary {
-  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
-  color: #ffffff;
-  border-color: transparent;
+  border: 1px solid var(--rms-primary-solid);
+  background: var(--rms-primary-solid);
+  color: var(--rms-text-inverse);
+  box-shadow: none;
 }
 
-.dd-action-button.primary:hover {
-  filter: brightness(1.05);
+.dd-action-button.primary:hover:not(:disabled) {
+  border-color: var(--rms-primary-hover);
+  background: var(--rms-primary-hover);
+  color: var(--rms-text-inverse);
 }
 
 .dd-action-button.danger {
-  color: var(--rms-critical);
-  border-color: rgba(220, 38, 38, 0.25);
-  background: rgba(220, 38, 38, 0.06);
+  color: var(--rms-danger-text);
+  border-color: var(--rms-danger-border);
+  background: var(--rms-danger-soft);
 }
 
-.dd-action-button.danger:hover {
-  background: rgba(220, 38, 38, 0.12);
-  border-color: rgba(220, 38, 38, 0.35);
+.dd-action-button.danger:hover:not(:disabled) {
+  border-color: var(--rms-danger-border);
+  background: var(--rms-danger-soft);
+  color: var(--rms-danger-text);
 }
 
 .dd-media-card {
@@ -841,9 +860,9 @@
   max-height: min(88vh, 900px);
   overflow: auto;
   padding: 0;
-  border-radius: var(--rms-radius-lg);
-  border: 1px solid var(--rms-border);
-  background: var(--rms-bg-modal);
+  border-radius: var(--rms-radius-md);
+  border: 1px solid var(--rms-border-strong);
+  background: var(--rms-bg-panel);
   box-shadow: var(--rms-shadow-lg);
   display: grid;
   gap: 0;
@@ -855,61 +874,83 @@
 
 .dd-modal > header,
 .dd-preview-modal > .dd-preview-header {
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--rms-border-divider);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--rms-border-strong);
   background: var(--rms-bg-panel-header);
 }
 
 .dd-modal > header h3,
 .dd-preview-header h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--rms-text-strong);
 }
 
 .dd-modal form {
   display: grid;
   gap: 12px;
-  padding: 16px 18px 18px;
+  padding: 16px;
 }
 
+/* Labels above fields: 12px, 600, muted (form-kit look). */
 .dd-modal label {
   display: grid;
-  gap: 6px;
-  font-size: 0.82rem;
+  gap: 5px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--rms-text-body);
+  color: var(--rms-text-muted);
 }
 
-.dd-modal input,
+/* Text fields and selects: 36px, tokens. Checkboxes and radios stay native. */
+.dd-modal input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]),
 .dd-modal select,
 .dd-modal textarea {
   width: 100%;
-  min-height: 38px;
-  padding: 9px 12px;
-  border: 1px solid var(--rms-border);
-  border-radius: 8px;
-  background: #ffffff;
-  color: #0f172a;
-  font-size: 0.88rem;
-  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
-  appearance: none;
-}
-
-.digital-dashboard-page .dd-modal-form {
-  color-scheme: light;
-}
-
-html[data-theme="dark"] .digital-dashboard-page .dd-modal input,
-html[data-theme="dark"] .digital-dashboard-page .dd-modal select,
-html[data-theme="dark"] .digital-dashboard-page .dd-modal textarea {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
-  color: var(--rms-text-strong);
+  color: var(--rms-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
   box-shadow: none;
 }
 
+.dd-modal input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]) {
+  appearance: none;
+}
+
+.dd-modal select {
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+.dd-modal input[type="checkbox"],
+.dd-modal input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin: 0;
+  appearance: auto;
+  accent-color: var(--rms-primary-solid);
+  cursor: pointer;
+}
+
+.dd-modal :is(input, select, textarea):focus {
+  outline: none;
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft);
+}
+
 .dd-modal textarea {
-  min-height: 88px;
+  height: auto;
+  min-height: 84px;
+  padding: 8px 10px;
+  line-height: 1.45;
   resize: vertical;
 }
 
@@ -923,12 +964,14 @@ html[data-theme="dark"] .digital-dashboard-page .dd-modal textarea {
   display: inline-flex !important;
   align-items: center;
   gap: 8px;
+  font-size: 13px !important;
   font-weight: 500 !important;
+  color: var(--rms-text) !important;
 }
 
 .dd-checkbox input {
-  width: auto;
-  min-height: auto;
+  width: 16px;
+  min-height: 0;
 }
 
 .dd-modal-actions {
@@ -1284,41 +1327,6 @@ html[data-theme="light"] .dd-table tbody tr:hover {
   background: #f8fafc;
 }
 
-html[data-theme="light"] .dd-icon-button {
-  background: #ffffff;
-  border-color: var(--rms-border);
-  color: var(--rms-text-body);
-}
-
-html[data-theme="light"] .dd-icon-button:hover {
-  background: #eef2f7;
-  border-color: var(--rms-border-strong);
-  color: var(--rms-text-strong);
-}
-
-html[data-theme="light"] .dd-action-button {
-  background: #ffffff;
-  border-color: var(--rms-border);
-  color: var(--rms-text-strong);
-}
-
-html[data-theme="light"] .dd-action-button:hover {
-  background: #eef2f7;
-  border-color: var(--rms-border-strong);
-}
-
-html[data-theme="light"] .dd-action-button.primary {
-  background: var(--rms-primary-solid);
-  border-color: var(--rms-primary-solid);
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
-}
-
-html[data-theme="light"] .dd-action-button.primary:hover {
-  background: var(--rms-primary-hover);
-  filter: none;
-}
-
 html[data-theme="light"] .dd-media-type {
   color: #1d4ed8;
   background: rgba(37, 99, 235, 0.1);
@@ -1355,15 +1363,15 @@ html[data-theme="light"] .dd-empty-detail {
 
 html[data-theme="light"] .dd-modal,
 html[data-theme="light"] .dd-preview-modal {
-  background: #ffffff;
-  border-color: var(--rms-border);
+  background: var(--rms-bg-panel);
+  border-color: var(--rms-border-strong);
 }
 
 html[data-theme="light"] .dd-modal > header,
 html[data-theme="light"] .dd-preview-modal > .dd-preview-header,
 html[data-theme="light"] .dd-preview-footer {
-  background: #f1f5f9;
-  border-color: var(--rms-border-divider);
+  background: var(--rms-bg-panel-header);
+  border-color: var(--rms-border-strong);
 }
 
 html[data-theme="light"] .dd-modal > header h3,
@@ -1373,18 +1381,6 @@ html[data-theme="light"] .dd-preview-header h3 {
 
 html[data-theme="light"] .dd-preview-header p {
   color: var(--rms-text-muted);
-}
-
-html[data-theme="light"] .dd-modal label {
-  color: var(--rms-text-body);
-}
-
-html[data-theme="light"] .dd-modal input,
-html[data-theme="light"] .dd-modal select,
-html[data-theme="light"] .dd-modal textarea {
-  background: #ffffff;
-  border-color: var(--rms-border);
-  color: var(--rms-text-strong);
 }
 
 html[data-theme="light"] .dd-media-picker {
@@ -1455,11 +1451,11 @@ html[data-theme="light"] .dd-preview-screen {
 }
 
 .digital-dashboard-page .dd-modal {
-  background: #ffffff;
+  background: var(--rms-bg-panel);
 }
 
 .digital-dashboard-page .dd-modal > header {
-  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  background: var(--rms-bg-panel-header);
 }
 
 html[data-theme="dark"] .digital-dashboard-page .dd-header-anchor,
@@ -2851,13 +2847,15 @@ html[data-theme="dark"] .digital-dashboard-page .dd-modal > header {
 }
 
 .neris-connection-result.is-ok {
-  color: var(--rms-success);
-  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid var(--rms-success-border);
+  background: var(--rms-success-soft);
+  color: var(--rms-success-text);
 }
 
 .neris-connection-result.is-problem {
-  color: var(--rms-warning);
-  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid var(--rms-danger-border);
+  background: var(--rms-danger-soft);
+  color: var(--rms-danger-text);
 }
 
 .neris-sync-group {
@@ -2872,8 +2870,9 @@ html[data-theme="dark"] .digital-dashboard-page .dd-modal > header {
 
 .neris-sync-table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--rms-border-subtle);
-  border-radius: 8px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
 }
 
 .neris-sync-table {
@@ -2902,14 +2901,23 @@ html[data-theme="dark"] .digital-dashboard-page .dd-modal > header {
 
 .neris-sync-table select,
 .neris-sync-table input[type="number"] {
-  padding: 4px 6px;
-  border: 1px solid var(--rms-border-subtle);
-  border-radius: 6px;
-  font-size: 0.82rem;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.neris-sync-table select {
+  padding-right: 28px;
 }
 
 .neris-sync-staffing {
-  width: 64px;
+  width: 72px;
 }
 
 .neris-sync-muted {
@@ -2931,13 +2939,9 @@ html[data-theme="dark"] .digital-dashboard-page .dd-modal > header {
   align-items: flex-start;
 }
 
-.neris-sync-results li.is-ok { color: var(--rms-success); }
-.neris-sync-results li.is-problem { color: var(--rms-critical); }
-html[data-theme="light"] .neris-sync-results li.is-ok { color: #15803d; }
-html[data-theme="light"] .neris-sync-results li.is-problem { color: #b91c1c; }
+.neris-sync-results li.is-ok { color: var(--rms-success-text); }
+.neris-sync-results li.is-problem { color: var(--rms-danger-text); }
 
-html[data-theme="light"] .neris-connection-result.is-ok { color: #15803d; }
-html[data-theme="light"] .neris-connection-result.is-problem,
 html[data-theme="light"] .neris-connection-env { color: #b45309; }
 
 .dd-alert-settings-body {
@@ -3042,11 +3046,9 @@ html[data-theme="light"] .neris-connection-env { color: #b45309; }
 
 .dd-display-url-label {
   margin: 0;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--rms-text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rms-text-muted);
 }
 
 .dd-display-url-input {
@@ -3101,4 +3103,185 @@ html[data-theme="light"] .neris-connection-env { color: #b45309; }
 .workspace-alert-dashboard {
   padding: 0;
   overflow: hidden;
+}
+
+/* ── Form controls: the shared RMS form look (src/styles/form-kit.css) ──
+ * Labels above fields (12px, 600, muted), 36px inputs and selects, 84px
+ * textareas, one focus ring, native theme-coloured checkboxes. Colours are
+ * theme tokens so light and dark both work. Tiles and charts are untouched. */
+.app-shell :is(
+  .dd-source-body > label,
+  .dd-source-field-full,
+  .dd-gallery-form-grid label,
+  .dd-gallery-advanced label,
+  .dd-add-media-sidebar label,
+  .dd-active911-connect label,
+  .dd-google-api-field label
+) {
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--rms-text-muted);
+}
+
+.app-shell :is(
+  .dd-import-panel-row,
+  .dd-source-field-full,
+  .dd-source-body label,
+  .dd-gallery-form-grid,
+  .dd-gallery-advanced,
+  .dd-add-media-sidebar,
+  .dd-active911-connect,
+  .dd-google-api-field,
+  .dd-display-url-field
+) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]), select) {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  box-shadow: none;
+}
+
+.app-shell .dd-display-url-field .dd-display-url-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.app-shell :is(.dd-source-body, .dd-gallery-form-grid, .dd-gallery-advanced, .dd-add-media-sidebar) select {
+  padding-right: 28px;
+}
+
+.app-shell :is(.dd-add-media-sidebar, .dd-active911-connect, .dd-alert-csv-import) textarea {
+  width: 100%;
+  min-height: 84px;
+  padding: 8px 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+/* Duration: icon + number inside one 36px box. */
+.app-shell .dd-duration-input {
+  min-height: 36px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+}
+
+.app-shell .dd-add-media-sidebar .dd-duration-input input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]) {
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Toggle rows and checkbox rows read as check rows, not field labels. */
+.app-shell :is(.dd-toggle-row, .dd-alert-checkbox) {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rms-text);
+}
+
+/* Search pills (library, add-media sources): token colours + focus ring. */
+.app-shell :is(.dd-library-search, .dd-library-filter, .dd-add-media-app-search) {
+  min-height: 36px;
+  border-color: var(--rms-border-strong);
+  background: var(--rms-bg-input);
+}
+
+.app-shell :is(.dd-library-search, .dd-library-filter, .dd-add-media-app-search):focus-within {
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft);
+}
+
+.app-shell :is(.dd-library-search, .dd-library-filter, .dd-add-media-app-search) :is(input, select):focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.app-shell :is(.dd-library-search input, .dd-library-filter select, .dd-add-media-app-search input) {
+  font-size: 14px;
+  color: var(--rms-text);
+}
+
+/* One focus ring for every dd field. */
+.app-shell :is(
+  .dd-import-panel-row,
+  .dd-source-field-full,
+  .dd-source-body,
+  .dd-gallery-form-grid,
+  .dd-gallery-advanced,
+  .dd-add-media-sidebar,
+  .dd-active911-connect,
+  .dd-google-api-field,
+  .dd-display-url-field,
+  .dd-alert-csv-import,
+  .neris-sync-table
+) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus {
+  outline: none;
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft);
+}
+
+.app-shell .dd-add-media-sidebar .dd-duration-input:focus-within {
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft);
+}
+
+.app-shell .dd-add-media-sidebar .dd-duration-input input:focus {
+  box-shadow: none;
+}
+
+/* Dialog shells: token surfaces and the shared card border. */
+.app-shell .dd-add-media-modal {
+  border-color: var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
+  box-shadow: var(--rms-shadow-lg);
+}
+
+.app-shell .dd-add-media-header {
+  border-bottom-color: var(--rms-border-strong);
+  background: var(--rms-bg-panel-header);
+}
+
+.app-shell .dd-add-media-footer {
+  border-top-color: var(--rms-border-strong);
+  background: var(--rms-bg-panel-header);
+}
+
+.app-shell .dd-add-media-source-tabs button.active,
+.app-shell .dd-gallery-mode-toggle button.active {
+  color: var(--rms-text-inverse);
+}
+
+.app-shell .dd-display-url-field {
+  border-color: var(--rms-border-strong);
+  background: var(--rms-bg-panel);
+}
+
+.app-shell :is(.dd-google-apis-intro a, .dd-alert-display-links a, .dd-table-link) {
+  color: var(--rms-text-link);
+}
+
+.app-shell .dd-upload-error {
+  color: var(--rms-danger-text);
 }

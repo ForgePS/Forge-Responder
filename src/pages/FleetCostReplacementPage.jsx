@@ -172,7 +172,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
         onNavigate={onNavigate}
         actions={canEdit ? (
           <div className="inspections-header-actions">
-            <button type="button" disabled={saving} onClick={async () => {
+            <button type="button" className="secondary-button" disabled={saving} onClick={async () => {
               setSaving(true);
               setError("");
               try {
@@ -254,7 +254,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
           <>
             {canEdit ? (
               <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                <button type="button" onClick={() => setModal("cost")}><CirclePlus size={14} /> Add cost</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("cost")}><CirclePlus size={14} /> Add cost</button>
               </div>
             ) : null}
             {(board?.costs || []).length ? (
@@ -307,7 +307,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
           <>
             {canEdit ? (
               <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                <button type="button" onClick={() => setModal("downtime")}><CirclePlus size={14} /> Log downtime</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("downtime")}><CirclePlus size={14} /> Log downtime</button>
               </div>
             ) : null}
             <section className="panel" style={{ marginBottom: "12px" }}>
@@ -347,7 +347,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
                         <span>{row.lostServiceHours}</span>
                         <FleetStatusBadge status={row.status} />
                         {canEdit && row.status === "open" ? (
-                          <button type="button" onClick={async () => {
+                          <button type="button" className="secondary-button" onClick={async () => {
                             try {
                               await updateDowntimeEvent(departmentId, row.id, { endedAt: new Date().toISOString(), status: "closed" }, actor);
                               setMessage("Downtime closed.");
@@ -426,7 +426,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
                               }}
                             />
                           </Field>
-                          <select
+                          <select className="status-select" style={{ width: "auto" }}
                             value={selectedCase.status}
                             onChange={async (e) => {
                               await updateReplacementCase(departmentId, selectedCase.id, { status: e.target.value }, actor);
@@ -453,7 +453,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
           <>
             {canEdit ? (
               <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                <button type="button" disabled={saving} onClick={async () => {
+                <button type="button" className="secondary-button" disabled={saving} onClick={async () => {
                   setSaving(true);
                   try {
                     const items = await generateCapitalPlanFromScores(departmentId, { horizonYears: 10 }, actor);
@@ -467,7 +467,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
                 }}>
                   <CalendarRange size={14} /> Generate from scores
                 </button>
-                <button type="button" onClick={() => setModal("capital")}><CirclePlus size={14} /> Add line</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("capital")}><CirclePlus size={14} /> Add line</button>
               </div>
             ) : null}
             {(board?.capital || []).length ? (
@@ -519,7 +519,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
           <>
             {canEdit ? (
               <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                <button type="button" onClick={() => setModal("valuation")}><CirclePlus size={14} /> Add valuation</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("valuation")}><CirclePlus size={14} /> Add valuation</button>
               </div>
             ) : null}
             {(board?.valuations || []).length ? (
@@ -553,7 +553,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
           <>
             {canEdit ? (
               <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                <button type="button" onClick={() => setModal("disposal")}><CirclePlus size={14} /> Start decommission</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("disposal")}><CirclePlus size={14} /> Start decommission</button>
               </div>
             ) : null}
             {(board?.disposals || []).length ? (
@@ -583,7 +583,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
                     {selectedDisposal ? (
                       <>
                         {selectedDisposal.decommissionChecklist.map((item) => (
-                          <label key={item.id} className="config-field" style={{ flexDirection: "row", alignItems: "center", gap: "8px" }}>
+                          <label key={item.id} className="rms-check">
                             <input
                               type="checkbox"
                               disabled={!canEdit || saving || selectedDisposal.status === "complete"}
@@ -677,7 +677,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
         {modal === "cost" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>Add cost entry</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Add cost entry</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Asset">
                   <select value={costDraft.fleetAssetId} onChange={(e) => setCostDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -695,7 +695,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
                 <Field label="Description"><textarea rows={2} value={costDraft.description} onChange={(e) => setCostDraft((c) => ({ ...c, description: e.target.value }))} /></Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving} onClick={async () => {
                   setSaving(true);
                   try {
@@ -721,7 +721,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
         {modal === "downtime" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>Log downtime</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Log downtime</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Asset">
                   <select value={downtimeDraft.fleetAssetId} onChange={(e) => setDowntimeDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -735,13 +735,13 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
                 </Field>
                 <Field label="Service impact"><input value={downtimeDraft.serviceImpact} onChange={(e) => setDowntimeDraft((c) => ({ ...c, serviceImpact: e.target.value }))} /></Field>
                 <Field label="Notes"><textarea rows={2} value={downtimeDraft.notes} onChange={(e) => setDowntimeDraft((c) => ({ ...c, notes: e.target.value }))} /></Field>
-                <label className="config-field" style={{ flexDirection: "row", gap: "8px", alignItems: "center" }}>
+                <label className="rms-check">
                   <input type="checkbox" checked={downtimeDraft.planned} onChange={(e) => setDowntimeDraft((c) => ({ ...c, planned: e.target.checked }))} />
                   <span>Planned downtime</span>
                 </label>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !downtimeDraft.fleetAssetId} onClick={async () => {
                   setSaving(true);
                   try {
@@ -763,7 +763,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
         {modal === "capital" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>Add capital plan line</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Add capital plan line</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Year"><input value={capitalDraft.planYear} onChange={(e) => setCapitalDraft((c) => ({ ...c, planYear: e.target.value }))} /></Field>
                 <Field label="Asset">
@@ -782,7 +782,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
                 </Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !capitalDraft.description} onClick={async () => {
                   setSaving(true);
                   try {
@@ -810,7 +810,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
         {modal === "valuation" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>Add valuation</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Add valuation</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Asset">
                   <select value={valuationDraft.fleetAssetId} onChange={(e) => setValuationDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -830,7 +830,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
                 <Field label="Replacement value"><input value={valuationDraft.replacementValue} onChange={(e) => setValuationDraft((c) => ({ ...c, replacementValue: e.target.value }))} /></Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !valuationDraft.fleetAssetId} onClick={async () => {
                   setSaving(true);
                   try {
@@ -862,7 +862,7 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
         {modal === "disposal" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>Start decommission</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Start decommission</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Asset">
                   <select value={disposalDraft.fleetAssetId} onChange={(e) => setDisposalDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -877,13 +877,13 @@ export default function FleetCostReplacementPage({ onNavigate, legacyApparatus =
                   </select>
                 </Field>
                 <Field label="Authorization"><input value={disposalDraft.authorization} onChange={(e) => setDisposalDraft((c) => ({ ...c, authorization: e.target.value }))} /></Field>
-                <label className="config-field" style={{ flexDirection: "row", gap: "8px", alignItems: "center" }}>
+                <label className="rms-check">
                   <input type="checkbox" checked={disposalDraft.moveToReserve} onChange={(e) => setDisposalDraft((c) => ({ ...c, moveToReserve: e.target.checked }))} />
                   <span>Move to reserve now</span>
                 </label>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !disposalDraft.fleetAssetId} onClick={async () => {
                   setSaving(true);
                   try {

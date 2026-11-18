@@ -1,0 +1,169 @@
+/* Public utility acknowledgment portal (/utility-ack).
+ *
+ * Rendered outside .app-shell, so the shared form kit doesn't reach it.
+ * These rules give it the same look (labels above 36px fields, bordered
+ * cards, one focus ring) using the theme tokens, with light fallbacks so
+ * it still reads correctly if the tokens aren't loaded. */
+
+.utility-ack-portal {
+  min-height: 100vh;
+  padding: 32px 16px;
+  background: var(--rms-bg-body, linear-gradient(180deg, #e8f4f2 0%, #f7faf9 40%, #ffffff 100%));
+  color: var(--rms-text, #0f172a);
+}
+
+.utility-ack-portal__inner {
+  max-width: 720px;
+  margin: 0 auto;
+  display: grid;
+  gap: 16px;
+}
+
+.utility-ack-portal__eyebrow {
+  margin: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rms-text-link, #145d55);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.utility-ack-portal__title {
+  margin: 6px 0 0;
+  font-size: 1.75rem;
+  color: var(--rms-text-strong, #0f172a);
+}
+
+.utility-ack-portal__lead {
+  margin: 8px 0 0;
+  color: var(--rms-text-muted, #475569);
+}
+
+.utility-ack-portal__error {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--rms-danger-border, #fecaca);
+  border-radius: var(--rms-radius-sm, 6px);
+  background: var(--rms-danger-soft, #fef2f2);
+  color: var(--rms-danger-text, #b91c1c);
+}
+
+.utility-ack-portal__success {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--rms-success-border, #a7d7cf);
+  border-radius: var(--rms-radius-sm, 6px);
+  background: var(--rms-success-soft, #e8f4f2);
+  color: var(--rms-success-text, #145d55);
+}
+
+.utility-ack-portal__card {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--rms-border-strong, #d5e3df);
+  border-radius: var(--rms-radius-md, 12px);
+  background: var(--rms-bg-panel, #ffffff);
+  box-shadow: var(--rms-shadow-sm, none);
+}
+
+.utility-ack-portal__muted {
+  color: var(--rms-text-muted, #64748b);
+}
+
+.utility-ack-portal__facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 520px) {
+  .utility-ack-portal__facts {
+    grid-template-columns: 1fr;
+  }
+}
+
+.utility-ack-portal__fact-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rms-text-muted, #64748b);
+}
+
+/* Label above field */
+.utility-ack-portal__field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  color: var(--rms-text, #0f172a);
+}
+
+.utility-ack-portal__field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rms-text-muted, #475569);
+}
+
+.utility-ack-portal__field :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong, #cbd5e1);
+  border-radius: var(--rms-radius-sm, 6px);
+  background: var(--rms-bg-input, #ffffff);
+  color: var(--rms-text, #0f172a);
+  font: inherit;
+  font-size: 14px;
+}
+
+.utility-ack-portal__field select {
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+.utility-ack-portal__field textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 84px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--rms-border-strong, #cbd5e1);
+  border-radius: var(--rms-radius-sm, 6px);
+  background: var(--rms-bg-input, #ffffff);
+  color: var(--rms-text, #0f172a);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.utility-ack-portal__field :is(input, select, textarea):focus {
+  outline: none;
+  border-color: var(--rms-primary, #145d55);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft, rgba(20, 93, 85, 0.18));
+}
+
+.utility-ack-portal__submit {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--rms-radius-sm, 8px);
+  background: var(--rms-primary-solid, #145d55);
+  color: var(--rms-text-inverse, #ffffff);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.utility-ack-portal__submit:hover:not(:disabled) {
+  background: var(--rms-primary-hover, #0f4a44);
+}
+
+.utility-ack-portal__submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}

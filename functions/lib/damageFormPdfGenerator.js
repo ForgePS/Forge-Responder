@@ -23,7 +23,7 @@ function generateDamageFormPdfBuffer(record = {}) {
     doc.on("error", reject);
 
     const title = record.title || record.formTitle || "Damage Form";
-    const source = record.source === "jotform" ? "JotForm" : "Employee portal";
+    const source = record.source === "field-app" ? "FORGE FIELD" : record.source === "jotform" ? "JotForm (older record)" : "Employee portal";
 
     doc.font("Helvetica-Bold").fontSize(18).text(title);
     doc.moveDown(0.4);

@@ -3,6 +3,7 @@ import {
   Activity,
   CalendarDays,
   Check,
+  ChevronRight,
   CirclePlus,
   Clock3,
   ClipboardCheck,
@@ -16,11 +17,11 @@ import {
   X
 } from "lucide-react";
 import InternalEmailBoard from "../components/InternalEmailBoard.jsx";
+import HelpDeskPage from "./HelpDeskPage.jsx";
 import LeaveRequestForm from "../components/employee/LeaveRequestForm.jsx";
 import LeaveRequestsPanel from "../components/scheduling/LeaveRequestsPanel.jsx";
 import VacancyPickupPanel from "../components/employee/VacancyPickupPanel.jsx";
 import MaintenanceIssueForm from "../components/employee/MaintenanceIssueForm.jsx";
-import DamageFormEmbed from "../components/employee/DamageFormEmbed.jsx";
 import EmployeeTimeCard from "../components/employee/EmployeeTimeCard.jsx";
 import ShiftTradeForm from "../components/employee/ShiftTradeForm.jsx";
 import DailyLogPage from "./DailyLogPage.jsx";
@@ -35,7 +36,7 @@ import {
   resolveAllBattalionChiefs,
   validateMaintenanceIssueForm,
 } from "../lib/maintenanceIssueWorkflow.js";
-import { createPortalDamageFormRecord, loadDamageFormSettings } from "../lib/damageFormService.js";
+import { createPortalDamageFormRecord } from "../lib/damageFormService.js";
 import { createFleetWorkOrder } from "../lib/fleet/fleetWorkOrderService.js";
 import { createDefect } from "../lib/fleet/fleetDefectService.js";
 import { resolveFleetAsset } from "../lib/fleet/resolveFleetAsset.js";
@@ -86,10 +87,14 @@ import { resolveEmployeeVacancyDays, formatVacancyPickupSummary, buildVacancyPic
 import { hasPermission } from "../lib/permissions.js";
 import { formatRoleLabel } from "../lib/departmentMembership.js";
 import MyProfile from "../components/profile/MyProfile.jsx";
+import DashboardQuickLinks from "../components/employee/DashboardQuickLinks.jsx";
+import { quickLinksPreferenceKey } from "../lib/dashboardQuickLinks.js";
+import { saveUserPreferences } from "../lib/userPreferences.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { uniqueRecordId } from "../lib/recordIds.js";
-import { acknowledgementKeys, pendingForPerson, withAcknowledgement } from "../lib/documentAcknowledgement.js";
+import { acknowledgementKeys, hasAcknowledged, pendingForPerson, withAcknowledgement } from "../lib/documentAcknowledgement.js";
+import DocumentViewerDialog from "../components/DocumentViewerDialog.jsx";
 import { loadDepartmentMembership } from "../lib/departmentMembership.js";
 import { uploadDamageReportPhotos } from "../lib/damageReportPhotos.js";
 import { processLeaveDecision } from "../lib/leaveAccrualIntegration.js";
@@ -182,8 +187,8 @@ function ApprovalQueue({ leaveActions = [], tradeActions = [], onDecideLeave, on
               <span>{request.dates}{request.hours ? ` · ${request.hours}` : ""} · as {LEAVE_STAGE_ROLE[request.approvalStage] || "approver"}{request.coveringFor ? ` (covering for ${request.coveringFor})` : ""}</span>
             </div>
             <div className="inline-actions">
-              <button type="button" onClick={() => onDecideLeave(request.id, "Approved")}><Check size={13} /> Approve</button>
-              <button type="button" onClick={() => onDecideLeave(request.id, "Denied")}><X size={13} /> Deny</button>
+              <button type="button" className="primary-button" onClick={() => onDecideLeave(request.id, "Approved")}><Check size={13} /> Approve</button>
+              <button type="button" className="secondary-button" onClick={() => onDecideLeave(request.id, "Denied")}><X size={13} /> Deny</button>
             </div>
           </div>
         ))}
@@ -194,8 +199,8 @@ function ApprovalQueue({ leaveActions = [], tradeActions = [], onDecideLeave, on
               <span>{trade.give} → {trade.receive} · as {shiftTradeActionLabel(role)}</span>
             </div>
             <div className="inline-actions">
-              <button type="button" onClick={() => onDecideTrade(trade.id, "Approved")}><Check size={13} /> Approve</button>
-              <button type="button" onClick={() => onDecideTrade(trade.id, "Denied")}><X size={13} /> Deny</button>
+              <button type="button" className="primary-button" onClick={() => onDecideTrade(trade.id, "Approved")}><Check size={13} /> Approve</button>
+              <button type="button" className="secondary-button" onClick={() => onDecideTrade(trade.id, "Denied")}><X size={13} /> Deny</button>
             </div>
           </div>
         ))}
@@ -216,6 +221,10 @@ export default function EmployeePortalPage({
   membership,
   user,
   permissions = {},
+  // Pages this person can pin as Dashboard quick links (from their menu).
+  quickLinkOptions = [],
+  // Render only the personal part of the dashboard (shown on the Command Dashboard).
+  embedded = false,
   showInternalEmail = true,
   personnel = [],
   certifications = [],
@@ -260,13 +269,27 @@ export default function EmployeePortalPage({
 }) {
   const { departmentId } = useTenant();
   const { patchMembership } = useAuth();
+  const quickLinksKey = quickLinksPreferenceKey(membership);
+  const savedQuickLinks = membership?.preferences?.[quickLinksKey];
+  async function saveQuickLinks(next) {
+    const previous = savedQuickLinks ?? null;
+    const patch = { [quickLinksKey]: next ?? null };
+    patchMembership({ preferences: patch });
+    try {
+      await saveUserPreferences(membership?.departmentId || departmentId, user?.uid, patch);
+    } catch (error) {
+      console.error("Failed to save quick links", error);
+      patchMembership({ preferences: { [quickLinksKey]: previous } });
+      setMessage("Couldn't save your quick links. Check your connection and try again.");
+    }
+  }
   const [message, setMessage] = useState("");
+  const [viewingDocId, setViewingDocId] = useState("");
   const [academyTraining, setAcademyTraining] = useState([]);
   const [leaveForm, setLeaveForm] = useState(defaultLeaveForm);
   const [tradeForm, setTradeForm] = useState(defaultTradeForm);
   const [maintenanceForm, setMaintenanceForm] = useState(defaultMaintenanceIssueForm);
   const [submittingMaintenance, setSubmittingMaintenance] = useState(false);
-  const [damageFormSettings, setDamageFormSettings] = useState(null);
   const calendarToday = new Date();
   const [scheduleCalendarYear, setScheduleCalendarYear] = useState(calendarToday.getFullYear());
   const [scheduleCalendarMonth, setScheduleCalendarMonth] = useState(calendarToday.getMonth());
@@ -328,26 +351,6 @@ export default function EmployeePortalPage({
       cancelled = true;
     };
   }, [departmentId, myPerson?.id, myPerson?.forgePersonId, current]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!departmentId) {
-      setDamageFormSettings(null);
-      return undefined;
-    }
-
-    loadDamageFormSettings(departmentId)
-      .then((settings) => {
-        if (!cancelled) setDamageFormSettings(settings);
-      })
-      .catch(() => {
-        if (!cancelled) setDamageFormSettings(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [departmentId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -429,6 +432,8 @@ export default function EmployeePortalPage({
     () => pendingForPerson(documents, acknowledgementKeys(myAckIdentity)),
     [documents, myAckIdentity]
   );
+  // Looked up from all documents so the viewer stays open after acknowledging.
+  const viewingDoc = viewingDocId ? documents.find((item) => item.id === viewingDocId) || null : null;
 
   const myLeave = useMemo(
     () => leaveRequests.filter((item) => recordBelongsToEmployee(item, membership, myPerson)),
@@ -966,13 +971,102 @@ export default function EmployeePortalPage({
     setMessage(`Acknowledged ${doc.title}`);
   }
 
+  // Dashboard pieces, shared by the full personal dashboard and the personal
+  // part shown on the Command Dashboard (`embedded`) for people with department access.
+  const quickLinksBlock = previewPerson ? null : (
+    <DashboardQuickLinks
+      options={quickLinkOptions}
+      saved={savedQuickLinks}
+      onSave={saveQuickLinks}
+      onNavigate={onNavigate}
+    />
+  );
+  const approvalsBlock = approvalCount ? (
+    <ApprovalQueue
+      leaveActions={pendingLeaveActions}
+      tradeActions={pendingTradeActions}
+      onDecideLeave={decideLeaveApproval}
+      onDecideTrade={decideTradeApproval}
+    />
+  ) : null;
+  const certPanel = (
+    <Panel title="Certification Alerts" icon={FileCheck2}>
+      <div className="operational-notes employee-cert-list">
+        {myCertAlerts.map((item) => <p key={item.id}><time>{item.expires}</time><b>{item.type}</b><span>{item.status}</span></p>)}
+        {!myCertAlerts.length && (
+          <p className="operational-notes-empty">
+            <b>All clear</b>
+            <span>{myCerts.length ? `${myCerts.length} certification${myCerts.length === 1 ? "" : "s"} current; none expire in the next 90 days` : "No certifications on file"}</span>
+          </p>
+        )}
+      </div>
+    </Panel>
+  );
+  const requestsPanel = (
+    <Panel title="Pending Requests" icon={CalendarDays}>
+      <div className="operational-notes employee-leave-history">
+        {myPendingLeave.map((item) => (
+          <p key={item.id}>
+            <time>{item.dates}</time>
+            <b>{item.type}</b>
+            <span>{leaveStatusDetail(item)}</span>
+          </p>
+        ))}
+        {myTrades.filter((item) => /pending|awaiting/i.test(item.status || "")).map((item) => (
+          <p key={item.id}><time>{item.submitted}</time><b>Shift trade</b><span>{shiftTradeStatusDetail(item)}</span></p>
+        ))}
+        {!myPendingLeave.length && !pendingTrades && <p className="operational-notes-empty"><b>No pending requests</b><span>Leave and trades will appear here</span></p>}
+      </div>
+    </Panel>
+  );
+  const docsPanel = (
+    <Panel title="Documents to Acknowledge" icon={FileText}>
+      <div className="operational-notes employee-doc-ack-list">
+        {myDocs.map((item) => <p key={item.id} className="is-clickable" role="button" tabIndex={0} title="Open to read and acknowledge" onClick={() => setViewingDocId(item.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setViewingDocId(item.id); } }}><time>{formatShortDate(item.effectiveDate)}</time><b>{item.title}</b><span>{item.category}</span></p>)}
+        {!myDocs.length && <p className="operational-notes-empty"><b>All caught up</b><span>No pending acknowledgements</span></p>}
+      </div>
+    </Panel>
+  );
+  const docViewer = viewingDoc ? (
+    <DocumentViewerDialog
+      doc={viewingDoc}
+      acknowledged={hasAcknowledged(viewingDoc, acknowledgementKeys(myAckIdentity))}
+      onAcknowledge={() => acknowledgeDocument(viewingDoc.id)}
+      onClose={() => setViewingDocId("")}
+    />
+  ) : null;
+  const pendingRequestCount = myPendingLeave.length + pendingTrades;
+
+  if (embedded) {
+    // Only what needs this person's attention; "all clear" panels stay off the Command Dashboard.
+    const myPanels = [
+      myCertAlerts.length ? ["certs", certPanel] : null,
+      pendingRequestCount ? ["requests", requestsPanel] : null,
+      myDocs.length ? ["docs", docsPanel] : null,
+    ].filter(Boolean);
+    return (
+      <div className="employee-portal employee-portal-embedded">
+        {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}>×</button></div>}
+        {quickLinksBlock}
+        {approvalsBlock}
+        {myPanels.length ? (
+          <section className={`dashboard-grid my-work-grid my-work-grid-${myPanels.length}`} aria-label="My work">
+            <h2 className="my-work-heading">My Work</h2>
+            {myPanels.map(([key, panel]) => <div key={key} className="dashboard-column">{panel}</div>)}
+          </section>
+        ) : null}
+        {docViewer}
+      </div>
+    );
+  }
+
   return (
     <div className="employee-portal">
       <section className="module-heading employee-portal-heading">
         <div>
           <span className="module-icon"><UserRound size={22} /></span>
           <div>
-            <h1>{current || "My Dashboard"}</h1>
+            <h1>{current || "Dashboard"}</h1>
             <p>
               {myPerson?.name || membership?.displayName || "Member"}
               {myPerson?.rank ? ` · ${myPerson.rank}` : ""}
@@ -997,60 +1091,19 @@ export default function EmployeePortalPage({
 
       {message && <div className="success-banner">{message}<button onClick={() => setMessage("")}>×</button></div>}
 
-      {current === "My Dashboard" && (
+      {current === "Dashboard" && (
         <>
           <section className="training-summary">
             {[["Next Shift", scheduleContext.isWorkDayToday && myPerson?.shift ? `Today · ${myPerson.shift}` : myShift ? `${myShift.date} · ${myShift.shift}` : (!onRotation && (myPerson?.shift || membership?.assignedShift) ? "Day staff" : "—"), "info"], ["Certification Alerts", certAlerts, certAlerts ? "warning" : "success"], ["Training Due", trainingDue, trainingDue ? "warning" : "success"], ["Documents", myDocs.length, myDocs.length ? "warning" : "success"], ["Pending Trades", pendingTrades, pendingTrades ? "warning" : "info"]].map(([label, value, tone]) => (
               <div key={label} className={`fleet-stat stat-${tone}`}><strong>{value}</strong><span>{label}</span></div>
             ))}
           </section>
-          {approvalCount ? (
-            <ApprovalQueue
-              leaveActions={pendingLeaveActions}
-              tradeActions={pendingTradeActions}
-              onDecideLeave={decideLeaveApproval}
-              onDecideTrade={decideTradeApproval}
-            />
-          ) : null}
+          {quickLinksBlock}
+          {approvalsBlock}
           <section className="dashboard-grid">
-            <div className="dashboard-column">
-              <Panel title="Certification Alerts" icon={FileCheck2}>
-                <div className="operational-notes employee-cert-list">
-                  {myCertAlerts.map((item) => <p key={item.id}><time>{item.expires}</time><b>{item.type}</b><span>{item.status}</span></p>)}
-                  {!myCertAlerts.length && (
-                    <p className="operational-notes-empty">
-                      <b>All clear</b>
-                      <span>{myCerts.length ? `${myCerts.length} certification${myCerts.length === 1 ? "" : "s"} current; none expire in the next 90 days` : "No certifications on file"}</span>
-                    </p>
-                  )}
-                </div>
-              </Panel>
-            </div>
-            <div className="dashboard-column">
-              <Panel title="Pending Requests" icon={CalendarDays}>
-                <div className="operational-notes employee-leave-history">
-                  {myPendingLeave.map((item) => (
-                    <p key={item.id}>
-                      <time>{item.dates}</time>
-                      <b>{item.type}</b>
-                      <span>{leaveStatusDetail(item)}</span>
-                    </p>
-                  ))}
-                  {myTrades.filter((item) => /pending|awaiting/i.test(item.status || "")).map((item) => (
-                    <p key={item.id}><time>{item.submitted}</time><b>Shift trade</b><span>{shiftTradeStatusDetail(item)}</span></p>
-                  ))}
-                  {!myPendingLeave.length && !pendingTrades && <p className="operational-notes-empty"><b>No pending requests</b><span>Leave and trades will appear here</span></p>}
-                </div>
-              </Panel>
-            </div>
-            <div className="dashboard-column">
-              <Panel title="Documents to Acknowledge" icon={FileText}>
-                <div className="operational-notes employee-doc-ack-list">
-                  {myDocs.map((item) => <p key={item.id}><time>{formatShortDate(item.effectiveDate)}</time><b>{item.title}</b><span>{item.category}</span></p>)}
-                  {!myDocs.length && <p className="operational-notes-empty"><b>All caught up</b><span>No pending acknowledgements</span></p>}
-                </div>
-              </Panel>
-            </div>
+            <div className="dashboard-column">{certPanel}</div>
+            <div className="dashboard-column">{requestsPanel}</div>
+            <div className="dashboard-column">{docsPanel}</div>
           </section>
         </>
       )}
@@ -1263,10 +1316,10 @@ export default function EmployeePortalPage({
                           <span>Awaiting your approval as {shiftTradeActionLabel(role)}</span>
                         </p>
                         <div className="inline-actions">
-                          <button type="button" onClick={() => decideTradeApproval(trade.id, "Approved")}>
+                          <button type="button" className="primary-button" onClick={() => decideTradeApproval(trade.id, "Approved")}>
                             <Check size={13} /> Approve
                           </button>
-                          <button type="button" onClick={() => decideTradeApproval(trade.id, "Denied")}>
+                          <button type="button" className="secondary-button" onClick={() => decideTradeApproval(trade.id, "Denied")}>
                             <X size={13} /> Deny
                           </button>
                         </div>
@@ -1369,10 +1422,10 @@ export default function EmployeePortalPage({
         <Panel title="My Documents" icon={FileText}>
           <div className="document-library">
             {myDocs.map((item) => (
-              <div className="doc-row" key={item.id}>
+              <button type="button" className="doc-row employee-doc-row" key={item.id} onClick={() => setViewingDocId(item.id)}>
                 <span><strong>{item.title}</strong><small>{item.category}</small></span>
-                <button className="row-action" onClick={() => acknowledgeDocument(item.id)}>Acknowledge</button>
-              </div>
+                <span className="employee-doc-row-action">Read &amp; acknowledge <ChevronRight size={16} aria-hidden="true" /></span>
+              </button>
             ))}
             {!myDocs.length && <p className="empty-table">No pending document acknowledgements.</p>}
           </div>
@@ -1419,6 +1472,8 @@ export default function EmployeePortalPage({
 
       {current === "Field App" && fieldApp}
 
+      {current === "Help Desk" && <HelpDeskPage embedded />}
+
       {current === "Messages" && canViewInternalEmail && (
         <Panel title="Messages" icon={Mail}>
           <InternalEmailBoard compact onMessage={setMessage} personnelRecords={personnel} />
@@ -1427,12 +1482,7 @@ export default function EmployeePortalPage({
 
       {current === "Maintenance Issues" && (
         <Panel title="Report Maintenance Issue" icon={Wrench}>
-          {damageFormSettings?.formUrl ? (
-            <DamageFormEmbed
-              formUrl={damageFormSettings.formUrl}
-              formTitle={damageFormSettings.formTitle || "Damage Form"}
-            />
-          ) : canSubmitMaintenance ? (
+          {canSubmitMaintenance ? (
             <MaintenanceIssueForm
               value={maintenanceForm}
               onChange={setMaintenanceForm}
@@ -1446,6 +1496,8 @@ export default function EmployeePortalPage({
           )}
         </Panel>
       )}
+
+      {docViewer}
     </div>
   );
 }

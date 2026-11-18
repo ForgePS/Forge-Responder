@@ -22,17 +22,17 @@
 select.checklist-input-invalid,
 input.checklist-input-invalid,
 textarea.checklist-input-invalid {
-  border-color: #dc2626 !important;
-  outline-color: #dc2626;
+  border-color: var(--rms-danger-border) !important;
+  outline-color: var(--rms-danger-border);
 }
 
 .checklist-field-missing > span:first-child {
-  color: #b91c1c;
+  color: var(--rms-danger-text);
 }
 
 .checklist-field-error {
   display: block;
-  color: #b91c1c;
+  color: var(--rms-danger-text);
 }
 
 .checklist-photo-field {
@@ -58,8 +58,8 @@ textarea.checklist-input-invalid {
   width: 84px;
   height: 84px;
   object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--rms-radius-sm);
+  border: 1px solid var(--rms-border-strong);
 }
 
 .checklist-photo-remove {
@@ -119,10 +119,10 @@ textarea.checklist-input-invalid {
 .checklist-missing-alert {
   margin: 0 0 12px;
   padding: 10px 12px;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  background: #fef2f2;
-  color: #991b1b;
+  border: 1px solid var(--rms-danger-border);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-danger-soft);
+  color: var(--rms-danger-text);
 }
 
 .checklist-missing-alert ul {
@@ -146,37 +146,40 @@ textarea.checklist-input-invalid {
   gap: 8px 12px;
   margin: 0 0 12px;
   padding: 10px 12px;
-  border: 1px solid #bfdbfe;
-  border-radius: 8px;
-  background: #eff6ff;
-  color: #1e3a8a;
+  border: 1px solid var(--rms-primary);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-primary-soft);
+  color: var(--rms-text-body);
 }
 
 .pending-citation-banner > span {
   flex: 1 1 220px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .checklist-missing-alert {
-    border-color: #7f1d1d;
-    background: rgba(127, 29, 29, 0.25);
-    color: #fecaca;
-  }
-  :root:not([data-theme="light"]) .pending-citation-banner {
-    border-color: #1e3a8a;
-    background: rgba(30, 58, 138, 0.25);
-    color: #bfdbfe;
-  }
+/* Remarks and photos under a No/Fail answer (templates with remarksOnFail). */
+.inspection-fail-details {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--rms-danger-border);
+  border-left: 3px solid var(--rms-danger-text);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-danger-soft);
 }
-
-:root[data-theme="dark"] .checklist-missing-alert {
-  border-color: #7f1d1d;
-  background: rgba(127, 29, 29, 0.25);
-  color: #fecaca;
+.inspection-fail-details > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rms-text-muted);
 }
-
-:root[data-theme="dark"] .pending-citation-banner {
-  border-color: #1e3a8a;
-  background: rgba(30, 58, 138, 0.25);
-  color: #bfdbfe;
+.inspection-fail-details textarea {
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
+  font: inherit;
+  font-size: 14px;
 }

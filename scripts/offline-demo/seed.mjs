@@ -110,6 +110,13 @@ export async function seedOfflineDemo({ root, dataDir }) {
     });
   }
 
+  // Forge AI is off by default for every department; the demo department starts
+  // with it on. Only written once, so turning it off in the demo sticks.
+  const forgeAiRef = db.doc(`departments/${DEPARTMENT_ID}/forgeAiSettings/main`);
+  if (!(await forgeAiRef.get()).exists) {
+    await forgeAiRef.set({ enabled: true, capabilities: {}, dailyLimit: 300, updatedAt: now, updatedBy: "offline-demo" });
+  }
+
   // The local creator login (Creator Console). Its password is made once and kept with the demo data.
   mkdirSync(dataDir, { recursive: true });
   const loginFile = join(dataDir, "creator-login.txt");

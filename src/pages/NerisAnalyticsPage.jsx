@@ -13,6 +13,7 @@ import { isNerisFeatureEnabled } from "../lib/neris/featureFlags.js";
 import { useTenant } from "../context/TenantContext.jsx";
 import { labelFromKey } from "../lib/labelFromKey.js";
 import { INCIDENT_KINDS, primaryTypeLabel } from "../lib/neris/reportModel.js";
+import ForgeAiLaunchButton from "../components/forgeAi/ForgeAiLaunchButton.jsx";
 import "../styles/neris-analytics.css";
 
 const NOT_ENOUGH = "Not enough data";
@@ -131,6 +132,9 @@ export default function NerisAnalyticsPage({ reports = [] }) {
             <p>NFPA 1710 response metrics, annual survey exports, incident heat mapping, and ad-hoc reporting.</p>
           </div>
         </div>
+        <div className="heading-actions">
+          <ForgeAiLaunchButton capability="incident" prompt="Summarize incidents this month by type and response time" />
+        </div>
       </section>
 
       <section className="cert-toolbar">
@@ -223,8 +227,8 @@ export default function NerisAnalyticsPage({ reports = [] }) {
       {activeTab === "annual" ? (
         <section className="neris-analytics-grid">
           <div className="neris-analytics-toolbar">
-            <label>
-              Survey year
+            <label className="rms-field">
+              <span>Survey year</span>
               <input
                 type="number"
                 value={surveyYear}
@@ -313,12 +317,12 @@ export default function NerisAnalyticsPage({ reports = [] }) {
       {activeTab === "adhoc" ? (
         <section className="neris-analytics-grid">
           <div className="neris-analytics-toolbar">
-            <label>
-              Status filter
+            <label className="rms-field">
+              <span>Status filter</span>
               <input value={adHocFilter.status} onChange={(e) => setAdHocFilter((f) => ({ ...f, status: e.target.value }))} placeholder="Draft, Approved…" />
             </label>
-            <label>
-              Type filter
+            <label className="rms-field">
+              <span>Type filter</span>
               <input value={adHocFilter.incidentType} onChange={(e) => setAdHocFilter((f) => ({ ...f, incidentType: e.target.value }))} placeholder="Chest pain, fire…" />
             </label>
             <button

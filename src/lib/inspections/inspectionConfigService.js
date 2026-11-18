@@ -85,6 +85,10 @@ export function normalizeInspectionTemplate(raw = {}, departmentId = "") {
     currentVersion: Number.isFinite(Number(data.currentVersion)) ? Number(data.currentVersion) : 0,
     publishedVersionId: data.publishedVersionId || "",
     draftVersionId: data.draftVersionId || "",
+    // Yes/No and Pass/Fail items answered No/Fail ask for remarks and photos.
+    remarksOnFail: Boolean(data.remarksOnFail),
+    // Set when the template was made from a digital form (Digital Forms → Use for inspections).
+    sourceDigitalFormId: data.sourceDigitalFormId || "",
     sections,
     createdAt: data.createdAt || "",
     updatedAt: data.updatedAt || "",
@@ -315,6 +319,7 @@ export async function publishInspectionTemplate(departmentId, template = {}, opt
     name: current.name,
     description: current.description,
     inspectionTypeId: current.inspectionTypeId,
+    remarksOnFail: current.remarksOnFail,
     sections: current.sections,
   };
 

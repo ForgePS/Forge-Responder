@@ -568,6 +568,48 @@ service cloud.firestore {
       allow write: if isPlatformCreator();
     }
 
+    // ---- Help Desk (functions/lib/helpDesk.js writes everything) ----
+    // FORGE staff (platform creators) see every request; a department's admins see
+    // their own department's; anyone else sees only the requests they opened, and
+    // never internal notes or the notification log.
+    function isHelpDeskStaff(departmentId) {
+      return isPlatformCreator() || isDepartmentAdmin(departmentId);
+    }
+    function helpDeskTicket(ticketId) {
+      return get(/databases/$(database)/documents/helpDeskTickets/$(ticketId)).data;
+    }
+    match /helpDeskTickets/{ticketId} {
+      allow read: if isAuthenticated()
+        && (resource.data.requesterUid == request.auth.uid || isHelpDeskStaff(resource.data.departmentId));
+      allow write: if false;
+      match /messages/{messageId} {
+        allow read: if isAuthenticated()
+          && exists(/databases/$(database)/documents/helpDeskTickets/$(ticketId))
+          && (isHelpDeskStaff(helpDeskTicket(ticketId).departmentId)
+            || (helpDeskTicket(ticketId).requesterUid == request.auth.uid && resource.data.visibility == "public"));
+        allow write: if false;
+      }
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated()
+          && exists(/databases/$(database)/documents/helpDeskTickets/$(ticketId))
+          && isHelpDeskStaff(helpDeskTicket(ticketId).departmentId);
+        allow write: if false;
+      }
+    }
+    // Notification lists (email addresses): the platform's for creators, each
+    // department's for its admins. Counter and rate limits are server-only.
+    match /platformHelpDesk/{document} {
+      allow read: if document == "settings" && isPlatformCreator();
+      allow write: if false;
+    }
+    match /helpDeskSettings/{departmentId} {
+      allow read: if isHelpDeskStaff(departmentId);
+      allow write: if false;
+    }
+    match /helpDeskRate/{uid} {
+      allow read, write: if false;
+    }
+
     // Platform IFC / code library (Creator-managed publications).
     match /codePublications/{publicationId} {
       allow read: if isAuthenticated();
@@ -707,6 +749,9 @@ service cloud.firestore {
         "fieldCheckoffLists", "fieldCheckoffs", "fieldPlanUpdates",
         "hydrants", "hydrantInspections", "hydrantFlowTests", "dailyActivity",
         "heatZoneAccess", "heatZoneCalls", "heatZoneEvents", "heatZoneGeocodes", "heatZoneMeta", "heatZoneSettings", "heatZoneZones",
+        "forgeAiBriefings", "forgeAiConversations", "forgeAiFeedback", "forgeAiMessageSources", "forgeAiMessages",
+        "forgeAiSettings", "forgeAiUsage", "forgeAiUsageLogs",
+        "formImports", "formSubmissions", "formTemplateVersions", "formTemplates",
         "pcrs"
       ];
     }
@@ -924,6 +969,31 @@ service cloud.firestore {
         allow delete: if canWriteModule(departmentId, "internalEmail")
           && (resource.data.get("fromUid", "") == request.auth.uid || memberCanAny(departmentId, ["manageInternalEmail"]));
       }
+      // Digital Forms (functions/lib/digitalForms). Everything is written by Cloud
+      // Functions, which check membership and permissions; browsers only read.
+      // Uploads and drafts under review are for form managers only; published forms
+      // for anyone who fills in, manages or reviews forms; a submission for the
+      // member who sent it and those allowed to see everyone's.
+      match /formImports/{document} {
+        allow read: if canAccessDepartment(departmentId) && memberCanAny(departmentId, ["manageDigitalForms"]);
+        allow write: if false;
+      }
+      match /formTemplates/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["fillDigitalForms", "manageDigitalForms", "viewDigitalFormSubmissions"]);
+        allow write: if false;
+      }
+      match /formTemplateVersions/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["fillDigitalForms", "manageDigitalForms", "viewDigitalFormSubmissions"]);
+        allow write: if false;
+      }
+      match /formSubmissions/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && (resource.data.get("submittedBy", "") == request.auth.uid
+            || memberCanAny(departmentId, ["viewDigitalFormSubmissions", "manageDigitalForms"]));
+        allow write: if false;
+      }
       // Heat Zone Analytics (functions/lib/heatZone). Everything is written by Cloud
       // Functions only; analytics are served through callables that check the
       // caller's department membership, permissions and district scope. Browsers
@@ -948,6 +1018,46 @@ service cloud.firestore {
         allow read, write: if false;
       }
       match /heatZoneGeocodes/{document} {
+        allow read, write: if false;
+      }
+      // Forge AI (functions/lib/forgeAi). Written only by Cloud Functions. A member
+      // may read their own conversations, messages and message sources; settings,
+      // usage, feedback and audit data are served by permission-checked callables.
+      match /forgeAiConversations/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["useForgeAi"])
+          && resource.data.get("ownerUid", "") == request.auth.uid;
+        allow write: if false;
+      }
+      match /forgeAiMessages/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["useForgeAi"])
+          && resource.data.get("ownerUid", "") == request.auth.uid;
+        allow write: if false;
+      }
+      match /forgeAiMessageSources/{document} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["useForgeAi"])
+          && resource.data.get("ownerUid", "") == request.auth.uid;
+        allow write: if false;
+      }
+      match /forgeAiBriefings/{document} {
+        // A briefing holds what its author was allowed to see, so only its author reads it.
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["useForgeAiBriefings"])
+          && resource.data.get("createdBy", "") == request.auth.uid;
+        allow write: if false;
+      }
+      match /forgeAiSettings/{document} {
+        allow read, write: if false;
+      }
+      match /forgeAiUsage/{document} {
+        allow read, write: if false;
+      }
+      match /forgeAiUsageLogs/{document} {
+        allow read, write: if false;
+      }
+      match /forgeAiFeedback/{document} {
         allow read, write: if false;
       }
       match /auditLogs/{logId} {

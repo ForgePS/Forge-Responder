@@ -88,16 +88,17 @@
   place-items: center;
   width: 26px;
   height: 26px;
-  border: 1px solid #cbd5e1;
-  border-radius: 3px;
-  background: #f8fafc;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text-body);
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .time-card-save-note {
   margin: 0;
-  color: #047857;
+  color: var(--rms-success-text);
   font-size: 13px;
   font-weight: 600;
 }
@@ -611,13 +612,14 @@
 
 .admin-time-card-editor-controls label {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   min-width: 240px;
 }
 
 .admin-time-card-editor-controls label span {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
+  color: var(--rms-text-muted);
 }
 
 .admin-time-card-editor-controls select {
@@ -648,12 +650,26 @@
 
 .time-card-bulk-print-controls label {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .time-card-bulk-print-controls label span {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
+  color: var(--rms-text-muted);
+}
+
+.admin-time-card-editor-controls select,
+.time-card-bulk-print-controls :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
+  color: var(--rms-text);
+  font: inherit;
+  font-size: 14px;
 }
 
 .time-card-bulk-print-stack {

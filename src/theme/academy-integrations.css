@@ -1,9 +1,9 @@
 .admin-integration-card {
   margin-top: 1rem;
   padding: 1rem 1.25rem;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
 }
 
 .admin-integration-card__header {
@@ -35,9 +35,10 @@
 }
 
 .academy-connection-card {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
   padding: 0.85rem 1rem;
+  background: var(--rms-bg-surface-2);
 }
 
 .academy-connection-card__title {
@@ -55,14 +56,21 @@
 }
 
 .academy-provider-fields {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
   padding: 0.75rem 1rem;
+}
+
+.academy-provider-fields legend {
+  padding: 0 4px;
+  color: var(--rms-text-muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .academy-audit-drawer {
   margin-top: 1rem;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid var(--rms-border-divider);
   padding-top: 1rem;
 }
 
@@ -77,7 +85,7 @@
 .academy-workflow-shell {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+  border-top: 1px dashed var(--rms-border-strong);
 }
 
 .academy-person-block + .academy-person-block {
@@ -88,9 +96,10 @@
   max-height: 160px;
   overflow: auto;
   font-size: 0.75rem;
-  background: #f7f7f8;
+  background: var(--rms-bg-surface-2);
+  color: var(--rms-text-body);
   padding: 0.5rem;
-  border-radius: 6px;
+  border-radius: var(--rms-radius-sm);
 }
 
 .badge {
@@ -99,13 +108,13 @@
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
   font-size: 0.7rem;
-  background: #e8eef5;
-  color: #1f3a5f;
+  background: var(--rms-primary-soft);
+  color: var(--rms-text-strong);
 }
 
 .badge-muted {
-  background: #eee;
-  color: #555;
+  background: var(--rms-bg-surface-3);
+  color: var(--rms-text-muted);
 }
 
 .muted.small,
@@ -114,7 +123,7 @@
 }
 
 .form-success {
-  color: #17633a;
+  color: var(--rms-success-text);
 }
 
 .checkbox-row {

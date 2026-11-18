@@ -508,7 +508,7 @@ export default function FleetOperationsPage({ onNavigate, legacyApparatus = [] }
         {modal === "assign" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Assign unit</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Assign unit</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={assignDraft.fleetAssetId} onChange={(e) => setAssignDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -542,7 +542,7 @@ export default function FleetOperationsPage({ onNavigate, legacyApparatus = [] }
         {modal === "transfer" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Request transfer</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Request transfer</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={transferDraft.fleetAssetId} onChange={(e) => setTransferDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -577,7 +577,7 @@ export default function FleetOperationsPage({ onNavigate, legacyApparatus = [] }
         {modal === "swap" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Reserve swap</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Reserve swap</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Frontline unit">
                   <select value={swapDraft.frontlineAssetId} onChange={(e) => setSwapDraft((c) => ({ ...c, frontlineAssetId: e.target.value }))}>
@@ -614,7 +614,7 @@ export default function FleetOperationsPage({ onNavigate, legacyApparatus = [] }
         {modal === "checkout" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Check out unit</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Check out unit</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={checkoutDraft.fleetAssetId} onChange={(e) => setCheckoutDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -652,7 +652,7 @@ export default function FleetOperationsPage({ onNavigate, legacyApparatus = [] }
         {modal === "reserve" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Pool reservation</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Pool reservation</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={reserveDraft.fleetAssetId} onChange={(e) => setReserveDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -690,7 +690,7 @@ export default function FleetOperationsPage({ onNavigate, legacyApparatus = [] }
         {modal === "decon" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Record decontamination</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Record decontamination</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={deconDraft.fleetAssetId} onChange={(e) => setDeconDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>

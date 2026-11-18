@@ -267,7 +267,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
             </div>
             {selected.fileUrl && selected.fileUrl !== "#" ? (
               <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <a className="primary-button" href={selected.fileUrl} target="_blank" rel="noreferrer" style={{ display: "inline-flex" }}>
+                <a className="primary-button" href={selected.fileUrl} target="_blank" rel="noreferrer">
                   Open Document
                 </a>
                 {canEdit ? (
@@ -287,7 +287,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
               </div>
             )}
             {canEdit && isObjectVisibleInActiveList(selected) ? (
-              <label className="inline-check" style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+              <label className="inline-check" style={{ marginTop: 12 }}>
                 <input
                   type="checkbox"
                   checked={requiresAcknowledgement(selected)}
@@ -318,7 +318,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
           onClose={() => { setShowUpload(false); setAttachToId(""); }}
         >
           {attachToId ? null : <div className="upload-form" style={{ marginBottom: 12 }}>
-            <label>
+            <label className="rms-field">
               <span>Title</span>
               <input
                 value={uploadMeta.title}
@@ -326,7 +326,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
                 placeholder="Document title"
               />
             </label>
-            <label>
+            <label className="rms-field">
               <span>Category</span>
               <select
                 value={uploadMeta.category}
@@ -337,7 +337,7 @@ export function DocumentsPage({ query, records = [], setRecords, navLabel = "Doc
                 ))}
               </select>
             </label>
-            <label className="wide-field">
+            <label className="rms-field wide">
               <span>Description</span>
               <input
                 value={uploadMeta.description}

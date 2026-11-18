@@ -123,7 +123,7 @@ export default function FleetVendorPortalPage({ onNavigate }) {
                 </select>
               </Field>
               {canEdit && board.vendor ? (
-                <label className="config-field" style={{ flexDirection: "row", gap: "8px", alignItems: "center" }}>
+                <label className="rms-check">
                   <input
                     type="checkbox"
                     checked={board.vendor.portalEnabled !== false}

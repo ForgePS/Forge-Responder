@@ -13,7 +13,7 @@ import { currentHydrantYear } from "../lib/hydrantCompletionStats.js";
 import HydrantCompletionChart from "./HydrantCompletionChart.jsx";
 import DamageFormsPanel from "./DamageFormsPanel.jsx";
 
-import ThemeToggle from "./ThemeToggle.jsx";
+import ForgeAiLaunchButton from "./forgeAi/ForgeAiLaunchButton.jsx";
 
 function Panel({ title, icon: Icon, action, children, className = "" }) {
   return (
@@ -47,6 +47,8 @@ function MiniTable({ columns, rows, emptyMessage }) {
 
 export default function CommandDashboard({
   onNavigate,
+  // This person's quick links, approvals and alerts (from EmployeePortalPage, embedded).
+  personal = null,
   departmentId = "",
   personnel,
   certifications,
@@ -169,9 +171,10 @@ export default function CommandDashboard({
           <span>Operational overview, readiness, and action items</span>
         </div>
         <div className="dashboard-theme-actions">
-          <ThemeToggle />
+          <ForgeAiLaunchButton capability="briefing" prompt="Create a shift briefing for the last 24 hours" label="Shift briefing" title="Forge AI writes a shift briefing from the last 24 hours of records" />
         </div>
       </section>
+      {personal}
       <section className="kpi-grid">
         {kpis.map(([label, value, note, tone, Icon, target]) => (
           <button key={label} className={`kpi-card tone-${tone}`} onClick={() => onNavigate(target)}>

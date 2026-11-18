@@ -15,6 +15,7 @@ export const NAV_MODULE_MAP = {
   "Readiness Board": "apparatus",
   "Fleet Defects": "apparatus",
   "Fleet Work Orders": "apparatus",
+  "Maintenance Dashboard": "apparatus",
   "PM Forecast": "apparatus",
   "Fleet Tests": "apparatus",
   "Fuel & Energy": "apparatus",
@@ -94,6 +95,7 @@ export const NAV_MODULE_MAP = {
   "SOGs / Policies": "documents",
   "EMS Protocols": "documents",
   Forms: "documents",
+  "Digital Forms": "documents",
   Uploads: "documents",
   Analytics: "analytics",
   "Messages": "internalEmail",
@@ -196,6 +198,9 @@ export const ADMIN_PERMISSION_LABELS = {
   editFleetVendorPortal: "Edit fleet vendor portal",
   viewDocuments: "View documents",
   editDocuments: "Edit documents",
+  manageDigitalForms: "Upload, convert, review and publish digital forms",
+  fillDigitalForms: "Fill in digital forms",
+  viewDigitalFormSubmissions: "View everyone's digital form submissions",
   viewInspections: "View inspections",
   editInspections: "Edit inspections",
   manageInspectionConfig: "Manage inspection configuration",
@@ -268,6 +273,11 @@ export const ADMIN_PERMISSION_LABELS = {
   viewHeatZoneRepeatLocations: "View repeat-location analytics",
   exportHeatZoneReports: "Export Heat Zone reports",
   manageHeatZoneSettings: "Manage Heat Zone boundaries, weights and district access",
+  useForgeAi: "Use Forge AI (only with data the member can already see)",
+  useForgeAiBriefings: "Generate Forge AI shift and command briefings",
+  useForgeAiSupervisorQa: "Run Forge AI supervisor QA reviews",
+  manageForgeAi: "Turn Forge AI and its capabilities on or off",
+  viewForgeAiUsage: "View Forge AI usage, feedback and audit trail",
   accessAdminRms: "Access Admin RMS",
   accessEmployeePortal: "Access employee portal",
   submitLeaveRequests: "Submit leave requests",
@@ -361,6 +371,9 @@ export const ADMIN_PERMISSION_GROUPS = [
     keys: [
       "viewDocuments",
       "editDocuments",
+      "manageDigitalForms",
+      "fillDigitalForms",
+      "viewDigitalFormSubmissions",
       "viewInspections",
       "editInspections",
       "manageInspectionConfig",
@@ -427,6 +440,10 @@ export const ADMIN_PERMISSION_GROUPS = [
   {
     label: "Heat Zone Analytics",
     keys: ["viewHeatZoneAnalytics", "viewHeatZoneMarkers", "viewHeatZoneAllDistricts", "viewHeatZoneHistory", "viewHeatZoneRepeatLocations", "exportHeatZoneReports", "manageHeatZoneSettings"]
+  },
+  {
+    label: "Forge AI",
+    keys: ["useForgeAi", "useForgeAiBriefings", "useForgeAiSupervisorQa", "manageForgeAi", "viewForgeAiUsage"]
   },
   {
     label: "Portal access",

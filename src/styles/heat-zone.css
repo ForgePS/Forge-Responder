@@ -27,29 +27,33 @@
 .heat-zone-page .hz-input,
 .heat-zone-page .config-field select,
 .heat-zone-page .config-field input:not([type="checkbox"]):not([type="color"]) {
-  min-height: 32px;
-  padding: 0 8px;
+  min-height: 36px;
+  padding: 0 10px;
   border: 1px solid var(--rms-border-strong);
-  border-radius: 5px;
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
   color: var(--rms-text-strong);
   font: inherit;
   font-size: 14px;
 }
 .heat-zone-page .config-field input[type="file"] { padding: 4px 6px; }
-.heat-zone-page input:focus-visible,
-.heat-zone-page select:focus-visible,
+.heat-zone-page :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select):focus {
+  outline: none;
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft);
+}
+.heat-zone-page :is(input[type="checkbox"], input[type="radio"], input[type="range"]):focus-visible,
 .heat-zone-page button:focus-visible,
 .heat-zone-page tr:focus-visible { outline: 2px solid var(--rms-primary); outline-offset: 1px; }
 .heat-zone-page .hz-input.is-invalid { border-color: var(--rms-critical); }
 .heat-zone-page .hz-number { width: 96px; }
-.heat-zone-page .hz-color { width: 40px; height: 30px; padding: 2px; border: 1px solid var(--rms-border-strong); border-radius: 5px; background: var(--rms-bg-input); cursor: pointer; }
-.heat-zone-page .hz-icon-button { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 5px; background: transparent; color: var(--rms-text-muted); }
-.heat-zone-page .hz-icon-button:hover { background: var(--rms-bg-hover); color: var(--rms-text-strong); }
+.heat-zone-page .hz-color { width: 40px; height: 36px; padding: 2px; border: 1px solid var(--rms-border-strong); border-radius: var(--rms-radius-sm); background: var(--rms-bg-input); cursor: pointer; }
+.heat-zone-page .hz-icon-button { width: 36px; min-width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border: 1px solid var(--rms-border-strong); border-radius: var(--rms-radius-sm); background: var(--rms-bg-input); color: var(--rms-text-body); }
+.heat-zone-page .hz-icon-button:hover:not(:disabled) { border-color: var(--rms-primary); background: var(--rms-bg-hover); color: var(--rms-primary); }
 
 .heat-zone-page .hz-chip-set { display: flex; flex-wrap: wrap; gap: 4px; }
 .heat-zone-page .hz-chip {
-  min-height: 30px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -66,15 +70,15 @@
 .heat-zone-page .hz-chip:hover:not(:disabled) { background: var(--rms-bg-hover); color: var(--rms-text-strong); }
 .heat-zone-page .hz-chip.active { border-color: var(--rms-primary); background: var(--rms-primary-soft); color: var(--rms-text-link); }
 
-.heat-zone-page .config-field { display: grid; gap: 4px; min-width: 0; }
-.heat-zone-page .config-field > span { color: var(--rms-text-muted); font-size: 13px; font-weight: 700; }
+.heat-zone-page .config-field { display: grid; gap: 5px; min-width: 0; }
+.heat-zone-page .config-field > span { color: var(--rms-text-muted); font-size: 12px; font-weight: 600; }
 
 /* Heading, tabs, live status */
 .heat-zone-page .module-heading .heading-actions { align-items: center; }
 .heat-zone-page .hz-tabs { flex-wrap: wrap; }
 .heat-zone-page .hz-tabs .segmented-control { flex-wrap: wrap; flex-shrink: 1; }
 .heat-zone-page .hz-tabs .segmented-control button { display: inline-flex; align-items: center; gap: 6px; }
-.heat-zone-page .hz-live { display: inline-flex; align-items: center; gap: 7px; min-height: 33px; padding: 0 10px; border: 1px solid var(--rms-border); border-radius: 999px; background: var(--rms-bg-surface-2); color: var(--rms-text-body); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.heat-zone-page .hz-live { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 10px; border: 1px solid var(--rms-border); border-radius: 999px; background: var(--rms-bg-surface-2); color: var(--rms-text-body); font-size: 13px; font-weight: 700; white-space: nowrap; }
 .heat-zone-page .hz-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rms-text-faint); }
 .heat-zone-page .hz-live.is-live .hz-live-dot { background: var(--rms-success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rms-success) 25%, transparent); }
 .heat-zone-page .hz-live.is-busy .hz-live-dot { background: var(--rms-warning); animation: hz-pulse 1s ease-in-out infinite; }
@@ -86,7 +90,7 @@
 .heat-zone-page .hz-filter-bar { display: grid; gap: 8px; padding: 8px 10px; border: 1px solid var(--rms-border); border-radius: 7px; background: var(--rms-bg-surface-2); }
 .heat-zone-page .hz-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .heat-zone-page .hz-filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.heat-zone-page .hz-inline-field { display: inline-flex; align-items: center; gap: 6px; color: var(--rms-text-muted); font-size: 13px; font-weight: 700; }
+.heat-zone-page .hz-inline-field { display: inline-flex; align-items: center; gap: 6px; color: var(--rms-text-muted); font-size: 12px; font-weight: 600; }
 .heat-zone-page .hz-filter-count { color: var(--rms-text-muted); font-size: 13px; }
 .heat-zone-page .hz-filter-notes { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .heat-zone-page .hz-note { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--rms-text-muted); font-size: 13px; }
@@ -97,14 +101,14 @@
 /* Multi-select popover (fixed so table/panel overflow cannot clip it) */
 .heat-zone-page .hz-ms { position: relative; }
 .heat-zone-page .hz-ms-button {
-  min-height: 30px;
+  min-height: 36px;
   max-width: 230px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 0 8px 0 10px;
   border: 1px solid var(--rms-border-strong);
-  border-radius: 5px;
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-surface);
   color: var(--rms-text-body);
   font-size: 13px;
@@ -131,7 +135,7 @@
 .heat-zone-page .hz-ms-list { min-height: 0; overflow-y: auto; display: grid; gap: 1px; }
 .heat-zone-page .hz-ms-option { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 4px; color: var(--rms-text-body); font-size: 13px; cursor: pointer; }
 .heat-zone-page .hz-ms-option:hover { background: var(--rms-bg-hover); }
-.heat-zone-page .hz-ms-option input { accent-color: var(--rms-primary); }
+.heat-zone-page .hz-ms-option input { accent-color: var(--rms-primary-solid); }
 .heat-zone-page .hz-ms-list .hz-muted { margin: 4px 6px; font-size: 13px; }
 
 /* Summary cards */
@@ -267,7 +271,7 @@
 .heat-zone-page .hz-click-row.selected { background: var(--rms-primary-soft); }
 .heat-zone-page .hz-row-actions { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
 .heat-zone-page .hz-switch { display: inline-flex; align-items: center; gap: 6px; color: var(--rms-text-body); font-size: 13px; cursor: pointer; }
-.heat-zone-page .hz-switch input { accent-color: var(--rms-primary); width: 16px; height: 16px; }
+.heat-zone-page .hz-switch input { accent-color: var(--rms-primary-solid); width: 16px; height: 16px; }
 
 /* Forms (reports, settings) */
 .heat-zone-page .hz-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; padding: 12px; }

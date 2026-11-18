@@ -38,7 +38,7 @@ function Modal({ title, onClose, children }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
-        <header><strong>{title}</strong><button type="button" onClick={onClose}><X size={14} /></button></header>
+        <header><strong>{title}</strong><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button></header>
         {children}
       </div>
     </div>
@@ -211,11 +211,11 @@ export default function ShiftTradesPanel({ trades = [], setTrades, personnel = [
                 <div className="inline-actions">
                   {actionable ? (
                     <>
-                      <button type="button" onClick={() => decideTrade(trade.id, "Approved")}><Check size={13} /> Approve</button>
-                      <button type="button" onClick={() => decideTrade(trade.id, "Denied")}><X size={13} /> Deny</button>
+                      <button type="button" className="primary-button" onClick={() => decideTrade(trade.id, "Approved")}><Check size={13} /> Approve</button>
+                      <button type="button" className="secondary-button" onClick={() => decideTrade(trade.id, "Denied")}><X size={13} /> Deny</button>
                     </>
                   ) : (
-                    <button type="button" onClick={() => setMessage(`${trade.id} opened for audit review`)}>Open</button>
+                    <button type="button" className="secondary-button" onClick={() => setMessage(`${trade.id} opened for audit review`)}>Open</button>
                   )}
                 </div>
               </div>
