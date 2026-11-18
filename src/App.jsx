@@ -1245,6 +1245,11 @@ function AppShell() {
       apparatus,
     ]
   );
+  // Today's duty roster for the Training module's "add on-duty crew" (it never marks attendance).
+  const trainingScheduling = useMemo(
+    () => ({ dutyDayId: currentDutyDayId, scheduleDays, rotation: shiftRotation, roster, leaveRequests, shiftTrades, schedulingSettings, apparatus, shiftChangeTime: dailyLogSettings.shiftChangeTime }),
+    [currentDutyDayId, scheduleDays, shiftRotation, roster, leaveRequests, shiftTrades, schedulingSettings, apparatus, dailyLogSettings.shiftChangeTime]
+  );
   // Days left and Expired/Due Soon worked out from each expiration date, every time.
   const liveCertifications = useMemo(
     () => (Array.isArray(certifications) ? certifications : []).map((cert) => withLiveCertDays(cert)),
@@ -1388,7 +1393,7 @@ function AppShell() {
       />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Training" ? (
-    hasPermission(permissions, "viewTraining") ? (
+    ["viewTraining", "editTraining", "approveTraining", "evaluateSkills", "manageTrainingConfig", "approveCeCredits"].some((key) => hasPermission(permissions, key)) ? (
       <TrainingPage
         query={query}
         records={training}
@@ -1397,6 +1402,10 @@ function AppShell() {
           hasPermission(permissions, "editTraining")
           || hasPermission(permissions, "manageSystemSettings")
         }
+        personnel={personnel}
+        certifications={liveCertifications}
+        scheduling={trainingScheduling}
+        onNavigate={(name) => navigate(name === "Admin Console" ? "System Admin" : name)}
       />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Scheduling" ? (

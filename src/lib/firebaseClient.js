@@ -69,10 +69,12 @@ function firebaseServices() {
     functions = getFunctions(app, "us-central1");
     if (useEmulators) {
       // Local testing only (npm run dev:emulator): never talks to the real project.
-      connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-      connectFirestoreEmulator(db, "127.0.0.1", 8080);
-      connectStorageEmulator(storage, "127.0.0.1", 9199);
-      connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+      // Ports can be moved (e.g. a second emulator set in .env.emulator.local); defaults are the standard ones.
+      const port = (name, fallback) => Number(import.meta.env[`VITE_EMULATOR_${name}_PORT`]) || fallback;
+      connectAuthEmulator(auth, `http://127.0.0.1:${port("AUTH", 9099)}`, { disableWarnings: true });
+      connectFirestoreEmulator(db, "127.0.0.1", port("FIRESTORE", 8080));
+      connectStorageEmulator(storage, "127.0.0.1", port("STORAGE", 9199));
+      connectFunctionsEmulator(functions, "127.0.0.1", port("FUNCTIONS", 5001));
     } else {
       initAppCheck(app);
     }

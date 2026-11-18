@@ -151,6 +151,61 @@ service cloud.firestore {
     function canManageModule(departmentId, moduleKey, keys) {
       return canWriteModule(departmentId, moduleKey) && memberCanAny(departmentId, keys);
     }
+    // ---- Training module ----
+    function trainingViewKeys() {
+      return ["viewTraining", "editTraining", "approveTraining", "evaluateSkills", "manageTrainingConfig", "approveCeCredits"];
+    }
+    function trainingEditKeys() {
+      return ["editTraining", "approveTraining", "manageTrainingConfig"];
+    }
+    function trainingConfigKeys() {
+      return ["manageTrainingConfig"];
+    }
+    // Reviewers of private training data (evaluations, task books, snapshots).
+    function trainingReviewKeys() {
+      return ["approveTraining", "evaluateSkills", "manageTrainingConfig", "approveCeCredits"];
+    }
+    // (myPersonnelId is defined with the scheduling helpers below.)
+    function isMyPerson(departmentId, personId) {
+      return personId != "" && myPersonnelId(departmentId) == personId;
+    }
+    // Training record workflow: draft/returned -> submitted -> approved -> locked.
+    // Fields an approver may change when approving, returning, locking or reopening.
+    function trainingStatusOnlyChange() {
+      return changedKeys().hasOnly(["status", "history", "updatedAt", "updatedBy",
+        "approvedBy", "approvedByName", "approvedAt", "returnReason", "returnedBy", "returnedAt",
+        "lockedBy", "lockedAt"]);
+    }
+    function trainingRecordUpdateOk(departmentId, recordId) {
+      let before = resource.data.get("status", "draft");
+      let after = request.resource.data.get("status", "draft");
+      // Branch on the current status first so each path checks permissions once
+      // (rules stop after 1000 evaluated expressions per request).
+      return before in ["draft", "returned"]
+        // Author/editor: edit a draft or returned record, or submit it as themselves.
+        ? ((after in ["draft", "returned"]
+              || (after == "submitted" && request.resource.data.get("submittedBy", "") == request.auth.uid))
+            && memberCanAny(departmentId, trainingEditKeys()))
+        : before == "submitted"
+        // Approver: approve (never their own submission) or return a submitted record.
+        ? ((after == "returned"
+              || (after == "approved" && resource.data.get("submittedBy", "") != request.auth.uid
+                  && request.resource.data.get("approvedBy", "") == request.auth.uid))
+            && trainingStatusOnlyChange()
+            && memberCanAny(departmentId, ["approveTraining"]))
+        : before == "approved"
+        // Approver: lock or reopen an approved record, or amend it together with its
+        // amendment entry (which can't rewrite who created, submitted or approved it).
+        ? ((after in ["locked", "returned"]
+              ? trainingStatusOnlyChange()
+              : (after == "approved"
+                  && request.resource.data.get("lastAmendmentId", "") != resource.data.get("lastAmendmentId", "")
+                  && !changedKeys().hasAny(["createdBy", "submittedBy", "approvedBy", "approvedAt", "lockedBy"])
+                  && existsAfter(/databases/$(database)/documents/departments/$(departmentId)/trainingRecords/$(recordId)/amendments/$(request.resource.data.get("lastAmendmentId", "none")))))
+            && memberCanAny(departmentId, ["approveTraining"]))
+        // Locked (or unknown) records never change.
+        : false;
+    }
     // Permission groups used by the module rules below.
     function inspectionWorkKeys() {
       return ["editInspections", "conductInspections", "approveInspections", "editViolations",
@@ -746,7 +801,12 @@ service cloud.firestore {
         "heatZoneAccess", "heatZoneCalls", "heatZoneEvents", "heatZoneGeocodes", "heatZoneMeta", "heatZoneSettings", "heatZoneZones",
         "forgeAiBriefings", "forgeAiConversations", "forgeAiFeedback", "forgeAiMessageSources", "forgeAiMessages",
         "forgeAiSettings", "forgeAiUsage", "forgeAiUsageLogs",
-        "formImports", "formSubmissions", "formTemplateVersions", "formTemplates"
+        "formImports", "formSubmissions", "formTemplateVersions", "formTemplates",
+        "trainingRecords", "trainingTemplates", "trainingCourses", "trainingSessions", "trainingSkills",
+        "trainingEvaluations", "trainingTaskBooks", "trainingTaskBookAssignments", "trainingRequirements",
+        "trainingExemptions", "trainingComplianceSnapshots", "trainingCeRuleSets", "trainingCeAwards",
+        "trainingCeCycles", "trainingRequests", "trainingResources", "trainingReservations",
+        "trainingStandards", "trainingSettings"
       ];
     }
 
@@ -1719,6 +1779,178 @@ service cloud.firestore {
         allow read: if canAccessDepartment(departmentId);
         allow create: if canWriteModule(departmentId, "hydrants");
         allow update, delete: if false;
+      }
+      // ---- Training module (src/lib/training/trainingService.js) ----
+      match /trainingRecords/{recordId} {
+        allow read: if canAccessDepartment(departmentId) && memberCanAny(departmentId, trainingViewKeys());
+        allow create: if canManageModule(departmentId, "training", trainingEditKeys())
+          && request.resource.data.get("status", "") == "draft"
+          && request.resource.data.get("createdBy", "") == request.auth.uid;
+        allow update: if canWriteModule(departmentId, "training") && trainingRecordUpdateOk(departmentId, recordId);
+        allow delete: if canWriteModule(departmentId, "training")
+          && resource.data.get("status", "") == "draft"
+          && (resource.data.get("createdBy", "") == request.auth.uid || memberCanAny(departmentId, ["approveTraining"]));
+        // Amendment history is append-only, and an amendment exists only with its record update.
+        match /amendments/{amendmentId} {
+          allow read: if canAccessDepartment(departmentId) && memberCanAny(departmentId, trainingViewKeys());
+          allow create: if canManageModule(departmentId, "training", ["approveTraining"])
+            && request.resource.data.get("by", "") == request.auth.uid
+            && getAfter(/databases/$(database)/documents/departments/$(departmentId)/trainingRecords/$(recordId)).data.get("lastAmendmentId", "") == amendmentId;
+          allow update, delete: if false;
+        }
+      }
+      match /trainingTemplates/{templateId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", trainingEditKeys());
+      }
+      match /trainingCourses/{courseId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", trainingEditKeys());
+        // Published versions are permanent: records point at the exact version taught.
+        match /versions/{version} {
+          allow read: if canAccessDepartment(departmentId);
+          allow create: if canManageModule(departmentId, "training", trainingEditKeys());
+          allow update, delete: if false;
+        }
+      }
+      match /trainingSessions/{sessionId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", trainingEditKeys());
+        // Members enroll or cancel themselves; schedulers enroll anyone. Enrollment is not attendance.
+        match /enrollments/{personId} {
+          allow read: if canAccessDepartment(departmentId);
+          allow create, update: if canWriteModule(departmentId, "training") && (
+            memberCanAny(departmentId, trainingEditKeys())
+            || (isMyPerson(departmentId, personId)
+                && request.resource.data.get("personId", "") == personId
+                && request.resource.data.get("assigned", false) == false
+                && (resource == null || resource.data.get("assigned", false) == false))
+          );
+          allow delete: if false;
+        }
+      }
+      match /trainingSkills/{skillId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", ["manageTrainingConfig", "approveTraining"]);
+      }
+      // Evaluations are private to the member and to evaluators/reviewers.
+      match /trainingEvaluations/{evaluationId} {
+        allow read: if canAccessDepartment(departmentId) && (
+          memberCanAny(departmentId, trainingReviewKeys())
+          || isMyPerson(departmentId, resource.data.get("personId", "")));
+        allow create: if canManageModule(departmentId, "training", ["evaluateSkills", "approveTraining"])
+          && request.resource.data.get("evaluatorUid", "") == request.auth.uid
+          && request.resource.data.get("status", "") == "submitted";
+        allow update: if canWriteModule(departmentId, "training") && resource.data.get("status", "") == "submitted" && (
+          // The evaluator may correct their own submitted evaluation.
+          (resource.data.get("evaluatorUid", "") == request.auth.uid
+            && request.resource.data.get("evaluatorUid", "") == request.auth.uid
+            && request.resource.data.get("status", "") == "submitted")
+          // A different approver signs off the result.
+          || (memberCanAny(departmentId, ["approveTraining"])
+            && resource.data.get("evaluatorUid", "") != request.auth.uid
+            && request.resource.data.get("status", "") == "approved"
+            && changedKeys().hasOnly(["status", "approvedBy", "approvedByName", "approvedAt"]))
+        );
+        allow delete: if false;
+      }
+      match /trainingTaskBooks/{taskBookId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", ["manageTrainingConfig", "approveTraining"]);
+      }
+      match /trainingTaskBookAssignments/{assignmentId} {
+        allow read: if canAccessDepartment(departmentId) && (
+          memberCanAny(departmentId, trainingReviewKeys())
+          || isMyPerson(departmentId, resource.data.get("personId", "")));
+        allow create, update: if canManageModule(departmentId, "training", ["evaluateSkills", "approveTraining", "manageTrainingConfig"])
+          && (resource == null || resource.data.get("status", "") != "authorized"
+              || memberCanAny(departmentId, ["approveTraining", "manageTrainingConfig"]));
+        allow delete: if canManageModule(departmentId, "training", ["manageTrainingConfig"]);
+      }
+      match /trainingRequirements/{ruleId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", trainingConfigKeys());
+        match /versions/{version} {
+          allow read: if canAccessDepartment(departmentId);
+          allow create: if canManageModule(departmentId, "training", trainingConfigKeys());
+          allow update, delete: if false;
+        }
+      }
+      match /trainingExemptions/{exemptionId} {
+        allow read: if canAccessDepartment(departmentId) && memberCanAny(departmentId, trainingViewKeys());
+        allow write: if canManageModule(departmentId, "training", trainingConfigKeys());
+      }
+      // Compliance history: saved once, never rewritten.
+      match /trainingComplianceSnapshots/{snapshotId} {
+        allow read: if canAccessDepartment(departmentId) && memberCanAny(departmentId, trainingReviewKeys());
+        allow create: if canManageModule(departmentId, "training", ["manageTrainingConfig", "approveTraining"])
+          && request.resource.data.get("createdBy", "") == request.auth.uid;
+        allow update, delete: if false;
+      }
+      match /trainingCeRuleSets/{ruleSetId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", ["manageTrainingConfig", "approveCeCredits"]);
+      }
+      // CE credit: created pending (by staff, or by a member for their own outside education),
+      // approved by someone else, never overwritten or deleted. The id is derived from
+      // (person, learning source), so the same source can't be credited twice.
+      match /trainingCeAwards/{awardId} {
+        // Reading an id that doesn't exist yet is allowed (the duplicate check reads before creating).
+        allow read: if canAccessDepartment(departmentId) && (
+          resource == null
+          || memberCanAny(departmentId, ["approveCeCredits", "approveTraining", "manageTrainingConfig"])
+          || isMyPerson(departmentId, resource.data.get("personId", "")));
+        allow create: if canWriteModule(departmentId, "training")
+          && request.resource.data.get("status", "") == "pending"
+          && request.resource.data.get("createdBy", "") == request.auth.uid
+          && (memberCanAny(departmentId, ["editTraining", "approveCeCredits", "approveTraining"])
+              || isMyPerson(departmentId, request.resource.data.get("personId", "")));
+        allow update: if canManageModule(departmentId, "training", ["approveCeCredits"])
+          && changedKeys().hasOnly(["status", "reviewedBy", "reviewedByName", "reviewedAt", "reviewNote"])
+          && request.resource.data.get("status", "") in ["approved", "rejected", "voided"]
+          && (request.resource.data.get("status", "") != "approved" || resource.data.get("createdBy", "") != request.auth.uid);
+        allow delete: if false;
+      }
+      match /trainingCeCycles/{personId} {
+        allow read: if canAccessDepartment(departmentId) && (
+          memberCanAny(departmentId, ["approveCeCredits", "approveTraining", "manageTrainingConfig"])
+          || isMyPerson(departmentId, personId));
+        allow write: if canManageModule(departmentId, "training", ["approveCeCredits", "manageTrainingConfig"]);
+      }
+      // External training requests: members file their own; someone else decides.
+      match /trainingRequests/{requestId} {
+        allow read: if canAccessDepartment(departmentId) && (
+          memberCanAny(departmentId, ["approveTraining", "manageTrainingConfig"])
+          || resource.data.get("requesterUid", "") == request.auth.uid);
+        allow create: if canWriteModule(departmentId, "training")
+          && request.resource.data.get("requesterUid", "") == request.auth.uid
+          && request.resource.data.get("status", "") == "submitted";
+        allow update: if canWriteModule(departmentId, "training") && (
+          (memberCanAny(departmentId, ["approveTraining"])
+            && (resource.data.get("requesterUid", "") != request.auth.uid
+                || request.resource.data.get("status", "") == "cancelled"))
+          || (resource.data.get("requesterUid", "") == request.auth.uid
+            && request.resource.data.get("requesterUid", "") == request.auth.uid
+            && resource.data.get("status", "") in ["submitted", "approved"]
+            && request.resource.data.get("status", "") == "cancelled")
+        );
+        allow delete: if false;
+      }
+      match /trainingResources/{resourceId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", ["manageTrainingConfig", "editTraining"]);
+      }
+      match /trainingReservations/{reservationId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", trainingEditKeys());
+      }
+      match /trainingStandards/{standardId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", trainingConfigKeys());
+      }
+      match /trainingSettings/{settingId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "training", trainingConfigKeys());
       }
       // Fallback for tenant collections without an explicit rule above.
       match /{collection}/{document} {

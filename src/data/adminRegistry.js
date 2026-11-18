@@ -153,6 +153,10 @@ export const ADMIN_PERMISSION_LABELS = {
   editCertifications: "Edit certifications",
   viewTraining: "View training",
   editTraining: "Edit training",
+  approveTraining: "Approve training records",
+  evaluateSkills: "Conduct skills evaluations",
+  manageTrainingConfig: "Manage training configuration",
+  approveCeCredits: "Approve EMS CE credit",
   viewSchedule: "View schedule",
   editSchedule: "Edit schedule",
   viewDailyLog: "View daily log",
@@ -312,7 +316,7 @@ export const ADMIN_PERMISSION_GROUPS = [
   },
   {
     label: "Personnel & training",
-    keys: ["viewPersonnel", "editPersonnel", "viewCertifications", "editCertifications", "viewTraining", "editTraining"]
+    keys: ["viewPersonnel", "editPersonnel", "viewCertifications", "editCertifications", "viewTraining", "editTraining", "approveTraining", "evaluateSkills", "manageTrainingConfig", "approveCeCredits"]
   },
   {
     label: "Scheduling",
