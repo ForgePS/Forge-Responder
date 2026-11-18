@@ -52,6 +52,7 @@ describe("inspection report email", () => {
     assert.match(sig.answer, /^Signed by Lt\. Rivera/);
     assert.equal(report.violations[0].citation, "IFC 503.4");
     assert.equal(report.violations[0].dueAt, "December 1, 2026");
+    assert.equal(buildReport(inspection, [{ ...violations[0], evidence: [{ type: "photo", url: "u" }, { type: "note" }] }]).violations[0].photos, 1);
   });
 
   it("writes a short email body that lists violations", () => {

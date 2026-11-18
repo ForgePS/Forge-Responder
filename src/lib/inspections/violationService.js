@@ -390,6 +390,42 @@ export async function addViolationEvidence(departmentId, violationId, evidenceIt
   return next;
 }
 
+/**
+ * Attach uploaded photos to a violation as evidence (one write).
+ * @param {{ id, fileName, storagePath, url }[]} photos
+ */
+export async function addViolationPhotos(departmentId, violationId, photos = [], audit = {}) {
+  const existing = (await listViolations(departmentId)).find((row) => row.id === violationId);
+  if (!existing) throw new Error("Violation not found");
+  const stamp = nowIso();
+  const items = photos.filter((p) => p?.url).map((p) => ({
+    id: p.id || `ev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    type: "photo",
+    label: "Photo",
+    url: p.url,
+    storagePath: p.storagePath || "",
+    fileName: p.fileName || "",
+    notes: p.notes || "",
+    addedAt: stamp,
+    addedBy: audit.actorName || "User",
+  }));
+  if (!items.length) return existing;
+  const next = normalizeViolationRecord({
+    ...existing,
+    evidence: [...items, ...(existing.evidence || [])],
+    updatedAt: stamp,
+  }, departmentId);
+  await updateRecord(departmentId, VIOLATIONS_COLLECTION, violationId, next);
+  await writeInspectionAuditLog(departmentId, {
+    action: "evidence",
+    recordId: violationId,
+    summary: `Added ${items.length} photo${items.length === 1 ? "" : "s"} to violation ${existing.name}`,
+    actorUid: audit.actorUid || "system",
+    actorName: audit.actorName || "System",
+  }).catch(() => null);
+  return next;
+}
+
 export async function closeViolation(departmentId, violationId, {
   status = "closed",
   closureNotes = "",

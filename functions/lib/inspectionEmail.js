@@ -123,6 +123,7 @@ function buildReport(inspection = {}, violations = [], { departmentName = "", ti
     location: text(v.locationOnProperty, 300),
     dueAt: formatDate(v.dueAt, timeZone),
     status: text(v.status, 40),
+    photos: (Array.isArray(v.evidence) ? v.evidence : []).filter((e) => e?.type === "photo").length,
   }));
 
   return {
@@ -180,6 +181,7 @@ function renderPdf(report) {
           v.description,
           v.correctiveAction && `Correction required: ${v.correctiveAction}`,
           v.dueAt && `Correct by: ${v.dueAt}`,
+          v.photos && `${v.photos} photo${v.photos === 1 ? "" : "s"} on file`,
         ].filter(Boolean);
         for (const line of lines) doc.font("Helvetica").text(line, { indent: 14, width: width - 14 });
         doc.moveDown(0.3);
