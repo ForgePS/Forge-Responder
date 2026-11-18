@@ -7,6 +7,7 @@ import { localDate } from "../fieldValidation.js";
 import { failDetailFields, isFailAnswer } from "../../lib/inspections/inspectionFailDetails.js";
 import { inspectionFields, validateInspectionForm } from "../inspectionValidation.js";
 import { answersWithOccupancy } from "../../lib/inspections/occupancyPrefill.js";
+import { MAX_REPORT_RECIPIENTS, occupancyEmails } from "../../lib/inspections/inspectionEmailRecipients.js";
 import { DEFAULT_INSPECTION_RESULTS, inspectionResultTone, resultNeedsReinspection } from "../../lib/inspections/inspectionResults.js";
 
 export { inspectionFields, validateInspectionForm };
@@ -131,6 +132,8 @@ export function InspectionFormScreen({ params = {} }) {
         updatedAt: fromRef.updatedAt,
       } : null,
       answers: fromRef ? answersWithOccupancy(fromRef) : {},
+      // Emailed to the occupancy once the completed inspection syncs (fieldSyncHandlers.syncInspection).
+      emailReport: { send: false, to: occupancyEmails(fromRef?.occupancySnapshot).join(", "), note: "" },
       violations: [],
       result: fromRef?.result || "",
       summary: fromRef?.summary || "",
@@ -310,6 +313,41 @@ export function InspectionFormScreen({ params = {} }) {
           </Field>
         ) : null}
       </Section>
+
+      {data.inspectionId ? (
+        <Section title="Email report" hint="A PDF copy goes to the occupancy once this inspection is completed and synced.">
+          <Field label="Email the report to the occupancy?">
+            <Segmented
+              value={data.emailReport?.send ? "yes" : "no"}
+              options={[{ value: "no", label: "No" }, { value: "yes", label: "Yes", tone: "ok" }]}
+              onChange={(value) => update({ emailReport: { ...(data.emailReport || {}), send: value === "yes" } })}
+            />
+          </Field>
+          {data.emailReport?.send ? (
+            <>
+              <Field label="Send to" required error={errors.emailTo} hint={`Up to ${MAX_REPORT_RECIPIENTS}, separated by commas.`}>
+                <TextInput
+                  type="text"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  value={data.emailReport?.to || ""}
+                  onChange={(value) => update({ emailReport: { ...(data.emailReport || {}), to: value } })}
+                  placeholder="owner@business.com"
+                  disabled={readOnly}
+                />
+              </Field>
+              <Field label="Note (optional)">
+                <TextArea
+                  value={data.emailReport?.note || ""}
+                  onChange={(value) => update({ emailReport: { ...(data.emailReport || {}), note: value } })}
+                  rows={2}
+                  disabled={readOnly}
+                />
+              </Field>
+            </>
+          ) : null}
+        </Section>
+      ) : null}
 
       <PickerSheet
         open={sheet}
