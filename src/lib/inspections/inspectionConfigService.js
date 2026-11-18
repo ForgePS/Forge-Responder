@@ -5,6 +5,8 @@ import {
   updateRecord,
 } from "../firestoreService.js";
 import { writeInspectionAuditLog } from "./inspectionAudit.js";
+import { starterTemplateFromDefault, starterTemplateNeedsDefault } from "./platformDefaultForm.js";
+import { loadPlatformDefaultForm } from "./platformDefaultFormService.js";
 import {
   buildStarterTemplateDraft,
   CONFIG_LIFECYCLE_STATUSES,
@@ -89,6 +91,9 @@ export function normalizeInspectionTemplate(raw = {}, departmentId = "") {
     remarksOnFail: Boolean(data.remarksOnFail),
     // Set when the template was made from a digital form (Digital Forms → Use for inspections).
     sourceDigitalFormId: data.sourceDigitalFormId || "",
+    // Set on starter templates that use the platform default form (platformDefaultForm.js).
+    starterFormVersion: data.starterFormVersion || "",
+    starterFormSignature: data.starterFormSignature || "",
     sections,
     createdAt: data.createdAt || "",
     updatedAt: data.updatedAt || "",
@@ -180,10 +185,14 @@ export async function listTemplateVersions(departmentId, templateId = "") {
 export async function ensureInspectionConfigSeeded(departmentId, audit = {}) {
   if (!departmentId) return { types: [], templates: [] };
 
-  const existingTypes = await listInspectionTypes(departmentId);
-  const existingTemplates = await listInspectionTemplates(departmentId);
+  const [existingTypes, existingTemplates, defaultForm] = await Promise.all([
+    listInspectionTypes(departmentId),
+    listInspectionTemplates(departmentId),
+    loadPlatformDefaultForm(),
+  ]);
   if (existingTypes.length) {
-    return { types: existingTypes, templates: existingTemplates };
+    const templates = await refreshStarterTemplates(departmentId, existingTemplates, defaultForm);
+    return { types: existingTypes, templates };
   }
 
   const types = [];
@@ -211,6 +220,7 @@ export async function ensureInspectionConfigSeeded(departmentId, audit = {}) {
     const templateDraft = buildStarterTemplateDraft(typeId, starter.name);
     const templateRecord = normalizeInspectionTemplate({
       ...templateDraft,
+      ...(defaultForm ? starterTemplateFromDefault(defaultForm, typeId) : {}),
       id: templateId,
       departmentId,
       lifecycleStatus: "draft",
@@ -240,6 +250,35 @@ export async function ensureInspectionConfigSeeded(departmentId, audit = {}) {
   }
 
   return { types, templates };
+}
+
+/**
+ * Point starter templates the department hasn't changed at the platform default
+ * form. Members who can't edit inspection settings can't write templates, so a
+ * refused write is skipped (new inspections still use the default; see
+ * inspectionWorkflow.createInspection).
+ */
+async function refreshStarterTemplates(departmentId, templates, defaultForm) {
+  if (!defaultForm) return templates;
+  const out = [];
+  for (const template of templates) {
+    if (!starterTemplateNeedsDefault(template, defaultForm)) {
+      out.push(template);
+      continue;
+    }
+    const next = normalizeInspectionTemplate({
+      ...template,
+      ...starterTemplateFromDefault(defaultForm, template.inspectionTypeId),
+      updatedAt: nowIso(),
+    }, departmentId);
+    try {
+      await updateRecord(departmentId, INSPECTION_TEMPLATES_COLLECTION, template.id, next);
+      out.push(next);
+    } catch {
+      out.push(template);
+    }
+  }
+  return out;
 }
 
 /**

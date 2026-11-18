@@ -20,6 +20,7 @@ import {
 import { listInspectionTypes } from "../lib/inspections/inspectionConfigService.js";
 import { canManageInspectionConfig } from "../lib/inspections/inspectionPermissions.js";
 import { applyFormToInspections } from "../lib/digitalForms/inspectionTemplateFromForm.js";
+import { clearPlatformDefaultForm, loadPlatformDefaultForm, setPlatformDefaultForm } from "../lib/inspections/platformDefaultFormService.js";
 import "../styles/inspections-checklist.css";
 import "../styles/digital-forms.css";
 
@@ -464,8 +465,37 @@ function UseForInspections({ departmentId, form, actor, onDone, onCancel }) {
   );
 }
 
-function ManageTab({ departmentId, forms, signerName, canConfigInspections, actor }) {
+function ManageTab({ departmentId, forms, signerName, canConfigInspections, canSetPlatformDefault, actor }) {
   const [forInspections, setForInspections] = useState(null);
+  const [platformDefault, setPlatformDefault] = useState(null);
+  useEffect(() => {
+    if (!canSetPlatformDefault) return undefined;
+    let live = true;
+    loadPlatformDefaultForm({ fresh: true }).then((row) => { if (live) setPlatformDefault(row); });
+    return () => { live = false; };
+  }, [canSetPlatformDefault]);
+  const isPlatformDefault = (form) => platformDefault?.sourceDepartmentId === departmentId && platformDefault?.sourceFormId === form.id;
+
+  async function makePlatformDefault(form) {
+    const ok = window.confirm(
+      `Make version ${form.currentVersion} of "${form.name}" the default inspection form for every department?
+
+`
+      + "Departments that haven't changed their starter inspection forms will use it for new inspections. "
+      + "Forms a department has edited, published or replaced are left alone.",
+    );
+    if (!ok) return;
+    await act(async () => {
+      const version = await loadFormVersion(departmentId, form.publishedVersionId);
+      if (!version?.snapshot) throw new Error("This form's published version couldn't be loaded.");
+      setPlatformDefault(await setPlatformDefaultForm({ departmentId, form, definition: version.snapshot }, actor));
+    }, `"${form.name}" is now the platform's default inspection form.`);
+  }
+
+  async function stopPlatformDefault() {
+    if (!window.confirm("Stop using this form as the platform default? New departments get the built-in starter checklist again.")) return;
+    await act(async () => { await clearPlatformDefaultForm(); setPlatformDefault(null); }, "The platform default inspection form was removed.");
+  }
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState(null);
   const [message, setMessage] = useState(null);
@@ -524,6 +554,16 @@ function ManageTab({ departmentId, forms, signerName, canConfigInspections, acto
                 ) : (
                   <button type="button" className="secondary-button" disabled={busy} onClick={() => act(() => setFormStatus(departmentId, form.id, "published"), `"${form.name}" restored.`)}><RotateCcw size={14} /> Restore</button>
                 )}
+                {isPlatformDefault(form) ? <Badge tone="good">Platform default</Badge> : null}
+                {canSetPlatformDefault && form.lifecycleStatus === "published" ? (
+                  isPlatformDefault(form) && platformDefault.sourceFormVersion === form.currentVersion ? (
+                    <button type="button" className="secondary-button" disabled={busy} onClick={stopPlatformDefault}>Stop platform default</button>
+                  ) : (
+                    <button type="button" className="secondary-button" disabled={busy} onClick={() => makePlatformDefault(form)}>
+                      {isPlatformDefault(form) ? `Update platform default to v${form.currentVersion}` : "Make platform default"}
+                    </button>
+                  )
+                ) : null}
                 {canConfigInspections && form.lifecycleStatus === "published" ? (
                   <button type="button" className="secondary-button" disabled={busy}
                     onClick={() => { setMessage(null); setForInspections(form.id); }}><ClipboardCheck size={14} /> Use for inspections</button>
@@ -594,6 +634,7 @@ export default function DigitalFormsPage() {
           {tab === "import" && canManage ? <ImportTab departmentId={departmentId} signerName={signerName} /> : null}
           {tab === "manage" && canManage ? <ManageTab departmentId={departmentId} forms={forms} signerName={signerName}
             canConfigInspections={canManageInspectionConfig(permissions, isCreator)}
+            canSetPlatformDefault={isCreator}
             actor={{ actorUid: user?.uid || "system", actorName: signerName || user?.email || "User" }} /> : null}
         </>
       )}

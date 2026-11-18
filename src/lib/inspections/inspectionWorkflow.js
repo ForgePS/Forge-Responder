@@ -21,6 +21,8 @@ import { listOccupancyRecords } from "./occupancyService.js";
 import { occupancySnapshotFor, prefillAnswersFromOccupancy } from "./occupancyPrefill.js";
 import { DEFAULT_INSPECTION_RESULTS, inspectionResultOptions } from "./inspectionResults.js";
 import { INSPECTIONS_COLLECTION } from "./paths.js";
+import { defaultFormSnapshotFor } from "./platformDefaultForm.js";
+import { loadPlatformDefaultForm } from "./platformDefaultFormService.js";
 
 const OPEN_STATUSES = new Set([
   "draft",
@@ -233,6 +235,10 @@ export async function createInspection(departmentId, input = {}, audit = {}) {
       templateSnapshot = published.snapshot;
       templateVersionId = published.id;
     }
+  }
+  if (!templateSnapshot && template) {
+    // A starter template the department hasn't changed uses the platform default form.
+    templateSnapshot = defaultFormSnapshotFor(template, await loadPlatformDefaultForm());
   }
   if (!templateSnapshot && template) {
     templateSnapshot = {
