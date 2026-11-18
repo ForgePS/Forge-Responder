@@ -16,6 +16,7 @@ const { sendTextEmail } = require("./mailer");
 const { safeTimeZone } = require("./heatZone/time");
 
 const MAX_RECIPIENTS = 5;
+const MAX_COPY_TO = 3;
 const MAX_NOTE_CHARS = 2000;
 const EMAIL_PATTERN = /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[^\s@<>(),;:"]{2,}$/;
 const PERMISSIONS = ["editInspections", "conductInspections", "approveInspections"];
@@ -193,7 +194,25 @@ function renderPdf(report) {
   });
 }
 
-function buildEmailText(report, { note = "", departmentName = "", senderName = "" } = {}) {
+/**
+ * The department's report email settings (inspectionSettings/main.reportEmail,
+ * set in Configuration Studio), re-checked here: bad addresses are dropped.
+ */
+function reportEmailSettings(raw = {}) {
+  const data = raw && typeof raw === "object" ? raw : {};
+  const list = (value) => (Array.isArray(value) ? value : String(value || "").split(/[,;\s]+/))
+    .map((e) => String(e || "").trim().toLowerCase())
+    .filter((e) => e.length <= 254 && EMAIL_PATTERN.test(e));
+  const replyTo = String(data.replyTo || "").trim().toLowerCase();
+  return {
+    senderName: String(data.senderName || "").replace(/["<>\\\r\n\t]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80),
+    replyTo: replyTo.length <= 254 && EMAIL_PATTERN.test(replyTo) ? replyTo : "",
+    copyTo: [...new Set(list(data.copyTo))].slice(0, MAX_COPY_TO),
+    signature: String(data.signature || "").replace(/\r\n/g, "\n").trim().slice(0, 1000),
+  };
+}
+
+function buildEmailText(report, { note = "", departmentName = "", senderName = "", signature = "", replyNote = "Reply to this email with any questions." } = {}) {
   const fact = (label) => report.facts.find(([l]) => l === label)?.[1] || "";
   const lines = [];
   if (note) lines.push(note, "");
@@ -207,7 +226,7 @@ function buildEmailText(report, { note = "", departmentName = "", senderName = "
     report.violations.forEach((v, i) => lines.push(`  ${i + 1}. ${v.title}${v.dueAt ? ` (correct by ${v.dueAt})` : ""}`));
   }
   if (report.reinspection) lines.push(`Reinspection: ${report.reinspection}`);
-  lines.push("", "Reply to this email with any questions.", "", [senderName, departmentName].filter(Boolean).join("\n"));
+  lines.push("", replyNote, "", signature ? [senderName, signature].filter(Boolean).join("\n") : [senderName, departmentName].filter(Boolean).join("\n"));
   return lines.join("\n").trim();
 }
 
@@ -241,24 +260,29 @@ async function emailInspectionReport(db, request) {
     throw new HttpsError("failed-precondition", "Only completed inspections can be emailed.");
   }
 
-  const [violationsSnap, departmentSnap] = await Promise.all([
+  const [violationsSnap, departmentSnap, settingsSnap] = await Promise.all([
     db.collection(`departments/${departmentId}/violations`).where("inspectionId", "==", inspectionId).get(),
     db.doc(`departments/${departmentId}/profile/main`).get(),
+    db.doc(`departments/${departmentId}/inspectionSettings/main`).get(),
   ]);
+  const settings = reportEmailSettings(settingsSnap.data()?.reportEmail);
   const violations = violationsSnap.docs.map((d) => d.data() || {}).filter((v) => v.status !== "voided" && v.status !== "void");
   const profile = departmentSnap.data() || {};
   const departmentName = text(profile.name, 200);
   const timeZone = profile.timezone;
   const senderName = text(request.auth.token?.name, 120);
-  const replyTo = EMAIL_PATTERN.test(String(request.auth.token?.email || "")) ? request.auth.token.email : "";
+  const inspectorEmail = EMAIL_PATTERN.test(String(request.auth.token?.email || "")) ? request.auth.token.email : "";
+  const replyTo = settings.replyTo || inspectorEmail;
 
   const report = buildReport(inspection, violations, { departmentName, timeZone });
   const pdf = await renderPdf(report);
   const email = {
     to: recipients,
     replyTo,
+    cc: settings.copyTo.filter((e) => !recipients.includes(e)),
+    fromName: settings.senderName || departmentName,
     subject: `Inspection report ${inspection.inspectionNumber || ""} — ${text(inspection.occupancyName, 120)}`.replace(/\s+/g, " ").trim(),
-    text: buildEmailText(report, { note, departmentName, senderName }),
+    text: buildEmailText(report, { note, departmentName, senderName, signature: settings.signature }),
     attachments: [{ filename: pdfFileName(inspection), content: pdf, type: "application/pdf" }],
   };
   // The demo department's sign-in is public, so its email is logged, never sent.
@@ -291,4 +315,4 @@ async function emailInspectionReport(db, request) {
   return { status, recipients, sentAt: stamp, ...(demo ? { message: DEMO_OUTBOUND_MESSAGE } : {}) };
 }
 
-module.exports = { MAX_RECIPIENTS, buildEmailText, buildReport, cleanRecipients, emailInspectionReport, formatAnswer, renderPdf };
+module.exports = { MAX_RECIPIENTS, buildEmailText, buildReport, cleanRecipients, emailInspectionReport, formatAnswer, renderPdf, reportEmailSettings };

@@ -44,6 +44,7 @@ import {
   saveInspectionTemplate,
   saveInspectionType,
 } from "../lib/inspections/index.js";
+import { REPORT_EMAIL_LIMITS, reportEmailSettingsProblems } from "../lib/inspections/reportEmailSettings.js";
 
 const TABS = [
   { id: "general", label: "General & numbering", icon: Settings2 },
@@ -163,8 +164,18 @@ export default function InspectionConfigStudioPage() {
     [versions, selectedTemplateId]
   );
 
+  function setReportEmail(patch) {
+    setSettings((current) => ({ ...current, reportEmail: { ...(current.reportEmail || {}), ...patch } }));
+  }
+
   async function handleSaveSettings() {
     if (!departmentId || !settings) return;
+    const emailProblems = reportEmailSettingsProblems(settings.reportEmail);
+    if (emailProblems.length) {
+      setError(emailProblems.join(" "));
+      setMessage("");
+      return;
+    }
     setSaving(true);
     setError("");
     setMessage("");
@@ -499,6 +510,46 @@ export default function InspectionConfigStudioPage() {
                     ...current,
                     priorityLevels: linesToList(e.target.value),
                   }))}
+                />
+              </Field>
+
+              <h4 className="config-studio-subheading">Report emails</h4>
+              <p className="occupancy-muted">
+                How completed inspection reports look when they're emailed to an occupancy.
+                Reports are sent from Forge's sending address under the name you choose here.
+              </p>
+              <div className="occupancy-form-grid">
+                <Field label="Sender name">
+                  <input
+                    value={settings.reportEmail?.senderName || ""}
+                    maxLength={REPORT_EMAIL_LIMITS.senderName}
+                    placeholder="Springfield Fire Prevention"
+                    onChange={(e) => setReportEmail({ senderName: e.target.value })}
+                  />
+                </Field>
+                <Field label="Reply-to address (blank = the inspector)">
+                  <input
+                    type="email"
+                    value={settings.reportEmail?.replyTo || ""}
+                    placeholder="fireprevention@springfield.gov"
+                    onChange={(e) => setReportEmail({ replyTo: e.target.value })}
+                  />
+                </Field>
+                <Field label={`Send a copy to (up to ${REPORT_EMAIL_LIMITS.copyTo}, comma separated)`}>
+                  <input
+                    value={Array.isArray(settings.reportEmail?.copyTo) ? settings.reportEmail.copyTo.join(", ") : (settings.reportEmail?.copyTo || "")}
+                    placeholder="records@springfield.gov"
+                    onChange={(e) => setReportEmail({ copyTo: e.target.value })}
+                  />
+                </Field>
+              </div>
+              <Field label="Email signature" wide>
+                <textarea
+                  rows={3}
+                  maxLength={REPORT_EMAIL_LIMITS.signature}
+                  value={settings.reportEmail?.signature || ""}
+                  placeholder={"Springfield Fire Department\nFire Prevention Bureau\n(555) 010-0100"}
+                  onChange={(e) => setReportEmail({ signature: e.target.value })}
                 />
               </Field>
 

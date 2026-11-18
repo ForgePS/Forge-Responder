@@ -60,7 +60,8 @@ export default function InspectionEmailPanel({ record, occupancy, departmentId }
     <section className="occupancy-section inspection-email-panel">
       <h4><Mail size={14} /> Email report to occupancy</h4>
       <p className="occupancy-muted">
-        Sends a PDF copy of this inspection, including answers, remarks and violations. Replies come to you.
+        Sends a PDF copy of this inspection, including answers, remarks and violations. The sender name,
+        reply-to address, copies and signature come from Configuration Studio → Module settings.
       </p>
       <div className="occupancy-form-grid">
         <label className="config-field">
