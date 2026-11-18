@@ -19,6 +19,7 @@ import {
 } from "./inspectionConfigService.js";
 import { listOccupancyRecords } from "./occupancyService.js";
 import { occupancySnapshotFor, prefillAnswersFromOccupancy } from "./occupancyPrefill.js";
+import { DEFAULT_INSPECTION_RESULTS, inspectionResultOptions } from "./inspectionResults.js";
 import { INSPECTIONS_COLLECTION } from "./paths.js";
 
 const OPEN_STATUSES = new Set([
@@ -29,18 +30,7 @@ const OPEN_STATUSES = new Set([
   "overdue",
 ]);
 
-const RESULT_OPTIONS = [
-  "Passed",
-  "Passed with conditions",
-  "Failed",
-  "Incomplete",
-  "Unable to inspect",
-  "No access",
-  "Business closed",
-  "Cancelled",
-  "Reinspection required",
-  "Immediate action required",
-];
+const RESULT_OPTIONS = DEFAULT_INSPECTION_RESULTS;
 
 function nowIso() {
   return new Date().toISOString();
@@ -115,8 +105,9 @@ export async function addInspectionAttachment(departmentId, inspectionId, attach
   return saveInspectionPatch(departmentId, inspectionId, { attachments: [...attachments, attachment] }, audit, `Added ${attachment.kind || "attachment"} ${attachment.fileName || ""}`);
 }
 
-export function getInspectionResultOptions() {
-  return [...RESULT_OPTIONS];
+/** The department's Result choices (pass its inspection settings; defaults otherwise). */
+export function getInspectionResultOptions(settings = null) {
+  return settings ? inspectionResultOptions(settings) : [...RESULT_OPTIONS];
 }
 
 /**

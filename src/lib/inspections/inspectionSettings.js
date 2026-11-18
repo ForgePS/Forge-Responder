@@ -10,6 +10,7 @@ import {
 } from "./paths.js";
 import { writeInspectionAuditLog } from "./inspectionAudit.js";
 import { normalizeReportEmailSettings } from "./reportEmailSettings.js";
+import { cleanInspectionResults } from "./inspectionResults.js";
 
 /**
  * @param {Partial<import("./types.js").InspectionSettings>|null|undefined} remote
@@ -42,6 +43,7 @@ export function normalizeInspectionSettings(remote = {}, departmentId = "") {
       : defaults.priorityLevels,
     terminology: { ...defaults.terminology, ...(data.terminology || {}) },
     reportEmail: normalizeReportEmailSettings(data.reportEmail),
+    inspectionResults: cleanInspectionResults(data.inspectionResults),
   };
 }
 

@@ -45,6 +45,7 @@ import {
   saveInspectionType,
 } from "../lib/inspections/index.js";
 import { REPORT_EMAIL_LIMITS, reportEmailSettingsProblems } from "../lib/inspections/reportEmailSettings.js";
+import { DEFAULT_INSPECTION_RESULTS } from "../lib/inspections/inspectionResults.js";
 
 const TABS = [
   { id: "general", label: "General & numbering", icon: Settings2 },
@@ -501,6 +502,20 @@ export default function InspectionConfigStudioPage() {
                     severityLevels: linesToList(e.target.value),
                   }))}
                 />
+              </Field>
+              <Field label="Inspection results (one per line; shown when completing an inspection)" wide>
+                <textarea
+                  rows={6}
+                  value={listToLines(settings.inspectionResults?.length ? settings.inspectionResults : DEFAULT_INSPECTION_RESULTS)}
+                  onChange={(e) => setSettings((current) => ({
+                    ...current,
+                    inspectionResults: linesToList(e.target.value),
+                  }))}
+                />
+                <small className="occupancy-muted">
+                  In FORGE FIELD the first five are large buttons and the rest are smaller choices.
+                  Results containing "fail" or "reinspect" tick Reinspection required. Clear the box to go back to the defaults.
+                </small>
               </Field>
               <Field label="Priority levels (one per line)" wide>
                 <textarea
