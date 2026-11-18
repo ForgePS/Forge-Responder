@@ -6,6 +6,7 @@ import { refItems } from "../fieldRefData.js";
 import { localDate } from "../fieldValidation.js";
 import { failDetailFields, isFailAnswer } from "../../lib/inspections/inspectionFailDetails.js";
 import { inspectionFields, validateInspectionForm } from "../inspectionValidation.js";
+import { answersWithOccupancy } from "../../lib/inspections/occupancyPrefill.js";
 
 export { inspectionFields, validateInspectionForm };
 import {
@@ -135,7 +136,7 @@ export function InspectionFormScreen({ params = {} }) {
         recordVersion: fromRef.recordVersion,
         updatedAt: fromRef.updatedAt,
       } : null,
-      answers: { ...(fromRef?.answers || {}) },
+      answers: fromRef ? answersWithOccupancy(fromRef) : {},
       violations: [],
       result: fromRef?.result || "",
       summary: fromRef?.summary || "",
