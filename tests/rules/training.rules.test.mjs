@@ -259,3 +259,16 @@ describe("requirements, snapshots and requests", () => {
     await assertFails(setDoc(doc(db("other"), `departments/${A}/trainingSessions/S9`), { title: "x" }));
   });
 });
+
+describe("task book final authorization", () => {
+  const tba = `departments/${A}/trainingTaskBookAssignments/TBA1`;
+  it("evaluators sign off items but only approvers can authorize, on create or update", async () => {
+    await assertFails(setDoc(doc(db("officer"), `${tba}x`), { personId: "P-FF", status: "authorized" }));
+    await assertSucceeds(setDoc(doc(db("officer"), tba), { personId: "P-FF", status: "in_progress", signoffs: {} }));
+    await assertSucceeds(updateDoc(doc(db("officer"), tba), { signoffs: { i1: { by: "officer" } } }));
+    await assertFails(updateDoc(doc(db("officer"), tba), { status: "authorized" }));
+    await assertSucceeds(updateDoc(doc(db("bc"), tba), { status: "authorized", authorizedBy: "bc" }));
+    await assertFails(updateDoc(doc(db("officer"), tba), { status: "in_progress" }));
+    await assertSucceeds(setDoc(doc(db("bc"), `${tba}y`), { personId: "P-FF2", status: "authorized" }));
+  });
+});

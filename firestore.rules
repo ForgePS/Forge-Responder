@@ -1862,8 +1862,10 @@ service cloud.firestore {
         allow read: if canAccessDepartment(departmentId) && (
           memberCanAny(departmentId, trainingReviewKeys())
           || isMyPerson(departmentId, resource.data.get("personId", "")));
+        // Final authorization (entering, or editing after, the "authorized" state) is an approver decision.
         allow create, update: if canManageModule(departmentId, "training", ["evaluateSkills", "approveTraining", "manageTrainingConfig"])
-          && (resource == null || resource.data.get("status", "") != "authorized"
+          && ((request.resource.data.get("status", "") != "authorized"
+               && (resource == null || resource.data.get("status", "") != "authorized"))
               || memberCanAny(departmentId, ["approveTraining", "manageTrainingConfig"]));
         allow delete: if canManageModule(departmentId, "training", ["manageTrainingConfig"]);
       }

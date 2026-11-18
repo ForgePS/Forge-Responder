@@ -248,3 +248,24 @@ test("live-fire records can't be submitted until roles and the full checklist ar
   // Not a live-fire record: no live-fire checks.
   assert.deepEqual(liveFireProblems({ ...base, type: "Company drill" }), []);
 });
+
+test("compliance as of a past date ignores evidence dated after it", () => {
+  const rule = { id: "H", kind: "hours", period: "annual", minHours: 2, active: true };
+  const member = { id: "p1" };
+  const records = [{ id: "R", status: "approved", date: "2026-11-01", durationHours: 2, participants: [{ personId: "p1", attendance: "present" }] }];
+  assert.equal(evaluateRequirement(rule, member, { records }, "2026-01-01").earned, 0);
+  assert.notEqual(evaluateRequirement(rule, member, { records }, "2026-01-01").status, "compliant");
+  assert.equal(evaluateRequirement(rule, member, { records }, "2026-11-15").status, "compliant");
+});
+
+test("an Academy completion meets a requirement on the local course with the same code", async () => {
+  const { buildEvidence } = await import("../../src/lib/training/trainingEvidence.js");
+  const evidence = buildEvidence({
+    courses: [{ id: "CRS-1", code: "hm-101" }],
+    legacyTraining: [{ id: "A1", source: "forge_academy", status: "Completed", personnelId: "p1", courseNumber: "HM-101", endDate: "2026-03-01" }],
+  });
+  assert.equal(evidence.completions[0].courseId, "CRS-1");
+  assert.equal(evidence.completions[0].academyCourseNumber, "HM-101");
+  const rule = { id: "C", kind: "course", period: "annual", courseId: "CRS-1", active: true };
+  assert.equal(evaluateRequirement(rule, { id: "p1" }, evidence, "2026-06-01").status, "compliant");
+});

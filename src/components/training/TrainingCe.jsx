@@ -158,7 +158,8 @@ export default function TrainingCe() {
   const emsMembers = useMemo(() => t.personnel.map((p) => ({ p, level: normalizeLevel(levelOf(p)) })).filter((x) => x.level && (!personId || String(x.p.id) === String(personId))), [t.personnel, personId]);
   const rows = emsMembers.map(({ p, level }) => {
     const cycle = cycleFor(p, ruleSet);
-    const progress = ruleSet ? ceProgress({ ruleSet, level, awards: t.ceAwards.filter((a) => String(a.personId) === String(p.id)), cycle }) : null;
+    // Without known cycle dates every old award would count, so progress isn't calculated.
+    const progress = ruleSet && cycle ? ceProgress({ ruleSet, level, awards: t.ceAwards.filter((a) => String(a.personId) === String(p.id)), cycle }) : null;
     return { id: p.id, p, level, cycle, progress };
   });
   const pending = t.ceAwards.filter((a) => a.status === "pending");
@@ -191,7 +192,7 @@ export default function TrainingCe() {
                 { key: "cycle", label: "Cycle", render: (r) => (r.cycle ? `${r.cycle.start} – ${r.cycle.end}` : <span className="trn-muted">No NR expiration on profile</span>) },
                 ...CE_COMPONENTS.map((c) => ({ key: c.value, label: c.label, render: (r) => { const x = r.progress?.components?.find((y) => y.component === c.value); return x ? `${fmtHours(x.earned)} / ${fmtHours(x.required)}` : "—"; } })),
                 { key: "total", label: "Total", render: (r) => (r.progress?.ok ? `${fmtHours(r.progress.totalEarned)} / ${fmtHours(r.progress.totalRequired)}` : "—") },
-                { key: "status", label: "Status", render: (r) => (r.progress?.ok ? <Badge tone={r.progress.complete ? "success" : r.progress.totalEarned ? "info" : "warning"}>{r.progress.complete ? "Complete" : `${fmtHours(r.progress.totalMissing)} h missing`}</Badge> : "—") },
+                { key: "status", label: "Status", render: (r) => (!r.cycle ? <Badge tone="warning">Cycle unknown</Badge> : r.progress?.ok ? <Badge tone={r.progress.complete ? "success" : r.progress.totalEarned ? "info" : "warning"}>{r.progress.complete ? "Complete" : `${fmtHours(r.progress.totalMissing)} h missing`}</Badge> : "—") },
                 { key: "x", label: "", render: (r) => <button type="button" className="text-button" onClick={() => transcript(r)}>Transcript</button> }]} />
           </Section>
         ) : <EmptyState title="No EMS-credentialed members found">CE tracking uses each member's EMS level from their personnel profile (EMS credentials or National Registry level).</EmptyState>

@@ -50,14 +50,23 @@ export function credentialsFromCertifications(certs = [], personnel = []) {
   })).filter((c) => c.personId && c.name);
 }
 
-/** Forge Academy completions synced into the classic training list. */
-export function completionsFromLegacy(items = []) {
+const codeKey = (v) => String(v || "").trim().toLowerCase();
+
+/**
+ * Forge Academy completions synced into the classic training list. The Academy
+ * course number is mapped to the local course whose code matches it, so a
+ * requirement built on that local course is met by the Academy completion.
+ * Completions with no matching local course keep the Academy number.
+ */
+export function completionsFromLegacy(items = [], courses = []) {
+  const byCode = new Map(courses.filter((c) => codeKey(c.code)).map((c) => [codeKey(c.code), String(c.id)]));
   return items
     .filter((i) => i && (i.source === "forge_academy" || i.registrationId) && /complete/i.test(String(i.status || "")) && i.personnelId)
     .map((i) => ({
       id: i.id,
       personId: String(i.personnelId),
-      courseId: i.courseNumber || i.classId || "",
+      courseId: byCode.get(codeKey(i.courseNumber || i.classId)) || i.courseNumber || i.classId || "",
+      academyCourseNumber: i.courseNumber || i.classId || "",
       courseTitle: i.course || "",
       completedAt: isoOf(i.endDate || i.date || i.updatedAt),
       status: "completed",
@@ -66,11 +75,11 @@ export function completionsFromLegacy(items = []) {
     }));
 }
 
-export function buildEvidence({ records = [], evaluations = [], certifications = [], personnel = [], legacyTraining = [], exemptions = [] } = {}) {
+export function buildEvidence({ records = [], evaluations = [], certifications = [], personnel = [], legacyTraining = [], exemptions = [], courses = [] } = {}) {
   return {
     records,
     evaluations,
-    completions: completionsFromLegacy(legacyTraining),
+    completions: completionsFromLegacy(legacyTraining, courses),
     credentials: credentialsFromCertifications(certifications, personnel),
     exemptions,
   };

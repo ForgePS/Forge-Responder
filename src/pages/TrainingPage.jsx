@@ -66,9 +66,9 @@ function TrainingModule({ tab, setTab, focus, go, legacy, onNavigate, onDutyIds 
     // Members without reviewer access only see their own evidence, so only their own status is computed.
     const people = t.flags.canReview || t.flags.canApprove ? t.personnel : t.personnel.filter((p) => String(p.id) === String(t.myPersonId));
     const members = people.map((p) => memberFromPersonnel(p, resolvePersonEmsLevel));
-    const evidence = buildEvidence({ records: t.records, evaluations: t.evaluations, certifications: t.certifications, personnel: t.allPersonnel, legacyTraining: t.legacyTraining, exemptions: t.exemptions });
+    const evidence = buildEvidence({ records: t.records, evaluations: t.evaluations, certifications: t.certifications, personnel: t.allPersonnel, legacyTraining: t.legacyTraining, exemptions: t.exemptions, courses: t.courses });
     return evaluateCompliance({ rules, members, evidence, asOf });
-  }, [t.requirements, t.personnel, t.allPersonnel, t.records, t.evaluations, t.certifications, t.legacyTraining, t.exemptions, t.flags, t.myPersonId, asOf]);
+  }, [t.requirements, t.personnel, t.allPersonnel, t.records, t.evaluations, t.certifications, t.legacyTraining, t.exemptions, t.courses, t.flags, t.myPersonId, asOf]);
   const compliance = useMemo(() => ({ results, asOf, setAsOf }), [results, asOf]);
 
   if (!t.flags.canView) return <ErrorNote error="You don't have access to training. Ask your training officer for the View training permission." />;

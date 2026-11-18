@@ -124,9 +124,9 @@ export function ruleInEffect(rule = {}, asOfIso) {
   return true;
 }
 
-function inWindow(dateIso, period) {
+function inWindow(dateIso, range) {
   const d = String(dateIso || "").slice(0, 10);
-  return d && d >= period.start && d <= period.end;
+  return d && d >= range.start && d <= range.end;
 }
 
 function recordMatchesHours(rule, record) {
@@ -163,6 +163,9 @@ export function evaluateRequirement(rule, member, evidence = {}, asOfIso = iso(D
     return { ...base, status: "not_applicable", explanation: "This requirement doesn't apply to this member on this date.", evidence: [] };
   }
   const period = periodFor(rule, asOfIso, member);
+  // Evidence dated after the as-of date doesn't count (historical views and snapshots);
+  // the period end is still used for the deadline.
+  const window = { start: period.start, end: asOfIso < period.end ? asOfIso : period.end };
   const dueSoonDays = Number(rule.dueSoonDays ?? 30);
 
   const exemption = (evidence.exemptions || []).find((x) =>
@@ -187,7 +190,7 @@ export function evaluateRequirement(rule, member, evidence = {}, asOfIso = iso(D
   if (rule.kind === "hours") {
     required = Number(rule.minHours) || 0;
     for (const record of evidence.records || []) {
-      if (!inWindow(record.date, period) || !recordMatchesHours(rule, record)) continue;
+      if (!inWindow(record.date, window) || !recordMatchesHours(rule, record)) continue;
       const p = participantOf(record, member.id);
       if (!p) continue;
       const h = creditedHoursFor(p, record);
@@ -197,19 +200,19 @@ export function evaluateRequirement(rule, member, evidence = {}, asOfIso = iso(D
     }
   } else if (rule.kind === "course") {
     for (const record of evidence.records || []) {
-      if (!inWindow(record.date, period) || !recordMatchesCourse(rule, record)) continue;
+      if (!inWindow(record.date, window) || !recordMatchesCourse(rule, record)) continue;
       const p = participantOf(record, member.id);
       if (!p || !creditedHoursFor(p, record)) continue;
       if (VERIFIED.has(record.status)) { earned = 1; used.push({ type: "record", id: record.id, title: record.title, date: record.date }); }
       else if (PENDING.has(record.status)) pending = 1;
     }
     for (const c of evidence.completions || []) {
-      if (String(c.personId) !== String(member.id) || !inWindow(c.completedAt, period) || !recordMatchesCourse(rule, c)) continue;
+      if (String(c.personId) !== String(member.id) || !inWindow(c.completedAt, window) || !recordMatchesCourse(rule, c)) continue;
       if (c.status === "passed" || c.status === "completed") { earned = 1; used.push({ type: "completion", id: c.id, title: c.courseTitle, date: String(c.completedAt).slice(0, 10) }); }
     }
   } else if (rule.kind === "skill") {
     for (const ev of evidence.evaluations || []) {
-      if (String(ev.personId) !== String(member.id) || String(ev.skillId) !== String(rule.skillId) || !inWindow(ev.date, period)) continue;
+      if (String(ev.personId) !== String(member.id) || String(ev.skillId) !== String(rule.skillId) || !inWindow(ev.date, window)) continue;
       if (ev.result === "pass" && ev.status === "approved") { earned = 1; used.push({ type: "evaluation", id: ev.id, title: ev.skillTitle, date: ev.date }); }
       else if (ev.result === "pass" && ev.status === "submitted") pending = 1;
     }

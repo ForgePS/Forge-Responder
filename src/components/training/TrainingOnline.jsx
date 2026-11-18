@@ -38,6 +38,12 @@ export default function TrainingOnline({ onOpenAcademySettings }) {
     .filter((i) => !q || [i.course, i.members, i.courseNumber].join(" ").toLowerCase().includes(q.toLowerCase()));
   const completed = visibleSynced.filter((i) => /complete/i.test(String(i.status || "")));
   const courseRules = t.requirements.filter((r) => r.kind === "course" && r.active !== false);
+  // An Academy course number counts for the local course with the same code.
+  const rulesFor = (number) => {
+    const local = t.courses.filter((c) => c.code && String(c.code).trim().toLowerCase() === String(number || "").trim().toLowerCase()).map((c) => String(c.id));
+    const ids = new Set([String(number || ""), ...local]);
+    return courseRules.filter((r) => [r.courseId, ...(r.equivalentCourseIds || [])].some((id) => ids.has(String(id))));
+  };
 
   return (
     <div className="trn-page">
@@ -57,9 +63,9 @@ export default function TrainingOnline({ onOpenAcademySettings }) {
           <Table rows={visibleSynced}
             columns={[{ key: "members", label: "Member" }, { key: "course", label: "Course" }, { key: "courseNumber", label: "Number" }, { key: "endDate", label: "Completed", render: (i) => i.endDate || i.date || "—" }, { key: "hours", label: "Hours", render: (i) => i.hours || "—" },
               { key: "status", label: "Status", render: (i) => <Badge tone={/complete/i.test(i.status) ? "success" : "info"}>{i.status}</Badge> },
-              { key: "linked", label: "Counts toward", render: (i) => courseRules.filter((r) => String(r.courseId) === String(i.courseNumber || i.classId)).map((r) => r.name).join(", ") || "—" }]} />
+              { key: "linked", label: "Counts toward", render: (i) => rulesFor(i.courseNumber || i.classId).map((r) => r.name).join(", ") || "—" }]} />
         ) : <EmptyState title="No Academy activity yet">{t.flags.canConfigure ? "Connect Forge Academy and link members to see online completions here." : "Your completed online courses will appear here."}</EmptyState>}
-        {completed.length && t.flags.canReview ? <p className="trn-muted">{completed.length} completion{completed.length === 1 ? "" : "s"} available as evidence. To count one toward a course requirement, set the requirement's course to the Academy course number.</p> : null}
+        {completed.length && t.flags.canReview ? <p className="trn-muted">{completed.length} completion{completed.length === 1 ? "" : "s"} available as evidence. A completion counts toward a course requirement when the local course's code matches the Academy course number.</p> : null}
       </Section>
       {t.flags.canConfigure && onOpenAcademySettings ? <button type="button" className="secondary-button" onClick={onOpenAcademySettings}><ExternalLink size={14} /> Academy connection settings</button> : null}
     </div>

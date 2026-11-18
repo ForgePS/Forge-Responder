@@ -59,6 +59,8 @@ export function SessionEditor({ initial, onClose, onSaved }) {
       }
       // Reserve resources for each session.
       for (const ses of saved) {
+        const removed = t.reservations.filter((r) => r.sessionId === ses.id && r.status !== "cancelled" && !s.resourceIds.includes(r.resourceId));
+        for (const r of removed) await saveTrainingDoc(t.departmentId, C.reservations, { ...r, status: "cancelled" }, t.actor);
         for (const rid of s.resourceIds) {
           const existing = t.reservations.find((r) => r.sessionId === ses.id && r.resourceId === rid);
           await saveTrainingDoc(t.departmentId, C.reservations, { ...(existing || {}), resourceId: rid, sessionId: ses.id, title: ses.title, date: ses.date, startTime: ses.startTime, endTime: ses.endTime, status: "reserved" }, t.actor, "RSV");
