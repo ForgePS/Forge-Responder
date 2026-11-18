@@ -1766,3 +1766,7 @@ exports.digitalFormsDiscardImport = onCall({ memory: "256MiB", timeoutSeconds: 3
 exports.digitalFormsSubmit = onCall({ memory: "256MiB", timeoutSeconds: 60 }, (request) =>
   digitalForms.submit(admin.firestore(), admin.storage().bucket(), request));
 exports.digitalFormsLinkOptions = digitalFormsCall(digitalForms.linkOptions);
+
+// ---- Inspections: email a completed inspection report (functions/lib/inspectionEmail.js) ----
+exports.emailInspectionReport = onCall({ secrets: EMAIL_SECRETS, memory: "512MiB", timeoutSeconds: 60 }, (request) =>
+  require("./lib/inspectionEmail").emailInspectionReport(admin.firestore(), request));

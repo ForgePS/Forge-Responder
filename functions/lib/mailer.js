@@ -1,5 +1,5 @@
 /**
- * Plain-text email. Provider: Resend (RESEND_API_KEY, preferred) or SendGrid
+ * Plain-text email, optionally with attachments ([{ filename, content: Buffer, type }]). Provider: Resend (RESEND_API_KEY, preferred) or SendGrid
  * (SENDGRID_API_KEY + SENDGRID_FROM_EMAIL) as a fallback.
  *
  * Returns "sent" | "not_configured" | "no_recipient" | "failed".
@@ -14,9 +14,18 @@ function cleanList(list = []) {
   return [...new Set(list.map((e) => String(e || "").trim().toLowerCase()).filter(Boolean))];
 }
 
-async function sendViaResend({ apiKey, from, to, cc, replyTo, subject, text }) {
+function encodeAttachments(attachments = []) {
+  return attachments.map((a) => ({
+    filename: String(a.filename || "attachment"),
+    content: Buffer.from(a.content || "").toString("base64"),
+    type: a.type || "application/octet-stream",
+  }));
+}
+
+async function sendViaResend({ apiKey, from, to, cc, replyTo, subject, text, attachments = [] }) {
   const body = { from, to, subject, text };
   if (cc.length) body.cc = cc;
+  if (attachments.length) body.attachments = encodeAttachments(attachments).map(({ filename, content }) => ({ filename, content }));
   if (replyTo) body.reply_to = replyTo;
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -30,7 +39,7 @@ async function sendViaResend({ apiKey, from, to, cc, replyTo, subject, text }) {
   return "sent";
 }
 
-async function sendViaSendGrid({ apiKey, fromEmail, to, cc, subject, text }) {
+async function sendViaSendGrid({ apiKey, fromEmail, to, cc, replyTo, subject, text, attachments = [] }) {
   const personalization = { to: to.map((email) => ({ email })) };
   if (cc.length) personalization.cc = cc.map((email) => ({ email }));
   const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -41,6 +50,10 @@ async function sendViaSendGrid({ apiKey, fromEmail, to, cc, subject, text }) {
       from: { email: fromEmail, name: "Forge Public Safety" },
       subject,
       content: [{ type: "text/plain", value: text }],
+      ...(replyTo ? { reply_to: { email: replyTo } } : {}),
+      ...(attachments.length ? {
+        attachments: encodeAttachments(attachments).map(({ filename, content, type }) => ({ filename, content, type, disposition: "attachment" })),
+      } : {}),
     }),
   });
   if (!response.ok) {
@@ -50,14 +63,14 @@ async function sendViaSendGrid({ apiKey, fromEmail, to, cc, subject, text }) {
   return "sent";
 }
 
-async function sendTextEmail({ to = [], cc = [], replyTo = "", subject, text }) {
+async function sendTextEmail({ to = [], cc = [], replyTo = "", subject, text, attachments = [] }) {
   const toList = cleanList(to);
   const ccList = cleanList(cc).filter((e) => !toList.includes(e));
   if (!toList.length) return "no_recipient";
 
   // Staging (functions/.env.forge-rms-staging): log instead of emailing anyone.
   if (process.env.EMAIL_DELIVERY === "log") {
-    console.log("[email not sent: EMAIL_DELIVERY=log]", JSON.stringify({ to: toList, cc: ccList, subject, text: String(text || "").slice(0, 2000) }));
+    console.log("[email not sent: EMAIL_DELIVERY=log]", JSON.stringify({ to: toList, cc: ccList, subject, text: String(text || "").slice(0, 2000), attachments: attachments.map((a) => a.filename) }));
     return "logged";
   }
 
@@ -67,10 +80,10 @@ async function sendTextEmail({ to = [], cc = [], replyTo = "", subject, text }) 
   try {
     if (resendKey) {
       const from = String(process.env.EMAIL_FROM || DEFAULT_FROM).trim();
-      return await sendViaResend({ apiKey: resendKey, from, to: toList, cc: ccList, replyTo, subject, text });
+      return await sendViaResend({ apiKey: resendKey, from, to: toList, cc: ccList, replyTo, subject, text, attachments });
     }
     if (sendGridKey && sendGridFrom) {
-      return await sendViaSendGrid({ apiKey: sendGridKey, fromEmail: sendGridFrom, to: toList, cc: ccList, subject, text });
+      return await sendViaSendGrid({ apiKey: sendGridKey, fromEmail: sendGridFrom, to: toList, cc: ccList, replyTo, subject, text, attachments });
     }
     return "not_configured";
   } catch (error) {
