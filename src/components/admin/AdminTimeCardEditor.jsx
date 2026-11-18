@@ -179,7 +179,7 @@ export default function AdminTimeCardEditor({
           </p>
         </div>
         <div className="admin-time-card-editor-controls">
-          <label>
+          <label className="rms-field">
             <span>Employee</span>
             <select
               value={selectedPersonnelId}

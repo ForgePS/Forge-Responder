@@ -13,7 +13,7 @@ export default function InternalEmailBoardPage({ personnel = [] }) {
           <span className="module-icon"><Mail size={22} /></span>
           <div>
             <h1>{title}</h1>
-            <p>Agency-only inbox for personnel inside this department platform. Messages never cross to other departments.</p>
+            <p>Send announcements, alerts and messages to your people. Messages stay inside this department.</p>
           </div>
         </div>
       </section>

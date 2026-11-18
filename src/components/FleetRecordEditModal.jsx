@@ -41,7 +41,7 @@ export default function FleetRecordEditModal({
   return (
     <Modal title={title} onClose={onClose}>
       <div className="workflow-form">
-        {fields.map(({ key, label, dropdownId, type = "text", wide = false }) => (
+        {fields.map(({ key, label, dropdownId, type = "text", wide = false, placeholder, autoFocus = false }) => (
           <label key={key} className={wide ? "wide-field" : undefined}>
             <span>{label}</span>
             {dropdownId ? (
@@ -54,6 +54,10 @@ export default function FleetRecordEditModal({
               <input
                 type={type}
                 value={draft[key] ?? ""}
+                placeholder={placeholder}
+                autoFocus={autoFocus}
+                // Select the text so typing replaces a default like "New Apparatus".
+                onFocus={autoFocus ? (event) => event.target.select() : undefined}
                 onChange={(event) => updateField(key, event.target.value)}
               />
             )}
@@ -71,7 +75,8 @@ export default function FleetRecordEditModal({
 }
 
 export const APPARATUS_EDIT_FIELDS = [
-  { key: "unit", label: "Unit name", dropdownId: "apparatusUnits" },
+  // Typed, not a dropdown: a new truck's name isn't in any list yet.
+  { key: "unit", label: "Unit name", placeholder: "e.g. Engine 4", autoFocus: true },
   { key: "type", label: "Apparatus type", dropdownId: "apparatusTypes" },
   { key: "station", label: "Station", dropdownId: "stations" },
   { key: "year", label: "Model year" },

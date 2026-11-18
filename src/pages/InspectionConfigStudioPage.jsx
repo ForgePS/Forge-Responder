@@ -15,6 +15,7 @@ import {
   FileBarChart2,
   Wifi,
   Zap,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
@@ -578,11 +579,11 @@ export default function InspectionConfigStudioPage() {
                       onChange={(e) => setTypeDraft((c) => ({ ...c, feeAmount: Number(e.target.value) || 0 }))}
                     />
                   </Field>
-                  <label className="occupancy-primary-toggle">
+                  <label className="rms-check">
                     <input type="checkbox" checked={Boolean(typeDraft.publicRequestEligible)} onChange={(e) => setTypeDraft((c) => ({ ...c, publicRequestEligible: e.target.checked }))} />
                     Public request eligible
                   </label>
-                  <label className="occupancy-primary-toggle">
+                  <label className="rms-check">
                     <input type="checkbox" checked={Boolean(typeDraft.requiredApprovals)} onChange={(e) => setTypeDraft((c) => ({ ...c, requiredApprovals: e.target.checked }))} />
                     Requires approval
                   </label>
@@ -710,7 +711,7 @@ export default function InspectionConfigStudioPage() {
                   </div>
 
                   <div className="occupancy-detail-actions">
-                    <button className="text-button" type="button" onClick={addSection}>Add section</button>
+                    <button className="rms-add-row is-block" type="button" onClick={addSection}><CirclePlus size={14} /> Add section</button>
                   </div>
 
                   {(templateDraft.sections || []).map((section, sectionIndex) => (
@@ -740,7 +741,7 @@ export default function InspectionConfigStudioPage() {
                             <Field label="Help text">
                               <input value={field.helpText || ""} onChange={(e) => updateField(sectionIndex, fieldIndex, { helpText: e.target.value })} />
                             </Field>
-                            <label className="occupancy-primary-toggle">
+                            <label className="rms-check">
                               <input
                                 type="checkbox"
                                 checked={Boolean(field.required)}
@@ -748,7 +749,7 @@ export default function InspectionConfigStudioPage() {
                               />
                               Required
                             </label>
-                            <label className="occupancy-primary-toggle">
+                            <label className="rms-check">
                               <input
                                 type="checkbox"
                                 checked={Boolean(field.autoCreateViolation)}
@@ -756,11 +757,11 @@ export default function InspectionConfigStudioPage() {
                               />
                               Auto-create violation
                             </label>
-                            <button className="text-button" type="button" onClick={() => removeField(sectionIndex, fieldIndex)}>Remove field</button>
+                            <button className="icon-button danger" type="button" style={{ justifySelf: "end" }} aria-label="Remove field" title="Remove field" onClick={() => removeField(sectionIndex, fieldIndex)}><Trash2 size={15} /></button>
                           </div>
                         ))}
                       </div>
-                      <button className="text-button" type="button" onClick={() => addField(sectionIndex)}>
+                      <button className="rms-add-row is-block" type="button" onClick={() => addField(sectionIndex)}>
                         <CirclePlus size={14} /> Add field
                       </button>
                     </div>

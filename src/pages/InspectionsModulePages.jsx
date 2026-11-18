@@ -6,7 +6,9 @@ import InspectionEmptyState from "../components/inspections/InspectionEmptyState
 import InspectionPermissionGate from "../components/inspections/InspectionPermissionGate.jsx";
 import InspectionStatusBadge from "../components/inspections/InspectionStatusBadge.jsx";
 import InspectionsModuleLayout from "../components/inspections/InspectionsModuleLayout.jsx";
+import PreventionKpiGroups from "../components/inspections/PreventionKpiGroups.jsx";
 import ChecklistFieldInput from "../components/inspections/ChecklistFieldInput.jsx";
+import { failDetailFields, findMissingFailRemarks, isFailAnswer } from "../lib/inspections/inspectionFailDetails.js";
 import { findMissingRequiredFields, formatMissingFieldsMessage } from "../lib/inspections/checklistFields.js";
 import { describeNumberingFormat } from "../lib/inspections/inspectionNumbering.js";
 import {
@@ -85,11 +87,13 @@ function CreateInspectionModal({
   occupancies,
   types,
   saving,
+  error = "",
   defaultAssigneeId,
   defaultAssigneeName,
 }) {
+  const activeTypes = types.filter((row) => row.lifecycleStatus !== "archived");
   const [occupancyId, setOccupancyId] = useState(occupancies[0]?.id || "");
-  const [inspectionTypeId, setInspectionTypeId] = useState(types[0]?.id || "");
+  const [inspectionTypeId, setInspectionTypeId] = useState(activeTypes[0]?.id || "");
   const [scheduledStart, setScheduledStart] = useState("");
   const [priority, setPriority] = useState("normal");
   const [assignToMe, setAssignToMe] = useState(true);
@@ -98,7 +102,7 @@ function CreateInspectionModal({
   useEffect(() => {
     if (!open) return;
     setOccupancyId(occupancies[0]?.id || "");
-    setInspectionTypeId(types[0]?.id || "");
+    setInspectionTypeId(types.find((row) => row.lifecycleStatus !== "archived")?.id || "");
     setScheduledStart("");
     setPriority("normal");
     setAssignToMe(true);
@@ -112,7 +116,7 @@ function CreateInspectionModal({
       <section className="workflow-modal inspection-create-modal">
         <header>
           <strong>Create inspection</strong>
-          <button type="button" onClick={onClose}>×</button>
+          <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>×</button>
         </header>
         <div className="modal-content occupancy-form-grid">
           <Field label="Occupancy">
@@ -126,7 +130,7 @@ function CreateInspectionModal({
           <Field label="Inspection type">
             <select value={inspectionTypeId} onChange={(e) => setInspectionTypeId(e.target.value)}>
               <option value="">Select type</option>
-              {types.filter((row) => row.lifecycleStatus !== "archived").map((row) => (
+              {activeTypes.map((row) => (
                 <option key={row.id} value={row.id}>{row.name}</option>
               ))}
             </select>
@@ -147,6 +151,18 @@ function CreateInspectionModal({
             <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </Field>
         </div>
+        {error ? (
+          <div className="inspections-error-state" role="alert">
+            <strong>Couldn't create inspection</strong>
+            <p>{error}</p>
+          </div>
+        ) : null}
+        {!occupancies.length || !activeTypes.length ? (
+          <p className="inspections-settings-hint">
+            {!occupancies.length ? "Add an occupancy first. " : ""}
+            {!activeTypes.length ? "Add or restore an inspection type first." : ""}
+          </p>
+        ) : null}
         <div className="modal-actions">
           <button className="secondary-button" type="button" onClick={onClose} disabled={saving}>Cancel</button>
           <button
@@ -249,7 +265,10 @@ function InspectionWorkspace({
   }
 
   function handleCompleteClick() {
-    const missing = findMissingRequiredFields(record?.templateSnapshot, answers);
+    const missing = [
+      ...findMissingRequiredFields(record?.templateSnapshot, answers),
+      ...findMissingFailRemarks(record?.templateSnapshot, answers),
+    ];
     setMissingFields(missing);
     if (missing.length) {
       setCompleteError(formatMissingFieldsMessage(missing));
@@ -482,6 +501,32 @@ function InspectionWorkspace({
                         onChange={(next) => setAnswer(field.key, next)}
                       />
                       {field.helpText ? <small className="occupancy-muted">{field.helpText}</small> : null}
+                      {isFailAnswer(field, answers[field.key]) ? (() => {
+                        const extra = failDetailFields(field);
+                        const remarksMissing = missingKeys.has(extra.remarks.key);
+                        return (
+                          <div className={`inspection-fail-details${remarksMissing ? " checklist-field-missing" : ""}`} data-checklist-key={extra.remarks.key}>
+                            <span>{extra.remarks.label} *{remarksMissing ? " — required" : ""}</span>
+                            <ChecklistFieldInput
+                              field={extra.remarks}
+                              value={answers[extra.remarks.key]}
+                              editable={editable}
+                              invalid={remarksMissing}
+                              onChange={(next) => setAnswer(extra.remarks.key, next)}
+                            />
+                            <span>Photos</span>
+                            <ChecklistFieldInput
+                              field={extra.photos}
+                              value={answers[extra.photos.key]}
+                              editable={editable}
+                              departmentId={departmentId}
+                              inspectionId={record.id}
+                              actor={actor}
+                              onChange={(next) => setAnswer(extra.photos.key, next)}
+                            />
+                          </div>
+                        );
+                      })() : null}
                     </div>
                   );
                 })}
@@ -587,6 +632,7 @@ function InspectionsShellPage({
   const [occupancies, setOccupancies] = useState([]);
   const [types, setTypes] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [activeId, setActiveId] = useState("");
   const [commandBoard, setCommandBoard] = useState(null);
 
@@ -696,7 +742,7 @@ function InspectionsShellPage({
 
   async function handleCreate(payload) {
     setSaving(true);
-    setError("");
+    setCreateError("");
     setMessage("");
     try {
       const created = await createInspection(departmentId, payload, actor);
@@ -705,8 +751,10 @@ function InspectionsShellPage({
       setActiveId(created.id);
       setMessage(`Created ${created.inspectionNumber}`);
       if (mode === "dashboard") onNavigate?.("Work Queue");
-    } catch (createError) {
-      setError(friendlyError(createError, "Couldn't create inspection."));
+    } catch (createFailure) {
+      // Shown inside the dialog: the page's own error slot sits behind it.
+      console.error("Failed to create inspection", createFailure);
+      setCreateError(friendlyError(createFailure, "Couldn't create inspection."));
     } finally {
       setSaving(false);
     }
@@ -736,7 +784,7 @@ function InspectionsShellPage({
         activeNavName={navName}
         onNavigate={onNavigate}
         actions={canEdit ? (
-          <button className="primary-button" type="button" onClick={() => setShowCreate(true)}>
+          <button className="primary-button" type="button" onClick={() => { setCreateError(""); setShowCreate(true); }}>
             <CirclePlus size={14} /> New inspection
           </button>
         ) : null}
@@ -751,25 +799,7 @@ function InspectionsShellPage({
 
         {!loading && !error && mode === "dashboard" ? (
           <>
-            <div className="inspections-kpi-grid">
-              {kpiCards.map((card) => {
-                const raw = dashboardKpis[card.id];
-                const display = card.id === "outstanding_fees" || card.id === "revenue_collected"
-                  ? formatCurrency(raw || 0)
-                  : (raw ?? 0);
-                return (
-                  <button
-                    key={card.id}
-                    type="button"
-                    className="inspections-kpi-card inspections-kpi-card-button"
-                    onClick={() => onNavigate?.(card.drillNav)}
-                  >
-                    <span>{card.label}</span>
-                    <strong>{display}</strong>
-                  </button>
-                );
-              })}
-            </div>
+            <PreventionKpiGroups cards={kpiCards} values={dashboardKpis} onNavigate={onNavigate} />
             {commandBoard?.charts ? (
               <div className="inspection-chart-grid">
                 {[
@@ -986,11 +1016,12 @@ function InspectionsShellPage({
 
       <CreateInspectionModal
         open={showCreate}
-        onClose={() => setShowCreate(false)}
+        onClose={() => { setCreateError(""); setShowCreate(false); }}
         onCreated={handleCreate}
         occupancies={occupancies}
         types={types}
         saving={saving}
+        error={createError}
         defaultAssigneeId={inspectorId}
         defaultAssigneeName={inspectorName}
       />

@@ -1230,6 +1230,13 @@ html[data-field-theme="dark"] .fa-seg-btn.is-active.tone-muted {
   font-size: 14px;
 }
 
+.fa-fail-details {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--fa-bad);
+}
+
 .fa-fail-rule {
   color: var(--fa-warn) !important;
   font-weight: 700;

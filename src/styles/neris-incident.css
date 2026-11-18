@@ -812,9 +812,9 @@
 }
 
 .neris-analytics-metric {
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #d1d9e6);
-  border-radius: 8px;
+  background: var(--rms-bg-panel);
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -823,11 +823,13 @@
 
 .neris-analytics-metric span {
   font-size: 12px;
-  color: var(--text-muted, #64748b);
+  font-weight: 600;
+  color: var(--rms-text-muted);
 }
 
 .neris-analytics-metric strong {
   font-size: 22px;
+  color: var(--rms-text-strong);
 }
 
 .neris-analytics-toolbar {
@@ -838,9 +840,9 @@
 }
 
 .neris-analytics-toolbar label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  gap: 5px;
+  min-width: 180px;
   font-size: 12px;
 }
 
@@ -858,8 +860,8 @@
   flex-direction: column;
   gap: 2px;
   padding: 8px 10px;
-  border: 1px solid var(--border, #e8edf3);
-  border-radius: 6px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
 }
 
 .neris-input-mode-toggle:hover {

@@ -3,6 +3,7 @@ import { getFirestoreDb } from "../firebaseClient.js";
 import { allocateRecordNumber } from "../recordCounters.js";
 import { createRecord, getRecord, updateRecord } from "../firestoreService.js";
 import { findMissingRequiredFields, formatMissingFieldsMessage } from "./checklistFields.js";
+import { findMissingFailRemarks } from "./inspectionFailDetails.js";
 import {
   inspectionNumberYearPrefix,
   nextInspectionNumber,
@@ -244,6 +245,7 @@ export async function createInspection(departmentId, input = {}, audit = {}) {
       name: template.name,
       description: template.description,
       inspectionTypeId: template.inspectionTypeId,
+      remarksOnFail: Boolean(template.remarksOnFail),
       sections: template.sections,
     };
   }
@@ -431,7 +433,10 @@ export async function completeInspection(departmentId, inspectionId, {
   assertEditable(existing);
 
   const mergedAnswers = { ...(existing.answers || {}), ...answers };
-  const missing = findMissingRequiredFields(existing.templateSnapshot, mergedAnswers);
+  const missing = [
+    ...findMissingRequiredFields(existing.templateSnapshot, mergedAnswers),
+    ...findMissingFailRemarks(existing.templateSnapshot, mergedAnswers),
+  ];
   if (missing.length) throw new Error(formatMissingFieldsMessage(missing));
   if (!String(result || "").trim()) throw new Error("Choose a result before completing the inspection.");
   const failCount = countFailedAnswers(mergedAnswers, existing.templateSnapshot);

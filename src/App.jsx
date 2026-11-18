@@ -13,6 +13,7 @@ import {
   canEditApparatus,
   canEditAssets,
   canEditPersonnel,
+  canAccessNavItem,
   canEditScheduleRoster,
   canViewPersonnelPrivateInfo,
   canEditPcrs,
@@ -61,6 +62,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  ClipboardList,
   Clock3,
   DollarSign,
   ExternalLink,
@@ -72,6 +74,7 @@ import {
   Home,
   Landmark,
   LayoutList,
+  LifeBuoy,
   Mail,
   MapPin,
   Menu,
@@ -88,8 +91,11 @@ import {
   Wrench,
   X,
   Flame,
+  Sparkles,
 } from "lucide-react";
 const InternalEmailBoardPage = lazyPage(() => import("./pages/InternalEmailBoardPage.jsx"));
+const HelpDeskPage = lazyPage(() => import("./pages/HelpDeskPage.jsx"));
+import { rememberPageForHelpDesk } from "./lib/helpDesk/launch.js";
 const DigitalDashboardPage = lazyPage(() => import("./pages/DigitalDashboardPage.jsx"));
 import { filterNavByEnabledModules, filterNavByCodeLibraryAccess } from "./lib/navFilter.js";
 // Direct imports (not lib/inspections/index.js) so every inspection service isn't in the first download.
@@ -106,6 +112,7 @@ import {
 import { groupContainsRoute, groupHasNavTree, groupNavLeavesAsItems } from "./lib/navTree.js";
 import { buildPageIndex, depthFromHistoryState, pageFromLocation, pageHistoryState, pageSlug, slugFromHistoryState, urlWithPage } from "./lib/pageUrl.js";
 import { employeePortalNavGroups, filterEmployeePortalNav } from "./data/employeePortalNav.js";
+import { quickLinkOptions } from "./lib/dashboardQuickLinks.js";
 import CommandDashboard from "./components/CommandDashboard.jsx";
 const DailyLogPage = lazyPage(() => import("./pages/DailyLogPage.jsx"));
 const PersonnelPage = lazyPage(() => import("./pages/PersonnelPage.jsx"));
@@ -144,6 +151,10 @@ const NerisFireReportsPage = lazyPage(() => import("./pages/NerisFireReportsPage
 const PatientCareReportsPage = lazyPage(() => import("./pages/PatientCareReportsPage.jsx"));
 const NerisAnalyticsPage = lazyPage(() => import("./pages/NerisAnalyticsPage.jsx"));
 const HeatZoneAnalyticsPage = lazyPage(() => import("./pages/HeatZoneAnalyticsPage.jsx"));
+const DigitalFormsPage = lazyPage(() => import("./pages/DigitalFormsPage.jsx"));
+const ForgeAiPage = lazyPage(() => import("./pages/ForgeAiPage.jsx"));
+import { FORGE_AI_OPEN_EVENT, FORGE_AI_PAGE } from "./lib/forgeAi/launch.js";
+import "./styles/forge-ai-shell.css";
 import { resolveInitialHydrantTab, resolveInitialAppModule, shouldOpenHydrantsModule } from "./lib/hydrantAppRouting.js";
 // Pages grouped in one file each still load only when opened.
 const AnalyticsPage = lazyPage(() => import("./pages/SprintModulePages.jsx").then((m) => ({ default: m.AnalyticsPage })));
@@ -183,6 +194,7 @@ const ApparatusCheckSetupPage = lazyPage(() => import("./pages/ApparatusCheckSet
 const FleetReadinessBoardPage = lazyPage(() => import("./pages/FleetReadinessBoardPage.jsx"));
 const FleetDefectsPage = lazyPage(() => import("./pages/FleetDefectsPage.jsx"));
 const FleetWorkOrdersPage = lazyPage(() => import("./pages/FleetWorkOrdersPage.jsx"));
+const MaintenanceIssuesPage = lazyPage(() => import("./pages/MaintenanceIssuesPage.jsx"));
 const FleetPmForecastPage = lazyPage(() => import("./pages/FleetPmForecastPage.jsx"));
 const FleetTestsPage = lazyPage(() => import("./pages/FleetTestsPage.jsx"));
 const FleetFuelEnergyPage = lazyPage(() => import("./pages/FleetFuelEnergyPage.jsx"));
@@ -204,14 +216,19 @@ import {
   changedUnitStatuses,
   findFleetAssetForUnit,
   fleetDecisionForClassicStatus,
+  fleetUpdatesForClassicEdits,
 } from "./lib/fleet/fleetStatusOverlay.js";
 import { isFleetPageVisible } from "./lib/fleet/fleetNavVisibility.js";
 
+// Optional second line under a nav label (shown when the sidebar is expanded).
+const NAV_SUBTITLES = { "Forge AI": "Public Safety Operations Intelligence" };
+
 const navGroups = [
-  { label: "", items: [["Dashboard", Home]] },
+  { label: "", items: [["Dashboard", Home], ["Forge AI", Sparkles]] },
   { label: "RMS", items: [["Personnel", Users], ["Certifications", FileCheck2], ["Training", BookOpen], ["Academy Class Schedule", GraduationCap, FORGE_ACADEMY_CLASS_SCHEDULE_URL], ["Scheduling", CalendarDays], ["Time Sheets", Clock3], ["Daily Log", ClipboardCheck]] },
   { label: "Fleet", items: [
     ["Readiness Board", ClipboardCheck],
+    ["Maintenance Dashboard", Wrench],
     ["Fleet Defects", AlertTriangle],
     ["Fleet Work Orders", Wrench],
     ["PM Forecast", CalendarDays],
@@ -240,8 +257,8 @@ const navGroups = [
     items: [],
   },
   { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["Patient Care Reports", Ambulance], ["NERIS Analytics", BarChart3], ["Heat Zone Analytics", Flame]] },
-  { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Uploads", Upload]] },
-  { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay]] },
+  { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Digital Forms", ClipboardList], ["Uploads", Upload]] },
+  { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay], ["Help Desk", LifeBuoy]] },
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
 ];
 
@@ -261,6 +278,8 @@ const PERSONAL_PAGE_NAMES = new Set([
 
 // Every in-app page, keyed by its URL slug (?page=...).
 const PAGE_INDEX = buildPageIndex([...new Set([...DEPARTMENT_PAGE_NAMES, ...PERSONAL_PAGE_NAMES])]);
+// "My Dashboard" became the one Dashboard; old links still open it.
+PAGE_INDEX.set("my-dashboard", "Dashboard");
 
 
 const NAV_SECTIONS_STORAGE_KEY = "rms-nav-sections-collapsed";
@@ -520,7 +539,9 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
                           aria-current={!isExternal && current === name ? "page" : undefined}
                         >
                           <NavIcon size={15} aria-hidden />
-                          <span>{name}</span>
+                          {NAV_SUBTITLES[name] && !collapsed ? (
+                            <span className="nav-item-text"><span>{name}</span><small className="nav-item-subtitle">{NAV_SUBTITLES[name]}</small></span>
+                          ) : <span>{name}</span>}
                           {isExternal && !collapsed ? (
                             <ExternalLink size={12} className="nav-external-icon" aria-hidden />
                           ) : null}
@@ -651,6 +672,7 @@ function TopBar({
     <div className="top-bar-utilities">
       <div className="command-time"><span><CalendarDays size={15} /> {dateLabel}</span><span><Clock3 size={15} /> {timeLabel}</span></div>
       {!hideSearch && <label className="global-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search personnel, apparatus, occupancies, training, inspections..." /></label>}
+      <ThemeToggle compact className="icon-button top-bar-theme-toggle" />
       <NotificationBell departmentId={departmentId} userId={user?.uid} />
       <AccountMenu initials={initials} displayName={displayName} roleLabel={roleLabel} onSignOut={onSignOut} />
     </div>
@@ -732,7 +754,15 @@ function AppShell() {
       : (typeof window !== "undefined" && pageFromLocation(PAGE_INDEX, window.location)) || initialModule
   );
   const [schedulingTab, setSchedulingTab] = useState(null);
+  // A new help request says which page the person was on before opening the Help Desk.
+  useEffect(() => { rememberPageForHelpDesk(current); }, [current]);
   const clearSchedulingTab = useCallback(() => setSchedulingTab(null), []);
+  // "Ask Forge AI" buttons on other pages open the Forge AI page.
+  useEffect(() => {
+    const open = () => setCurrent(FORGE_AI_PAGE);
+    window.addEventListener(FORGE_AI_OPEN_EVENT, open);
+    return () => window.removeEventListener(FORGE_AI_OPEN_EVENT, open);
+  }, []);
   const deepLinkAppliedRef = useRef(Boolean(initialDeepLink?.module));
   const [codeLibraryAccess, setCodeLibraryAccess] = useState(null);
   const [preplanFeatures, setPreplanFeatures] = useState(null);
@@ -823,7 +853,7 @@ function AppShell() {
   // Personal pages render in the Employee Portal page; everything else is a department page.
   const onPersonalPage = !showAdminToggle || (PERSONAL_PAGE_NAMES.has(current) && !DEPARTMENT_PAGE_NAMES.has(current));
   const effectiveAppView = onPersonalPage ? "employee" : "admin";
-  const homePage = showAdminToggle ? "Dashboard" : "My Dashboard";
+  const homePage = "Dashboard";
   const menuGroups = useMemo(() => {
     if (!showAdminToggle) return visibleEmployeeNavGroups;
     if (!showEmployeeToggle) return visibleNavGroups;
@@ -835,6 +865,8 @@ function AppShell() {
     const [first, ...rest] = visibleNavGroups;
     return first && !first.label ? [first, myWork, ...rest] : [myWork, ...visibleNavGroups];
   }, [showAdminToggle, showEmployeeToggle, visibleNavGroups, visibleEmployeeNavGroups]);
+  // Dashboard quick links may point at any page this person's menu offers.
+  const dashboardQuickLinkOptions = useMemo(() => quickLinkOptions(menuGroups, groupNavLeavesAsItems), [menuGroups]);
 
   // Keep the open page in the address (?page=...) so it can be bookmarked,
   // shared and reached with back/forward. The first sync replaces the current
@@ -885,15 +917,22 @@ function AppShell() {
 
   useEffect(() => {
     if (membershipLoading || !user?.uid || showAdminToggle) return undefined;
+    // A demo persona is the shared demo login viewed as a smaller role on purpose:
+    // "recovering" it would always succeed (the real account is the Fire Chief).
+    if (membership?.demoPersona) return undefined;
     if (adminRecoveryAttemptedRef.current) return undefined;
     let cancelled = false;
     (async () => {
       const restored = await recoverAccess();
       adminRecoveryAttemptedRef.current = true;
-      if (!cancelled && restored) setCurrent("Dashboard");
+      if (!cancelled && restored) {
+        // Keep a page named in the address (?page=...), e.g. after a reload.
+        const requested = pageFromLocation(PAGE_INDEX, window.location);
+        if (!requested) setCurrent("Dashboard");
+      }
     })();
     return () => { cancelled = true; };
-  }, [showAdminToggle, user?.uid, recoverAccess, membershipLoading]);
+  }, [showAdminToggle, user?.uid, recoverAccess, membershipLoading, membership?.demoPersona]);
 
   useEffect(() => {
     if (membershipLoading) return;
@@ -904,14 +943,14 @@ function AppShell() {
       setCurrent("Hydrants");
       return;
     }
-    setCurrent(showAdminToggle ? "Dashboard" : "My Dashboard");
+    setCurrent("Dashboard");
   }, [showAdminToggle, showEmployeeToggle, membershipLoading]);
 
   // Members without Admin RMS access only have personal pages (an old link to a
-  // department page lands on My Dashboard instead).
+  // department page lands on the Dashboard instead).
   useEffect(() => {
     if (membershipLoading || showAdminToggle) return;
-    if (!PERSONAL_PAGE_NAMES.has(current)) setCurrent("My Dashboard");
+    if (!PERSONAL_PAGE_NAMES.has(current)) setCurrent("Dashboard");
   }, [membershipLoading, showAdminToggle, current]);
 
   useEffect(() => {
@@ -1011,10 +1050,10 @@ function AppShell() {
   const apparatusLive = useMemo(() => applyFleetStatus(apparatus, fleetStatusAssets), [apparatus, fleetStatusAssets]);
 
   // Status changed on the classic Apparatus page: record it on the fleet unit too.
-  async function syncClassicStatusesToFleet(changedUnits = []) {
+  async function syncClassicStatusesToFleet(changedUnits = [], assets = fleetStatusAssets) {
     const actor = { actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "User" };
     for (const unit of changedUnits) {
-      const asset = findFleetAssetForUnit(fleetStatusAssets, unit);
+      const asset = findFleetAssetForUnit(assets, unit);
       const change = fleetDecisionForClassicStatus(unit.status);
       if (!asset || !change) continue;
       if (change.decision) {
@@ -1029,18 +1068,36 @@ function AppShell() {
     }
   }
 
+  // Name, type, station or status changed on the classic Apparatus page: copy it to the fleet unit.
+  async function syncClassicEditsToFleet(before = [], next = []) {
+    const actor = { actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "User" };
+    const edits = fleetUpdatesForClassicEdits(before, next, fleetStatusAssets);
+    for (const { asset, patch } of edits) {
+      await saveFleetAsset(departmentId, { ...asset, ...patch }, actor);
+    }
+    // Status changes run after, on the renamed copies, so they don't put the old name back.
+    const patched = fleetStatusAssets.map((asset) => {
+      const edit = edits.find((item) => item.asset.id === asset.id);
+      return edit ? { ...asset, ...edit.patch } : asset;
+    });
+    const changed = changedUnitStatuses(before, next);
+    if (changed.length) await syncClassicStatusesToFleet(changed, patched);
+    // New units added here also become fleet units (checks, work orders, Readiness Board).
+    // A rename can free up a unit that was skipped for sharing a name (two "New Apparatus").
+    const renamed = next.some((unit) => {
+      const old = before.find((item) => item.id === unit.id);
+      return old && String(old.unit || "").trim() !== String(unit.unit || "").trim();
+    });
+    if (next.length > before.length || renamed) {
+      await syncFleetAssetsFromApparatus(departmentId, next, actor);
+    }
+  }
+
   function setApparatusFromClassicPage(update) {
     const next = typeof update === "function" ? update(apparatusLive) : update;
     setApparatus(next);
-    const changed = changedUnitStatuses(apparatusLive, next);
-    if (changed.length) {
-      syncClassicStatusesToFleet(changed).catch((error) => console.warn("Couldn't update fleet status", error));
-    }
-    // New units added here also become fleet units (checks, work orders, Readiness Board).
-    if (Array.isArray(next) && next.length > apparatusLive.length) {
-      syncFleetAssetsFromApparatus(departmentId, next, { actorUid: user?.uid || "", actorName: membership?.displayName || user?.email || "User" })
-        .catch(() => {});
-    }
+    if (!Array.isArray(next)) return;
+    syncClassicEditsToFleet(apparatusLive, next).catch((error) => console.warn("Couldn't update the fleet unit", error));
   }
   const [workOrders, setWorkOrders] = useTenantPersistentState(departmentId, LIST_KEYS.workOrders, getTenantListFallback(departmentId, LIST_KEYS.workOrders));
   const [fleetCutover, setFleetCutover] = useState({
@@ -1240,13 +1297,15 @@ function AppShell() {
   // A page whose module is switched off (reachable by a saved ?page= link) is not shown.
   const blockedModuleKey = effectiveAppView === "employee" ? "" : NAV_MODULE_MAP[current] || "";
   const moduleBlocked = Boolean(!inPlatformScope && blockedModuleKey && !isModuleEnabled(blockedModuleKey));
-  const pageContent = effectiveAppView === "employee" ? (
+  // Personal pages (and the personal part of the Dashboard) render in the Employee Portal page.
+  const renderEmployeePortal = (overrides = {}) => (
     <EmployeePortalPage
       current={current}
       onNavigate={navigate}
       membership={membership}
       user={user}
       permissions={permissions}
+      quickLinkOptions={dashboardQuickLinkOptions}
       showInternalEmail={isModuleEnabled("internalEmail")}
       personnel={personnel}
       certifications={liveCertifications}
@@ -1293,9 +1352,13 @@ function AppShell() {
         setCurrent("System Admin");
         setMobileNav(false);
       }}
+      {...overrides}
     />
+  );
+  const pageContent = effectiveAppView === "employee" ? (
+    renderEmployeePortal()
   ) : current === "Dashboard" ? (
-    <CommandDashboard onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={liveCertifications} apparatus={apparatusLive} workOrders={fleetWorkOrdersForDashboard || workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} dutyDayId={currentDutyDayId} />
+    <CommandDashboard personal={renderEmployeePortal({ embedded: true, previewPerson: null })} onNavigate={navigate} departmentId={departmentId} personnel={personnel} certifications={liveCertifications} apparatus={apparatusLive} workOrders={fleetWorkOrdersForDashboard || workOrders} training={training} assets={assets} inspections={inspections} documents={documents} scheduleDays={scheduleDays} leaveRequests={leaveRequests} shiftTrades={shiftTrades} shiftRotation={shiftRotation} liveDayMetrics={dashboardLiveDayMetrics} dutyDayId={currentDutyDayId} />
   ) : current === "Personnel" ? (
     hasPermission(permissions, "viewPersonnel") ? (
       <PersonnelPage
@@ -1459,6 +1522,13 @@ function AppShell() {
       || hasPermission(permissions, "viewApparatus")
       || isCreator
       ? <FleetDefectsPage query={query} onNavigate={setCurrent} legacyApparatus={apparatus} />
+      : <AccessDeniedModule name={current} />
+  ) : current === "Maintenance Dashboard" ? (
+    hasPermission(permissions, "viewFleetWorkOrders")
+      || hasPermission(permissions, "viewFleetDefects")
+      || hasPermission(permissions, "viewApparatus")
+      || isCreator
+      ? <MaintenanceIssuesPage onNavigate={setCurrent} legacyApparatus={apparatus} legacyWorkOrders={workOrders} />
       : <AccessDeniedModule name={current} />
   ) : current === "Fleet Work Orders" ? (
     hasPermission(permissions, "viewFleetWorkOrders")
@@ -1813,8 +1883,14 @@ function AppShell() {
     hasPermission(permissions, "viewHeatZoneAnalytics") || isCreator ? (
       <HeatZoneAnalyticsPage />
     ) : <AccessDeniedModule name={current} />
+  ) : current === FORGE_AI_PAGE ? (
+    hasPermission(permissions, "useForgeAi") || hasPermission(permissions, "manageForgeAi") || hasPermission(permissions, "viewForgeAiUsage") || isCreator ? (
+      <ForgeAiPage onNavigate={setCurrent} />
+    ) : <AccessDeniedModule name={current} />
   ) : current === "Analytics" ? (
     hasPermission(permissions, "accessAdminRms") ? <AnalyticsPage personnel={personnel} certifications={liveCertifications} training={training} apparatus={apparatusLive} workOrders={workOrders} assets={assets} inspections={inspections} scheduleDays={scheduleDays} /> : <AccessDeniedModule name={current} />
+  ) : current === "Help Desk" ? (
+    <HelpDeskPage />
   ) : current === "Messages" ? (
     hasPermission(permissions, "viewInternalEmail") ? <InternalEmailBoardPage personnel={personnel} /> : <AccessDeniedModule name={current} />
   ) : current === "Digital Dashboard" ? (
@@ -1837,6 +1913,10 @@ function AppShell() {
         permissions={permissions}
         isCreator={isCreator}
       />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "Digital Forms" ? (
+    canAccessNavItem("Digital Forms", permissions, { isCreator }) || isCreator ? (
+      <DigitalFormsPage />
     ) : <AccessDeniedModule name={current} />
   ) : ["SOGs / Policies", "EMS Protocols", "Forms", "Uploads"].includes(current) ? (
     hasPermission(permissions, "viewDocuments") ? (

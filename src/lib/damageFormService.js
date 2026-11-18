@@ -1,32 +1,12 @@
-import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { getFirestoreDb, getFirebaseFunctions } from "./firebaseClient.js";
+import { getFirebaseFunctions } from "./firebaseClient.js";
 import { createRecord, subscribeCollection } from "./firestoreService.js";
 
-export const DAMAGE_FORM_SETTINGS_DOC = "damageFormJotform";
-
-export function extractJotformId(formUrl = "") {
-  const match = String(formUrl).match(/jotform\.com\/(?:form\/|jsform\/)?(\d+)/i);
-  return match ? match[1] : "";
-}
-
-export function buildJotformEmbedUrl(formUrl = "") {
-  const formId = extractJotformId(formUrl);
-  if (!formId) return String(formUrl || "").trim();
-  return `https://form.jotform.com/${formId}`;
-}
-
-export function resolveJotformPdfViewerUrl(record = {}) {
-  const submissionId = String(record.submissionId || "").trim();
-  if (!submissionId) return "";
-  if (record.publicPdfUrl) return record.publicPdfUrl;
-  return `https://www.jotform.com/pdf-submission/${submissionId}`;
-}
-
-export function buildJotformWebhookUrl(projectId, departmentId, token) {
-  if (!projectId || !departmentId || !token) return "";
-  const params = new URLSearchParams({ departmentId, token });
-  return `https://us-central1-${projectId}.cloudfunctions.net/jotformDamageWebhook?${params.toString()}`;
+/** Where a damage form came from, in plain words. Older JotForm records keep their label. */
+export function damageFormSourceLabel(record = {}) {
+  if (record.source === "field-app") return "FORGE FIELD";
+  if (record.source === "jotform") return "JotForm (older record)";
+  return "Employee portal";
 }
 
 export function formatDamageFormDate(value = "") {
@@ -82,58 +62,14 @@ export function subscribeDamageForms(departmentId, onData, onError) {
   );
 }
 
-export async function loadDamageFormSettings(departmentId) {
-  const db = getFirestoreDb();
-  if (!db || !departmentId) return null;
-  const ref = doc(db, "departments", departmentId, "settings", DAMAGE_FORM_SETTINGS_DOC);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return null;
-  // Older departments may still have the key and webhook token here until an admin
-  // opens the setup screen (the server then moves them); never pass them on.
-  const { apiKey, webhookToken: _webhookToken, ...rest } = snap.data();
-  return { ...rest, apiKeyConfigured: Boolean(apiKey) };
-}
-
-async function callJotformSetup(departmentId, data) {
-  const functions = getFirebaseFunctions();
-  if (!functions || !departmentId) throw new Error("Damage form setup is unavailable.");
-  const callable = httpsCallable(functions, "saveJotformDamageSetup");
-  const result = await callable({ departmentId, ...data });
-  return result.data || null;
-}
-
-/** Admins: load the setup (including the webhook link). The key stays on the server. */
-export async function ensureDamageFormSettings(departmentId) {
-  return callJotformSetup(departmentId, { readOnly: true });
-}
-
-/** Admins: save the form link/title; a non-blank apiKey replaces the stored one. */
-export async function saveDamageFormSettings(departmentId, settings = {}) {
-  return callJotformSetup(departmentId, {
-    formUrl: String(settings.formUrl || "").trim(),
-    formTitle: String(settings.formTitle || "").trim(),
-    apiKey: String(settings.apiKey || "").trim(),
-    removeApiKey: Boolean(settings.removeApiKey),
-  });
-}
-
-export async function fetchJotformDamagePdf(departmentId, { recordId = "", submissionId = "", formId = "" } = {}) {
+/** A printable PDF of a damage form, built on the server from the saved record. */
+export async function fetchDamageFormPdf(departmentId, recordId = "") {
   const functions = getFirebaseFunctions();
   if (!functions || !departmentId || !recordId) {
     throw new Error("PDF download is unavailable.");
   }
-  const callable = httpsCallable(functions, "getJotformDamagePdf");
-  const result = await callable({ departmentId, recordId, submissionId, formId });
-  return result.data || {};
-}
-
-export async function syncJotformDamageSubmissions(departmentId, limit = 25) {
-  const functions = getFirebaseFunctions();
-  if (!functions || !departmentId) {
-    throw new Error("Sync is unavailable.");
-  }
-  const callable = httpsCallable(functions, "syncJotformDamageSubmissions");
-  const result = await callable({ departmentId, limit });
+  const callable = httpsCallable(functions, "getDamageFormPdf");
+  const result = await callable({ departmentId, recordId });
   return result.data || {};
 }
 

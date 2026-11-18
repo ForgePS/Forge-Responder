@@ -63,11 +63,11 @@
 .schedule-calendar-filter {
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
-  background: var(--rms-bg-surface-2);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
   color: var(--rms-text-body);
   cursor: pointer;
 }
@@ -80,10 +80,10 @@
 
 .schedule-calendar-nav-btn,
 .schedule-calendar-today-btn {
-  min-height: 34px;
-  border: 1px solid var(--rms-border);
-  border-radius: 6px;
-  background: var(--rms-bg-surface-2, #fff);
+  min-height: 36px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
+  background: var(--rms-bg-input);
   color: var(--rms-text-strong);
   cursor: pointer;
   font-size: 13px;
@@ -91,7 +91,7 @@
 }
 
 .schedule-calendar-nav-btn {
-  width: 34px;
+  width: 36px;
   padding: 0;
   display: inline-grid;
   place-items: center;

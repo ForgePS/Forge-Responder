@@ -434,7 +434,7 @@ export default function FleetAccidentRiskPage({ onNavigate, legacyApparatus = []
         {modal === "accident" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Report accident</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Report accident</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={accidentDraft.fleetAssetId} onChange={(e) => setAccidentDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -489,7 +489,7 @@ export default function FleetAccidentRiskPage({ onNavigate, legacyApparatus = []
         {modal === "claim" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>File insurance claim</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>File insurance claim</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Accident">
                   <select value={claimDraft.accidentEventId} onChange={(e) => setClaimDraft((c) => ({ ...c, accidentEventId: e.target.value }))}>
@@ -528,7 +528,7 @@ export default function FleetAccidentRiskPage({ onNavigate, legacyApparatus = []
         {modal === "roadside" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Dispatch roadside / tow</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Dispatch roadside / tow</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
                   <select value={roadsideDraft.fleetAssetId} onChange={(e) => setRoadsideDraft((c) => ({ ...c, fleetAssetId: e.target.value }))}>
@@ -574,7 +574,7 @@ export default function FleetAccidentRiskPage({ onNavigate, legacyApparatus = []
         {modal === "review" ? (
           <div className="modal-backdrop">
             <section className="workflow-modal">
-              <header><strong>Safety review</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Safety review</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Accident">
                   <select value={reviewDraft.accidentEventId} onChange={(e) => setReviewDraft((c) => ({ ...c, accidentEventId: e.target.value }))}>

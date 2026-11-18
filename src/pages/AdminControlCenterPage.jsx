@@ -5,7 +5,6 @@ import DepartmentConfigPanel from "../components/DepartmentConfigPanel.jsx";
 import FieldAppSettingsPanel from "../components/FieldAppSettingsPanel.jsx";
 import GoogleApisIntegrationPanel from "../components/digitalDashboard/GoogleApisIntegrationPanel.jsx";
 import Active911IntegrationPanel from "../components/digitalDashboard/Active911IntegrationPanel.jsx";
-import DamageFormJotformIntegrationPanel from "../components/digitalDashboard/DamageFormJotformIntegrationPanel.jsx";
 import TrainingAcademiesPanel from "../components/academy/TrainingAcademiesPanel.jsx";
 import NerisConnectionPanel from "../components/neris/NerisConnectionPanel.jsx";
 import { isAdminMembershipRoles } from "../lib/adminGuards.js";
@@ -20,6 +19,8 @@ import { isDemoDepartment, isPlatformScope } from "../lib/tenantPaths.js";
 import { listRecords } from "../lib/firestoreService.js";
 import { canManagePlatformSecrets, hasPermission } from "../lib/permissions.js";
 import { ensureDefaultRoles } from "../lib/roleService.js";
+import ForgeAiLaunchButton from "../components/forgeAi/ForgeAiLaunchButton.jsx";
+import "../styles/admin-control-center.css";
 
 function AdminSectionPill({ id, label, description = "", icon: Icon, isOpen, onToggle, children }) {
   return (
@@ -68,9 +69,6 @@ export default function AdminControlCenterPage({
   const { departmentId, profile, settings, isModuleEnabled } = useTenant();
   const { isCreator, membership, permissions } = useAuth();
   const canConfigureApiKeys = canManagePlatformSecrets(permissions, isCreator, membership);
-  const canConfigureDamageForm = isCreator
-    || hasPermission(permissions, "manageSystemSettings")
-    || hasPermission(permissions, "accessAdminRms");
   // Matches the server check: department admin or creator; the public demo is creator-only.
   const canConfigureNeris = isCreator || (isAdminMembershipRoles(membership) && !isDemoDepartment(departmentId));
   const canViewAcademyIntegrations = isCreator
@@ -167,13 +165,16 @@ export default function AdminControlCenterPage({
           </div>
         </div>
         {inPlatformScope ? null : (
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => window.dispatchEvent(new CustomEvent("forge:open-setup-wizard"))}
-          >
-            <Wand2 size={14} /> Run setup wizard
-          </button>
+          <div className="heading-actions">
+            <ForgeAiLaunchButton view="admin" label="Forge AI settings" title="Turn Forge AI on or off, choose capabilities and see usage" />
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => window.dispatchEvent(new CustomEvent("forge:open-setup-wizard"))}
+            >
+              <Wand2 size={14} /> Run setup wizard
+            </button>
+          </div>
         )}
       </section>
 
@@ -271,7 +272,7 @@ export default function AdminControlCenterPage({
         <AdminSectionPill
           id="integrations"
           label="Connected Services"
-          description="NERIS reporting, Google Maps, Active911, the JotForm damage form, and FORGE Academy."
+          description="NERIS reporting, Google Maps, Active911, and FORGE Academy."
           icon={KeyRound}
           isOpen={isOpen("integrations")}
           onToggle={toggleSection}
@@ -293,10 +294,6 @@ export default function AdminControlCenterPage({
               departmentId={departmentId}
               canConfigure={canConfigureApiKeys}
               variant="admin"
-            />
-            <DamageFormJotformIntegrationPanel
-              departmentId={departmentId}
-              canConfigure={canConfigureDamageForm}
             />
             <TrainingAcademiesPanel
               departmentId={departmentId}

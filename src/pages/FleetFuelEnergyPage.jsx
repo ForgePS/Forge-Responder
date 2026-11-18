@@ -370,7 +370,7 @@ export default function FleetFuelEnergyPage({ onNavigate, legacyApparatus = [] }
             <section className="workflow-modal">
               <header>
                 <strong>Log fuel transaction</strong>
-                <button type="button" onClick={() => setShowFuel(false)}>×</button>
+                <button type="button" className="icon-button" aria-label="Close" onClick={() => setShowFuel(false)}>×</button>
               </header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
@@ -447,7 +447,7 @@ export default function FleetFuelEnergyPage({ onNavigate, legacyApparatus = [] }
             <section className="workflow-modal">
               <header>
                 <strong>Log EV charge</strong>
-                <button type="button" onClick={() => setShowCharge(false)}>×</button>
+                <button type="button" className="icon-button" aria-label="Close" onClick={() => setShowCharge(false)}>×</button>
               </header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">
@@ -511,7 +511,7 @@ export default function FleetFuelEnergyPage({ onNavigate, legacyApparatus = [] }
             <section className="workflow-modal">
               <header>
                 <strong>Ingest telematics event</strong>
-                <button type="button" onClick={() => setShowTelematics(false)}>×</button>
+                <button type="button" className="icon-button" aria-label="Close" onClick={() => setShowTelematics(false)}>×</button>
               </header>
               <div className="modal-content occupancy-form-grid">
                 <Field label="Unit">

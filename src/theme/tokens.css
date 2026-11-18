@@ -49,6 +49,12 @@ html[data-theme="light"] {
   --rms-success: #45b369;
   --rms-warning: #ff9f29;
   --rms-critical: #ef4a00;
+  --rms-danger-text: #dc2626;
+  --rms-danger-border: rgba(220, 38, 38, 0.45);
+  --rms-danger-soft: rgba(220, 38, 38, 0.08);
+  --rms-success-text: #15803d;
+  --rms-success-border: rgba(34, 197, 94, 0.45);
+  --rms-success-soft: rgba(34, 197, 94, 0.1);
   --rms-shadow-sm: 0 4px 30px rgba(46, 45, 116, 0.05);
   --rms-shadow-md: 0 6px 32px rgba(46, 45, 116, 0.08);
   --rms-shadow-lg: 0 12px 40px rgba(46, 45, 116, 0.12);
@@ -119,6 +125,12 @@ html[data-theme="dark"] {
   --rms-success: #45b369;
   --rms-warning: #ff9f29;
   --rms-critical: #ff7b42;
+  --rms-danger-text: #f87171;
+  --rms-danger-border: rgba(248, 113, 113, 0.45);
+  --rms-danger-soft: rgba(248, 113, 113, 0.12);
+  --rms-success-text: #86efac;
+  --rms-success-border: rgba(34, 197, 94, 0.4);
+  --rms-success-soft: rgba(34, 197, 94, 0.12);
   --rms-shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.24);
   --rms-shadow-md: 0 18px 46px rgba(0, 0, 0, 0.32);
   --rms-shadow-lg: 0 26px 70px rgba(0, 0, 0, 0.42);

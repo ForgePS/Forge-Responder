@@ -50,13 +50,24 @@
 }
 
 .leave-request-search input {
-  min-height: 30px;
+  min-height: 34px;
   width: 100%;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--rms-text-strong);
   font-size: 14px;
+}
+
+/* The pill wrapper carries the focus ring, not the bare input inside it. */
+.app-shell .leave-request-search input:not([type="checkbox"]):not([type="radio"]):focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.leave-request-search:focus-within {
+  border-color: var(--rms-primary);
+  box-shadow: 0 0 0 3px var(--rms-primary-soft);
 }
 
 .leave-request-table {

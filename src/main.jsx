@@ -25,9 +25,14 @@ import "./theme/corona.css";
 import "./styles/neris-incident.css";
 import "./styles/neris-reports.css";
 import "./theme/demo-polish.css";
+// Shared RMS form look (labels, fields, cards, buttons, dialogs); keep last.
+import "./styles/form-kit.css";
+import "./theme/messages.css";
+import "./theme/help-desk.css";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 
 // The offline field app (/field) loads on demand and is cached by its service worker.
+import BrowserTabBranding from "./components/BrowserTabBranding.jsx";
 const FieldApp = lazy(() => import("./field/FieldApp.jsx"));
 
 function Root() {
@@ -72,6 +77,7 @@ function Root() {
         <TenantProvider>
           <ThemeProvider>
             <DropdownProvider>
+              <BrowserTabBranding />
               <App />
             </DropdownProvider>
           </ThemeProvider>

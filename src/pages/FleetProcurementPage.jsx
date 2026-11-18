@@ -276,7 +276,7 @@ export default function FleetProcurementPage({ onNavigate }) {
                       </dl>
                       {canEdit ? (
                         <div className="inspections-header-actions" style={{ marginTop: "12px", flexWrap: "wrap" }}>
-                          <select
+                          <select className="status-select" style={{ width: "auto" }}
                             value={selectedRequest.status}
                             onChange={async (e) => {
                               setSaving(true);
@@ -293,7 +293,7 @@ export default function FleetProcurementPage({ onNavigate }) {
                           >
                             {requestStatuses.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
                           </select>
-                          <button type="button" onClick={() => {
+                          <button type="button" className="secondary-button" onClick={() => {
                             setSpecDraft((c) => ({
                               ...c,
                               requestId: selectedRequest.id,
@@ -302,7 +302,7 @@ export default function FleetProcurementPage({ onNavigate }) {
                             }));
                             setModal("spec");
                           }}>Create specification</button>
-                          <button type="button" onClick={() => {
+                          <button type="button" className="secondary-button" onClick={() => {
                             setBuildDraft((c) => ({
                               ...c,
                               requestId: selectedRequest.id,
@@ -332,7 +332,7 @@ export default function FleetProcurementPage({ onNavigate }) {
               <header>
                 <div><strong>Specifications</strong></div>
                 {canEdit ? (
-                  <button type="button" onClick={() => setModal("spec")}><CirclePlus size={14} /> Add</button>
+                  <button type="button" className="secondary-button" onClick={() => setModal("spec")}><CirclePlus size={14} /> Add</button>
                 ) : null}
               </header>
               <div className="panel-body">
@@ -378,7 +378,7 @@ export default function FleetProcurementPage({ onNavigate }) {
                 <header>
                   <div><strong>Build projects</strong></div>
                   {canEdit ? (
-                    <button type="button" onClick={() => setModal("build")}><CirclePlus size={14} /> New build</button>
+                    <button type="button" className="secondary-button" onClick={() => setModal("build")}><CirclePlus size={14} /> New build</button>
                   ) : null}
                 </header>
                 <div className="panel-body">
@@ -485,7 +485,7 @@ export default function FleetProcurementPage({ onNavigate }) {
                   {selectedBuild ? (
                     <>
                       {selectedBuild.commissioning.map((item) => (
-                        <label key={item.id} className="config-field" style={{ flexDirection: "row", alignItems: "center", gap: "8px" }}>
+                        <label key={item.id} className="rms-check">
                           <input
                             type="checkbox"
                             disabled={!canEdit || saving}
@@ -552,7 +552,7 @@ export default function FleetProcurementPage({ onNavigate }) {
           <>
             {canEdit ? (
               <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                <button type="button" onClick={() => setModal("grant")}><CirclePlus size={14} /> Add grant</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("grant")}><CirclePlus size={14} /> Add grant</button>
               </div>
             ) : null}
             {(board?.grants || []).length ? (
@@ -584,7 +584,7 @@ export default function FleetProcurementPage({ onNavigate }) {
           <>
             {canEdit ? (
               <div className="inspections-header-actions" style={{ marginBottom: "8px" }}>
-                <button type="button" onClick={() => setModal("insurance")}><CirclePlus size={14} /> Add policy</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("insurance")}><CirclePlus size={14} /> Add policy</button>
               </div>
             ) : null}
             {(board?.insurance || []).length ? (
@@ -616,7 +616,7 @@ export default function FleetProcurementPage({ onNavigate }) {
         {modal === "request" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>New fleet request</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>New fleet request</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Need"><input value={requestDraft.need} onChange={(e) => setRequestDraft((c) => ({ ...c, need: e.target.value }))} /></Field>
                 <Field label="Fleet class"><input value={requestDraft.fleetClass} onChange={(e) => setRequestDraft((c) => ({ ...c, fleetClass: e.target.value }))} /></Field>
@@ -634,7 +634,7 @@ export default function FleetProcurementPage({ onNavigate }) {
                 <Field label="Required capabilities"><textarea rows={2} value={requestDraft.requiredCapabilities} onChange={(e) => setRequestDraft((c) => ({ ...c, requiredCapabilities: e.target.value }))} /></Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !requestDraft.need} onClick={async () => {
                   setSaving(true);
                   setError("");
@@ -661,7 +661,7 @@ export default function FleetProcurementPage({ onNavigate }) {
         {modal === "spec" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>New specification</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>New specification</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Title"><input value={specDraft.title} onChange={(e) => setSpecDraft((c) => ({ ...c, title: e.target.value }))} /></Field>
                 <Field label="Version"><input value={specDraft.version} onChange={(e) => setSpecDraft((c) => ({ ...c, version: e.target.value }))} /></Field>
@@ -677,7 +677,7 @@ export default function FleetProcurementPage({ onNavigate }) {
                 <Field label="Evaluation criteria"><textarea rows={2} value={specDraft.evaluationCriteria} onChange={(e) => setSpecDraft((c) => ({ ...c, evaluationCriteria: e.target.value }))} /></Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !specDraft.title} onClick={async () => {
                   setSaving(true);
                   try {
@@ -700,7 +700,7 @@ export default function FleetProcurementPage({ onNavigate }) {
         {modal === "build" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>Start build project</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Start build project</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Project name"><input value={buildDraft.name} onChange={(e) => setBuildDraft((c) => ({ ...c, name: e.target.value }))} /></Field>
                 <Field label="Draft fleet number"><input value={buildDraft.fleetNumberDraft} onChange={(e) => setBuildDraft((c) => ({ ...c, fleetNumberDraft: e.target.value }))} /></Field>
@@ -722,7 +722,7 @@ export default function FleetProcurementPage({ onNavigate }) {
                 </Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !buildDraft.name} onClick={async () => {
                   setSaving(true);
                   try {
@@ -745,7 +745,7 @@ export default function FleetProcurementPage({ onNavigate }) {
         {modal === "grant" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>Add grant</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Add grant</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Name"><input value={grantDraft.name} onChange={(e) => setGrantDraft((c) => ({ ...c, name: e.target.value }))} /></Field>
                 <Field label="Agency"><input value={grantDraft.agency} onChange={(e) => setGrantDraft((c) => ({ ...c, agency: e.target.value }))} /></Field>
@@ -759,7 +759,7 @@ export default function FleetProcurementPage({ onNavigate }) {
                 </Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !grantDraft.name} onClick={async () => {
                   setSaving(true);
                   try {
@@ -785,7 +785,7 @@ export default function FleetProcurementPage({ onNavigate }) {
         {modal === "insurance" ? (
           <div className="modal-backdrop" role="dialog">
             <div className="modal-card">
-              <header><strong>Add apparatus insurance</strong><button type="button" onClick={() => setModal("")}>×</button></header>
+              <header><strong>Add apparatus insurance</strong><button type="button" className="icon-button" aria-label="Close" onClick={() => setModal("")}>×</button></header>
               <div className="modal-body config-grid">
                 <Field label="Fleet number"><input value={insuranceDraft.fleetNumber} onChange={(e) => setInsuranceDraft((c) => ({ ...c, fleetNumber: e.target.value }))} /></Field>
                 <Field label="Build project">
@@ -807,7 +807,7 @@ export default function FleetProcurementPage({ onNavigate }) {
                 <Field label="Deductible"><input value={insuranceDraft.deductible} onChange={(e) => setInsuranceDraft((c) => ({ ...c, deductible: e.target.value }))} /></Field>
               </div>
               <footer>
-                <button type="button" onClick={() => setModal("")}>Cancel</button>
+                <button type="button" className="secondary-button" onClick={() => setModal("")}>Cancel</button>
                 <button className="primary-button" type="button" disabled={saving || !insuranceDraft.carrier} onClick={async () => {
                   setSaving(true);
                   try {

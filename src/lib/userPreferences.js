@@ -26,3 +26,15 @@ export async function saveUserThemePreference(departmentId, uid, theme) {
   await setDoc(ref, payload, { merge: true });
   return preferences;
 }
+
+/**
+ * Merge `patch` into the member's own preferences (only the named keys change;
+ * arrays are replaced whole). Returns the patch for patchMembership.
+ */
+export async function saveUserPreferences(departmentId, uid, patch = {}) {
+  const db = getFirestoreDb();
+  if (!db || !departmentId || !uid) return null;
+  const ref = doc(db, "departments", departmentId, "users", uid);
+  await setDoc(ref, { uid, preferences: patch, updatedAt: new Date().toISOString() }, { merge: true });
+  return patch;
+}

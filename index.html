@@ -44,7 +44,12 @@
       })();
     </script>
     <script>
-      if (!window.__FORGE_FIELD__) document.documentElement.setAttribute("data-theme", "dark");
+      if (!window.__FORGE_FIELD__) {
+        // Start in the last theme picked on this browser (src/context/ThemeContext.jsx) so pages don't flash.
+        var savedTheme = "light";
+        try { savedTheme = localStorage.getItem("forge-theme") === "dark" ? "dark" : "light"; } catch (e) {}
+        document.documentElement.setAttribute("data-theme", savedTheme);
+      }
       (function () {
         var path = location.pathname.replace(/\/$/, "") || "/";
         var isAlert = path === "/alerts" || path.endsWith("/alerts");
@@ -71,7 +76,28 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <title>FORGE Public Safety RMS</title>
+    <script>
+      // The tab title and icon set in Creator Console (remembered from the last visit),
+      // applied before the app loads so the tab doesn't flash the defaults.
+      (function () {
+        if (window.__FORGE_FIELD__) return;
+        try {
+          var saved = JSON.parse(localStorage.getItem("forge-tab-branding") || "null");
+          if (!saved) return;
+          if (saved.browserTitle) document.title = String(saved.browserTitle).slice(0, 80);
+          var icon = String(saved.faviconUrl || "");
+          var link = document.querySelector('link[rel="icon"]');
+          if (link && (/^\/(?!\/)/.test(icon) || /^https:\/\//i.test(icon))) {
+            link.href = icon;
+            link.removeAttribute("type");
+          }
+        } catch (e) {
+          // Keep the defaults.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

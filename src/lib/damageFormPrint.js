@@ -1,4 +1,4 @@
-import { formatDamageFormDate } from "./damageFormService.js";
+import { damageFormSourceLabel, formatDamageFormDate } from "./damageFormService.js";
 
 function escapeHtml(value = "") {
   return String(value)
@@ -11,7 +11,7 @@ function escapeHtml(value = "") {
 export function buildDamageFormPrintHtml(record = {}) {
   const title = record.title || "Damage form";
   const submittedAt = formatDamageFormDate(record.submittedAt || record.receivedAt);
-  const source = record.source === "jotform" ? "JotForm" : "Employee portal";
+  const source = damageFormSourceLabel(record);
   const answers = Array.isArray(record.answers) ? record.answers : [];
 
   const answerRows = answers.length

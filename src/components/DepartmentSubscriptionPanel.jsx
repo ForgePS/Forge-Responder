@@ -91,7 +91,7 @@ export default function DepartmentSubscriptionPanel({
 
       {!fixedDepartmentId && (
         <div className="department-subscription-toolbar">
-          <label>
+          <label className="rms-field">
             <span>Department branch</span>
             <select
               value={selectedDepartmentId}

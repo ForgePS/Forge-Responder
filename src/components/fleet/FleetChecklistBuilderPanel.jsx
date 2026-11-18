@@ -240,7 +240,7 @@ export default function FleetChecklistBuilderPanel({
               </Field>
             </div>
 
-            <button className="text-button" type="button" onClick={addSection}>Add section</button>
+            <button className="rms-add-row is-block" type="button" onClick={addSection}><CirclePlus size={14} /> Add section</button>
 
             {(draft.sections || []).map((section, sectionIndex) => (
               <div key={section.id || sectionIndex} className="template-section-card">
@@ -273,7 +273,7 @@ export default function FleetChecklistBuilderPanel({
                           ))}
                         </select>
                       </Field>
-                      <label className="occupancy-primary-toggle">
+                      <label className="rms-check">
                         <input
                           type="checkbox"
                           checked={Boolean(field.required)}
@@ -281,7 +281,7 @@ export default function FleetChecklistBuilderPanel({
                         />
                         Required
                       </label>
-                      <label className="occupancy-primary-toggle">
+                      <label className="rms-check">
                         <input
                           type="checkbox"
                           checked={Boolean(field.noteRequiredOnFail)}
@@ -292,7 +292,7 @@ export default function FleetChecklistBuilderPanel({
                     </div>
                   ))}
                 </div>
-                <button className="text-button" type="button" onClick={() => addField(sectionIndex)}>
+                <button className="rms-add-row is-block" type="button" onClick={() => addField(sectionIndex)}>
                   <CirclePlus size={14} /> Add field
                 </button>
               </div>

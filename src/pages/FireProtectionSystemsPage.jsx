@@ -542,7 +542,7 @@ export default function FireProtectionSystemsPage({
                   <InspectionStatusBadge status={labelForFpsSystemStatus(selectedSystem.status)} />
                 </header>
                 <div className="panel-body occupancy-detail-body">
-                  <div className="occupancy-form-grid">
+                  <div className="detail-grid">
                     <div><span className="occupancy-muted">Type</span><strong>{systemTypes.find((t) => t.id === selectedSystem.systemTypeId)?.label || selectedSystem.systemTypeId}</strong></div>
                     <div><span className="occupancy-muted">Occupancy</span><strong>{selectedSystem.occupancyName || "—"}</strong></div>
                     <div><span className="occupancy-muted">Manufacturer</span><strong>{selectedSystem.manufacturer || "—"}</strong></div>

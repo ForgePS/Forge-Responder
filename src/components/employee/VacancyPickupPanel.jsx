@@ -91,7 +91,7 @@ export default function VacancyPickupPanel({
         <p className="auth-help">No open shifts on opposite platoons in the next several weeks.</p>
       ) : (
         <form className="vacancy-pickup-form" onSubmit={handleSubmit}>
-          <label>
+          <label className="rms-field">
             <span>Open vacancy</span>
             <select
               value={selectedVacancyId}
@@ -124,7 +124,7 @@ export default function VacancyPickupPanel({
             </div>
           ) : null}
 
-          <label>
+          <label className="rms-field">
             <span>Message to Battalion Chief</span>
             <textarea
               rows={3}

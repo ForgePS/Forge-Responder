@@ -117,7 +117,7 @@ export default function TimeCardBulkPrintPanel({
           </p>
         </div>
         <div className="time-card-bulk-print-controls">
-          <label>
+          <label className="rms-field">
             <span>Pay period ending</span>
             <input
               type="date"
@@ -125,7 +125,7 @@ export default function TimeCardBulkPrintPanel({
               onChange={(event) => setReferenceDayId(event.target.value)}
             />
           </label>
-          <label>
+          <label className="rms-field">
             <span>Shift</span>
             <select value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)}>
               {shiftOptions.map((option) => (

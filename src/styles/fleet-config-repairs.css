@@ -11,8 +11,8 @@
   padding: 10px 14px 10px 28px;
   display: grid;
   gap: 4px;
-  border: 1px solid var(--rms-border-subtle);
-  border-radius: 8px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
   color: var(--rms-text-body);
   font-size: 14px;
 }

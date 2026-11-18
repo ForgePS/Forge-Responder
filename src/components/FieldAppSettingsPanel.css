@@ -30,8 +30,9 @@
 
 .fa-admin-table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--rms-border);
-  border-radius: 8px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
 }
 
 .fa-admin-table {
@@ -52,25 +53,26 @@
   background: var(--rms-bg-panel-header);
   color: var(--rms-text-muted);
   font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-weight: 600;
   white-space: nowrap;
 }
 
-.fa-admin-table input:not([type="checkbox"]):not([type="radio"]),
-.fa-admin-table select {
+.app-shell .fa-admin-table input:not([type="checkbox"]):not([type="radio"]),
+.app-shell .fa-admin-table select {
   width: 100%;
-  min-height: 29px;
-  padding: 0 7px;
-  border: 1px solid var(--rms-border);
-  border-radius: 4px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-sm);
   background: var(--rms-bg-input);
-  color: var(--rms-text-strong);
+  color: var(--rms-text);
+  font: inherit;
   font-size: 14px;
   box-sizing: border-box;
 }
 
-.fa-admin-table .fa-admin-num {
+.app-shell .fa-admin-table .fa-admin-num {
   width: 72px;
 }
 
@@ -129,9 +131,9 @@
   display: grid;
   gap: 8px;
   padding: 12px;
-  border: 1px solid var(--rms-border);
-  border-radius: 8px;
-  background: var(--rms-bg-surface);
+  border: 1px solid var(--rms-border-strong);
+  border-radius: var(--rms-radius-md);
+  background: var(--rms-bg-panel);
 }
 
 .fa-admin-card.is-alert {
@@ -148,8 +150,8 @@
 }
 
 .fa-admin-badge.is-alert {
-  background: rgba(255, 159, 41, 0.18);
-  color: #9a5b00;
+  background: color-mix(in srgb, var(--rms-warning) 18%, transparent);
+  color: var(--rms-text-strong);
 }
 
 .fa-admin-restock {
@@ -173,8 +175,8 @@
   width: 96px;
   height: 96px;
   object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid var(--rms-border);
+  border-radius: var(--rms-radius-sm);
+  border: 1px solid var(--rms-border-strong);
 }
 
 .fa-admin-fields,
@@ -212,4 +214,8 @@
 
 .fa-admin-actions .icon-button {
   margin-left: 4px;
+}
+
+.app-shell .fa-admin .rms-field > .secondary-button {
+  justify-self: start;
 }

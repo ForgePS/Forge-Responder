@@ -411,6 +411,8 @@ export function publicPlatformBranding(config = {}) {
     name: String(config.name || defaultPlatformConfig.name),
     platformTitle: String(config.platformTitle || defaultPlatformConfig.platformTitle),
     tagline: String(config.tagline || defaultPlatformConfig.tagline),
+    browserTitle: String(config.browserTitle || defaultPlatformConfig.browserTitle),
+    faviconUrl: String(config.faviconUrl || defaultPlatformConfig.faviconUrl),
     updatedAt: new Date().toISOString(),
   };
 }
