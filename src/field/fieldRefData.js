@@ -23,10 +23,11 @@ import { listViolationCatalog } from "../lib/inspections/violationService.js";
 import { listPreplanFiles, listPreplans } from "../lib/inspections/preplanService.js";
 import { fieldCapabilities } from "./fieldSession.js";
 import { listCheckoffLists, loadFieldAppConfig } from "./fieldAdminService.js";
-import { loadEmsSettings } from "../lib/pcrService.js";
+import { loadEmsSettings, loadPcrForm } from "../lib/pcrService.js";
 import { localDate } from "./fieldValidation.js";
 import { isObjectVisibleInActiveList } from "../lib/objectLifecycle.js";
 import { referenceKind } from "./fieldReference.js";
+import { recentDispatches } from "./fieldDispatch.js";
 
 
 const OPEN_INSPECTION_STATUSES = new Set(["draft", "scheduled", "in_progress", "overdue", "awaiting_approval"]);
@@ -299,6 +300,13 @@ const PART_LOADERS = {
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
   },
 
+  // Recent Active911 dispatches, so a new patient care report can start from one (fieldDispatch.js).
+  async dispatches({ departmentId, caps }) {
+    if (!caps.pcr) return [];
+    const list = await readTenantList(getFirestoreDb(), departmentId, LIST_KEYS.active911Alerts).catch(() => ({ items: [] }));
+    return recentDispatches(list.items || [], { hours: 48, limit: 40 });
+  },
+
   async incidents({ departmentId, caps }) {
     if (!caps.incidents) return [];
     const list = await readTenantList(getFirestoreDb(), departmentId, LIST_KEYS.nerisFireReports);
@@ -345,12 +353,15 @@ export async function refreshRefData({ departmentId, snapshot, actor }) {
   const failed = [];
   // Department FORGE FIELD settings first: they decide what else is needed.
   try {
-    const [config, ems] = await Promise.all([
+    const emsOn = snapshot?.modules?.ems !== false;
+    const [config, ems, emsForm] = await Promise.all([
       loadFieldAppConfig(departmentId),
       // EMS agency settings prefill new patient care reports (eResponse.01/.02).
-      snapshot?.modules?.ems === false ? null : loadEmsSettings(departmentId).catch(() => null),
+      emsOn ? loadEmsSettings(departmentId).catch(() => null) : null,
+      // The department's patient care report form: wording, drop-downs, defaults, required and hidden fields.
+      emsOn ? loadPcrForm(departmentId).catch(() => null) : null,
     ]);
-    parts.config = { items: { ...config, ...(ems ? { ems } : {}) }, fetchedAt: new Date().toISOString() };
+    parts.config = { items: { ...config, ...(ems ? { ems } : {}), ...(emsForm ? { emsForm } : {}) }, fetchedAt: new Date().toISOString() };
   } catch (error) {
     console.warn("FORGE FIELD settings could not be refreshed", error);
     failed.push("config");

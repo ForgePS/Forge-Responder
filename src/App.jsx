@@ -1797,6 +1797,7 @@ function AppShell() {
         actor={hydrantActor}
         query={query}
         canViewAll={canViewAllPcrs(permissions, isCreator)}
+        canEdit={canEditPcrs(permissions, isCreator)}
         canUnlock={isCreator || hasPermission(permissions, "unlockPcrs")}
         canExport={isCreator || hasPermission(permissions, "exportPcrs")}
         canManageSettings={isCreator || isAdminMembershipRoles(membership)}

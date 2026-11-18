@@ -1190,6 +1190,7 @@ exports.refreshEntitlements = onCall({ timeoutSeconds: 300 }, async (request) =>
 // ---- ePCR: server-side NEMSIS check of a patient care report (XSD-level + national Schematron).
 // PHI: never log the report or findings.
 const pcrCheck = require("./lib/nemsis/pcrCheck");
+const nemsisCore = require("./lib/nemsis/generated/nemsisCore.cjs");
 const { memberPermissions } = require("./lib/access");
 
 exports.checkPcr = onCall({ memory: "1GiB", timeoutSeconds: 120 }, async (request) => {
@@ -1346,6 +1347,94 @@ exports.draftNerisNarrative = onCall(
         throw new HttpsError("internal", "The AI service had a problem. Try again.");
       }
       console.error("draftNerisNarrative failed", error);
+      throw new HttpsError("internal", "Couldn't draft the narrative. Try again.");
+    }
+  }
+);
+
+// ---- AI narrative drafts for patient care reports. The model gets de-identified clinical facts built here from
+// the saved report (never the report sent by the browser), and only when the department switched the writer on.
+const pcrNarrative = require("./lib/pcrNarrative");
+
+exports.draftPcrNarrative = onCall(
+  { secrets: [anthropicApiKey], timeoutSeconds: 120, memory: "1GiB" },
+  async (request) => {
+    const db = admin.firestore();
+    const departmentId = String(request.data?.departmentId || "").trim();
+    const pcrId = String(request.data?.pcrId || "").trim();
+    await assertDepartmentAccess(db, departmentId, request.auth);
+    if (!pcrId || pcrId.includes("/")) throw new HttpsError("invalid-argument", "Save the report first.");
+
+    const ent = await db.doc(`platformEntitlements/${departmentId}`).get();
+    const modules = ent.data()?.modules;
+    if (Array.isArray(modules) && !modules.includes("ems")) {
+      throw new HttpsError("permission-denied", "Patient care reports aren't included in your department's plan.");
+    }
+    const [snap, userSnap, formSnap, creator] = await Promise.all([
+      db.doc(`departments/${departmentId}/pcrs/${pcrId}`).get(),
+      db.doc(`departments/${departmentId}/users/${request.auth.uid}`).get(),
+      db.doc(`departments/${departmentId}/settings/emsForm`).get(),
+      isPlatformCreator(db, request.auth),
+    ]);
+    if (formSnap.data()?.aiNarrative !== true) {
+      throw new HttpsError("failed-precondition", "The AI narrative writer is switched off for your department. An administrator can switch it on in Form settings.");
+    }
+    const denied = new HttpsError("not-found", "That report isn't available to you.");
+    if (!snap.exists) throw denied;
+    const pcr = snap.data();
+    const permissions = creator ? {} : await memberPermissions(db, departmentId, request.auth);
+    const isAdmin = invites.isAdminMembership(userSnap.data() || {});
+    if (!pcrCheck.canReadPcr(pcr, { uid: request.auth.uid, permissions, isAdmin, isCreator: creator })) throw denied;
+    if (!(creator || isAdmin || permissions.editPcrs === true || permissions.unlockPcrs === true)) {
+      throw new HttpsError("permission-denied", "Your role can't chart patient care reports.");
+    }
+    const key = anthropicApiKey.value();
+    if (!key) throw new HttpsError("failed-precondition", "AI narratives aren't set up yet (missing API key).");
+
+    const style = Object.keys(pcrNarrative.STYLES).includes(request.data?.style) ? request.data.style : "chronological";
+    const facts = nemsisCore.pcrNarrativeFacts(nemsisCore.nemsisSchema, pcr.nemsis || {});
+    await nerisNarrative.reserveDailyUse(db, departmentId);
+
+    const Anthropic = require("@anthropic-ai/sdk");
+    const AnthropicClient = Anthropic.default || Anthropic;
+    const client = new AnthropicClient({ apiKey: key, timeout: 90_000, maxRetries: 2 });
+    try {
+      const result = await pcrNarrative.draftPcrNarrative(client, {
+        facts,
+        notes: String(request.data?.notes || ""),
+        style,
+        existingNarrative: String(request.data?.existingNarrative || ""),
+      });
+      await db.collection(`departments/${departmentId}/auditLogs`).add({
+        action: "pcr.ai-narrative-draft",
+        module: "EMS",
+        recordId: pcrId,
+        summary: `AI narrative draft for patient care report ${String(pcr.number || pcrId)}`,
+        actorUid: request.auth.uid,
+        actorName: request.auth.token?.email || "",
+        model: result.model,
+        created_at: new Date().toISOString(),
+      }).catch(() => undefined);
+      return result;
+    } catch (error) {
+      await nerisNarrative.releaseDailyUse(db, departmentId).catch(() => undefined);
+      if (error instanceof HttpsError) throw error;
+      if (error instanceof AnthropicClient.RateLimitError) {
+        throw new HttpsError("resource-exhausted", "The AI service is busy. Try again in a minute.");
+      }
+      if (error instanceof AnthropicClient.AuthenticationError || error instanceof AnthropicClient.PermissionDeniedError) {
+        console.error("draftPcrNarrative: API key rejected", error.status);
+        throw new HttpsError("failed-precondition", "AI narratives aren't set up correctly. Contact FORGE Public Safety.");
+      }
+      if (error instanceof AnthropicClient.APIConnectionError) {
+        throw new HttpsError("unavailable", "Couldn't reach the AI service. Try again.");
+      }
+      if (error instanceof AnthropicClient.APIError) {
+        // Status only: the error text could echo report content.
+        console.error("draftPcrNarrative: API error", error.status);
+        throw new HttpsError("internal", "The AI service had a problem. Try again.");
+      }
+      console.error("draftPcrNarrative failed", error?.name || "");
       throw new HttpsError("internal", "Couldn't draft the narrative. Try again.");
     }
   }

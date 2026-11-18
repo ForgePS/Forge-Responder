@@ -216,14 +216,10 @@ async function releaseDailyUse(db, departmentId) {
 }
 
 /**
- * Draft a narrative. `client` is an Anthropic SDK client.
- * @returns {Promise<{narrative: string, missing: string[], model: string}>}
+ * One structured draft from the model: { narrative, missing, model }. `client` is an Anthropic SDK client.
+ * Shared by NERIS and patient care report narratives.
  */
-async function draftNarrative(client, { report, notes = "", style = "standard", existingNarrative = "" }) {
-  const facts = buildNarrativeFacts(report);
-  const cleanNotes = scrubFreeText(notes, MAX_NOTES_CHARS);
-  const current = scrubFreeText(existingNarrative, 8000);
-
+async function requestDraft(client, { system, user }) {
   const response = await client.beta.messages.create({
     model: MODEL,
     max_tokens: 4000,
@@ -233,8 +229,8 @@ async function draftNarrative(client, { report, notes = "", style = "standard", 
       effort: "medium",
       format: { type: "json_schema", schema: OUTPUT_SCHEMA },
     },
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: buildUserMessage(facts, cleanNotes, style, current) }],
+    system,
+    messages: [{ role: "user", content: user }],
   });
 
   if (response.stop_reason === "refusal") {
@@ -257,12 +253,24 @@ async function draftNarrative(client, { report, notes = "", style = "standard", 
   };
 }
 
+/**
+ * Draft a narrative. `client` is an Anthropic SDK client.
+ * @returns {Promise<{narrative: string, missing: string[], model: string}>}
+ */
+async function draftNarrative(client, { report, notes = "", style = "standard", existingNarrative = "" }) {
+  const facts = buildNarrativeFacts(report);
+  const cleanNotes = scrubFreeText(notes, MAX_NOTES_CHARS);
+  const current = scrubFreeText(existingNarrative, 8000);
+  return requestDraft(client, { system: SYSTEM_PROMPT, user: buildUserMessage(facts, cleanNotes, style, current) });
+}
+
 module.exports = {
   MODEL,
   DAILY_LIMIT_PER_DEPARTMENT,
   buildNarrativeFacts,
   buildUserMessage,
   draftNarrative,
+  requestDraft,
   reserveDailyUse,
   releaseDailyUse,
   scrubFreeText,

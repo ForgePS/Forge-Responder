@@ -4059,28 +4059,4 @@ html[data-theme="light"] .apparatus-check-card { background: #fff; border-color:
   font-weight: 700;
 }
 
-/* Patient care reports (src/pages/PatientCareReportsPage.jsx) */
-.pcr-page { display: grid; gap: 14px; min-width: 0; }
-.pcr-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
-.pcr-toolbar select { min-height: 32px; }
-.pcr-detail .panel-body { display: grid; gap: 12px; min-width: 0; }
-.pcr-detail header { flex-wrap: wrap; gap: 8px; }
-.pcr-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; margin: 0; }
-.pcr-facts dt { font-size: 12px; color: var(--rms-text-subtle); }
-.pcr-facts dd { margin: 2px 0 0; overflow-wrap: anywhere; }
-.pcr-checks { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--rms-border); border-radius: 8px; }
-.pcr-checks p { margin: 0; }
-.pcr-issues { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
-.pcr-section { border: 1px solid var(--rms-border); border-radius: 8px; padding: 8px 12px; }
-.pcr-section > summary { cursor: pointer; font-weight: 600; }
-.pcr-readout { display: grid; gap: 6px; margin: 8px 0 0; }
-.pcr-readout-field { display: grid; grid-template-columns: minmax(140px, 38%) 1fr; gap: 12px; }
-.pcr-readout dt { color: var(--rms-text-subtle); font-size: 13px; }
-.pcr-readout dd { margin: 0; overflow-wrap: anywhere; }
-.pcr-readout-group > dt { font-weight: 600; color: inherit; }
-.pcr-readout-group > dd { padding-left: 12px; border-left: 2px solid var(--rms-border); }
-.pcr-readout-row + .pcr-readout-row { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--rms-border); }
-@media (max-width: 640px) {
-  .pcr-readout-field { grid-template-columns: 1fr; gap: 2px; }
-}
-.pcr-signature { display: block; width: 100%; max-width: 300px; aspect-ratio: 3 / 1; object-fit: contain; background: #fff; border: 1px solid var(--rms-border); border-radius: 6px; }
+/* Patient care reports: src/styles/pcr-desktop.css */

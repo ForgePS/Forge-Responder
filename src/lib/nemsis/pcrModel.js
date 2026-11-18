@@ -434,7 +434,8 @@ export function fromLocalInput(value) {
  *   unit?: { vehicleNumber?: string, callSign?: string },
  *   incidentNumber?: string, responseNumber?: string,
  *   crew?: { id: string, level?: string, roles?: string[] }[],
- *   cad?: { id?: string, notified?: string, enRoute?: string, onScene?: string, dispatchReason?: string } }} input
+ *   cad?: { id?: string, notified?: string, enRoute?: string, onScene?: string, dispatchReason?: string,
+ *     address?: string, gps?: string, stateCode?: string } }} input
  */
 export function newPcr(schema, input) {
   if (!input?.uuid) throw new Error("newPcr: uuid is required (PatientCareReport/@UUID, fixed on the device)");
@@ -457,6 +458,9 @@ export function newPcr(schema, input) {
   set("eTimes.03", input.cad?.notified);
   set("eTimes.05", input.cad?.enRoute);
   set("eTimes.06", input.cad?.onScene);
+  set("eScene.11", input.cad?.gps);
+  set("eScene.15", input.cad?.address);
+  set("eScene.18", input.cad?.stateCode);
   (input.crew ?? []).forEach((member, index) => {
     const at = { "eCrew.CrewGroup": index };
     set("eCrew.01", member.id, at);

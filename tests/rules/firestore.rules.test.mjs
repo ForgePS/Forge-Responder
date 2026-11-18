@@ -55,6 +55,17 @@ before(async () => {
     firestore: { rules: FIRESTORE_RULES, host: "127.0.0.1", port: 8080 },
     storage: { rules: STORAGE_RULES, host: "127.0.0.1", port: 9199 },
   });
+  // The offline demo (npm run demo:offline) uses the same project id and ports. These tests clear the
+  // database before each test, so never run them against a demo that is running.
+  let demoRunning = false;
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    demoRunning = (await getDoc(doc(ctx.firestore(), "rmsGateways/forge-demo"))).exists();
+  });
+  if (demoRunning) {
+    await env.cleanup();
+    env = null;
+    throw new Error("The offline demo is running on these emulators. Stop it (Ctrl+C) before running the rules tests: they would erase its data.");
+  }
 });
 
 after(async () => {

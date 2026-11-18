@@ -1,33 +1,41 @@
 /**
- * Patient care reports (ePCR) in the RMS: crews see the reports they were on; supervisors with viewAllPcrs,
- * unlockPcrs or exportPcrs see every report, review it section by section, run the server NEMSIS check, unlock a
- * posted report for an amendment and export NEMSIS 3.5.1 XML. Admins set the EMS agency details here.
+ * Patient care reports (ePCR) in the RMS, in the same look as NERIS incident reports.
  *
- * PHI: every report holds patient data. Opening, unlocking and exporting a report is written to the audit log
- * (report number only, never patient details). Nothing here logs report contents.
+ *   - list: crews see the reports they were on; supervisors (viewAllPcrs / unlockPcrs / exportPcrs) see every report
+ *   - start a report from a CAD call (Active911, CAD records) or blank, and chart it on the desktop (PcrEditor)
+ *   - review: NEMSIS checks, export, print, unlock (PcrReview)
+ *   - admins: EMS agency settings and the department's form settings (PcrFormSettings)
+ *
+ * PHI: every report holds patient data. Opening, unlocking, printing and exporting a report is written to the audit
+ * log (report number only). Nothing here logs report contents.
  */
-import { useEffect, useMemo, useState } from "react";
-import { Ambulance, Download, Lock, LockOpen, Printer, RefreshCw, Search, Settings2, ShieldCheck } from "lucide-react";
-import { Badge, FleetSummary, Modal } from "../components/shell/ui.jsx";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  checkPcrOnServer,
-  getPcr,
-  listPcrs,
-  loadEmsSettings,
-  recordPcrExport,
-  recordPcrPrint,
-  saveEmsSettings,
-  unlockPcr,
+  Ambulance, ChevronRight, CirclePlus, ClipboardList, Loader2, RefreshCw, Search, Settings2, SlidersHorizontal, Sparkles, Wifi, WifiOff, X,
+} from "lucide-react";
+import { version as APP_VERSION } from "../../package.json";
+import { ProgressRing } from "../components/neris/NerisControls.jsx";
+import PcrEditor from "../components/pcr/PcrEditor.jsx";
+import PcrFormSettings from "../components/pcr/PcrFormSettings.jsx";
+import { PcrStartDialog } from "../components/pcr/PcrCadDialogs.jsx";
+import { formatWhen, friendlyError, needsReview } from "../components/pcr/PcrReview.jsx";
+import {
+  createPcr, getPcr, listPcrs, loadCadRecords, loadEmsSettings, loadPcrForm, rmsPcrNumber, saveEmsSettings, savePcrForm,
 } from "../lib/pcrService.js";
-import { emsSettingsAgency, emsSettingsErrors, missingEmsSettings, normalizeEmsSettings } from "../lib/nemsis/emsSettings.js";
+import { emsSettingsErrors, missingEmsSettings, normalizeEmsSettings } from "../lib/nemsis/emsSettings.js";
+import { normalizePcrForm, applyFormDefaults } from "../lib/pcr/pcrForm.js";
+import { applyCadChanges, cadChanges, cadLink, cadValues } from "../lib/pcr/pcrCad.js";
+import { newPcrRecordData } from "../field/fieldPcr.js";
+import { pcrSummary, sectionProgress } from "../lib/nemsis/pcrModel.js";
+import "../styles/pcr-desktop.css";
 
-function useNemsis() {
-  const [state, setState] = useState({ schema: null, model: null, error: "" });
+function useNemsisSchema() {
+  const [state, setState] = useState({ schema: null, error: "" });
   useEffect(() => {
     let active = true;
-    Promise.all([import("../lib/nemsis/index.js"), import("../lib/nemsis/pcrModel.js"), import("../lib/nemsis/pcrPrint.js")])
-      .then(([mod, model, print]) => active && setState({ schema: mod.nemsisSchema, model: { ...model, ...print }, error: "" }))
-      .catch(() => active && setState({ schema: null, model: null, error: "The NEMSIS data couldn't load. Refresh the page to try again." }));
+    import("../lib/nemsis/index.js")
+      .then((mod) => active && setState({ schema: mod.nemsisSchema, error: "" }))
+      .catch(() => active && setState({ schema: null, error: "The NEMSIS data couldn't load. Refresh the page to try again." }));
     return () => {
       active = false;
     };
@@ -35,72 +43,73 @@ function useNemsis() {
   return state;
 }
 
-function formatWhen(value) {
-  if (!value) return "";
-  const t = Date.parse(value);
-  return Number.isNaN(t) ? String(value) : new Date(t).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+function useOnline() {
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+  return online;
 }
 
-function friendlyError(error, fallback) {
-  const code = String(error?.code || "");
-  if (code.includes("permission-denied")) return "You don't have permission to do that.";
-  if (code.includes("not-found")) return "That report wasn't found, or you can't open it.";
-  if (code.includes("failed-precondition")) return error.message || fallback;
-  return fallback;
-}
+const GROUPS = [
+  { id: "all", label: "All" },
+  { id: "draft", label: "Drafts" },
+  { id: "review", label: "Needs review" },
+  { id: "posted", label: "Posted" },
+];
+const inGroup = (report, group) => group === "all"
+  || (group === "review" ? needsReview(report) : group === "posted" ? report.status === "posted" && !needsReview(report) : report.status === group);
 
-function downloadText(filename, text, type) {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-const STATUS_LABEL = { draft: "Draft", posted: "Posted" };
-
-/** Posted, but the server NEMSIS check (run on post) found errors: a supervisor should review and unlock it. */
-const needsReview = (report) => report.status === "posted" && report.nemsisCheck?.ok === false;
-
-function statusBadge(report) {
-  if (needsReview(report)) return { tone: "critical", label: "Needs review" };
-  if (report.status === "draft" && report.unlockedAt) return { tone: "warning", label: "Unlocked" };
-  return { tone: report.status === "posted" ? "success" : "warning", label: STATUS_LABEL[report.status] || report.status };
+function statusOf(report) {
+  if (needsReview(report)) return { tone: "returned", label: "Needs review" };
+  if (report.status === "draft" && report.unlockedAt) return { tone: "review", label: "Unlocked" };
+  return report.status === "posted" ? { tone: "done", label: "Posted" } : { tone: "draft", label: "Draft" };
 }
 
 export default function PatientCareReportsPage({
-  departmentId,
-  uid,
-  actor,
-  query = "",
-  canViewAll = false,
-  canUnlock = false,
-  canExport = false,
-  canManageSettings = false,
+  departmentId, uid, actor, query = "", canViewAll = false, canEdit = false, canUnlock = false, canExport = false, canManageSettings = false,
 }) {
-  const { schema, model, error: schemaError } = useNemsis();
+  const { schema, error: schemaError } = useNemsisSchema();
+  const online = useOnline();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [group, setGroup] = useState("all");
   const [selected, setSelected] = useState(null);
+  const [view, setView] = useState("list");
   const [settings, setSettings] = useState(normalizeEmsSettings(null));
-  const [editingSettings, setEditingSettings] = useState(false);
+  const [form, setForm] = useState(normalizePcrForm(null));
+  const [editingAgency, setEditingAgency] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [startBusy, setStartBusy] = useState(false);
+  const [cad, setCad] = useState({ records: [], loading: false, start: [] });
+
+  const say = (text) => { setMessage(text); setError(""); };
+  const fail = (text) => { setError(text); setMessage(""); };
 
   const reload = async () => {
     setLoading(true);
     setError("");
     try {
-      const [rows, ems] = await Promise.all([listPcrs(departmentId, { uid, readAll: canViewAll }), loadEmsSettings(departmentId)]);
+      const [rows, ems, pcrForm] = await Promise.all([
+        listPcrs(departmentId, { uid, readAll: canViewAll }),
+        loadEmsSettings(departmentId),
+        loadPcrForm(departmentId).catch(() => normalizePcrForm(null)),
+      ]);
       setReports(rows);
       setSettings(ems);
+      setForm(pcrForm);
     } catch (err) {
-      setError(friendlyError(err, "Reports couldn't be loaded. Check your connection and try again."));
+      fail(friendlyError(err, "Reports couldn't be loaded. Check your connection and try again."));
     } finally {
       setLoading(false);
     }
@@ -110,25 +119,50 @@ export default function PatientCareReportsPage({
     if (departmentId && uid) reload();
   }, [departmentId, uid, canViewAll]);
 
+  /** CAD records for refreshes (latest). Returns them. */
+  const reloadCad = useCallback(async ({ sync = false, quiet = false } = {}) => {
+    if (!quiet) setCad((c) => ({ ...c, loading: true }));
+    try {
+      const records = await loadCadRecords(departmentId, { sync });
+      setCad((c) => ({ ...c, records, loading: false }));
+      return records;
+    } catch {
+      setCad((c) => ({ ...c, loading: false }));
+      return null;
+    }
+  }, [departmentId]);
+
+  useEffect(() => {
+    if (departmentId && canEdit) reloadCad({ quiet: true });
+  }, [departmentId, canEdit, reloadCad]);
+
+  /** CAD calls to start from. In the demo these are the calls as first dispatched, so a refresh later has news. */
+  const loadStartRecords = async (sync = false) => {
+    setCad((c) => ({ ...c, loading: true }));
+    try {
+      const start = await loadCadRecords(departmentId, { sync, stage: "initial" });
+      setCad((c) => ({ ...c, start, loading: false }));
+    } catch {
+      setCad((c) => ({ ...c, loading: false }));
+    }
+  };
+
   const summaries = useMemo(() => {
-    if (!schema || !model) return [];
-    return reports.map((report) => ({ report, summary: model.pcrSummary(schema, report.nemsis || {}) }));
-  }, [reports, schema, model]);
+    if (!schema) return [];
+    return reports.map((report) => {
+      const progress = sectionProgress(schema, report.nemsis || {});
+      const totals = Object.values(progress).reduce((a, p) => ({ filled: a.filled + p.filled, total: a.total + p.total }), { filled: 0, total: 0 });
+      return { report, summary: pcrSummary(schema, report.nemsis || {}), percent: totals.total ? Math.round((totals.filled / totals.total) * 100) : 0 };
+    });
+  }, [reports, schema]);
 
   const needle = `${query} ${search}`.trim().toLowerCase();
   const visible = summaries
-    .filter(({ report }) => statusFilter === "all" || (statusFilter === "review" ? needsReview(report) : report.status === statusFilter))
-    .filter(({ report, summary }) => !needle || [report.number, report.unit, report.incidentNumber, summary.patient, summary.complaint]
+    .filter(({ report }) => inGroup(report, group))
+    .filter(({ report, summary }) => !needle || [report.number, report.unit, report.incidentNumber, summary.patient, summary.complaint, report.cad?.description]
       .join(" ").toLowerCase().includes(needle));
-
+  const counts = Object.fromEntries(GROUPS.map((g) => [g.id, reports.filter((r) => inGroup(r, g.id)).length]));
   const missingAgency = missingEmsSettings(settings);
-  const counts = {
-    all: reports.length,
-    draft: reports.filter((r) => r.status === "draft").length,
-    posted: reports.filter((r) => r.status === "posted").length,
-    unlocked: reports.filter((r) => r.status === "draft" && r.unlockedAt).length,
-    review: reports.filter(needsReview).length,
-  };
 
   const open = async (id) => {
     setError("");
@@ -137,382 +171,246 @@ export default function PatientCareReportsPage({
       const pcr = await getPcr(departmentId, id, actor);
       if (!pcr) throw Object.assign(new Error("missing"), { code: "not-found" });
       setSelected(pcr);
+      setView("editor");
     } catch (err) {
-      setError(friendlyError(err, "That report couldn't be opened."));
+      fail(friendlyError(err, "That report couldn't be opened."));
     }
   };
 
-  const updateSelected = (next) => {
-    setSelected(next);
-    setReports((rows) => rows.map((row) => (row.id === next.id ? { ...row, ...next } : row)));
+  const start = async ({ record, unit }) => {
+    setStartBusy(true);
+    try {
+      const id = globalThis.crypto.randomUUID();
+      const values = record ? cadValues(record, unit) : {};
+      const data = newPcrRecordData(schema, {
+        uuid: id,
+        number: rmsPcrNumber(),
+        softwareVersion: APP_VERSION,
+        uid,
+        agency: { number: settings.agencyNumber, name: settings.agencyName },
+        unit: unit ? { callSign: unit, vehicleNumber: unit } : undefined,
+      });
+      let nemsis = applyFormDefaults(schema, data.nemsis, form);
+      if (record) nemsis = applyCadChanges(schema, nemsis, cadChanges(schema, nemsis, values, null, { overwrite: true }));
+      const saved = await createPcr(departmentId, {
+        ...data,
+        nemsis,
+        incidentNumber: values["eResponse.03"] || "",
+        ...(record ? { cad: cadLink(record, values) } : {}),
+      }, actor);
+      setReports((rows) => [saved, ...rows]);
+      setSelected(saved);
+      setView("editor");
+      setStarting(false);
+      say(`${saved.number} started${record ? " from CAD" : ""}.`);
+    } catch (err) {
+      fail(friendlyError(err, "The report couldn't be started. Check your connection and try again."));
+    } finally {
+      setStartBusy(false);
+    }
   };
+
+  const onSaved = useCallback((saved) => {
+    setReports((rows) => {
+      const exists = rows.some((r) => r.id === saved.id);
+      return exists ? rows.map((r) => (r.id === saved.id ? { ...r, ...saved } : r)) : [saved, ...rows];
+    });
+  }, []);
+
+  const banner = message || error ? (
+    <div className={`nr-banner${error ? " pcr-banner-error" : ""}`} role={error ? "alert" : "status"}>
+      <span>{error || message}</span>
+      <button type="button" aria-label="Dismiss" onClick={() => { setMessage(""); setError(""); }}><X size={14} /></button>
+    </div>
+  ) : null;
 
   if (!schema) {
     return (
-      <section className="panel">
-        <div className="panel-body">
-          <p className={schemaError ? "occupancy-error" : "occupancy-muted"} role={schemaError ? "alert" : "status"}>
-            {schemaError || "Loading patient care reports…"}
-          </p>
+      <div className="module-page nr-page pcr-page">
+        <div className="nr-empty-state">
+          {schemaError ? <p className="nr-error" role="alert">{schemaError}</p> : <p className="nr-muted" role="status"><Loader2 size={16} className="nr-spin" /> Loading patient care reports…</p>}
         </div>
-      </section>
+      </div>
+    );
+  }
+
+  if (view === "editor" && selected) {
+    return (
+      <div className="module-page nr-page pcr-page">
+        {banner}
+        <PcrEditor
+          key={selected.id}
+          schema={schema}
+          form={form}
+          settings={settings}
+          initial={selected}
+          departmentId={departmentId}
+          uid={uid}
+          actor={actor}
+          canEdit={canEdit}
+          canUnlock={canUnlock}
+          canExport={canExport}
+          online={online}
+          cadRecords={cad.records}
+          cadLoading={cad.loading}
+          onReloadCad={reloadCad}
+          onSaved={onSaved}
+          onMessage={say}
+          onError={fail}
+          onClose={() => { setView("list"); setSelected(null); setMessage(""); }}
+        />
+      </div>
+    );
+  }
+
+  if (view === "form" && canManageSettings) {
+    return (
+      <div className="module-page nr-page pcr-page">
+        {banner}
+        <PcrFormSettings
+          schema={schema}
+          initial={form}
+          onClose={() => setView("list")}
+          onSave={async (next) => {
+            setForm(await savePcrForm(departmentId, next, actor));
+            say("Form settings saved. FORGE FIELD picks them up the next time a device refreshes its data.");
+          }}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="pcr-page">
-      <FleetSummary
-        items={[
-          ["Reports", counts.all, "neutral"],
-          ["Drafts", counts.draft, counts.draft ? "warning" : "neutral"],
-          ["Posted", counts.posted, "success"],
-          ["Posted with NEMSIS errors", counts.review, counts.review ? "critical" : "neutral"],
-          ["Unlocked for changes", counts.unlocked, counts.unlocked ? "warning" : "neutral"],
-        ]}
-      />
-
-      {(canExport || canManageSettings) && missingAgency.length ? (
-        <p className="occupancy-error" role="alert">
-          NEMSIS export needs the EMS agency details: {missingAgency.join(", ")}.
-          {canManageSettings ? " Use Agency settings to add them." : " Ask an administrator to add them."}
-        </p>
-      ) : null}
-      {error ? <p className="occupancy-error" role="alert">{error}</p> : null}
-      {message ? <p className="occupancy-message" role="status">{message}</p> : null}
-
-      <section className="personnel-workspace occupancy-workspace">
-        <section className="panel">
-          <header>
-            <div><Ambulance size={15} aria-hidden /><strong>{canViewAll ? "All reports" : "My reports"}</strong></div>
-            <div className="pcr-toolbar">
-              <label className="config-inline-search">
-                <Search size={14} aria-hidden />
-                <input placeholder="Search number, unit, patient" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search reports" />
-              </label>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Status">
-                <option value="all">All</option>
-                <option value="draft">Drafts</option>
-                <option value="posted">Posted</option>
-                <option value="review">Needs review</option>
-              </select>
-              <button className="secondary-button" type="button" onClick={reload} disabled={loading} title="Refresh">
-                <RefreshCw size={14} aria-hidden /> <span className="sr-only">Refresh</span>
-              </button>
-              {canManageSettings ? (
-                <button className="secondary-button" type="button" onClick={() => setEditingSettings(true)}>
-                  <Settings2 size={14} aria-hidden /> Agency settings
-                </button>
-              ) : null}
-            </div>
-          </header>
-          <div className="panel-body">
-            {loading ? <p className="occupancy-muted" role="status">Loading reports…</p> : null}
-            <div className="personnel-list">
-              {visible.map(({ report, summary }) => (
-                <button
-                  key={report.id}
-                  type="button"
-                  className={report.id === selected?.id ? "person-row selected" : "person-row"}
-                  onClick={() => open(report.id)}
-                >
-                  <span>
-                    <strong>{report.number || report.id}</strong>
-                    <small>
-                      {[formatWhen(summary.notified) || formatWhen(report.createdAt), report.unit, summary.patient, summary.complaint].filter(Boolean).join(" · ")}
-                    </small>
-                  </span>
-                  <Badge tone={statusBadge(report).tone}>{statusBadge(report).label}</Badge>
-                </button>
-              ))}
-              {!loading && !visible.length ? (
-                <p className="occupancy-muted">
-                  {reports.length ? "No reports match." : "No patient care reports yet. Crews chart them in FORGE FIELD."}
-                </p>
-              ) : null}
-            </div>
+    <div className="module-page nr-page pcr-page">
+      <section className="nr-hero">
+        <div className="nr-hero-text">
+          <span className="nr-hero-icon"><Ambulance size={22} /></span>
+          <div>
+            <h1>Patient Care Reports</h1>
+            <p>NEMSIS 3.5.1 charting for {settings.agencyName || "your agency"}. Start from CAD, step by step, with an AI narrator.</p>
           </div>
-        </section>
+        </div>
+        <div className="nr-hero-actions">
+          <span className={`nr-pill ${online ? "nr-pill-ok" : "nr-pill-warn"}`}>{online ? <Wifi size={12} /> : <WifiOff size={12} />} {online ? "Online" : "Offline"}</span>
+          {canManageSettings ? (
+            <>
+              <button type="button" className="nr-btn nr-btn-ghost" onClick={() => setView("form")}><SlidersHorizontal size={16} /> Form settings</button>
+              <button type="button" className="nr-btn nr-btn-ghost" onClick={() => setEditingAgency(true)}><Settings2 size={16} /> Agency settings</button>
+            </>
+          ) : null}
+          {canEdit ? (
+            <button type="button" className="nr-btn nr-btn-primary nr-btn-lg" onClick={() => { setStarting(true); loadStartRecords(true); }}>
+              <CirclePlus size={18} /> Start a report
+            </button>
+          ) : null}
+        </div>
+      </section>
 
-        {selected ? (
-          <ReportDetail
-            key={selected.id}
-            schema={schema}
-            model={model}
-            pcr={selected}
-            departmentId={departmentId}
-            actor={actor}
-            settings={settings}
-            canUnlock={canUnlock}
-            canExport={canExport}
-            onChange={updateSelected}
-            onMessage={(text) => { setMessage(text); setError(""); }}
-            onError={(text) => { setError(text); setMessage(""); }}
-          />
+      {banner}
+      {(canExport || canManageSettings) && missingAgency.length ? (
+        <div className="nr-banner pcr-banner-warn" role="status">
+          <span>NEMSIS export needs the EMS agency details: {missingAgency.join(", ")}.{canManageSettings ? " Use Agency settings to add them." : " Ask an administrator to add them."}</span>
+        </div>
+      ) : null}
+
+      <section className="nr-stats">
+        {[
+          ["draft", "Drafts", "nr-stat-draft"],
+          ["review", "Posted with NEMSIS errors", "nr-stat-review"],
+          ["posted", "Posted", "nr-stat-submitted"],
+        ].map(([id, label, tone]) => (
+          <button key={id} type="button" className={`nr-stat ${tone}${group === id ? " active" : ""}`} onClick={() => setGroup(group === id ? "all" : id)}>
+            <strong>{counts[id]}</strong>
+            <span>{label}</span>
+          </button>
+        ))}
+        <button type="button" className={`nr-stat nr-stat-ready${group === "all" ? " active" : ""}`} onClick={() => setGroup("all")}>
+          <strong>{counts.all}</strong>
+          <span>{canViewAll ? "All reports" : "My reports"}</span>
+        </button>
+      </section>
+
+      <section className="nr-list-card">
+        <div className="nr-toolbar">
+          <div className="nr-segmented nr-small" role="tablist">
+            {GROUPS.map((g) => (
+              <button key={g.id} type="button" role="tab" aria-selected={group === g.id} className={group === g.id ? "active" : ""} onClick={() => setGroup(g.id)}>
+                {g.label} <span className="nr-count-badge">{counts[g.id]}</span>
+              </button>
+            ))}
+          </div>
+          <div className="pcr-toolbar-right">
+            <label className="nr-search">
+              <Search size={15} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search number, unit, patient…" aria-label="Search reports" />
+            </label>
+            <button type="button" className="nr-icon-btn" onClick={reload} disabled={loading} title="Refresh" aria-label="Refresh">
+              {loading ? <Loader2 size={16} className="nr-spin" /> : <RefreshCw size={16} />}
+            </button>
+          </div>
+        </div>
+
+        {visible.length ? (
+          <ul className="nr-reports">
+            {visible.map(({ report, summary, percent }) => {
+              const status = statusOf(report);
+              return (
+                <li key={report.id}>
+                  <button type="button" className="nr-report" onClick={() => open(report.id)}>
+                    <span className="nr-report-icon nr-kind-ems"><Ambulance size={18} /></span>
+                    <span className="nr-report-main">
+                      <strong>{summary.patient !== "Unknown patient" ? summary.patient : "Patient not yet identified"}</strong>
+                      <small>
+                        {[report.number, formatWhen(summary.notified) || formatWhen(report.createdAt), report.unit, summary.complaint || report.cad?.description].filter(Boolean).join(" · ")}
+                      </small>
+                    </span>
+                    <span className="nr-report-side">
+                      {report.aiNarrative?.generated && !report.aiNarrative?.reviewedAt ? <span className="nr-pill nr-pill-warn nr-hide-sm"><Sparkles size={11} /> AI draft to review</span> : null}
+                      <span className={`nr-status nr-status-${status.tone}`}>{status.label}</span>
+                      <ProgressRing percent={percent} size={38} stroke={4} />
+                      <ChevronRight size={18} className="nr-chevron" />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         ) : (
-          <section className="panel">
-            <div className="panel-body">
-              <p className="occupancy-muted">Pick a report to review it.</p>
-            </div>
-          </section>
+          <div className="nr-empty-state">
+            <span className="nr-empty-icon"><ClipboardList size={28} /></span>
+            <h3>{loading ? "Loading reports…" : reports.length ? "No reports match" : "No patient care reports yet"}</h3>
+            <p>{reports.length ? "Try another filter or search." : "Start one here from a CAD call, or chart it in FORGE FIELD on scene."}</p>
+            {canEdit && !reports.length && !loading ? (
+              <button type="button" className="nr-btn nr-btn-primary" onClick={() => { setStarting(true); loadStartRecords(true); }}><CirclePlus size={16} /> Start a report</button>
+            ) : null}
+          </div>
         )}
       </section>
 
-      {editingSettings ? (
-        <AgencySettingsModal
+      {starting ? (
+        <PcrStartDialog
+          records={cad.start}
+          loading={cad.loading}
+          busy={startBusy}
+          onReload={() => loadStartRecords(true)}
+          onStart={start}
+          onClose={() => setStarting(false)}
+        />
+      ) : null}
+
+      {editingAgency ? (
+        <AgencySettingsDialog
           initial={settings}
-          onClose={() => setEditingSettings(false)}
+          onClose={() => setEditingAgency(false)}
           onSave={async (next) => {
             const saved = await saveEmsSettings(departmentId, next, actor);
             setSettings(normalizeEmsSettings(saved));
-            setEditingSettings(false);
-            setMessage("EMS agency settings saved.");
+            setEditingAgency(false);
+            say("EMS agency settings saved.");
           }}
         />
       ) : null}
     </div>
-  );
-}
-
-function ReportDetail({ schema, model, pcr, departmentId, actor, settings, canUnlock, canExport, onChange, onMessage, onError }) {
-  const [busy, setBusy] = useState("");
-  const [serverCheck, setServerCheck] = useState(null);
-  const [unlocking, setUnlocking] = useState(false);
-  const nemsis = pcr.nemsis || {};
-  const local = useMemo(() => model.postCheck(schema, nemsis), [model, schema, nemsis]);
-  const sections = useMemo(
-    () => model.PCR_SECTIONS.map((section) => ({ section, items: model.sectionReadout(schema, nemsis, section.id) })),
-    [model, schema, nemsis],
-  );
-  const filled = sections.filter((s) => s.items.length);
-  const posted = pcr.status === "posted";
-  const missingAgency = missingEmsSettings(settings);
-  const lastCheck = pcr.nemsisCheck;
-  const lastCheckStale = lastCheck?.at && pcr.updatedAt && lastCheck.at < pcr.updatedAt;
-
-  const runCheck = async () => {
-    setBusy("check");
-    try {
-      const result = await checkPcrOnServer(departmentId, pcr.id);
-      setServerCheck(result);
-      onChange({ ...pcr, nemsisCheck: { at: new Date().toISOString(), ok: result.ok, errorCount: result.errorCount, warningCount: result.warningCount, trigger: "manual" } });
-      onMessage(result.ok ? "NEMSIS check passed." : "NEMSIS check finished with issues (listed below).");
-    } catch (err) {
-      onError(friendlyError(err, "The NEMSIS check couldn't run. Try again in a minute."));
-    } finally {
-      setBusy("");
-    }
-  };
-
-  const exportXml = async () => {
-    setBusy("export");
-    try {
-      const xml = model.pcrXml(schema, { agency: emsSettingsAgency(settings), pcr: { ...nemsis, attrs: { ...(nemsis.attrs || {}), UUID: nemsis.attrs?.UUID || pcr.uuid } } });
-      await recordPcrExport(departmentId, pcr, actor);
-      downloadText(`PCR-${pcr.number || pcr.id}.xml`, xml, "application/xml");
-      onMessage("NEMSIS XML downloaded. It contains patient information: store and send it securely.");
-    } catch (err) {
-      onError(friendlyError(err, "The report couldn't be exported."));
-    } finally {
-      setBusy("");
-    }
-  };
-
-  const print = async () => {
-    // Open the window first (in the click) so pop-up blockers allow it, then fill it.
-    const win = window.open("", "_blank");
-    if (!win) {
-      onError("The print view was blocked. Allow pop-ups for this site and try again.");
-      return;
-    }
-    try {
-      await recordPcrPrint(departmentId, pcr, actor);
-      win.document.open();
-      win.document.write(model.pcrPrintHtml(schema, pcr, {
-        agencyName: settings.agencyName,
-        printedBy: actor?.actorName,
-        printedAt: new Date().toISOString(),
-        when: formatWhen,
-      }));
-      win.document.close();
-      win.focus();
-      win.print();
-    } catch (err) {
-      win.close();
-      onError(friendlyError(err, "The print view couldn't be opened."));
-    }
-  };
-
-  const unlock = async (reason) => {
-    setBusy("unlock");
-    try {
-      onChange(await unlockPcr(departmentId, pcr, actor, reason));
-      setUnlocking(false);
-      onMessage("Report unlocked. The crew can edit it in FORGE FIELD the next time they open it with signal.");
-    } catch (err) {
-      onError(friendlyError(err, "The report couldn't be unlocked."));
-    } finally {
-      setBusy("");
-    }
-  };
-
-  return (
-    <section className="panel pcr-detail">
-      <header>
-        <div>
-          {posted ? <Lock size={15} aria-hidden /> : <LockOpen size={15} aria-hidden />}
-          <strong>{pcr.number || pcr.id}</strong>
-          <span className="occupancy-muted" style={{ marginLeft: 8 }}>
-            {posted ? `Posted ${formatWhen(pcr.postedAt)}${pcr.postedByName ? ` by ${pcr.postedByName}` : ""}` : pcr.unlockedAt ? `Unlocked ${formatWhen(pcr.unlockedAt)} by ${pcr.unlockedBy || "a supervisor"}` : "Draft"}
-          </span>
-        </div>
-        <div className="occupancy-detail-actions">
-          <button className="secondary-button" type="button" onClick={runCheck} disabled={Boolean(busy)}>
-            <ShieldCheck size={14} aria-hidden /> {busy === "check" ? "Checking…" : "Run NEMSIS check"}
-          </button>
-          {canExport ? (
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={exportXml}
-              disabled={Boolean(busy) || missingAgency.length > 0}
-              title={missingAgency.length ? "Add the EMS agency details first" : "Download NEMSIS 3.5.1 XML"}
-            >
-              <Download size={14} aria-hidden /> Export XML
-            </button>
-          ) : null}
-          <button className="secondary-button" type="button" onClick={print} disabled={Boolean(busy)}>
-            <Printer size={14} aria-hidden /> Print
-          </button>
-          {canUnlock && posted ? (
-            <button className="secondary-button" type="button" onClick={() => setUnlocking(true)} disabled={Boolean(busy)}>
-              <LockOpen size={14} aria-hidden /> Unlock
-            </button>
-          ) : null}
-        </div>
-      </header>
-      <div className="panel-body">
-        <dl className="pcr-facts">
-          <div><dt>Unit</dt><dd>{pcr.unit || "—"}</dd></div>
-          <div><dt>Incident</dt><dd>{pcr.incidentNumber || "—"}</dd></div>
-          <div><dt>Charted by</dt><dd>{pcr.createdByName || "—"}</dd></div>
-          <div><dt>Last change</dt><dd>{formatWhen(pcr.updatedAt) || "—"}{pcr.updatedByName ? ` · ${pcr.updatedByName}` : ""}</dd></div>
-        </dl>
-        {pcr.unlockReason ? <p className="occupancy-muted">Unlock reason: {pcr.unlockReason}</p> : null}
-
-        <div className="pcr-checks">
-          <p>
-            <strong>Charting check:</strong>{" "}
-            {local.ok ? "no errors" : `${local.blocking.length} error${local.blocking.length === 1 ? "" : "s"}`}
-            {local.warnings.length ? `, ${local.warnings.length} warning${local.warnings.length === 1 ? "" : "s"}` : ""}
-          </p>
-          {needsReview(pcr) && !serverCheck ? (
-            <p className="occupancy-error" role="alert">
-              Posted with NEMSIS errors. Run the NEMSIS check to see them{canUnlock ? ", then unlock the report so the crew can fix it" : ""}.
-            </p>
-          ) : null}
-          {lastCheck && !serverCheck ? (
-            <p className="occupancy-muted">
-              Last NEMSIS check{lastCheck.trigger === "post" ? " (on posting)" : ""} {formatWhen(lastCheck.at)}:{" "}
-              {lastCheck.ok ? "passed" : `${lastCheck.errorCount} error${lastCheck.errorCount === 1 ? "" : "s"}`}
-              {lastCheck.missingAgency ? " (agency settings incomplete)" : ""}
-              {lastCheckStale ? " (the report changed since)" : ""}
-            </p>
-          ) : null}
-          {serverCheck ? <ServerCheckResult result={serverCheck} /> : null}
-          {!local.ok ? (
-            <details>
-              <summary>Charting errors</summary>
-              <ul className="pcr-issues">
-                {local.blocking.map((issue, i) => (
-                  <li key={`${issue.path}-${i}`}>
-                    <strong>{model.PCR_SECTIONS.find((s) => s.id === model.sectionForPath(issue.path))?.label || "Report"}:</strong> {issue.message}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
-        </div>
-
-        {filled.map(({ section, items }) => (
-          <details key={section.id} className="pcr-section" open={["dispatch", "times", "patient", "situation", "narrative"].includes(section.id)}>
-            <summary>{section.label}</summary>
-            <ReadoutItems items={items} />
-          </details>
-        ))}
-        {!filled.length ? <p className="occupancy-muted">Nothing has been charted on this report yet.</p> : null}
-      </div>
-
-      {unlocking ? <UnlockModal busy={busy === "unlock"} onClose={() => setUnlocking(false)} onConfirm={unlock} /> : null}
-    </section>
-  );
-}
-
-function ServerCheckResult({ result }) {
-  const errors = (result.findings || []).filter((f) => f.severity === "error");
-  const warnings = (result.findings || []).filter((f) => f.severity !== "error");
-  return (
-    <div className="pcr-server-check">
-      <p>
-        <strong>NEMSIS check ({result.schemaVersion || "3.5.1"}):</strong>{" "}
-        {result.ok ? "passed" : `${result.errorCount} error${result.errorCount === 1 ? "" : "s"}`}
-        {result.warningCount ? `, ${result.warningCount} warning${result.warningCount === 1 ? "" : "s"}` : ""}
-      </p>
-      {result.missingAgency?.length ? <p className="occupancy-error">Agency settings missing: {result.missingAgency.join(", ")}.</p> : null}
-      {errors.length || warnings.length || result.blocking?.length ? (
-        <ul className="pcr-issues">
-          {(result.blocking || []).map((issue, i) => <li key={`b-${i}`}><Badge tone="critical">Error</Badge> {issue.message}</li>)}
-          {errors.map((f, i) => <li key={`e-${i}`}><Badge tone="critical">Error</Badge> {f.message}</li>)}
-          {warnings.map((f, i) => <li key={`w-${i}`}><Badge tone="warning">Warning</Badge> {f.message}</li>)}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
-function ReadoutItems({ items }) {
-  return (
-    <dl className="pcr-readout">
-      {items.map((item, i) => (item.type === "field" ? (
-        <div key={`${item.el}-${i}`} className="pcr-readout-field">
-          <dt>{item.label}</dt>
-          <dd>
-            {item.image ? <img className="pcr-signature" src={item.image} alt={item.label} />
-              : (item.kind === "datetime" ? item.values.map(formatWhen) : item.values).join(", ")}
-          </dd>
-        </div>
-      ) : (
-        <div key={`${item.name}-${i}`} className="pcr-readout-group">
-          <dt>{item.label}</dt>
-          <dd>
-            {item.rows.map((row, r) => (
-              <div key={r} className="pcr-readout-row">
-                {item.rows.length > 1 ? <span className="occupancy-muted">#{r + 1}</span> : null}
-                <ReadoutItems items={row} />
-              </div>
-            ))}
-          </dd>
-        </div>
-      )))}
-    </dl>
-  );
-}
-
-function UnlockModal({ busy, onClose, onConfirm }) {
-  const [reason, setReason] = useState("");
-  return (
-    <Modal title="Unlock this report?" onClose={onClose}>
-      <p>The report goes back to draft so the crew can amend it, then post it again. This is recorded in the audit log.</p>
-      <label className="config-field wide">
-        <span>Reason</span>
-        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="e.g. Add the second set of vitals" />
-      </label>
-      <div className="occupancy-detail-actions">
-        <button className="primary-button" type="button" disabled={busy || !reason.trim()} onClick={() => onConfirm(reason.trim())}>
-          {busy ? "Unlocking…" : "Unlock"}
-        </button>
-        <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
-      </div>
-    </Modal>
   );
 }
 
@@ -523,40 +421,42 @@ const SETTINGS_FIELDS = [
   { key: "state", label: "State code (dAgency.04)", hint: "Two-digit ANSI state code, e.g. 37 for North Carolina, 48 for Texas." },
 ];
 
-function AgencySettingsModal({ initial, onClose, onSave }) {
-  const [form, setForm] = useState(initial);
+function AgencySettingsDialog({ initial, onClose, onSave }) {
+  const [values, setValues] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const errors = emsSettingsErrors(form);
+  const errors = emsSettingsErrors(values);
   const save = async () => {
     setSaving(true);
     setError("");
     try {
-      await onSave(form);
+      await onSave(values);
     } catch (err) {
       setError(friendlyError(err, "The settings couldn't be saved."));
       setSaving(false);
     }
   };
   return (
-    <Modal title="EMS agency settings" onClose={onClose}>
-      <p className="occupancy-muted">Used in the NEMSIS export header and to prefill new patient care reports in FORGE FIELD.</p>
-      <div className="occupancy-form-grid">
+    <div className="nr-dialog-backdrop" onClick={onClose}>
+      <div className="nr-dialog" role="dialog" aria-modal="true" aria-label="EMS agency settings" onClick={(e) => e.stopPropagation()}>
+        <header>
+          <h2>EMS agency settings</h2>
+          <button type="button" className="nr-icon-btn" aria-label="Close" onClick={onClose}><X size={18} /></button>
+        </header>
+        <p className="nr-muted">Used in the NEMSIS export header and to prefill new patient care reports.</p>
         {SETTINGS_FIELDS.map((field) => (
-          <label key={field.key} className="config-field wide">
-            <span>{field.label}</span>
-            <input value={form[field.key] || ""} onChange={(e) => setForm({ ...form, [field.key]: e.target.value })} aria-invalid={Boolean(errors[field.key])} />
-            <small className={errors[field.key] ? "occupancy-error" : "occupancy-muted"}>{errors[field.key] || field.hint}</small>
-          </label>
+          <div key={field.key} className="nr-field nr-wide">
+            <span className="nr-label">{field.label}</span>
+            <input className="nr-input" value={values[field.key] || ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })} aria-invalid={Boolean(errors[field.key])} />
+            <small className={errors[field.key] ? "nr-error" : "nr-help"}>{errors[field.key] || field.hint}</small>
+          </div>
         ))}
+        {error ? <p className="nr-error" role="alert">{error}</p> : null}
+        <div className="pcr-dialog-actions">
+          <button className="nr-btn nr-btn-ghost" type="button" onClick={onClose}>Cancel</button>
+          <button className="nr-btn nr-btn-primary" type="button" disabled={saving || Object.keys(errors).length > 0} onClick={save}>{saving ? "Saving…" : "Save"}</button>
+        </div>
       </div>
-      {error ? <p className="occupancy-error" role="alert">{error}</p> : null}
-      <div className="occupancy-detail-actions">
-        <button className="primary-button" type="button" disabled={saving || Object.keys(errors).length > 0} onClick={save}>
-          {saving ? "Saving…" : "Save"}
-        </button>
-        <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
-      </div>
-    </Modal>
+    </div>
   );
 }

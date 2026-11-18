@@ -16,6 +16,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { DEFAULT_SUBSCRIPTION_PLANS } from "../../src/data/platformSubscriptions.js";
 import { defaultRoles } from "../../src/data/defaultRoles.js";
+import { seedOfflineEms } from "./seedEms.mjs";
 
 const require = createRequire(import.meta.url);
 const entitlements = require("../../functions/lib/entitlements.js");
@@ -119,6 +120,13 @@ export async function seedOfflineDemo({ root, dataDir }) {
   const creator = await ensureUser(CREATOR_EMAIL, creatorPassword, "Local creator");
   await db.doc(`platformCreators/${creator.uid}`).set({ status: "active", email: CREATOR_EMAIL, updatedAt: now }, { merge: true });
   writeFileSync(loginFile, `Offline demo Creator Console login (this computer only)\nEmail: ${CREATOR_EMAIL}\nPassword: ${creatorPassword}\n`);
+
+  // EMS patient care reports, switched on for the demo with sample reports (seedEms.mjs).
+  try {
+    await seedOfflineEms();
+  } catch (error) {
+    console.warn("[offline demo] EMS sample data skipped:", error?.message || error);
+  }
 
   return { loginFile };
 }
