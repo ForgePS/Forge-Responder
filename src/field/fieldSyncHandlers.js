@@ -54,6 +54,8 @@ import {
 import { localDate } from "./fieldValidation.js";
 import { completeInspection, getInspectionRecord, saveInspectionDraft } from "../lib/inspections/inspectionWorkflow.js";
 import { createViolation } from "../lib/inspections/violationService.js";
+import { emailInspectionReport } from "../lib/inspections/inspectionEmailService.js";
+import { parseRecipients } from "../lib/inspections/inspectionEmailRecipients.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -692,12 +694,41 @@ async function syncInspection(record, ctx) {
     violationIds.push(violation.id);
   }
 
+  const warnings = [];
+  if (data.finish && data.emailReport?.send && !ctx.steps.emailed) {
+    warnings.push(...await emailReportAfterSync(ctx, inspectionId, data.emailReport));
+  }
+
   const fresh = await getInspectionRecord(ctx.departmentId, inspectionId);
   return {
+    warnings,
     serverIds: { inspectionId, violationIds },
     base: fresh ? { answers: fresh.answers || {}, summary: fresh.summary, internalNotes: fresh.internalNotes, result: fresh.result, updatedAt: fresh.updatedAt } : record.base,
     keepSteps: false,
   };
+}
+
+/**
+ * Email the completed report (with the violations just filed). Never fails the
+ * sync: the inspection is already saved, so a problem becomes a warning and the
+ * report can still be emailed from the RMS.
+ */
+async function emailReportAfterSync(ctx, inspectionId, emailReport) {
+  const { recipients } = parseRecipients(emailReport.to);
+  if (!recipients.length) return ["Report not emailed: no address"];
+  const server = await getInspectionRecord(ctx.departmentId, inspectionId);
+  if (server?.status !== "completed") {
+    await ctx.markStep("emailed");
+    return ["Report not emailed: the inspection needs approval first; email it from the RMS once approved"];
+  }
+  try {
+    await emailInspectionReport(ctx.departmentId, inspectionId, { to: recipients, note: emailReport.note || "" });
+    await ctx.markStep("emailed");
+    return [];
+  } catch (error) {
+    await ctx.markStep("emailed");
+    return [`Report not emailed (${error?.message || "email failed"}); send it from the RMS`];
+  }
 }
 
 /* ------------------------------ pre-fire plans ---------------------------- */
