@@ -215,6 +215,7 @@ function InspectionWorkspace({
   departmentId,
   actor,
   occupancy = null,
+  resultOptions = getInspectionResultOptions(),
 }) {
   const [answers, setAnswers] = useState(() => answersWithOccupancy(record, occupancy));
   const [summary, setSummary] = useState(record?.summary || "");
@@ -546,8 +547,8 @@ function InspectionWorkspace({
           <Field label="Result *">
             <select value={result} disabled={!editable} onChange={(e) => setResult(e.target.value)}>
               <option value="">Select result</option>
-              {result && !getInspectionResultOptions().includes(result) ? <option value={result}>{result}</option> : null}
-              {getInspectionResultOptions().map((option) => <option key={option} value={option}>{option}</option>)}
+              {result && !resultOptions.includes(result) ? <option value={result}>{result}</option> : null}
+              {resultOptions.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </Field>
           <label className="occupancy-primary-toggle">
@@ -892,6 +893,7 @@ function InspectionsShellPage({
           <InspectionWorkspace
             record={activeRecord}
             occupancy={occupancies.find((row) => row.id === activeRecord?.occupancyId) || null}
+            resultOptions={getInspectionResultOptions(settings)}
             canEdit={canEdit}
             canApprove={canApprove}
             canCreatePreplan={canCreatePreplan}

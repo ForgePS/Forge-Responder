@@ -7,23 +7,15 @@ import { localDate } from "../fieldValidation.js";
 import { failDetailFields, isFailAnswer } from "../../lib/inspections/inspectionFailDetails.js";
 import { inspectionFields, validateInspectionForm } from "../inspectionValidation.js";
 import { answersWithOccupancy } from "../../lib/inspections/occupancyPrefill.js";
+import { DEFAULT_INSPECTION_RESULTS, inspectionResultTone, resultNeedsReinspection } from "../../lib/inspections/inspectionResults.js";
 
 export { inspectionFields, validateInspectionForm };
 import {
   Banner, Chips, ErrorSummary, Field, PhotoStrip, PickerButton, PickerSheet, Screen, Section, Segmented, StatusChip, TextArea, TextInput, cx, formatDay,
 } from "../ui.jsx";
 
-export const INSPECTION_RESULTS = [
-  "Passed",
-  "Passed with conditions",
-  "Failed",
-  "Reinspection required",
-  "Immediate action required",
-  "Incomplete",
-  "Unable to inspect",
-  "No access",
-  "Business closed",
-];
+/** The defaults; the department's own list comes down with the inspection data. */
+export const INSPECTION_RESULTS = DEFAULT_INSPECTION_RESULTS;
 
 const SEVERITIES = [
   { value: "minor", label: "Minor" },
@@ -120,6 +112,8 @@ export function InspectionFormScreen({ params = {} }) {
   const rules = rulesFor("inspection");
   const fromRef = params.inspectionId ? refItems(refData, "inspections").find((item) => item.id === params.inspectionId) : null;
   const catalog = refItems(refData, "violationCatalog");
+  const departmentResults = refItems(refData, "inspectionResults");
+  const results = departmentResults.length ? departmentResults : INSPECTION_RESULTS;
   const [sheet, setSheet] = useState(false);
   const form = useRecordForm({
     kind: "inspection",
@@ -295,8 +289,10 @@ export function InspectionFormScreen({ params = {} }) {
 
       <Section title="Result">
         <Field label="Result" required error={errors.result}>
-          <Segmented value={data.result} options={INSPECTION_RESULTS.slice(0, 5).map((value) => ({ value, label: value, tone: /^Passed$/.test(value) ? "ok" : /Failed|Immediate/.test(value) ? "bad" : "warn" }))} onChange={(value) => update({ result: value, reinspectionRequired: /reinspection|failed/i.test(value) })} columns={1} />
-          <Chips values={INSPECTION_RESULTS.slice(5).includes(data.result) ? [data.result] : []} options={INSPECTION_RESULTS.slice(5)} onChange={(values) => update({ result: values[values.length - 1] || "" })} />
+          <Segmented value={data.result} options={results.slice(0, 5).map((value) => ({ value, label: value, tone: inspectionResultTone(value) }))} onChange={(value) => update({ result: value, reinspectionRequired: resultNeedsReinspection(value) })} columns={1} />
+          {results.length > 5 ? (
+            <Chips values={results.slice(5).includes(data.result) ? [data.result] : []} options={results.slice(5)} onChange={(values) => update({ result: values[values.length - 1] || "" })} />
+          ) : null}
         </Field>
         {data.reinspectionRequired || /reinspection/i.test(data.result) ? (
           <Field label="Reinspection date" required={/reinspection/i.test(data.result)} error={errors.nextReinspectionAt}>

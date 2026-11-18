@@ -20,6 +20,8 @@ import {
 import { loadDepartmentHydrants, loadTenantHydrantCollection } from "../lib/hydrantTenantService.js";
 import { listRecords } from "../lib/firestoreService.js";
 import { listViolationCatalog } from "../lib/inspections/violationService.js";
+import { loadInspectionSettings } from "../lib/inspections/inspectionSettings.js";
+import { inspectionResultOptions } from "../lib/inspections/inspectionResults.js";
 import { listPreplanFiles, listPreplans } from "../lib/inspections/preplanService.js";
 import { fieldCapabilities } from "./fieldSession.js";
 import { listCheckoffLists, loadFieldAppConfig } from "./fieldAdminService.js";
@@ -106,6 +108,11 @@ const PART_LOADERS = {
         updatedAt: row.updatedAt || "",
       }))
       .sort((a, b) => String(a.scheduledStart || a.dueAt || "9").localeCompare(String(b.scheduledStart || b.dueAt || "9")));
+  },
+
+  async inspectionResults({ departmentId, caps }) {
+    if (!caps.inspections) return [];
+    return inspectionResultOptions(await loadInspectionSettings(departmentId));
   },
 
   async violationCatalog({ departmentId, caps }) {
