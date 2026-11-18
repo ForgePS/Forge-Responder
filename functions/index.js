@@ -1,4 +1,9 @@
 const admin = require("firebase-admin");
+const { setGlobalOptions } = require("firebase-functions/v2");
+// Staging's Cloud Run quota is 20 vCPU per region and can't be raised yet (not enough usage history). By default
+// every function gets a whole vCPU, so a full deploy runs out. FUNCTIONS_SMALL_CPU=true (.env.forge-rms-staging)
+// gives each function a share sized to its memory (256 MiB ≈ 1/6 vCPU, one request at a time). Production is unchanged.
+if (process.env.FUNCTIONS_SMALL_CPU === "true") setGlobalOptions({ cpu: "gcf_gen1" });
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const twilio = require("twilio");
