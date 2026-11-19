@@ -14,12 +14,12 @@ import {
 } from "../lib/digitalForms/formDraft.js";
 import {
   ACCEPTED_TYPES, checkFile, convertImport, describeError, discardImport, listLinkOptions, loadFormVersion, originalFileUrl,
-  publishImport, reviseForm, saveImportDraft, setFormStatus, submitForm, uploadAndConvert,
+  copyPlatformDefaultForm, publishImport, reviseForm, saveImportDraft, setFormStatus, submitForm, uploadAndConvert,
   watchForms, watchImports, watchSubmissions,
 } from "../lib/digitalForms/digitalFormsService.js";
 import { listInspectionTypes } from "../lib/inspections/inspectionConfigService.js";
 import { canManageInspectionConfig } from "../lib/inspections/inspectionPermissions.js";
-import { applyFormToInspections } from "../lib/digitalForms/inspectionTemplateFromForm.js";
+import { applyFormToInspections, applyFormToStarterTypes, refreshInspectionsFromForm } from "../lib/digitalForms/inspectionTemplateFromForm.js";
 import { clearPlatformDefaultForm, loadPlatformDefaultForm, setPlatformDefaultForm } from "../lib/inspections/platformDefaultFormService.js";
 import { loadPlatformCreator } from "../lib/platformService.js";
 import "../styles/inspections-checklist.css";
@@ -169,6 +169,7 @@ function FormsTab({ departmentId, uid, forms, signerName, canFill }) {
             <div key={form.id} className="df-card">
               <div>
                 <strong>{form.name}</strong>
+                {form.platformDefaultVersion ? <small className="occupancy-muted">From the platform default form</small> : null}
                 {form.description ? <small className="occupancy-muted">{form.description}</small> : null}
                 <small className="occupancy-muted">
                   {form.fieldCount || answerableCount(form)} fields · version {form.currentVersion}
@@ -470,12 +471,44 @@ function ManageTab({ departmentId, forms, signerName, canConfigInspections, canS
   const [forInspections, setForInspections] = useState(null);
   const [platformDefault, setPlatformDefault] = useState(null);
   useEffect(() => {
-    if (!canSetPlatformDefault) return undefined;
     let live = true;
     loadPlatformDefaultForm({ fresh: true }).then((row) => { if (live) setPlatformDefault(row); });
     return () => { live = false; };
-  }, [canSetPlatformDefault]);
+  }, [departmentId]);
   const isPlatformDefault = (form) => platformDefault?.sourceDepartmentId === departmentId && platformDefault?.sourceFormId === form.id;
+  // Departments edit the platform default through their own copy of it.
+  const offerOwnCopy = Boolean(platformDefault)
+    && platformDefault.sourceDepartmentId !== departmentId
+    && !forms.some((form) => form.platformDefaultVersion);
+
+  const plural = (names) => `${names.length} inspection type${names.length === 1 ? "" : "s"}`;
+
+  async function editPlatformDefault() {
+    await act(async () => {
+      const { templateId, versionId } = await copyPlatformDefaultForm(departmentId);
+      const version = await loadFormVersion(departmentId, versionId);
+      const definition = version?.snapshot;
+      if (!definition) throw new Error("Your copy was made, but it couldn't be opened. Find it under Published forms.");
+      const form = {
+        id: templateId,
+        name: definition.name,
+        description: definition.description || "",
+        linkType: definition.linkType || "",
+        sections: definition.sections,
+        currentVersion: Number(version.version) || 1,
+        publishedVersionId: versionId,
+        lifecycleStatus: "published",
+      };
+      let note = " Ask someone who manages inspection settings to choose Use for inspections on it.";
+      if (canConfigInspections) {
+        const names = await applyFormToStarterTypes(departmentId, { form, definition }, actor);
+        note = names.length ? ` ${plural(names)} now use it.` : " Choose Use for inspections on it to pick which inspection types use it.";
+      }
+      setEditing(form);
+      setDraft({ name: form.name, description: form.description, linkType: form.linkType, sections: form.sections });
+      return `"${form.name}" is now your department's own form.${note} Make your changes below and publish.`;
+    }, "");
+  }
 
   async function makePlatformDefault(form) {
     const ok = window.confirm(
@@ -507,8 +540,8 @@ function ManageTab({ departmentId, forms, signerName, canConfigInspections, canS
     setBusy(true);
     setMessage(null);
     try {
-      await fn();
-      setMessage({ tone: "ok", text: okText });
+      const text = await fn();
+      setMessage({ tone: "ok", text: typeof text === "string" && text ? text : okText });
       return true;
     } catch (error) {
       setMessage({ tone: "error", text: describeError(error) });
@@ -528,7 +561,18 @@ function ManageTab({ departmentId, forms, signerName, canConfigInspections, canS
         <div className="df-actions">
           <button type="button" className="primary-button" disabled={busy || problems.length > 0}
             onClick={async () => {
-              if (await act(() => reviseForm(departmentId, editing.id, draft), `New version of "${draft.name}" published.`)) setEditing(null);
+              const published = await act(async () => {
+                const result = await reviseForm(departmentId, editing.id, draft);
+                if (!canConfigInspections || !result?.versionId) return "";
+                const version = await loadFormVersion(departmentId, result.versionId);
+                if (!version?.snapshot) return "";
+                const names = await refreshInspectionsFromForm(departmentId, {
+                  form: { ...editing, currentVersion: Number(version.version) || editing.currentVersion },
+                  definition: version.snapshot,
+                }, actor);
+                return names.length ? `New version of "${draft.name}" published. ${plural(names)} now use it for new inspections.` : "";
+              }, `New version of "${draft.name}" published.`);
+              if (published) setEditing(null);
             }}>Publish new version</button>
         </div>
       </Panel>
@@ -538,7 +582,21 @@ function ManageTab({ departmentId, forms, signerName, canConfigInspections, canS
   return (
     <Panel title="Published forms" icon={Settings2}>
       <Message message={message} />
-      {!forms.length ? <p className="occupancy-muted">Nothing published yet. Convert a paper form to get started.</p> : (
+      {offerOwnCopy ? (
+        <div className="df-card">
+          <div>
+            <strong>Default inspection form: {platformDefault.name}</strong>
+            <small className="occupancy-muted">
+              Your starter inspection types use this form from FORGE. To change it, make it your department's own form and edit it.
+              New inspections then use your version.
+            </small>
+          </div>
+          <div className="df-card-actions">
+            <button type="button" className="primary-button" disabled={busy} onClick={editPlatformDefault}><Settings2 size={14} /> Edit for my department</button>
+          </div>
+        </div>
+      ) : null}
+      {!forms.length ? (offerOwnCopy ? null : <p className="occupancy-muted">Nothing published yet. Convert a paper form to get started.</p>) : (
         <div className="df-card-list">
           {forms.map((form) => (
             <div key={form.id} className="df-card">

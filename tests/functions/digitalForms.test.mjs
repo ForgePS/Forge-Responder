@@ -453,3 +453,44 @@ describe("remarks and photos on a Fail answer", () => {
     await expectCode(send(`formImports/${A}/x/source.pdf`), "invalid-argument");
   });
 });
+
+describe("platform default inspection form", () => {
+  const DEFAULT = {
+    version: "forge-demo:form-1:v3:2026-11-18T12:00:00.000Z",
+    name: "Fire Inspection Report",
+    description: "Platform default",
+    sections: [{ id: "s1", title: "Access", fields: [
+      { id: "f1", key: "access", label: "Fire Department access is unobstructed", type: "dropdown", options: ["Yes", "No"], required: true },
+      { id: "f2", key: "numbers", label: "Address numbers visible", type: "yes_no", options: [] },
+    ] }],
+  };
+
+  it("a department copies it as its own editable form, once", async () => {
+    await db.doc("platformConfig/defaultInspectionForm").set(DEFAULT);
+    const first = await forms.copyPlatformDefault(db, req("chief-b", { departmentId: B }));
+    assert.equal(first.existing, false);
+    const copy = (await db.doc(`departments/${B}/formTemplates/${first.templateId}`).get()).data();
+    assert.equal(copy.name, "Fire Inspection Report");
+    assert.equal(copy.platformDefaultVersion, DEFAULT.version);
+    assert.equal(copy.lifecycleStatus, "published");
+    assert.deepEqual(copy.sections[0].fields.map((f) => f.key), ["access", "numbers"]);
+    assert.deepEqual(copy.sections[0].fields[0].options, ["Yes", "No"]);
+    assert.ok((await db.doc(`departments/${B}/formTemplateVersions/${first.versionId}`).get()).exists);
+
+    const again = await forms.copyPlatformDefault(db, req("chief-b", { departmentId: B }));
+    assert.equal(again.templateId, first.templateId);
+    assert.equal(again.existing, true);
+
+    // Editing the copy is an ordinary revision of the department's form.
+    const revised = await forms.reviseTemplate(db, req("chief-b", { departmentId: B, templateId: first.templateId, draft: { ...copy, name: "Our Fire Inspection Report" } }));
+    assert.equal(revised.versionId, `${first.templateId}-v2`);
+    assert.equal((await db.doc(`departments/${A}/formTemplates/${first.templateId}`).get()).exists, false, "other departments untouched");
+  });
+
+  it("needs a default to be set and manageDigitalForms in that department", async () => {
+    await expectCode(forms.copyPlatformDefault(db, req("chief-b", { departmentId: B })), "not-found");
+    await db.doc("platformConfig/defaultInspectionForm").set(DEFAULT);
+    await expectCode(forms.copyPlatformDefault(db, req("ff-b", { departmentId: B })), "permission-denied");
+    await expectCode(forms.copyPlatformDefault(db, req("chief-b", { departmentId: A })), "permission-denied");
+  });
+});
