@@ -2,7 +2,7 @@
 // Run: npm run test:unit
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { answersWithOccupancy, occupancyAddressParts, occupancyFieldFor, occupancySnapshotFor, prefillAnswersFromOccupancy, splitOneLineAddress } from "../../src/lib/inspections/occupancyPrefill.js";
+import { answersWithOccupancy, occupancyAddressParts, occupancyFieldFor, occupancySnapshotFor, prefillAnswersFromOccupancy, splitOneLineAddress, withSplitAddress } from "../../src/lib/inspections/occupancyPrefill.js";
 
 const occupancy = {
   id: "occ-1",
@@ -134,5 +134,25 @@ describe("one-line occupancy addresses", () => {
     assert.deepEqual(prefillAnswersFromOccupancy(split, oneLine, earlier).answers, { addr: "2214 Goodman Rd W", city: "Horn Lake", state: "MS", zip: "38637" });
     const typed = { addr: "2214 Goodman Rd W (rear bay)", city: "", state: "", zip: "" };
     assert.equal(prefillAnswersFromOccupancy(split, oneLine, typed).answers.addr, "2214 Goodman Rd W (rear bay)");
+  });
+});
+
+describe("saving an occupancy with a one-line address", () => {
+  it("stores the address split into street, city, state and ZIP", () => {
+    const saved = withSplitAddress({ id: "occ-2", name: "662 Tire", address: "2214 Goodman Rd W, Horn Lake, MS 38637", city: "", state: "", zip: "", hazard: "Low" });
+    assert.deepEqual(saved, { id: "occ-2", name: "662 Tire", address: "2214 Goodman Rd W", city: "Horn Lake", state: "MS", zip: "38637", hazard: "Low" });
+  });
+
+  it("leaves it alone when City, State or ZIP is filled in, or the line can't be split", () => {
+    const withCity = { address: "2214 Goodman Rd W, Horn Lake, MS 38637", city: "Horn Lake", state: "", zip: "" };
+    assert.deepEqual(withSplitAddress(withCity), withCity);
+    const plain = { address: "Rear lot, behind store", city: "", state: "", zip: "" };
+    assert.deepEqual(withSplitAddress(plain), plain);
+    assert.deepEqual(withSplitAddress({ address: "", city: "", state: "", zip: "" }), { address: "", city: "", state: "", zip: "" });
+  });
+
+  it("is stable when saved again", () => {
+    const once = withSplitAddress({ address: "2214 Goodman Rd W, Horn Lake, MS 38637" });
+    assert.deepEqual(withSplitAddress(once), once);
   });
 });

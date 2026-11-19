@@ -113,6 +113,14 @@ export function occupancyAddressParts(occupancy) {
   return split ? { address: split.street, city: split.city, state: split.state, zip: split.zip } : base;
 }
 
+/**
+ * For saving: an occupancy typed or imported with the whole address in Address
+ * and City/State/ZIP blank is stored split into its parts (occupancyService).
+ */
+export function withSplitAddress(record) {
+  return { ...record, ...occupancyAddressParts(record) };
+}
+
 function joinAddress(occupancy, streetOnly) {
   const street = String(occupancy?.address || "").trim();
   if (streetOnly) return street;
