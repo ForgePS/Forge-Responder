@@ -1,8 +1,13 @@
-/** Assigned fire/prevention inspections: conduct offline, record violations, complete. */
+/**
+ * Fire/prevention inspections: the ones assigned to you, plus ones you start
+ * yourself (New inspection). Conduct offline, record violations, complete.
+ */
 import { useMemo, useState } from "react";
 import { Building2, CalendarClock, ClipboardCheck, Plus, Trash2 } from "lucide-react";
 import { useField, useRecordForm } from "../fieldContext.jsx";
 import { refItems } from "../fieldRefData.js";
+import { newLocalId } from "../fieldRecords.js";
+import { buildNewInspectionDraft, localOnlyInspections, newFieldInspectionId } from "../inspectionStart.js";
 import { localDate } from "../fieldValidation.js";
 import { failDetailFields, isFailAnswer } from "../../lib/inspections/inspectionFailDetails.js";
 import { inspectionFields, validateInspectionForm } from "../inspectionValidation.js";
@@ -35,22 +40,43 @@ const CHOICE_TYPES = {
 const FAIL_VALUES = new Set(["fail", "failed", "noncompliant", "no"]);
 
 export function InspectionsScreen() {
-  const { refData, records, navigate, back } = useField();
+  const { refData, records, navigate, back, caps } = useField();
   const assigned = refItems(refData, "inspections");
   const localById = useMemo(() => {
     const map = new Map();
     records.filter((row) => row.kind === "inspection" && row.status !== "synced").forEach((row) => map.set(row.data?.inspectionId, row));
     return map;
   }, [records]);
+  const started = useMemo(() => localOnlyInspections(records, assigned), [records, assigned]);
   const today = localDate();
+  const canStart = Boolean(caps?.inspectionStart);
   return (
     <Screen title="Inspections" subtitle="Assigned to you" onBack={back}>
-      {!assigned.length ? (
+      {canStart ? (
+        <div className="fa-inline-actions">
+          <button type="button" className="fa-btn fa-btn-primary fa-btn-grow" onClick={() => navigate("inspectionNew")}>
+            <Plus size={20} /> New inspection
+          </button>
+        </div>
+      ) : null}
+      {!assigned.length && !started.length ? (
         <Banner tone="info" icon={<ClipboardCheck size={22} />} title="No open inspections assigned to you">
-          Inspections assigned to you in the RMS show here and can be done offline.
+          {canStart
+            ? "Inspections assigned to you in the RMS show here, or start one with New inspection. Both work offline."
+            : "Inspections assigned to you in the RMS show here and can be done offline."}
         </Banner>
       ) : null}
       <div className="fa-list">
+        {started.map((row) => (
+          <button key={row.localId} type="button" className="fa-row" onClick={() => navigate("inspectionForm", { localId: row.localId })}>
+            <span className="fa-row-icon"><Building2 size={22} /></span>
+            <span className="fa-row-text">
+              <strong>{row.data?.inspection?.occupancyName || row.data?.inspection?.address || "New inspection"}</strong>
+              <small>{["Started by you", row.data?.inspection?.typeName, row.data?.inspection?.address].filter(Boolean).join(" · ")}</small>
+            </span>
+            <StatusChip status={row.status} />
+          </button>
+        ))}
         {assigned.map((item) => {
           const local = localById.get(item.id);
           const when = item.scheduledStart || item.dueAt;
@@ -61,7 +87,7 @@ export function InspectionsScreen() {
               <span className="fa-row-text">
                 <strong>{item.occupancyName || item.address || item.inspectionNumber}</strong>
                 <small>
-                  {[item.inspectionNumber, item.inspectionTypeSnapshot?.name || "Inspection", item.address || "No address"].filter(Boolean).join(" · ")}
+                  {[item.inspectionNumber, item.inspectionTypeSnapshot?.label || item.inspectionTypeSnapshot?.name || "Inspection", item.address || "No address"].filter(Boolean).join(" · ")}
                   {when ? <> · <CalendarClock size={13} /> {formatDay(String(when).slice(0, 10))}</> : null}
                 </small>
               </span>
@@ -74,10 +100,91 @@ export function InspectionsScreen() {
   );
 }
 
+/** Start an inspection that wasn't assigned: pick the occupancy and type (works offline). */
+export function InspectionNewScreen() {
+  const { refData, navigate, back, caps } = useField();
+  const occupancies = refItems(refData, "inspectionOccupancies");
+  const types = refItems(refData, "inspectionTypes");
+  const [occupancyId, setOccupancyId] = useState("");
+  const [typeId, setTypeId] = useState("");
+  const [picking, setPicking] = useState(false);
+  const occupancy = occupancies.find((row) => row.id === occupancyId);
+  const type = types.find((row) => row.id === typeId) || (types.length === 1 ? types[0] : null);
+
+  if (!caps?.inspectionStart) {
+    return (
+      <Screen title="New inspection" onBack={back}>
+        <Banner tone="warn" title="You can't start inspections">Ask an admin for the Conduct inspections permission.</Banner>
+      </Screen>
+    );
+  }
+  if (!occupancies.length || !types.length) {
+    return (
+      <Screen title="New inspection" onBack={back}>
+        <Banner tone="warn" title={!occupancies.length ? "No occupancies on this device" : "No inspection types on this device"}>
+          Connect and tap Update on the home screen. Occupancies and inspection types are set up in the RMS.
+        </Banner>
+      </Screen>
+    );
+  }
+
+  const start = () => {
+    if (!occupancy || !type) return;
+    navigate("inspectionForm", {
+      localId: newLocalId("in"),
+      newInspection: { id: newFieldInspectionId(), occupancyId: occupancy.id, inspectionTypeId: type.id },
+    }, { replace: true });
+  };
+
+  return (
+    <Screen
+      title="New inspection"
+      subtitle="Assigned to you"
+      onBack={back}
+      footer={(
+        <div className="fa-footer-row">
+          <button type="button" className="fa-btn fa-btn-primary fa-btn-grow" disabled={!occupancy || !type} onClick={start}>
+            Start inspection
+          </button>
+        </div>
+      )}
+    >
+      <Section title="Occupancy">
+        <Field label="Occupancy" required>
+          <PickerButton
+            value={occupancy ? [occupancy.name, occupancy.address].filter(Boolean).join(" · ") : ""}
+            placeholder="Search occupancies"
+            icon={<Building2 size={20} />}
+            onClick={() => setPicking(true)}
+          />
+        </Field>
+      </Section>
+      <Section title="Inspection type">
+        <Field label="Type" required>
+          {types.length <= 4 ? (
+            <Segmented value={type?.id || ""} options={types.map((row) => ({ value: row.id, label: row.name }))} onChange={setTypeId} columns={1} />
+          ) : (
+            <Chips values={type ? [type.id] : []} options={types.map((row) => ({ value: row.id, label: row.name }))} onChange={(values) => setTypeId(values[values.length - 1] || "")} />
+          )}
+        </Field>
+        {type && !type.templateSnapshot?.sections?.length ? <p className="fa-hint">This type has no checklist yet. You can still record the result, violations and photos.</p> : null}
+      </Section>
+      <PickerSheet
+        open={picking}
+        title="Occupancy"
+        searchPlaceholder="Name or address"
+        options={occupancies.map((row) => ({ value: row.id, label: row.name || row.address, detail: [row.address, row.occupancyType].filter(Boolean).join(" · "), keywords: [row.address, row.occupancyNumber, row.city].filter(Boolean).join(" ") }))}
+        onPick={(value) => { setOccupancyId(value); setPicking(false); }}
+        onClose={() => setPicking(false)}
+      />
+    </Screen>
+  );
+}
+
 function describe(data) {
   const inspection = data.inspection || {};
   return {
-    title: `${inspection.occupancyName || inspection.address || "Inspection"} — ${inspection.inspectionNumber || ""}`.trim(),
+    title: [inspection.occupancyName || inspection.address || "Inspection", inspection.inspectionNumber || (inspection.isNew ? "New" : "")].filter(Boolean).join(" — "),
     subtitle: data.finish ? (data.result || "Completed") : "In progress",
   };
 }
@@ -108,10 +215,24 @@ function AnswerInput({ field, value, onChange, disabled }) {
   return <TextInput value={value} onChange={onChange} disabled={disabled} placeholder={field.placeholder || ""} />;
 }
 
+/** Starting data for an inspection the inspector began on this device (New inspection). */
+function useNewInspectionDraft(params, refData, snapshot) {
+  const [draft] = useState(() => {
+    const pending = params.newInspection;
+    if (!pending?.id) return null;
+    const occupancy = refItems(refData, "inspectionOccupancies").find((row) => row.id === pending.occupancyId);
+    const type = refItems(refData, "inspectionTypes").find((row) => row.id === pending.inspectionTypeId);
+    if (!occupancy || !type) return null;
+    return buildNewInspectionDraft({ occupancy, type, snapshot, id: pending.id });
+  });
+  return draft;
+}
+
 export function InspectionFormScreen({ params = {} }) {
-  const { refData, back, rulesFor } = useField();
+  const { refData, back, rulesFor, snapshot } = useField();
   const rules = rulesFor("inspection");
   const fromRef = params.inspectionId ? refItems(refData, "inspections").find((item) => item.id === params.inspectionId) : null;
+  const newDraft = useNewInspectionDraft(params, refData, snapshot);
   const catalog = refItems(refData, "violationCatalog");
   const departmentResults = refItems(refData, "inspectionResults");
   const results = departmentResults.length ? departmentResults : INSPECTION_RESULTS;
@@ -119,14 +240,14 @@ export function InspectionFormScreen({ params = {} }) {
   const form = useRecordForm({
     kind: "inspection",
     localId: params.localId,
-    initialData: {
+    initialData: newDraft || {
       inspectionId: fromRef?.id || "",
       inspection: fromRef ? {
         id: fromRef.id,
         inspectionNumber: fromRef.inspectionNumber,
         occupancyName: fromRef.occupancyName,
         address: fromRef.address,
-        typeName: fromRef.inspectionTypeSnapshot?.name || "",
+        typeName: fromRef.inspectionTypeSnapshot?.label || fromRef.inspectionTypeSnapshot?.name || "",
         templateSnapshot: fromRef.templateSnapshot,
         recordVersion: fromRef.recordVersion,
         updatedAt: fromRef.updatedAt,
@@ -314,7 +435,7 @@ export function InspectionFormScreen({ params = {} }) {
         ) : null}
       </Section>
 
-      {data.inspectionId ? (
+      {data.inspectionId || data.newInspection ? (
         <Section title="Email report" hint="A PDF copy goes to the occupancy once this inspection is completed and synced.">
           <Field label="Email the report to the occupancy?">
             <Segmented

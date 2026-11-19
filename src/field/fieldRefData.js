@@ -23,6 +23,11 @@ import { listViolationCatalog } from "../lib/inspections/violationService.js";
 import { loadInspectionSettings } from "../lib/inspections/inspectionSettings.js";
 import { inspectionResultOptions } from "../lib/inspections/inspectionResults.js";
 import { listPreplanFiles, listPreplans } from "../lib/inspections/preplanService.js";
+import { listInspectionTemplates, listInspectionTypes, listTemplateVersions } from "../lib/inspections/inspectionConfigService.js";
+import { listOccupancyRecords } from "../lib/inspections/occupancyService.js";
+import { resolveInspectionTemplate } from "../lib/inspections/inspectionWorkflow.js";
+import { loadPlatformDefaultForm } from "../lib/inspections/platformDefaultFormService.js";
+import { startableInspectionTypes, startableOccupancies } from "./inspectionStart.js";
 import { fieldCapabilities } from "./fieldSession.js";
 import { listCheckoffLists, loadFieldAppConfig } from "./fieldAdminService.js";
 import { loadEmsSettings, loadPcrForm } from "../lib/pcrService.js";
@@ -108,6 +113,32 @@ const PART_LOADERS = {
         updatedAt: row.updatedAt || "",
       }))
       .sort((a, b) => String(a.scheduledStart || a.dueAt || "9").localeCompare(String(b.scheduledStart || b.dueAt || "9")));
+  },
+
+  // For starting an inspection on the device (New inspection), with no signal.
+  async inspectionOccupancies({ departmentId, caps }) {
+    if (!caps.inspectionStart) return [];
+    return startableOccupancies(await listOccupancyRecords(departmentId));
+  },
+
+  async inspectionTypes({ departmentId, caps }) {
+    if (!caps.inspectionStart) return [];
+    const [types, templates, versions, platformDefault] = await Promise.all([
+      listInspectionTypes(departmentId),
+      listInspectionTemplates(departmentId),
+      listTemplateVersions(departmentId),
+      loadPlatformDefaultForm().catch(() => null),
+    ]);
+    const live = types.filter((row) => row?.id && row.lifecycleStatus !== "archived" && row.active !== false);
+    const resolved = new Map();
+    for (const type of live) {
+      resolved.set(type.id, await resolveInspectionTemplate(departmentId, type, { templates, versions, platformDefault }).then((result) => ({
+        templateId: result.template?.id || "",
+        templateVersionId: result.templateVersionId,
+        templateSnapshot: result.templateSnapshot,
+      })));
+    }
+    return startableInspectionTypes(live, (type) => resolved.get(type.id));
   },
 
   async inspectionResults({ departmentId, caps }) {

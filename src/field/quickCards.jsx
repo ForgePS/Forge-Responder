@@ -196,7 +196,9 @@ export function useQuickCards() {
           key: "inspections",
           icon: <ClipboardList size={24} />,
           title: "Inspections",
-          detail: assignedInspections.length ? `${assignedInspections.length} assigned to you` : "None assigned right now",
+          detail: assignedInspections.length
+            ? `${assignedInspections.length} assigned to you`
+            : caps.inspectionStart ? "None assigned · start a new one" : "None assigned right now",
           onClick: () => navigate("inspections"),
         },
         caps.preFirePlans && {

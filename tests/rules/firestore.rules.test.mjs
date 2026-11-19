@@ -1434,3 +1434,59 @@ describe("digital forms", () => {
     });
   });
 });
+
+// FORGE FIELD "New inspection": an inspector (conductInspections, no admin or
+// edit rights) creates an inspection assigned to themselves when it syncs.
+describe("inspectors starting their own inspection", () => {
+  const inspectorA = () => as("insp-a", { email: "insp@a.gov", email_verified: true });
+  const viewerA = () => as("viewer-a", { email: "view@a.gov", email_verified: true });
+  const record = (departmentId, id) => ({
+    id, departmentId, inspectionNumber: "2026-0042", status: "draft", occupancyId: "OCC-1", inspectionTypeId: "T1",
+    assignedInspectorIds: ["P-INSP"], assignedInspectorNames: ["Ivy Inspector"], source: "field-app",
+  });
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `departments/${A}/users/insp-a`), membership("insp-a", A, { role: "inspector", roleIds: ["inspector"], personnelId: "P-INSP" }));
+      await setDoc(doc(db, `departments/${A}/memberGrants/insp-a`), { permissions: { viewInspections: true, conductInspections: true, viewViolations: true } });
+      await setDoc(doc(db, `departments/${A}/users/viewer-a`), membership("viewer-a", A, { roleIds: ["readOnly"] }));
+      await setDoc(doc(db, `departments/${A}/memberGrants/viewer-a`), { permissions: { viewInspections: true, viewInspectionDashboard: true } });
+      // What every real department has (written by the console and functions/lib/entitlements.js).
+      await setDoc(doc(db, `platformSubscriptions/${A}`), { departmentId: A, planId: "enterprise", status: "active" });
+      await setDoc(doc(db, `platformDepartments/${A}`), { id: A, status: "active", subscription: { planId: "enterprise", saasStatus: "active" } });
+      await setDoc(doc(db, `platformEntitlements/${A}`), {
+        departmentId: A, planId: "enterprise", status: "active",
+        modules: ["dashboard", "personnel", "certifications", "training", "scheduling", "timeSheets", "dailyLog", "apparatus",
+          "assets", "maintenance", "hoseTesting", "occupancies", "inspections", "preplans", "hydrants", "documents", "analytics",
+          "nerisFireReports", "internalEmail", "digitalDashboard", "ems", "administration"],
+        limits: { maxPersonnel: 0, maxPortalUsers: 0, maxStations: 0 }, usage: { personnel: 0, portalUsers: 1, stations: 1 },
+      });
+    });
+  });
+
+  it("an inspector can create, number, audit and then work the inspection in their department", async () => {
+    const db = inspectorA().firestore();
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/counters/inspection-2026`), { value: 42, updatedAt: "now" }));
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/inspections/INS-FABC-123`), record(A, "INS-FABC-123")));
+    await assertSucceeds(setDoc(doc(db, `departments/${A}/auditLogs/AL-1`), { action: "create", recordId: "INS-FABC-123", module: "Inspections" }));
+    await assertSucceeds(updateDoc(doc(db, `departments/${A}/inspections/INS-FABC-123`), { status: "in_progress", answers: { exits: "Pass" } }));
+    await assertSucceeds(updateDoc(doc(db, `departments/${A}/inspections/INS-FABC-123`), { status: "completed", result: "Passed" }));
+  });
+
+  it("a view-only member can't start one", async () => {
+    await assertFails(setDoc(doc(viewerA().firestore(), `departments/${A}/inspections/INS-FV-1`), record(A, "INS-FV-1")));
+  });
+
+  it("an inspector can't create one in another department, whatever the record says", async () => {
+    await assertFails(setDoc(doc(inspectorA().firestore(), `departments/${B}/inspections/INS-FX-1`), record(A, "INS-FX-1")));
+    await assertFails(setDoc(doc(inspectorA().firestore(), `departments/${B}/inspections/INS-FX-2`), record(B, "INS-FX-2")));
+  });
+
+  it("can't start one while the department's Inspections module is off", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `platformEntitlements/${A}`), { departmentId: A, modules: ["dashboard", "hydrants"] });
+    });
+    await assertFails(setDoc(doc(inspectorA().firestore(), `departments/${A}/inspections/INS-FM-1`), record(A, "INS-FM-1")));
+  });
+});

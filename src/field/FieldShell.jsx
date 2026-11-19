@@ -41,7 +41,7 @@ import IncidentsScreen from "./screens/IncidentsScreen.jsx";
 import IncidentFormScreen from "./screens/IncidentFormScreen.jsx";
 import PcrFormScreen from "./screens/PcrFormScreen.jsx";
 import { CheckoffFormScreen, CheckoffListsScreen } from "./screens/CheckoffScreens.jsx";
-import { InspectionFormScreen, InspectionsScreen } from "./screens/InspectionScreens.jsx";
+import { InspectionFormScreen, InspectionNewScreen, InspectionsScreen } from "./screens/InspectionScreens.jsx";
 import { PlanEditScreen, PlanUpdateScreen, PlanViewScreen, PlansScreen } from "./screens/PlanScreens.jsx";
 import HydrantEditScreen from "./screens/HydrantEditScreen.jsx";
 
@@ -71,6 +71,7 @@ const SCREENS = {
   checkoffForm: CheckoffFormScreen,
   inspections: InspectionsScreen,
   inspectionForm: InspectionFormScreen,
+  inspectionNew: InspectionNewScreen,
   plans: PlansScreen,
   planView: PlanViewScreen,
   planEdit: PlanEditScreen,
