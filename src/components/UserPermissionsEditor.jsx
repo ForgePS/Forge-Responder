@@ -308,14 +308,14 @@ export default function UserPermissionsEditor({
   }
 
   const invitesPanel = (
-    <DepartmentInvitesPanel departmentId={departmentId} roles={roles} onMessage={onMessage} />
+    <DepartmentInvitesPanel departmentId={departmentId} roles={roles} onMessage={onMessage} onUserCreated={loadData} />
   );
 
   if (!users.length) {
     return (
       <section className="user-permissions-editor">
         {invitesPanel}
-        <p className="auth-help">No users yet. Invite someone above.</p>
+        <p className="auth-help">No users yet. Add someone above.</p>
       </section>
     );
   }

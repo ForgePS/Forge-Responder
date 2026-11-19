@@ -412,12 +412,16 @@ async function acceptInvite(db, request) {
 module.exports = {
   acceptInvite,
   assertDepartmentAdmin,
+  assertSeatAvailable,
   createInvite,
   hashToken,
   isInviteExpired,
+  loadDepartmentName,
   maskEmail,
+  normalizeEmail,
   previewInvite,
   revokeInvite,
   safeAppOrigin,
   isAdminMembership,
+  validateRoleIds,
 };

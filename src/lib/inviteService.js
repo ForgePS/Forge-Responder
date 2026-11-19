@@ -81,6 +81,15 @@ export function createInvite({ departmentId, email, roleIds, displayName = "", p
   });
 }
 
+/**
+ * Create the person's sign-in and department membership now (System Admin).
+ * Links to an existing account with the same email instead of making a second one.
+ * Returns { uid, status: "created" | "linked" | "already_member", emailStatus, setupLink? }.
+ */
+export function createDepartmentUser({ departmentId, email, roleIds, displayName = "", personnelId = "", sendEmail = true }) {
+  return call("createDepartmentUser", { departmentId, email, roleIds, displayName, personnelId, sendEmail });
+}
+
 export function revokeInvite(inviteId) {
   return call("revokeDepartmentInvite", { inviteId });
 }

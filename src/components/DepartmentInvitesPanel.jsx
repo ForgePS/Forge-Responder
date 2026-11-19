@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Copy, MailPlus, RefreshCw, X } from "lucide-react";
+import { Copy, MailPlus, RefreshCw, UserPlus, X } from "lucide-react";
 import {
+  createDepartmentUser,
   createInvite,
   inviteErrorMessage,
   listPendingInvites,
@@ -20,11 +21,28 @@ function formatDate(value) {
   return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString() : "";
 }
 
+const ACCOUNT_EMAIL_TEXT = {
+  sent: "We emailed them a link to choose their password.",
+  not_configured: "Email isn't set up for this platform yet — copy the password link below and send it yourself.",
+  failed: "The email could not be sent — copy the password link below and send it yourself.",
+  skipped: "Copy the password link below and send it to them yourself.",
+  logged: "This is the demo department, so no email was sent.",
+};
+
+const ACCOUNT_STATUS_TEXT = {
+  created: "Account created",
+  linked: "They already had a FORGE Responder account, so it was added to this department. They sign in with their existing password",
+  already_member: "They're already a member of this department; nothing was changed",
+};
+
 /**
- * Invite people to the department by email. The server creates their membership
- * when they open the link and sign in with that email.
+ * Add people to the department. "Create account" makes their sign-in and
+ * membership right away (createDepartmentUser); "Send invite" emails a link and
+ * the server creates the membership when they accept it.
  */
-export default function DepartmentInvitesPanel({ departmentId, roles = [], onMessage, onInvitesChanged }) {
+export default function DepartmentInvitesPanel({ departmentId, roles = [], onMessage, onInvitesChanged, onUserCreated }) {
+  const [mode, setMode] = useState("create");
+  const [lastAccount, setLastAccount] = useState(null);
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [roleIds, setRoleIds] = useState(["firefighter"]);
@@ -69,11 +87,28 @@ export default function DepartmentInvitesPanel({ departmentId, roles = [], onMes
     event.preventDefault();
     setError("");
     setLastInvite(null);
+    setLastAccount(null);
     if (!roleIds.length) {
       setError("Pick at least one role.");
       return;
     }
     setSubmitting(true);
+    if (mode === "create") {
+      try {
+        const result = await createDepartmentUser({ departmentId, email: email.trim(), displayName: displayName.trim(), roleIds, sendEmail });
+        setLastAccount({ ...result, email: email.trim().toLowerCase() });
+        setEmail("");
+        setDisplayName("");
+        onMessage?.(result.status === "already_member" ? `${email.trim()} is already a member` : `Added ${email.trim()}`);
+        await loadPending();
+        onUserCreated?.(result);
+      } catch (submitError) {
+        setError(inviteErrorMessage(submitError));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
     try {
       const result = await createInvite({ departmentId, email: email.trim(), displayName: displayName.trim(), roleIds, sendEmail });
       setLastInvite({ ...result, email: email.trim().toLowerCase() });
@@ -89,12 +124,12 @@ export default function DepartmentInvitesPanel({ departmentId, roles = [], onMes
     }
   }
 
-  async function handleCopy(url) {
+  async function handleCopy(url, label = "Invite link") {
     try {
       await navigator.clipboard.writeText(url);
-      onMessage?.("Invite link copied");
+      onMessage?.(`${label} copied`);
     } catch {
-      window.prompt("Copy this invite link:", url);
+      window.prompt(`Copy this ${label.toLowerCase()}:`, url);
     }
   }
 
@@ -137,12 +172,23 @@ export default function DepartmentInvitesPanel({ departmentId, roles = [], onMes
     <article className="role-permissions-card department-invites-panel">
       <header className="role-permissions-header">
         <div>
-          <strong><MailPlus size={16} /> Invite a user</strong>
+          <strong><UserPlus size={16} /> Add a user</strong>
           <span>
-            They open the link, sign in or create an account with this email, and get access with the roles you pick.
+            {mode === "create"
+              ? "Their account is created now with the roles you pick. They get an email to choose a password. Someone who already has an account keeps it and just gets access here."
+              : "They open the link, sign in or create an account with this email, and get access with the roles you pick."}
           </span>
         </div>
       </header>
+
+      <div className="segmented-control admin-filter-control" role="group" aria-label="How to add them">
+        <button type="button" className={mode === "create" ? "active" : ""} onClick={() => setMode("create")}>
+          <UserPlus size={14} /> Create account
+        </button>
+        <button type="button" className={mode === "invite" ? "active" : ""} onClick={() => setMode("invite")}>
+          <MailPlus size={14} /> Send invite
+        </button>
+      </div>
 
       <form className="department-invite-form" onSubmit={handleSubmit}>
         <div className="department-invite-fields">
@@ -170,15 +216,35 @@ export default function DepartmentInvitesPanel({ departmentId, roles = [], onMes
 
         <label className="permission-toggle permission-check">
           <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} />
-          <span>Email the invite link</span>
+          <span>{mode === "create" ? "Email them a link to choose their password" : "Email the invite link"}</span>
         </label>
 
         {error && <div className="auth-error" role="alert">{error}</div>}
 
         <button className="primary-button" type="submit" disabled={submitting}>
-          {submitting ? "Creating invite..." : "Create invite"}
+          {mode === "create"
+            ? (submitting ? "Creating account..." : "Create account")
+            : (submitting ? "Creating invite..." : "Create invite")}
         </button>
       </form>
+
+      {lastAccount && (
+        <div className="department-invite-result" role="status">
+          <p className="auth-help">
+            {ACCOUNT_STATUS_TEXT[lastAccount.status] || "Done"} for <strong>{lastAccount.email}</strong>.
+            {lastAccount.status === "created" && <>{" "}{ACCOUNT_EMAIL_TEXT[lastAccount.emailStatus] || ""}</>}
+            {lastAccount.setupLink && " This link is shown only once."}
+          </p>
+          {lastAccount.setupLink && (
+            <div className="department-invite-link">
+              <code>{lastAccount.setupLink}</code>
+              <button className="secondary-button" type="button" onClick={() => handleCopy(lastAccount.setupLink, "Password link")}>
+                <Copy size={14} /> Copy link
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {lastInvite && (
         <div className="department-invite-result" role="status">
