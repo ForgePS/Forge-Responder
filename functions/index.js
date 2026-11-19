@@ -866,6 +866,13 @@ exports.acceptDepartmentInvite = onCall(async (request) =>
 exports.previewDepartmentInvite = onCall({ invoker: "public" }, async (request) =>
   invites.previewInvite(admin.firestore(), request));
 
+// System Admin "Create account": Auth user + membership + grants together
+// (manageUsers; links to an existing Auth user with the same email).
+const departmentUsers = require("./lib/departmentUsers");
+
+exports.createDepartmentUser = onCall({ secrets: EMAIL_SECRETS }, async (request) =>
+  departmentUsers.createDepartmentUser(admin.firestore(), admin.auth(), request));
+
 // Members link their own personnel record only through here (matched by verified email).
 exports.linkMyPersonnelRecord = onCall(async (request) =>
   linkMyPersonnelRecord(admin.firestore(), request));

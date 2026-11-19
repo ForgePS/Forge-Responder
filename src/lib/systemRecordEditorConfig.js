@@ -5,12 +5,12 @@ export const SYSTEM_RECORD_EDITOR_CONFIG = {
     deleteLabel: "Delete user",
     emptyLabel: "No user accounts yet.",
     createFirstLabel: "Create first user",
-    // Department memberships can only be created by accepting an invite
-    // (Firestore rules refuse client-side creates), so "New user" is replaced
-    // with a pointer to the invite form.
+    // Department memberships are created server-side only (createDepartmentUser
+    // or an accepted invite; Firestore rules refuse client-side creates), so
+    // "New user" is replaced with a pointer to the People & Access form.
     inviteOnly: true,
-    inviteNote: "To add someone, invite them by email from Admin → Permissions → Users. They get access as soon as they accept the invite.",
-    inviteLabel: "Invite someone",
+    inviteNote: "To add someone, go to People & Access → People. You can create their account right away or send them an invite.",
+    inviteLabel: "Add someone",
     helpText: "Choose a user account above, then edit their details below. Save when finished.",
     loadingText: "Loading user accounts...",
     groupBy: (row) => {
