@@ -49,6 +49,70 @@ function emergencyContact(occupancy) {
   return contacts.find((c) => EMERGENCY_ROLE.test(String(c?.role || ""))) || null;
 }
 
+const STATE_ZIP = /^([A-Za-z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$/;
+const ZIP_ONLY = /^(\d{5}(?:-\d{4})?)$/;
+const US_STATES = new Set(("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK "
+  + "OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR GU VI AS MP").split(" "));
+const isState = (value) => US_STATES.has(String(value || "").toUpperCase());
+
+/**
+ * Split a one-line US address ("2214 Goodman Rd W, Horn Lake, MS 38637") into
+ * street, city, state and ZIP. Occupancies imported or typed with the whole
+ * address in Address leave City/State/ZIP blank. Returns null when the line
+ * doesn't end in a state and/or ZIP, so other text is never guessed at.
+ * @param {string} line
+ * @returns {{ street: string, city: string, state: string, zip: string }|null}
+ */
+export function splitOneLineAddress(line) {
+  const parts = String(line || "").split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return null;
+  let tail = parts[parts.length - 1];
+  let state = "";
+  let zip = "";
+  let cityFromTail = "";
+  const zipOnly = tail.match(ZIP_ONLY);
+  if (zipOnly) {
+    // "..., Horn Lake, MS, 38637"
+    zip = zipOnly[1];
+    parts.pop();
+    tail = parts[parts.length - 1] || "";
+  }
+  let stateZip = tail.match(STATE_ZIP);
+  if (stateZip && !isState(stateZip[1])) stateZip = null;
+  if (!stateZip) {
+    // "..., Horn Lake MS 38637" (no comma before the state)
+    const loose = tail.match(/^(.*\S)\s+([A-Za-z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$/);
+    if (loose && isState(loose[2]) && (loose[3] || zip)) {
+      cityFromTail = loose[1];
+      stateZip = [tail, loose[2], loose[3]];
+    }
+  }
+  if (stateZip) {
+    state = stateZip[1].toUpperCase();
+    zip = stateZip[2] || zip;
+    parts.pop();
+  } else if (!zip) {
+    return null;
+  }
+  if (cityFromTail) parts.push(cityFromTail);
+  if (!parts.length) return null;
+  const city = parts.length > 1 ? parts.pop() : "";
+  return { street: parts.join(", "), city, state, zip };
+}
+
+/** The occupancy with City/State/ZIP taken from a one-line Address when they are blank. */
+export function occupancyAddressParts(occupancy) {
+  const base = {
+    address: String(occupancy?.address || "").trim(),
+    city: String(occupancy?.city || "").trim(),
+    state: String(occupancy?.state || "").trim(),
+    zip: String(occupancy?.zip || "").trim(),
+  };
+  if (base.city || base.state || base.zip) return base;
+  const split = splitOneLineAddress(base.address);
+  return split ? { address: split.street, city: split.city, state: split.state, zip: split.zip } : base;
+}
+
 function joinAddress(occupancy, streetOnly) {
   const street = String(occupancy?.address || "").trim();
   if (streetOnly) return street;
@@ -93,13 +157,14 @@ export function prefillAnswersFromOccupancy(templateSnapshot, occupancy, answers
   const hasCityField = [...kinds.values()].includes("city");
   const emergency = emergencyContact(occupancy);
   const type = context.inspectionType || {};
+  const place = occupancyAddressParts(occupancy);
 
   const values = {
     name: occupancy.name,
-    address: joinAddress(occupancy, hasCityField),
-    city: occupancy.city,
-    state: occupancy.state,
-    zip: occupancy.zip,
+    address: joinAddress({ ...occupancy, ...place }, hasCityField),
+    city: place.city,
+    state: place.state,
+    zip: place.zip,
     contactName: occupancy.primaryContactName,
     phone: occupancy.primaryContactPhone,
     email: occupancy.primaryContactEmail,
@@ -114,7 +179,11 @@ export function prefillAnswersFromOccupancy(templateSnapshot, occupancy, answers
     const kind = kinds.get(field.key);
     if (!kind) continue;
     const current = next[field.key];
-    if (current != null && String(current).trim() !== "") continue;
+    // An earlier prefill put the whole one-line address here; the street goes here now
+    // and City/State/ZIP go in their own items.
+    const staleOneLine = kind === "address" && hasCityField && place.address !== String(occupancy.address || "").trim()
+      && String(current || "").trim() === String(occupancy.address || "").trim();
+    if (current != null && String(current).trim() !== "" && !staleOneLine) continue;
     const fieldType = String(field.type || "");
 
     let value = "";

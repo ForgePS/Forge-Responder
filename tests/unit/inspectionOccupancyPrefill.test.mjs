@@ -2,7 +2,7 @@
 // Run: npm run test:unit
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { answersWithOccupancy, occupancyFieldFor, occupancySnapshotFor, prefillAnswersFromOccupancy } from "../../src/lib/inspections/occupancyPrefill.js";
+import { answersWithOccupancy, occupancyAddressParts, occupancyFieldFor, occupancySnapshotFor, prefillAnswersFromOccupancy, splitOneLineAddress } from "../../src/lib/inspections/occupancyPrefill.js";
 
 const occupancy = {
   id: "occ-1",
@@ -82,5 +82,57 @@ describe("inspection fields filled from the occupancy", () => {
     assert.equal(answersWithOccupancy(record).ec, "Sam Keys");
     assert.equal(answersWithOccupancy({ ...record, status: "completed" }).biz, "");
     assert.equal(answersWithOccupancy({ ...record, occupancySnapshot: null }, occupancy).biz, "Main Street Diner");
+  });
+});
+
+// Occupancies with the whole address in Address and City/State/ZIP blank (e.g. 662 Tire).
+describe("one-line occupancy addresses", () => {
+  const oneLine = { id: "occ-2", name: "662 Tire", address: "2214 Goodman Rd W, Horn Lake, MS 38637" };
+  const split = { sections: [{ fields: [
+    { key: "addr", label: "Address", type: "short_text" },
+    { key: "city", label: "City", type: "short_text" },
+    { key: "state", label: "State", type: "short_text" },
+    { key: "zip", label: "Zip Code", type: "short_text" },
+  ] }] };
+
+  it("splits street, city, state and ZIP", () => {
+    assert.deepEqual(splitOneLineAddress("2214 Goodman Rd W, Horn Lake, MS 38637"), { street: "2214 Goodman Rd W", city: "Horn Lake", state: "MS", zip: "38637" });
+    assert.deepEqual(splitOneLineAddress("2214 Goodman Rd W, Horn Lake MS 38637"), { street: "2214 Goodman Rd W", city: "Horn Lake", state: "MS", zip: "38637" });
+    assert.deepEqual(splitOneLineAddress("2214 Goodman Rd W, Horn Lake, ms, 38637-1234"), { street: "2214 Goodman Rd W", city: "Horn Lake", state: "MS", zip: "38637-1234" });
+    assert.deepEqual(splitOneLineAddress("Suite 4, 10 Main St, Horn Lake, MS"), { street: "Suite 4, 10 Main St", city: "Horn Lake", state: "MS", zip: "" });
+  });
+
+  it("leaves lines that don't end in a state or ZIP alone", () => {
+    assert.equal(splitOneLineAddress("2214 Goodman Rd W"), null);
+    assert.equal(splitOneLineAddress("Rear lot, behind store"), null);
+    assert.equal(splitOneLineAddress("100 Main St, Apt B, NW"), null);
+  });
+
+  it("fills a template's separate Address, City, State and ZIP items", () => {
+    const { answers } = prefillAnswersFromOccupancy(split, oneLine, {});
+    assert.deepEqual(answers, { addr: "2214 Goodman Rd W", city: "Horn Lake", state: "MS", zip: "38637" });
+  });
+
+  it("keeps the full line in a single Address item", () => {
+    const { answers } = prefillAnswersFromOccupancy({ sections: [{ fields: [{ key: "addr", label: "Address", type: "long_text" }] }] }, oneLine, {});
+    assert.equal(answers.addr, "2214 Goodman Rd W, Horn Lake, MS 38637");
+  });
+
+  it("uses the occupancy's own City/State/ZIP whenever any is set", () => {
+    assert.deepEqual(occupancyAddressParts({ address: "2214 Goodman Rd W, Horn Lake, MS 38637", city: "Southaven" }),
+      { address: "2214 Goodman Rd W, Horn Lake, MS 38637", city: "Southaven", state: "", zip: "" });
+    assert.deepEqual(prefillAnswersFromOccupancy(split, occupancy, {}).answers, { addr: "120 Main St", city: "Springfield", state: "IL", zip: "62701" });
+  });
+
+  it("fills blanks on an open inspection that was created before this", () => {
+    const record = { status: "in_progress", templateSnapshot: split, occupancySnapshot: oneLine, answers: { addr: "", city: "", state: "", zip: "" } };
+    assert.deepEqual(answersWithOccupancy(record), { addr: "2214 Goodman Rd W", city: "Horn Lake", state: "MS", zip: "38637" });
+  });
+
+  it("moves an earlier whole-line Address answer into the separate items, but keeps typed answers", () => {
+    const earlier = { addr: "2214 Goodman Rd W, Horn Lake, MS 38637", city: "", state: "", zip: "" };
+    assert.deepEqual(prefillAnswersFromOccupancy(split, oneLine, earlier).answers, { addr: "2214 Goodman Rd W", city: "Horn Lake", state: "MS", zip: "38637" });
+    const typed = { addr: "2214 Goodman Rd W (rear bay)", city: "", state: "", zip: "" };
+    assert.equal(prefillAnswersFromOccupancy(split, oneLine, typed).answers.addr, "2214 Goodman Rd W (rear bay)");
   });
 });
