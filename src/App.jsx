@@ -79,6 +79,7 @@ import {
   MapPin,
   Menu,
   MonitorPlay,
+  Package,
   PackageSearch,
   Search,
   Settings,
@@ -152,6 +153,7 @@ const PatientCareReportsPage = lazyPage(() => import("./pages/PatientCareReports
 const NerisAnalyticsPage = lazyPage(() => import("./pages/NerisAnalyticsPage.jsx"));
 const HeatZoneAnalyticsPage = lazyPage(() => import("./pages/HeatZoneAnalyticsPage.jsx"));
 const DigitalFormsPage = lazyPage(() => import("./pages/DigitalFormsPage.jsx"));
+const EmsSupplyInventoryPage = lazyPage(() => import("./pages/EmsSupplyInventoryPage.jsx"));
 const ForgeAiPage = lazyPage(() => import("./pages/ForgeAiPage.jsx"));
 import { FORGE_AI_OPEN_EVENT, FORGE_AI_PAGE } from "./lib/forgeAi/launch.js";
 import "./styles/forge-ai-shell.css";
@@ -251,6 +253,7 @@ const navGroups = [
     ["Vendor Portal", Store],
     ["Fleet Hardening", ShieldCheck],
   ] },
+  { label: "EMS", items: [["EMS Supply Inventory", Package]] },
   {
     label: "Prevention",
     tree: PREVENTION_NAV_TREE,
@@ -1922,6 +1925,10 @@ function AppShell() {
         permissions={permissions}
         isCreator={isCreator}
       />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "EMS Supply Inventory" ? (
+    canAccessNavItem("EMS Supply Inventory", permissions, { isCreator }) || isCreator ? (
+      <EmsSupplyInventoryPage />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Digital Forms" ? (
     canAccessNavItem("Digital Forms", permissions, { isCreator }) || isCreator ? (

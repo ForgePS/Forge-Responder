@@ -1775,6 +1775,25 @@ exports.digitalFormsSubmit = onCall({ memory: "256MiB", timeoutSeconds: 60 }, (r
   digitalForms.submit(admin.firestore(), admin.storage().bucket(), request));
 exports.digitalFormsLinkOptions = digitalFormsCall(digitalForms.linkOptions);
 
+// ---- EMS Management: supply inventory (functions/lib/emsInventory) ----
+// Every stock change is one Firestore transaction (ledger record + balances +
+// audit event); browsers only read. Each callable re-verifies membership,
+// permissions and the plan's emsManagement module.
+const emsInventory = require("./lib/emsInventory/service");
+const emsInventoryCall = (handler) => onCall({ memory: "256MiB", timeoutSeconds: 60 }, (request) =>
+  handler(admin.firestore(), request));
+exports.emsInventorySaveSettings = emsInventoryCall(emsInventory.saveSettings);
+exports.emsInventorySaveItem = emsInventoryCall(emsInventory.saveItem);
+exports.emsInventorySaveLocation = emsInventoryCall(emsInventory.saveLocation);
+exports.emsInventorySetPar = emsInventoryCall(emsInventory.setPar);
+exports.emsInventoryPostTransaction = emsInventoryCall(emsInventory.postTransaction);
+exports.emsInventoryReverseTransaction = emsInventoryCall(emsInventory.reverseTransaction);
+exports.emsInventoryStartCount = emsInventoryCall(emsInventory.startCount);
+exports.emsInventorySaveCount = emsInventoryCall(emsInventory.saveCount);
+exports.emsInventorySubmitCount = emsInventoryCall(emsInventory.submitCount);
+exports.emsInventoryApproveCount = emsInventoryCall(emsInventory.approveCount);
+exports.emsInventoryRejectCount = emsInventoryCall(emsInventory.rejectCount);
+
 // ---- Inspections: email a completed inspection report (functions/lib/inspectionEmail.js) ----
 exports.emailInspectionReport = onCall({ secrets: EMAIL_SECRETS, memory: "512MiB", timeoutSeconds: 60 }, (request) =>
   require("./lib/inspectionEmail").emailInspectionReport(admin.firestore(), request));
