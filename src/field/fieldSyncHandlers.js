@@ -52,7 +52,8 @@ import {
   updatePreplanRevision,
 } from "../lib/inspections/preplanService.js";
 import { localDate } from "./fieldValidation.js";
-import { completeInspection, getInspectionRecord, saveInspectionDraft } from "../lib/inspections/inspectionWorkflow.js";
+import { completeInspection, createInspection, getInspectionRecord, saveInspectionDraft } from "../lib/inspections/inspectionWorkflow.js";
+import { fieldCreateInput } from "./inspectionStart.js";
 import { createViolation } from "../lib/inspections/violationService.js";
 import { emailInspectionReport } from "../lib/inspections/inspectionEmailService.js";
 import { parseRecipients } from "../lib/inspections/inspectionEmailRecipients.js";
@@ -627,8 +628,37 @@ async function syncCheckoff(record, ctx) {
 
 const INSPECTION_EXTRA_PATHS = ["summary", "internalNotes", "result"];
 
+/**
+ * An inspection the inspector started in the field is created in the RMS the
+ * first time it syncs, under the id fixed when it was started: a retry (or a
+ * later save of the same draft) finds it instead of creating another.
+ */
+async function ensureFieldStartedInspection(data, ctx) {
+  const input = fieldCreateInput(data, ctx.snapshot || { uid: ctx.uid, displayName: ctx.actor.actorName });
+  const existing = await getInspectionRecord(ctx.departmentId, input.id);
+  if (existing) return existing;
+  try {
+    return await createInspection(ctx.departmentId, input, ctx.actor);
+  } catch (error) {
+    if (/not found|is required/i.test(error?.message || "")) {
+      throw new FieldRejectedError(`This inspection couldn't be created in the RMS: ${error.message}.`);
+    }
+    throw error;
+  }
+}
+
 async function syncInspection(record, ctx) {
-  const data = record.data;
+  let data = record.data;
+  let createdHere = null;
+  if (!data.inspectionId && data.newInspection) {
+    const created = await ensureFieldStartedInspection(data, ctx);
+    createdHere = created;
+    data = {
+      ...data,
+      inspectionId: created.id,
+      inspection: { ...(data.inspection || {}), id: created.id, inspectionNumber: created.inspectionNumber },
+    };
+  }
   const inspectionId = data.inspectionId;
   const server = await getInspectionRecord(ctx.departmentId, inspectionId);
   if (!server) throw new FieldRejectedError("This inspection no longer exists in the RMS.");
@@ -704,6 +734,8 @@ async function syncInspection(record, ctx) {
     warnings,
     serverIds: { inspectionId, violationIds },
     base: fresh ? { answers: fresh.answers || {}, summary: fresh.summary, internalNotes: fresh.internalNotes, result: fresh.result, updatedAt: fresh.updatedAt } : record.base,
+    // A field-started inspection now has its RMS id and number: later saves update it.
+    ...(createdHere ? { data } : {}),
     keepSteps: false,
   };
 }

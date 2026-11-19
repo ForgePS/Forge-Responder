@@ -88,6 +88,21 @@ export function canEditInspectionsModule(permissions = {}, isCreator = false) {
 }
 
 /**
+ * Start a new inspection (assigned to yourself), e.g. from FORGE FIELD. The same
+ * keys Firestore rules accept for writing an inspection the member works.
+ * @param {Record<string, boolean>} permissions
+ * @param {boolean} [isCreator]
+ */
+export function canStartInspections(permissions = {}, isCreator = false) {
+  return Boolean(
+    isCreator
+    || hasPermission(permissions, INSPECTION_PERMISSION_KEYS.conduct)
+    || hasPermission(permissions, INSPECTION_PERMISSION_KEYS.edit)
+    || hasPermission(permissions, INSPECTION_PERMISSION_KEYS.assign)
+  );
+}
+
+/**
  * @param {Record<string, boolean>} permissions
  * @param {boolean} [isCreator]
  */
