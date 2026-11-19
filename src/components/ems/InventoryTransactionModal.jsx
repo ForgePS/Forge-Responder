@@ -43,9 +43,17 @@ export default function InventoryTransactionModal({
   const activeItems = items.filter((i) => i.active !== false || i.id === form.itemId).sort((a, b) => a.name.localeCompare(b.name));
   const item = items.find((i) => i.id === form.itemId);
   const fromBalance = balances.find((b) => b.itemId === form.itemId && b.locationId === form.fromLocationId);
-  const lots = (fromBalance?.lots || []).filter((lot) => lot.quantity > 0);
   const today = todayIso();
   const warningDays = settings?.expirationWarningDays;
+  // Offer only the lots the server will accept: expired lots for "remove expired",
+  // unexpired lots for use and transfer, any lot otherwise.
+  const lotIsExpired = (lot) => expirationStatus(lot.expiration, warningDays, today).level === "expired";
+  const lots = (fromBalance?.lots || []).filter((lot) => {
+    if (!(lot.quantity > 0)) return false;
+    if (form.type === "expired") return lotIsExpired(lot);
+    if (form.type === "usage" || form.type === "transfer") return !lotIsExpired(lot);
+    return true;
+  });
 
   async function save(event) {
     event.preventDefault();

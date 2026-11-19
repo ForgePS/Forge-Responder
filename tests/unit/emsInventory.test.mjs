@@ -45,6 +45,9 @@ describe("lot picking", () => {
     const picks = logic.pickLots(lots, 2, { today: TODAY, stock: "expired" });
     assert.deepEqual(picks.map((p) => [p.lot, p.take]), [["OLD", 2]]);
     assert.throws(() => logic.pickLots(lots, 3, { today: TODAY, stock: "expired" }), /Only 2 expired/);
+    // A chosen lot must be expired too, so usable stock can't be written off without a reason.
+    assert.throws(() => logic.pickLots(lots, 1, { today: TODAY, stock: "expired", lotKey: logic.lotKey("C", "2027-06-01") }), /hasn't expired/);
+    assert.equal(logic.pickLots(lots, 1, { today: TODAY, stock: "expired", lotKey: logic.lotKey("OLD", "2026-10-01") })[0].take, 1);
   });
 
   it("a chosen lot is used alone, and an expired one is refused for use", () => {

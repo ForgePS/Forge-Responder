@@ -23,7 +23,7 @@ function CountEditor({ departmentId, uid, count, items, canApprove, onBack, onMe
   useEffect(() => { setRows((count.rows || []).map((r) => ({ ...r, counted: r.counted ?? "" }))); }, [count]);
 
   const editable = count.status === "open";
-  const isCounter = count.createdBy === uid || count.submittedBy === uid;
+  const isCounter = count.createdBy === uid || count.submittedBy === uid || (count.editorIds || []).includes(uid);
   const canReview = canApprove && count.status === "submitted" && !isCounter;
   const differences = rows.filter((r) => r.counted !== "" && Number(r.counted) !== r.expected).length;
   const uncounted = rows.filter((r) => r.counted === "").length;

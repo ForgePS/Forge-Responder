@@ -290,6 +290,31 @@ describe("physical counts", () => {
     assert.equal(supply.onHand, 7);
     assert.ok(supply.lots.some((l) => l.lot === "FOUND" && l.quantity === 2));
   });
+
+  it("found stock needs the expiration date the item tracks, so it can't skip expiration checks", async () => {
+    const ctx = await setup(); // the IV start kit tracks expiration
+    const { countId } = await countWithDifference(ctx);
+    await expectCode(inv.saveCount(db, req("ff-a", { departmentId: A, countId, addRows: [{ itemId: ctx.itemId, lot: "FOUND" }] })), "invalid-argument", /expiration/);
+    // An item with par but no stock gets a blank placeholder row; counting stock into it is refused too.
+    const { itemId: gauze } = await inv.saveItem(db, req("chief-a", { departmentId: A, item: { name: "Gauze", category: "Dressings", tracksExpiration: true } }));
+    await inv.setPar(db, req("chief-a", { departmentId: A, locationId: ctx.supply, itemId: gauze, par: { min: 2, max: 10 } }));
+    const second = await inv.startCount(db, req("ff-a", { departmentId: A, locationId: ctx.supply, requestId: rid() }));
+    const rows = (await db.doc(`departments/${A}/emsInventoryCounts/${second.countId}`).get()).data().rows;
+    const blank = rows.find((r) => r.itemId === gauze);
+    assert.equal(blank.expiration, "");
+    await expectCode(inv.submitCount(db, req("ff-a", { departmentId: A, countId: second.countId,
+      rows: rows.map((r) => ({ rowId: r.rowId, counted: r.itemId === gauze ? 3 : r.expected, reason: "Found" })) })), "failed-precondition", /expiration/);
+  });
+
+  it("anyone who entered counts can't approve them, even if someone else submitted", async () => {
+    const ctx = await setup();
+    const { countId, rowId } = await countWithDifference(ctx, "ff-a");
+    await inv.saveCount(db, req("bc-a", { departmentId: A, countId, rows: [{ rowId, counted: 9, reason: "Found four" }] }));
+    await inv.submitCount(db, req("ff-a", { departmentId: A, countId }));
+    await expectCode(inv.approveCount(db, req("bc-a", { departmentId: A, countId })), "permission-denied", /other than/);
+    await inv.approveCount(db, req("chief-a", { departmentId: A, countId }));
+    assert.equal((await balance(ctx.supply, ctx.itemId)).onHand, 9);
+  });
 });
 
 describe("reversals", () => {

@@ -122,6 +122,9 @@ function pickLots(lots, quantity, { policy = "fefo", today, stock = "any", lotKe
     if (stock === "unexpired" && isExpired(candidates[0], today)) {
       throw new InventoryRuleError(`Lot ${candidates[0].lot || "(no lot)"} expired on ${candidates[0].expiration}. Remove it as expired instead.`);
     }
+    if (stock === "expired" && !isExpired(candidates[0], today)) {
+      throw new InventoryRuleError(`Lot ${candidates[0].lot || "(no lot)"} hasn't expired. Remove it as damaged or waste, with a reason, instead.`);
+    }
   } else if (stock === "unexpired") {
     candidates = held.filter((lot) => !isExpired(lot, today));
   } else if (stock === "expired") {

@@ -391,16 +391,18 @@ async function postTransaction(db, request) {
   const at = nowIso();
   const today = logic.isoDay();
 
+  const replay = (snap) => {
+    const prior = snap.data();
+    if (prior.createdBy !== caller.uid || prior.type !== type || prior.itemId !== itemId) {
+      throw new HttpsError("already-exists", "That request id was already used.");
+    }
+    return { transactionId, replayed: true, quantity: prior.quantity };
+  };
+
   try {
     return await db.runTransaction(async (tx) => {
       const existing = await tx.get(txRef);
-      if (existing.exists) {
-        const prior = existing.data();
-        if (prior.createdBy !== caller.uid || prior.type !== type || prior.itemId !== itemId) {
-          throw new HttpsError("already-exists", "That request id was already used.");
-        }
-        return { transactionId, replayed: true, quantity: prior.quantity };
-      }
+      if (existing.exists) return replay(existing);
       const locationIds = [fromLocationId, toLocationId].filter(Boolean);
       const [itemSnap, settings, ...locationSnaps] = await Promise.all([
         tx.get(db.collection(paths.items(d)).doc(itemId)),
@@ -447,6 +449,13 @@ async function postTransaction(db, request) {
       return { transactionId, replayed: false, quantity, onHand, lines: lines.map((l) => ({ locationId: l.locationId, lot: l.lot, expiration: l.expiration, delta: l.delta })) };
     });
   } catch (error) {
+    // The same request sent twice at once: the copy that loses the race can fail at commit
+    // (ALREADY_EXISTS from create(), or an aborted/closed transaction) rather than reading
+    // the winner's record. If the winner's record is there now, answer as a replay.
+    if (!(error instanceof HttpsError) && !(error instanceof logic.InventoryRuleError)) {
+      const after = await txRef.get().catch(() => null);
+      if (after?.exists) return replay(after);
+    }
     throw ruleError(error);
   }
 }
@@ -572,6 +581,9 @@ function mergeCountRows(rows, input = {}, items = {}) {
     const lot = text(add.lot, 60);
     const expiration = text(add.expiration, 10);
     if (expiration && !logic.isValidDate(expiration)) throw new HttpsError("invalid-argument", "Expiration must be a date (YYYY-MM-DD).");
+    // Found stock becomes real lots on approval, so it needs the same details as receiving.
+    if (item.tracksLots && !lot) throw new HttpsError("invalid-argument", `${item.name} needs a lot number.`);
+    if (item.tracksExpiration && !expiration) throw new HttpsError("invalid-argument", `${item.name} needs an expiration date.`);
     const key = logic.lotKey(lot, expiration);
     const rowId = `${itemId}-${key}`;
     if (byId.has(rowId)) continue;
@@ -582,12 +594,21 @@ function mergeCountRows(rows, input = {}, items = {}) {
   return merged;
 }
 
+/** Rows that would add stock without the lot number or expiration date the item requires. */
+function untrackedIncreases(rows, items) {
+  return rows.filter((row) => {
+    const item = items[row.itemId];
+    if (!item || !(Number(row.counted) > Number(row.expected))) return false;
+    return (item.tracksLots && !row.lot) || (item.tracksExpiration && !row.expiration);
+  });
+}
+
 async function saveCount(db, request, { submit = false } = {}) {
   const caller = await resolveCaller(db, request, [PERMISSIONS.use, PERMISSIONS.manage]);
   const countId = cleanDocId(request.data?.countId, "Count");
   const d = caller.departmentId;
   const ref = db.collection(paths.counts(d)).doc(countId);
-  const needsItems = Array.isArray(request.data?.addRows) && request.data.addRows.length > 0;
+  const needsItems = submit || (Array.isArray(request.data?.addRows) && request.data.addRows.length > 0);
   const itemsSnap = needsItems ? await db.collection(paths.items(d)).get() : null;
   const items = itemsSnap ? Object.fromEntries(itemsSnap.docs.map((doc) => [doc.id, doc.data()])) : {};
   const at = nowIso();
@@ -597,8 +618,16 @@ async function saveCount(db, request, { submit = false } = {}) {
     const count = snap.data();
     if (count.status !== "open") throw new HttpsError("failed-precondition", "This count was already submitted.");
     const rows = mergeCountRows(count.rows || [], request.data || {}, items);
-    const update = { rows, updatedAt: at, updatedBy: caller.uid };
+    // Everyone who enters or changes counts is kept, so none of them can approve the result.
+    const editorIds = [...new Set([...(count.editorIds || []), caller.uid])];
+    const update = { rows, editorIds, updatedAt: at, updatedBy: caller.uid };
     if (submit) {
+      const untracked = untrackedIncreases(rows, items);
+      if (untracked.length) {
+        const first = untracked[0];
+        throw new HttpsError("failed-precondition",
+          `${first.itemName} needs a lot number and expiration date to add stock. Count it as found stock with those details instead.`);
+      }
       const problems = logic.countProblems(rows);
       if (problems.length) {
         const first = rows[problems[0].index];
@@ -617,9 +646,9 @@ async function saveCount(db, request, { submit = false } = {}) {
 
 const submitCount = (db, request) => saveCount(db, request, { submit: true });
 
-/** Approvers may not approve or reject a count they started or submitted. */
+/** Approvers may not approve or reject a count they started, entered counts on, or submitted. */
 function assertIndependentReviewer(caller, count) {
-  if (count.createdBy === caller.uid || count.submittedBy === caller.uid) {
+  if (count.createdBy === caller.uid || count.submittedBy === caller.uid || (count.editorIds || []).includes(caller.uid)) {
     throw new HttpsError("permission-denied", "Someone other than the person who did this count must review it.");
   }
 }
