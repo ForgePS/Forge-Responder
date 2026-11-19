@@ -48,6 +48,8 @@ export const saveImportDraft = (departmentId, importId, draft) => call("digitalF
 export const publishImport = (departmentId, importId, draft) => call("digitalFormsPublish", { departmentId, importId, draft });
 export const discardImport = (departmentId, importId) => call("digitalFormsDiscardImport", { departmentId, importId });
 export const reviseForm = (departmentId, templateId, draft) => call("digitalFormsRevise", { departmentId, templateId, draft });
+/** Copy the platform default inspection form into this department's forms (server reads the default). */
+export const copyPlatformDefaultForm = (departmentId) => call("digitalFormsCopyPlatformDefault", { departmentId });
 export const setFormStatus = (departmentId, templateId, status) => call("digitalFormsSetStatus", { departmentId, templateId, status });
 export const submitForm = (departmentId, templateId, versionId, answers, { details = {}, linkedRecordId = "" } = {}) =>
   call("digitalFormsSubmit", {

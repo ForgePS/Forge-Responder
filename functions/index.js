@@ -1760,6 +1760,7 @@ exports.digitalFormsConvert = onCall({ secrets: [anthropicApiKey], memory: "1GiB
 exports.digitalFormsSaveDraft = digitalFormsCall(digitalForms.saveDraft);
 exports.digitalFormsPublish = digitalFormsCall(digitalForms.publish);
 exports.digitalFormsRevise = digitalFormsCall(digitalForms.reviseTemplate);
+exports.digitalFormsCopyPlatformDefault = digitalFormsCall(digitalForms.copyPlatformDefault);
 exports.digitalFormsSetStatus = digitalFormsCall(digitalForms.setTemplateStatus);
 exports.digitalFormsDiscardImport = onCall({ memory: "256MiB", timeoutSeconds: 30 }, (request) =>
   digitalForms.discardImport(admin.firestore(), admin.storage().bucket(), request));

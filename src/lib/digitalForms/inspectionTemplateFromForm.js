@@ -22,6 +22,7 @@ import {
   saveInspectionType,
 } from "../inspections/inspectionConfigService.js";
 import { templateFromDefinition } from "./inspectionTemplateMapping.js";
+import { isUntouchedStarterTemplate } from "../inspections/platformDefaultForm.js";
 
 export { templateFromDefinition };
 
@@ -64,4 +65,36 @@ export async function applyFormToInspections(departmentId, { form, definition, t
     type = await saveInspectionType(departmentId, { ...type, defaultTemplateId: template.id }, audit);
   }
   return { type, template, version, updated: Boolean(existing) };
+}
+
+async function applyToTypes(departmentId, pick, { form, definition }, audit) {
+  const [types, templates] = await Promise.all([listInspectionTypes(departmentId), listInspectionTemplates(departmentId)]);
+  const targets = types.filter((type) => type.lifecycleStatus !== "archived" && pick(type, templates));
+  const names = [];
+  for (const type of targets) {
+    await applyFormToInspections(departmentId, { form, definition, typeId: type.id }, audit);
+    names.push(type.name);
+  }
+  return names;
+}
+
+/**
+ * Use the department's copy of the platform default form for every starter
+ * inspection type still on the default. Returns the type names.
+ */
+export function applyFormToStarterTypes(departmentId, { form, definition }, audit = {}) {
+  return applyToTypes(departmentId, (type, templates) => {
+    const current = templates.find((row) => row.id === type.defaultTemplateId);
+    return isUntouchedStarterTemplate(current);
+  }, { form, definition }, audit);
+}
+
+/**
+ * After a form is revised, publish the new version to every inspection type
+ * whose checklist comes from it. Returns the type names.
+ */
+export function refreshInspectionsFromForm(departmentId, { form, definition }, audit = {}) {
+  return applyToTypes(departmentId, (type, templates) => templates.some(
+    (row) => row.id === type.defaultTemplateId && row.sourceDigitalFormId === form.id,
+  ), { form, definition }, audit);
 }

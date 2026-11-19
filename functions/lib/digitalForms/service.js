@@ -390,6 +390,55 @@ async function reviseTemplate(db, request) {
   return { templateId, versionId };
 }
 
+/**
+ * Copy the platform's default inspection form (platformConfig/defaultInspectionForm,
+ * set by a platform creator) into the caller's department as its own published
+ * form, so the department can edit it. The questions are read here, never taken
+ * from the request. Copying the same default twice returns the first copy.
+ * Needs manageDigitalForms.
+ */
+async function copyPlatformDefault(db, request) {
+  const caller = await resolveCaller(db, request, [PERMISSIONS.manage]);
+  const snap = await db.doc("platformConfig/defaultInspectionForm").get();
+  const stored = snap.exists ? snap.data() : null;
+  if (!stored?.version) throw new HttpsError("not-found", "There's no platform default inspection form to copy.");
+  const defaultVersion = text(stored.version, 300);
+
+  const templates = db.collection(paths.templates(caller.departmentId));
+  const already = await templates.where("platformDefaultVersion", "==", defaultVersion).get();
+  if (!already.empty) {
+    const row = already.docs[0];
+    return { templateId: row.id, versionId: row.data().publishedVersionId || `${row.id}-v1`, existing: true };
+  }
+
+  const def = normalizeDefinition({ name: stored.name, description: stored.description, sections: stored.sections });
+  assertPublishable(def);
+  const templateRef = templates.doc();
+  const version = versionRecord(templateRef.id, 1, def, caller);
+  const batch = db.batch();
+  batch.set(templateRef, {
+    id: templateRef.id,
+    name: def.name,
+    description: def.description,
+    linkType: def.linkType || "",
+    sections: def.sections,
+    fieldCount: countFields(def),
+    lifecycleStatus: "published",
+    currentVersion: 1,
+    publishedVersionId: version.id,
+    platformDefaultVersion: defaultVersion,
+    createdAt: nowIso(),
+    createdBy: caller.uid,
+    updatedAt: nowIso(),
+    publishedAt: nowIso(),
+    publishedBy: caller.uid,
+  });
+  batch.set(db.doc(paths.versionDoc(caller.departmentId, version.id)), version);
+  await batch.commit();
+  await audit(db, caller, "digitalForms.copiedPlatformDefault", templateRef.id, `Copied the platform default inspection form "${def.name}"`);
+  return { templateId: templateRef.id, versionId: version.id, existing: false };
+}
+
 /** Archive (hide from members) or restore a form. Needs manageDigitalForms. */
 async function setTemplateStatus(db, request) {
   const caller = await resolveCaller(db, request, [PERMISSIONS.manage]);
@@ -520,6 +569,7 @@ module.exports = {
   PERMISSIONS,
   paths,
   convertImport,
+  copyPlatformDefault,
   createImport,
   discardImport,
   linkOptions,

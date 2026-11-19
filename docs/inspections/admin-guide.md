@@ -20,6 +20,11 @@ A department keeps the platform default until it changes the starter form itself
 Configuration Studio, or uses one of its own forms for that type (Digital Forms → Use for inspections). Changed forms
 are never overwritten. Inspections already started keep the checklist they began with.
 
+To edit the default for one department, open Digital Forms → Manage in that department and choose **Edit for my
+department**. That copies the default into the department's own forms, points every starter type still on the
+default at the copy, and opens it in the form editor. Publishing a new version of a form updates every inspection
+type that uses it.
+
 ## Permissions
 
 Grant paired `view*` / `edit*` (or `manage*`) keys per area. Export the matrix from **Import & Hardening**.
