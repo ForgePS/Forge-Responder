@@ -10,6 +10,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc, deleteDoc, where } from "firebase/firestore";
 import { ref, uploadString, getBytes } from "firebase/storage";
+import { DEMO_SETTINGS_CREATOR_ONLY_FIELDS, demoSettingsForWrite } from "../../src/lib/demoSettings.js";
 
 const PROJECT_ID = "demo-forge-rms";
 const FIRESTORE_RULES = readFileSync(new URL("../../firestore.rules", import.meta.url), "utf8");
@@ -259,6 +260,25 @@ describe("two-factor login (optional)", () => {
     });
     const db = as("demo-chief", { email: "demo@forge.demo", email_verified: true }).firestore();
     await assertSucceeds(setDoc(doc(db, "departments/forge-demo/roles/firefighter"), { name: "FF", permissions: {} }));
+  });
+
+  it("the demo reseed's settings write passes after a module is added to the app", async () => {
+    // Stored settings from before a module existed: the reseed must not try to change the module lists.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await setDoc(doc(d, "departments/forge-demo/users/demo-chief"), membership("demo-chief", "forge-demo", { roleIds: ["fireChief"] }));
+      await setDoc(doc(d, "departments/forge-demo/settings/main"), {
+        departmentId: "forge-demo", enabledModules: ["dashboard", "personnel"], subscription: { status: "active" },
+      });
+    });
+    const db = as("demo-chief", { email: "demo@forge.demo", email_verified: true }).firestore();
+    // The app's settings now list a module the stored doc doesn't have yet.
+    const full = { departmentId: "forge-demo", enabledModules: ["dashboard", "personnel", "emsManagement"], subscription: { status: "active", endsAt: "2027-01-01" }, platform: { name: "FORGE" } };
+    const write = demoSettingsForWrite(full);
+    for (const key of DEMO_SETTINGS_CREATOR_ONLY_FIELDS) assert.equal(key in write, false, key);
+    await assertSucceeds(setDoc(doc(db, "departments/forge-demo/settings/main"), { ...write, updatedAt: "now" }, { merge: true }));
+    // What the old reseed sent is still refused, which is why the demo login broke.
+    await assertFails(setDoc(doc(db, "departments/forge-demo/settings/main"), { ...full, updatedAt: "now" }, { merge: true }));
   });
 });
 
