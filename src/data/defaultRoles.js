@@ -4,6 +4,12 @@ export const defaultRoles = [
     name: "Creator",
     description: "FORGE platform owner with access to all department branches",
     permissions: {
+      viewEmsInventory: true,
+      useEmsSupplies: true,
+      manageEmsInventory: true,
+      approveEmsInventoryAdjustments: true,
+      manageEmsSettings: true,
+      viewEmsAudit: true,
       isPlatformCreator: true,
       accessAllDepartments: true,
       manageDepartments: true,
@@ -178,6 +184,12 @@ export const defaultRoles = [
     name: "Fire Chief",
     description: "Full administrative access",
     permissions: {
+      viewEmsInventory: true,
+      useEmsSupplies: true,
+      manageEmsInventory: true,
+      approveEmsInventoryAdjustments: true,
+      manageEmsSettings: true,
+      viewEmsAudit: true,
       manageUsers: true,
       manageRoles: true,
       managePermissions: true,
@@ -343,6 +355,8 @@ export const defaultRoles = [
     name: "Firefighter",
     description: "Employee portal access",
     permissions: {
+      viewEmsInventory: true,
+      useEmsSupplies: true,
       viewPersonnel: false,
       viewCertifications: true,
       viewTraining: true,
@@ -387,6 +401,8 @@ export const defaultRoles = [
     name: "Company Officer",
     description: "Captains and lieutenants: employee portal plus the Admin RMS views a company officer works in",
     permissions: {
+      viewEmsInventory: true,
+      useEmsSupplies: true,
       viewPersonnel: true,
       viewCertifications: true,
       viewTraining: true,
@@ -447,6 +463,11 @@ export const defaultRoles = [
     name: "Battalion Chief",
     description: "Shift command: everything a company officer has, plus the shift's schedule, unit status and hydrant damage follow-up",
     permissions: {
+      viewEmsInventory: true,
+      useEmsSupplies: true,
+      manageEmsInventory: true,
+      approveEmsInventoryAdjustments: true,
+      viewEmsAudit: true,
       viewPersonnel: true,
       viewCertifications: true,
       viewTraining: true,
@@ -516,6 +537,7 @@ export const defaultRoles = [
     name: "Read Only",
     description: "View-only administrative access",
     permissions: {
+      viewEmsInventory: true,
       viewPersonnel: true,
       viewCertifications: true,
       viewTraining: true,
@@ -584,6 +606,9 @@ export const defaultRoles = [
     name: "IT Admin",
     description: "System and user administration",
     permissions: {
+      viewEmsInventory: true,
+      manageEmsSettings: true,
+      viewEmsAudit: true,
       approveCeCredits: false,
       manageTrainingConfig: false,
       evaluateSkills: false,

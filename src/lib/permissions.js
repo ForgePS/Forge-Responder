@@ -220,6 +220,12 @@ export function canAccessNavItem(itemName, permissions = {}, options = {}) {
   if (itemName === "Time Sheets") {
     return canEditScheduleRoster(permissions, options.isCreator);
   }
+  // Anyone who can see, use, manage or approve EMS inventory opens the page; tabs narrow further.
+  if (itemName === "EMS Supply Inventory") {
+    return Boolean(options.isCreator)
+      || ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments", "manageEmsSettings", "viewEmsAudit"]
+        .some((key) => hasPermission(permissions, key));
+  }
   // Crews see the reports they charted; supervisors with a read-all permission see every report.
   if (itemName === "Patient Care Reports") {
     return canEditPcrs(permissions, options.isCreator) || canViewAllPcrs(permissions, options.isCreator);

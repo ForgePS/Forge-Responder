@@ -151,6 +151,17 @@ service cloud.firestore {
     function canManageModule(departmentId, moduleKey, keys) {
       return canWriteModule(departmentId, moduleKey) && memberCanAny(departmentId, keys);
     }
+    // ---- EMS Management (supply inventory) ----
+    function emsInventoryReadKeys() {
+      return ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments"];
+    }
+    function emsModuleOn(departmentId) {
+      return isPlatformCreator() || moduleOn(departmentId, "emsManagement");
+    }
+    function canReadEmsInventory(departmentId) {
+      return canAccessDepartment(departmentId) && emsModuleOn(departmentId)
+        && memberCanAny(departmentId, emsInventoryReadKeys());
+    }
     // ---- Training module ----
     function trainingViewKeys() {
       return ["viewTraining", "editTraining", "approveTraining", "evaluateSkills", "manageTrainingConfig", "approveCeCredits"];
@@ -556,7 +567,14 @@ service cloud.firestore {
         "codeSearchHistory": "inspections",
         "codeExtractionIssues": "inspections",
         "fireProtectionSystems": "inspections",
-        "pcrs": "ems"
+        "pcrs": "ems",
+        "emsSettings": "emsManagement",
+        "emsInventoryItems": "emsManagement",
+        "emsInventoryLocations": "emsManagement",
+        "emsInventoryBalances": "emsManagement",
+        "emsInventoryTransactions": "emsManagement",
+        "emsInventoryCounts": "emsManagement",
+        "emsAuditEvents": "emsManagement"
       }.get(collection, "");
     }
     // END generated module maps
@@ -816,6 +834,7 @@ service cloud.firestore {
         "forgeAiSettings", "forgeAiUsage", "forgeAiUsageLogs",
         "formImports", "formSubmissions", "formTemplateVersions", "formTemplates",
         "pcrs",
+        "emsSettings", "emsInventoryItems", "emsInventoryLocations", "emsInventoryBalances", "emsInventoryTransactions", "emsInventoryCounts", "emsAuditEvents",
         "trainingRecords", "trainingTemplates", "trainingCourses", "trainingSessions", "trainingSkills",
         "trainingEvaluations", "trainingTaskBooks", "trainingTaskBookAssignments", "trainingRequirements",
         "trainingExemptions", "trainingComplianceSnapshots", "trainingCeRuleSets", "trainingCeAwards",
@@ -1089,6 +1108,40 @@ service cloud.firestore {
         allow read: if canAccessDepartment(departmentId)
           && (resource.data.get("submittedBy", "") == request.auth.uid
             || memberCanAny(departmentId, ["viewDigitalFormSubmissions", "manageDigitalForms"]));
+        allow write: if false;
+      }
+      // EMS Management supply inventory (functions/lib/emsInventory). The ledger,
+      // balances, counts and audit events are written by Cloud Functions only, in one
+      // transaction per change; browsers may only read, with an EMS inventory
+      // permission and the emsManagement module on the plan.
+      match /emsSettings/{document} {
+        allow read: if canAccessDepartment(departmentId) && emsModuleOn(departmentId)
+          && memberCanAny(departmentId, emsInventoryReadKeys().concat(["manageEmsSettings"]));
+        allow write: if false;
+      }
+      match /emsInventoryItems/{document} {
+        allow read: if canReadEmsInventory(departmentId);
+        allow write: if false;
+      }
+      match /emsInventoryLocations/{document} {
+        allow read: if canReadEmsInventory(departmentId);
+        allow write: if false;
+      }
+      match /emsInventoryBalances/{document} {
+        allow read: if canReadEmsInventory(departmentId);
+        allow write: if false;
+      }
+      match /emsInventoryTransactions/{document} {
+        allow read: if canReadEmsInventory(departmentId);
+        allow write: if false;
+      }
+      match /emsInventoryCounts/{document} {
+        allow read: if canReadEmsInventory(departmentId);
+        allow write: if false;
+      }
+      match /emsAuditEvents/{document} {
+        allow read: if canAccessDepartment(departmentId) && emsModuleOn(departmentId)
+          && memberCanAny(departmentId, ["viewEmsAudit"]);
         allow write: if false;
       }
       // Heat Zone Analytics (functions/lib/heatZone). Everything is written by Cloud

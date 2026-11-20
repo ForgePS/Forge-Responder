@@ -12,7 +12,7 @@ const MODULE_KEYS = [
   "timeSheets", "dailyLog", "apparatus", "assets", "maintenance", "hoseTesting",
   "occupancies", "inspections", "preplans", "hydrants", "documents",
   "analytics", "nerisFireReports", "internalEmail", "digitalDashboard",
-  "ems", "administration",
+  "ems", "emsManagement", "administration",
 ];
 
 /** Modules that can never be switched off (home page and the admin screens). */
@@ -84,6 +84,13 @@ const COLLECTION_MODULES = {
   codeExtractionIssues: "inspections",
   fireProtectionSystems: "inspections",
   pcrs: "ems",
+  emsSettings: "emsManagement",
+  emsInventoryItems: "emsManagement",
+  emsInventoryLocations: "emsManagement",
+  emsInventoryBalances: "emsManagement",
+  emsInventoryTransactions: "emsManagement",
+  emsInventoryCounts: "emsManagement",
+  emsAuditEvents: "emsManagement",
 };
 
 /** Name prefixes for the large families (fleet*, inspection*, fps*, preplan*). */

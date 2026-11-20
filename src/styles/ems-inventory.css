@@ -1,0 +1,55 @@
+/* EMS Supply Inventory (src/pages/EmsSupplyInventoryPage.jsx). Reuses the shared
+   panel, table, badge and form-field styles; only layout specifics live here. */
+.ems-inventory-page .panel { margin-bottom: 16px; }
+/* Seven tabs: wrap on narrow screens instead of running off the edge. */
+.ems-inventory-page .segmented-control { flex-wrap: wrap; flex-shrink: 1; max-width: 100%; }
+
+.ems-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.ems-filters input,
+.ems-filters select {
+  min-height: 36px;
+  min-width: 180px;
+  flex: 1 1 180px;
+  max-width: 320px;
+}
+.ems-found { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--rms-border); }
+
+/* Positioned so the absolutely placed screen-reader labels stay inside the
+   table's own horizontal scroll instead of widening the page. */
+.ems-inventory-page .data-table-wrap { position: relative; }
+.ems-table td { vertical-align: top; }
+.ems-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ems-block { display: block; }
+.ems-in { color: var(--rms-success-text); font-weight: 600; }
+.ems-out { color: var(--rms-danger-text); font-weight: 600; }
+.ems-variance td { background: color-mix(in srgb, var(--rms-warning) 8%, transparent); }
+
+.ems-lots { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ems-lots li { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+.ems-row-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.ems-row-actions .secondary-button { min-width: 36px; min-height: 36px; padding: 6px 8px; }
+
+.ems-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.ems-span-2 { grid-column: span 2; }
+.ems-form textarea { width: 100%; }
+.ems-check { display: flex; gap: 8px; align-items: center; grid-column: span 2; }
+.ems-count-input { width: 88px; }
+.ems-review { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--rms-border); }
+
+@media (max-width: 640px) {
+  .ems-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .ems-span-2, .ems-check { grid-column: span 1; }
+  .ems-filters input, .ems-filters select { max-width: none; }
+  .ems-row-actions .secondary-button { min-width: 44px; min-height: 44px; }
+}

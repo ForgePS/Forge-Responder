@@ -91,6 +91,7 @@ export const NAV_MODULE_MAP = {
   Preplans: "preplans",
   "NERIS Fire Reports": "nerisFireReports",
   "Patient Care Reports": "ems",
+  "EMS Supply Inventory": "emsManagement",
   "NERIS Analytics": "nerisFireReports",
   "Heat Zone Analytics": "analytics",
   "SOGs / Policies": "documents",
@@ -126,6 +127,7 @@ export const ADMIN_MODULE_OPTIONS = [
   { key: "internalEmail", label: "Messages (department inbox)" },
   { key: "digitalDashboard", label: "Digital Dashboard (signage)" },
   { key: "ems", label: "EMS Patient Care Reports" },
+  { key: "emsManagement", label: "EMS Management (supplies and inventory)" },
   { key: "administration", label: "System Admin" }
 ];
 
@@ -272,6 +274,12 @@ export const ADMIN_PERMISSION_LABELS = {
   unlockPcrs: "Unlock posted patient care reports for amendment",
   exportPcrs: "Export patient care reports (NEMSIS XML)",
   reviewPcrs: "QA review patient care reports (comments, return to the crew; never edits the chart)",
+  viewEmsInventory: "View EMS supply inventory (stock, catalog, locations, transaction history)",
+  useEmsSupplies: "Record EMS supply use and restock transfers, and do physical counts",
+  manageEmsInventory: "Manage EMS inventory: catalog, locations, par levels, receiving, transfers and waste",
+  approveEmsInventoryAdjustments: "Approve physical count adjustments and reverse inventory transactions (never their own count)",
+  manageEmsSettings: "Configure EMS Management (stock rotation, expiration warnings)",
+  viewEmsAudit: "View the EMS Management audit history",
   viewHeatZoneAnalytics: "View Heat Zone Analytics",
   viewHeatZoneMarkers: "View individual incidents on the heat map",
   viewHeatZoneAllDistricts: "View Heat Zone analytics for all districts",
@@ -442,6 +450,10 @@ export const ADMIN_PERMISSION_GROUPS = [
   {
     label: "EMS patient care reports (PHI)",
     keys: ["editPcrs", "viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"]
+  },
+  {
+    label: "EMS Management",
+    keys: ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments", "manageEmsSettings", "viewEmsAudit"]
   },
   {
     label: "Heat Zone Analytics",
