@@ -10,6 +10,7 @@ import { readTenantList } from "../tenantListStore.js";
 import { LIST_KEYS } from "../tenantListKeys.js";
 import { writeInspectionAuditLog } from "./inspectionAudit.js";
 import { OCCUPANCIES_COLLECTION } from "./paths.js";
+import { withSplitAddress } from "./occupancyPrefill.js";
 
 /**
  * @param {object} raw
@@ -173,7 +174,7 @@ export async function migrateOccupanciesFromListIfEmpty(
 
   const migrated = [];
   for (const item of legacyItems) {
-    const record = legacyListItemToOccupancy(item, departmentId);
+    const record = withSplitAddress(legacyListItemToOccupancy(item, departmentId));
     if (!record.id) continue;
     await createRecord(departmentId, OCCUPANCIES_COLLECTION, record.id, record);
     migrated.push(normalizeOccupancyRecord(record, departmentId));
@@ -216,7 +217,7 @@ export async function ensureOccupancyRecords(departmentId, legacyFallback = [], 
  */
 export async function saveOccupancyRecord(departmentId, record = {}, audit = {}) {
   if (!departmentId) throw new Error("departmentId is required");
-  const normalized = normalizeOccupancyRecord(record, departmentId);
+  const normalized = withSplitAddress(normalizeOccupancyRecord(record, departmentId));
   if (!normalized.id) {
     normalized.id = `OCC-${Date.now().toString(36).toUpperCase()}`;
   }
