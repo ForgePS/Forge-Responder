@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { demoDepartmentProfile, demoDepartmentSettings, mapDemoDepartmentProfile } from "../data/demoDepartment.js";
+import { demoSettingsForWrite } from "./demoSettings.js";
 import { DEMO_FORCE_RESEED_KEYS, DEMO_LIST_KEYS, DEMO_LIST_SEEDS, DEMO_SEED_VERSION } from "../data/demoSeeds.js";
 import { defaultRoles } from "../data/defaultRoles.js";
 import { getFirestoreDb } from "./firebaseClient.js";
@@ -29,12 +30,9 @@ export async function ensureDemoDepartmentShell() {
     ...mapDemoDepartmentProfile(),
     updatedAt: now
   }, { merge: true });
-  // Never write `subscription`: only platform creators may change it (rules), and
-  // the demo's default dates change daily, so including it blocked every demo
-  // login after the first day.
-  const { subscription: _subscription, ...demoSettings } = demoDepartmentSettings;
+  // Only the fields the demo account may change (see demoSettingsForWrite).
   await setDoc(doc(db, "departments", DEMO_DEPARTMENT_ID, "settings", "main"), {
-    ...demoSettings,
+    ...demoSettingsForWrite(demoDepartmentSettings),
     updatedAt: now
   }, { merge: true });
   await ensureDefaultRoles(DEMO_DEPARTMENT_ID);
