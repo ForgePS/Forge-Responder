@@ -14,12 +14,14 @@ import InspectionPermissionGate from "../components/inspections/InspectionPermis
 import InspectionStatusBadge from "../components/inspections/InspectionStatusBadge.jsx";
 import InspectionsModuleLayout from "../components/inspections/InspectionsModuleLayout.jsx";
 import PreplanWorkspacePanels from "../components/inspections/PreplanWorkspacePanels.jsx";
+import DeleteRecordDialog from "../components/DeleteRecordDialog.jsx";
 import {
   approvePreplan,
   buildPreplanWorkQueueMetrics,
   canApprovePreplans,
   canCreatePreplans,
   canEditPreplans,
+  canManagePreplanConfig,
   canUploadPreplanFiles,
   canViewPreplanSensitive,
   canViewPreplans,
@@ -275,6 +277,8 @@ function PreplanDetailWorkspace({
   canApprove,
   canUpload = false,
   canViewSensitive = false,
+  canDelete = false,
+  onDeleted,
   actor = {},
   saving,
   onClose,
@@ -290,6 +294,7 @@ function PreplanDetailWorkspace({
   onMessage,
   onError,
 }) {
+  const [deleting, setDeleting] = useState(false);
   const [answers, setAnswers] = useState(revision?.sectionAnswers || {});
   const [dispatchSummary, setDispatchSummary] = useState(revision?.dispatchSummary || "");
   const [notes, setNotes] = useState(revision?.notes || "");
@@ -392,9 +397,23 @@ function PreplanDetailWorkspace({
         </div>
         <div className="occupancy-detail-actions">
           <InspectionStatusBadge status={labelForPreplanStatus(preplan.status)} />
+          {canDelete ? (
+            <button className="secondary-button danger-button" type="button" disabled={saving} onClick={() => setDeleting(true)}>
+              Delete
+            </button>
+          ) : null}
           <button className="secondary-button" type="button" onClick={onClose}>Close</button>
         </div>
       </header>
+      <DeleteRecordDialog
+        open={deleting}
+        kind="preplan"
+        departmentId={departmentId}
+        recordId={preplan.id}
+        label={[preplan.preplanNumber, preplan.facilityName || preplan.occupancyName].filter(Boolean).join(" · ")}
+        onCancel={() => setDeleting(false)}
+        onDeleted={(result) => { setDeleting(false); onDeleted?.(result); }}
+      />
       <div className="panel-body config-studio-body">
         <div className="occupancy-form-grid">
           <div><span className="occupancy-muted">Type</span><strong>{labelForPreplanType(preplan.preplanTypeId)}</strong></div>
@@ -994,6 +1013,13 @@ function PreplansShell({
             canApprove={canApprove}
             canUpload={canUpload}
             canViewSensitive={canViewSensitive}
+            canDelete={canManagePreplanConfig(permissions, isCreator)}
+            onDeleted={({ label, reason }) => {
+              const id = active.id;
+              setActiveId("");
+              setRecords((rows) => rows.filter((row) => row.id !== id));
+              setMessage(`Deleted ${label || "the preplan"} (${reason}). It's recorded in the audit log.`);
+            }}
             actor={actor}
             saving={saving}
             onClose={() => setActiveId("")}

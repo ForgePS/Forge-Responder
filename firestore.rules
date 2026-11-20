@@ -1228,7 +1228,10 @@ service cloud.firestore {
           && !(resource != null && resource.data.get("status", "") == "awaiting_approval"
                && request.resource.data.get("status", "") == "completed"
                && !memberCanAny(departmentId, ["approveInspections", "manageInspectionConfig"]));
-        allow delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys());
+        // Deleting goes through the deleteRecordWithReason function (reason + audit).
+        // Only the demo's reset (src/lib/demoPrevention.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId)
+          && canManageModule(departmentId, "inspections", inspectionWorkKeys());
       }
       match /occupancies/{occupancyId} {
         allow read: if canAccessDepartment(departmentId);
@@ -1303,7 +1306,8 @@ service cloud.firestore {
         allow read: if canAccessDepartment(departmentId);
         allow create, update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
           && (!movesToStatus(["approved", "published"]) || memberCanAny(departmentId, preplanApproveKeys()));
-        allow delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
+        // Deleting goes through the deleteRecordWithReason function (reason + audit).
+        allow delete: if false;
       }
       // Restricted preplan answers (gate codes, utility shutoffs, hazmat).
       match /preplanRestricted/{revisionId} {
@@ -1316,7 +1320,19 @@ service cloud.firestore {
         allow read: if canAccessDepartment(departmentId);
         allow create, update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
           && !request.resource.data.get("sectionAnswers", {}).keys().hasAny(["gatesCodes", "gas", "electric", "hazmat"]);
-        allow delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
+        allow delete: if false;
+      }
+      // Copies of deleted inspections and preplans with who deleted them and why
+      // (functions/lib/recordDeletion.js). Administrators only; written by the server.
+      match /deletedRecords/{archiveId} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["manageSystemSettings", "manageInspectionConfig", "managePreplanConfig"]);
+        allow write: if false;
+        match /documents/{documentId} {
+          allow read: if canAccessDepartment(departmentId)
+            && memberCanAny(departmentId, ["manageSystemSettings", "managePreplanConfig"]);
+          allow write: if false;
+        }
       }
       match /preplanTemplates/{templateId} {
         allow read: if canAccessDepartment(departmentId);

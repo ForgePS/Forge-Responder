@@ -734,6 +734,7 @@ describe("role-aware rules", () => {
       await setDoc(doc(db, `departments/${A}/preplanRevisions/RV1`), { sectionAnswers: { address: "1 Main" } });
       await setDoc(doc(db, `departments/${A}/preplanRestricted/R1`), { answers: { gatesCodes: "1234" } });
       await setDoc(doc(db, `departments/${A}/inspections/I1`), { status: "awaiting_approval" });
+      await setDoc(doc(db, `departments/${A}/deletedRecords/DR1`), { kind: "inspection", reason: "Duplicate record" });
       await setDoc(doc(db, `departments/${A}/fleetDefects/FD1`), { status: "submitted" });
       await setDoc(doc(db, `departments/${A}/fleetClasses/FC1`), { name: "Engine" });
       await setDoc(doc(db, `departments/${A}/counters/preplan-2026`), { value: 5 });
@@ -863,6 +864,18 @@ describe("role-aware rules", () => {
     await assertFails(updateDoc(doc(editorA().firestore(), `departments/${A}/inspections/I1`), { status: "completed" }));
     await assertSucceeds(updateDoc(doc(adminA().firestore(), `departments/${A}/inspections/I1`), { status: "completed" }));
     await assertFails(setDoc(doc(ffA().firestore(), `departments/${A}/inspections/I2`), { status: "draft" }));
+  });
+
+  it("inspections and preplans are only deleted by the server (reason + audit), never from the app", async () => {
+    await assertFails(deleteDoc(doc(adminA().firestore(), `departments/${A}/inspections/I1`)));
+    await assertFails(deleteDoc(doc(adminA().firestore(), `departments/${A}/preplans/PP1`)));
+    await assertFails(deleteDoc(doc(adminA().firestore(), `departments/${A}/preplanRevisions/RV1`)));
+    // The copies of deleted records: administrators read them, nobody writes them.
+    await assertSucceeds(getDoc(doc(adminA().firestore(), `departments/${A}/deletedRecords/DR1`)));
+    await assertFails(getDoc(doc(ffA().firestore(), `departments/${A}/deletedRecords/DR1`)));
+    await assertFails(getDoc(doc(memberB().firestore(), `departments/${A}/deletedRecords/DR1`)));
+    await assertFails(setDoc(doc(adminA().firestore(), `departments/${A}/deletedRecords/DR2`), { kind: "inspection" }));
+    await assertFails(deleteDoc(doc(adminA().firestore(), `departments/${A}/deletedRecords/DR1`)));
   });
 
   it("fleet: anyone can run a check and report a defect; setup needs fleet permissions", async () => {

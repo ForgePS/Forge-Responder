@@ -1794,6 +1794,10 @@ exports.emsInventorySubmitCount = emsInventoryCall(emsInventory.submitCount);
 exports.emsInventoryApproveCount = emsInventoryCall(emsInventory.approveCount);
 exports.emsInventoryRejectCount = emsInventoryCall(emsInventory.rejectCount);
 
+// ---- Administrators delete an inspection or preplan, with a reason (functions/lib/recordDeletion.js) ----
+exports.deleteRecordWithReason = onCall({ memory: "256MiB", timeoutSeconds: 60 }, (request) =>
+  require("./lib/recordDeletion").deleteRecordWithReason(admin.firestore(), request));
+
 // ---- Inspections: email a completed inspection report (functions/lib/inspectionEmail.js) ----
 exports.emailInspectionReport = onCall({ secrets: EMAIL_SECRETS, memory: "512MiB", timeoutSeconds: 60 }, (request) =>
   require("./lib/inspectionEmail").emailInspectionReport(admin.firestore(), request));

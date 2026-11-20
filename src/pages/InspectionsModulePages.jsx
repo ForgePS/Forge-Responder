@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CirclePlus, Play, Save, UploadCloud, RotateCcw, Archive, ShieldCheck, FileText, Flame, DollarSign } from "lucide-react";
+import { CirclePlus, Play, Save, UploadCloud, RotateCcw, Archive, ShieldCheck, FileText, Flame, DollarSign, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import InspectionEmptyState from "../components/inspections/InspectionEmptyState.jsx";
@@ -9,6 +9,7 @@ import InspectionsModuleLayout from "../components/inspections/InspectionsModule
 import PreventionKpiGroups from "../components/inspections/PreventionKpiGroups.jsx";
 import ChecklistFieldInput from "../components/inspections/ChecklistFieldInput.jsx";
 import InspectionEmailPanel from "../components/inspections/InspectionEmailPanel.jsx";
+import DeleteRecordDialog from "../components/DeleteRecordDialog.jsx";
 import { failDetailFields, findMissingFailRemarks, isFailAnswer } from "../lib/inspections/inspectionFailDetails.js";
 import { findMissingRequiredFields, formatMissingFieldsMessage } from "../lib/inspections/checklistFields.js";
 import { describeNumberingFormat } from "../lib/inspections/inspectionNumbering.js";
@@ -29,6 +30,7 @@ import {
   canEditInspectionFees,
   canEditInspectionNotices,
   canEditInspectionsModule,
+  canManageInspectionConfig,
   canViewFireProtectionSystems,
   canViewInspectionDashboard,
   canViewInspectionsModule,
@@ -198,6 +200,8 @@ function InspectionWorkspace({
   canScheduleReinspection = false,
   canViewFps = false,
   canEditFees = false,
+  canDelete = false,
+  onDeleted,
   saving,
   onClose,
   onStart,
@@ -217,6 +221,7 @@ function InspectionWorkspace({
   occupancy = null,
   resultOptions = getInspectionResultOptions(),
 }) {
+  const [deleting, setDeleting] = useState(false);
   const [answers, setAnswers] = useState(() => answersWithOccupancy(record, occupancy));
   const [summary, setSummary] = useState(record?.summary || "");
   const [internalNotes, setInternalNotes] = useState(record?.internalNotes || "");
@@ -420,7 +425,21 @@ function InspectionWorkspace({
               <DollarSign size={14} /> Add fee
             </button>
           ) : null}
+          {canDelete ? (
+            <button className="secondary-button danger-button" type="button" disabled={saving} onClick={() => setDeleting(true)}>
+              <Trash2 size={14} /> Delete
+            </button>
+          ) : null}
         </div>
+        <DeleteRecordDialog
+          open={deleting}
+          kind="inspection"
+          departmentId={departmentId}
+          recordId={record.id}
+          label={[record.inspectionNumber, record.occupancyName].filter(Boolean).join(" · ")}
+          onCancel={() => setDeleting(false)}
+          onDeleted={(result) => { setDeleting(false); onDeleted?.(result); }}
+        />
 
         {canEdit && record.status === "completed" ? (
           <InspectionEmailPanel record={record} occupancy={occupancy} departmentId={departmentId} />
@@ -901,6 +920,13 @@ function InspectionsShellPage({
             canScheduleReinspection={canScheduleReinspection}
             canViewFps={canViewFps}
             canEditFees={canEditFees}
+            canDelete={canManageInspectionConfig(permissions, isCreator)}
+            onDeleted={({ label, reason }) => {
+              const id = activeRecord.id;
+              setActiveId("");
+              setRecords((rows) => rows.filter((row) => row.id !== id));
+              setMessage(`Deleted ${label || "the inspection"} (${reason}). It's recorded in the audit log.`);
+            }}
             departmentId={departmentId}
             actor={actor}
             saving={saving}

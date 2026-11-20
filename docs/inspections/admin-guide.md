@@ -25,6 +25,17 @@ department**. That copies the default into the department's own forms, points ev
 default at the copy, and opens it in the form editor. Publishing a new version of a form updates every inspection
 type that uses it.
 
+## Deleting inspections and preplans
+
+Administrators see **Delete** on an open inspection (Manage inspection settings or System settings) and on an
+open preplan (Manage preplan settings, Manage inspection settings or System settings). They must pick a reason
+from the list, and add notes when the reason is Other.
+
+Deleting a preplan also deletes its revisions and restricted answers. Before anything is removed, the server
+keeps a copy of everything deleted, with who deleted it, when and why, in `deletedRecords` (administrators only).
+It also writes the deletion to the audit log. Inspections and preplans can't be deleted any other way. Deleting
+is turned off in the public demo.
+
 ## Permissions
 
 Grant paired `view*` / `edit*` (or `manage*`) keys per area. Export the matrix from **Import & Hardening**.
