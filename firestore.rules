@@ -51,15 +51,14 @@ service cloud.firestore {
 
     // A department is usable unless its subscription is suspended/cancelled or the
     // registry marks it disabled/archived. Both docs are creator-only writes.
+    // Each platform doc is read once with get() (null when missing) rather than
+    // exists() + get(): those count as two document reads, and a member's write
+    // through memberCanAny would otherwise pass Firestore's 10-read limit.
     function isDepartmentActive(departmentId) {
-      return (
-          !exists(/databases/$(database)/documents/platformSubscriptions/$(departmentId))
-          || !(get(/databases/$(database)/documents/platformSubscriptions/$(departmentId)).data.get("status", "") in ["suspended", "cancelled"])
-        )
-        && (
-          !exists(/databases/$(database)/documents/platformDepartments/$(departmentId))
-          || !(get(/databases/$(database)/documents/platformDepartments/$(departmentId)).data.get("status", "") in ["disabled", "archived"])
-        );
+      let subscription = get(/databases/$(database)/documents/platformSubscriptions/$(departmentId));
+      let registry = get(/databases/$(database)/documents/platformDepartments/$(departmentId));
+      return (subscription == null || !(subscription.data.get("status", "") in ["suspended", "cancelled"]))
+        && (registry == null || !(registry.data.get("status", "") in ["disabled", "archived"]));
     }
 
     function membershipData(departmentId) {
@@ -121,11 +120,12 @@ service cloud.firestore {
     function entitlementsData(departmentId) {
       return get(entitlementsPath(departmentId)).data;
     }
+    // One read of the entitlements doc (see isDepartmentActive).
+    function moduleListAllows(entitlements, moduleKey) {
+      return entitlements == null || !("modules" in entitlements.data) || moduleKey in entitlements.data.modules;
+    }
     function moduleOn(departmentId, moduleKey) {
-      return moduleKey == ""
-        || !exists(entitlementsPath(departmentId))
-        || !("modules" in entitlementsData(departmentId))
-        || moduleKey in entitlementsData(departmentId).modules;
+      return moduleKey == "" || moduleListAllows(get(entitlementsPath(departmentId)), moduleKey);
     }
     // Writing a module's data needs the module switched on (creators exempt).
     function canWriteModule(departmentId, moduleKey) {

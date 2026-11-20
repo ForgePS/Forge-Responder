@@ -199,6 +199,46 @@ function assertEditable(record) {
 }
 
 /**
+ * The checklist an inspection of this type starts with: the published version of
+ * its template, the platform default form for an unchanged starter template, or
+ * the template's working sections.
+ * @returns {Promise<{ template: object|null, templateSnapshot: object|null, templateVersionId: string }>}
+ */
+export async function resolveInspectionTemplate(departmentId, inspectionType, { templates = null, templateId = "", platformDefault, versions = null } = {}) {
+  const rows = templates || await listInspectionTemplates(departmentId);
+  let template = rows.find((row) => row.id === (templateId || inspectionType?.defaultTemplateId));
+  if (!template) template = rows.find((row) => row.inspectionTypeId === inspectionType?.id) || null;
+
+  let templateSnapshot = null;
+  let templateVersionId = "";
+  if (template?.publishedVersionId) {
+    const own = versions
+      ? versions.filter((row) => row.templateId === template.id).sort((a, b) => Number(b.version) - Number(a.version))
+      : await listTemplateVersions(departmentId, template.id);
+    const published = own.find((row) => row.id === template.publishedVersionId) || own[0];
+    if (published?.snapshot) {
+      templateSnapshot = published.snapshot;
+      templateVersionId = published.id;
+    }
+  }
+  if (!templateSnapshot && template) {
+    // A starter template the department hasn't changed uses the platform default form.
+    const defaultForm = platformDefault !== undefined ? platformDefault : await loadPlatformDefaultForm();
+    templateSnapshot = defaultFormSnapshotFor(template, defaultForm);
+  }
+  if (!templateSnapshot && template) {
+    templateSnapshot = {
+      name: template.name,
+      description: template.description,
+      inspectionTypeId: template.inspectionTypeId,
+      remarksOnFail: Boolean(template.remarksOnFail),
+      sections: template.sections,
+    };
+  }
+  return { template, templateSnapshot, templateVersionId };
+}
+
+/**
  * @param {string} departmentId
  * @param {object} input
  * @param {{ actorUid?: string, actorName?: string }} [audit]
@@ -221,37 +261,16 @@ export async function createInspection(departmentId, input = {}, audit = {}) {
   const occupancy = occupancies.find((row) => row.id === input.occupancyId);
   if (!occupancy) throw new Error("Occupancy not found");
 
-  let template = templates.find((row) => row.id === (input.templateId || inspectionType.defaultTemplateId));
-  if (!template) {
-    template = templates.find((row) => row.inspectionTypeId === inspectionType.id) || null;
-  }
-
-  let templateSnapshot = null;
-  let templateVersionId = "";
-  if (template?.publishedVersionId) {
-    const versions = await listTemplateVersions(departmentId, template.id);
-    const published = versions.find((row) => row.id === template.publishedVersionId) || versions[0];
-    if (published?.snapshot) {
-      templateSnapshot = published.snapshot;
-      templateVersionId = published.id;
-    }
-  }
-  if (!templateSnapshot && template) {
-    // A starter template the department hasn't changed uses the platform default form.
-    templateSnapshot = defaultFormSnapshotFor(template, await loadPlatformDefaultForm());
-  }
-  if (!templateSnapshot && template) {
-    templateSnapshot = {
-      name: template.name,
-      description: template.description,
-      inspectionTypeId: template.inspectionTypeId,
-      remarksOnFail: Boolean(template.remarksOnFail),
-      sections: template.sections,
-    };
-  }
+  // A field-started inspection (FORGE FIELD) brings the checklist the inspector
+  // already answered offline; otherwise use the type's published template.
+  const resolved = input.templateSnapshot
+    ? { template: templates.find((row) => row.id === input.templateId) || null, templateSnapshot: input.templateSnapshot, templateVersionId: input.templateVersionId || "" }
+    : await resolveInspectionTemplate(departmentId, inspectionType, { templates, templateId: input.templateId });
+  const { template, templateSnapshot, templateVersionId } = resolved;
 
   const stamp = nowIso();
-  const id = newId("INS");
+  if (input.id && !/^INS-[A-Za-z0-9-]{3,60}$/.test(input.id)) throw new Error("Invalid inspection id");
+  const id = input.id || newId("INS");
   const inspectionNumber = await allocateInspectionNumber(departmentId, settings);
   const assignees = Array.isArray(input.assignedInspectorIds)
     ? input.assignedInspectorIds.filter(Boolean)
@@ -294,6 +313,7 @@ export async function createInspection(departmentId, input = {}, audit = {}) {
     updatedBy: audit.actorName || "User",
     internalNotes: input.internalNotes || "",
   }, departmentId);
+  if (input.source) record.source = String(input.source);
 
   await createRecord(departmentId, INSPECTIONS_COLLECTION, id, record);
   await writeInspectionAuditLog(departmentId, {

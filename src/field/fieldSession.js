@@ -10,6 +10,7 @@ import { canConductFleetChecks } from "../lib/fleet/fleetPermissions.js";
 import { normalizeRoleIds } from "../lib/permissions.js";
 import {
   canEditInspectionsModule,
+  canStartInspections,
   canEditPreplans,
   canViewPreplanSensitive,
   canViewPreplans,
@@ -114,6 +115,8 @@ export function fieldCapabilities(snapshot, config = null) {
     incidents: allowed("incident") && on("nerisFireReports") && canEditNerisReports(permissions, isCreator),
     pcr: allowed("pcr") && on("ems") && canEditPcrs(permissions, isCreator),
     inspections: allowed("inspections") && on("inspections") && canEditInspectionsModule(permissions, isCreator),
+    // Start an inspection that wasn't assigned (it is assigned to the inspector).
+    inspectionStart: allowed("inspections") && on("inspections") && canStartInspections(permissions, isCreator),
     // EMS protocols / HazMat documents (Documents permission).
     referenceDocs: isCreator || hasPermission(permissions, "viewDocuments"),
     // Fire codes: the desktop Code Library (opened in the browser).
