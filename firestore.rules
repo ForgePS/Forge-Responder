@@ -788,7 +788,7 @@ service cloud.firestore {
     // Kept in sync by tests/rules/firestore.rules.test.mjs.
     function hasExplicitTenantRule(collection) {
       return collection in [
-        "academyAuditLogs", "academyEvents", "academyIntegrations", "adoptedCodeProfiles",
+        "academyAuditLogs", "academyEvents", "academyIntegrations", "adoptedCodeProfiles", "deletedRecords",
         "auditLogs", "codeExtractionIssues", "codeSavedSections", "codeSearchHistory", "counters",
         "internalEmails", "memberGrants", "personnelPrivate", "preplanRestricted",
         "codeSections", "codeSets", "dropdowns", "fireProtectionSystems",
