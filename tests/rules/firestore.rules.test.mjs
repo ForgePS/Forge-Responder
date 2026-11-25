@@ -14,6 +14,13 @@ import { DEMO_SETTINGS_CREATOR_ONLY_FIELDS, demoSettingsForWrite } from "../../s
 
 const PROJECT_ID = "demo-forge-rms";
 const FIRESTORE_RULES = readFileSync(new URL("../../firestore.rules", import.meta.url), "utf8");
+
+// emulators:exec sets the hosts it started; use them so a run never reaches
+// another emulator on the default ports (these tests clear the database).
+function emulatorAddress(name, fallbackPort) {
+  const [host, port] = (process.env[name] || `127.0.0.1:${fallbackPort}`).split(":");
+  return { host, port: Number(port) };
+}
 const STORAGE_RULES = readFileSync(new URL("../../storage.rules", import.meta.url), "utf8");
 
 let env;
@@ -53,8 +60,8 @@ function membership(uid, departmentId, extra = {}) {
 before(async () => {
   env = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { rules: FIRESTORE_RULES, host: "127.0.0.1", port: 8080 },
-    storage: { rules: STORAGE_RULES, host: "127.0.0.1", port: 9199 },
+    firestore: { rules: FIRESTORE_RULES, ...emulatorAddress("FIRESTORE_EMULATOR_HOST", 8080) },
+    storage: { rules: STORAGE_RULES, ...emulatorAddress("FIREBASE_STORAGE_EMULATOR_HOST", 9199) },
   });
   // The offline demo (npm run demo:offline) uses the same project id and ports. These tests clear the
   // database before each test, so never run them against a demo that is running.

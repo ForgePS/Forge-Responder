@@ -1799,6 +1799,28 @@ exports.emsInventorySubmitCount = emsInventoryCall(emsInventory.submitCount);
 exports.emsInventoryApproveCount = emsInventoryCall(emsInventory.approveCount);
 exports.emsInventoryRejectCount = emsInventoryCall(emsInventory.rejectCount);
 
+// ---- EMS Management: equipment (functions/lib/emsEquipment) ----
+// Serialized equipment: registration, moves, verification, inspections,
+// problems, repairs, retirement, files and the classic Assets import. Each
+// action writes the record, its history event and the audit event together.
+const emsEquipment = require("./lib/emsEquipment/service");
+const emsEquipmentFileCall = (handler) => onCall({ memory: "256MiB", timeoutSeconds: 60 }, (request) =>
+  handler(admin.firestore(), admin.storage().bucket(), request));
+exports.emsEquipmentSave = emsInventoryCall(emsEquipment.saveEquipment);
+exports.emsEquipmentTransfer = emsInventoryCall(emsEquipment.transferEquipment);
+exports.emsEquipmentVerify = emsInventoryCall(emsEquipment.verifyEquipment);
+exports.emsEquipmentReportProblem = emsInventoryCall(emsEquipment.reportProblem);
+exports.emsEquipmentRecordInspection = emsInventoryCall(emsEquipment.recordInspection);
+exports.emsEquipmentCompleteMaintenance = emsInventoryCall(emsEquipment.completeMaintenance);
+exports.emsEquipmentSetStatus = emsInventoryCall(emsEquipment.setStatus);
+exports.emsEquipmentAddFile = emsEquipmentFileCall(emsEquipment.addFile);
+exports.emsEquipmentRemoveFile = emsEquipmentFileCall(emsEquipment.removeFile);
+exports.emsEquipmentPreviewImport = emsInventoryCall(emsEquipment.previewMigration);
+exports.emsEquipmentApplyImport = onCall({ memory: "512MiB", timeoutSeconds: 300 }, (request) =>
+  emsEquipment.applyMigration(admin.firestore(), request));
+exports.emsEquipmentRollbackImport = onCall({ memory: "256MiB", timeoutSeconds: 300 }, (request) =>
+  emsEquipment.rollbackMigration(admin.firestore(), request));
+
 // ---- Administrators delete an inspection or preplan, with a reason (functions/lib/recordDeletion.js) ----
 exports.deleteRecordWithReason = onCall({ memory: "256MiB", timeoutSeconds: 60 }, (request) =>
   require("./lib/recordDeletion").deleteRecordWithReason(admin.firestore(), request));

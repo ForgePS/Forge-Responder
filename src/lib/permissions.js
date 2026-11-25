@@ -226,6 +226,11 @@ export function canAccessNavItem(itemName, permissions = {}, options = {}) {
       || ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments", "manageEmsSettings", "viewEmsAudit"]
         .some((key) => hasPermission(permissions, key));
   }
+  if (itemName === "EMS Equipment") {
+    return Boolean(options.isCreator)
+      || ["viewEmsEquipment", "checkEmsEquipment", "transferEmsEquipment", "manageEmsEquipment"]
+        .some((key) => hasPermission(permissions, key));
+  }
   // Crews see the reports they charted; supervisors with a read-all permission see every report.
   if (itemName === "Patient Care Reports") {
     return canEditPcrs(permissions, options.isCreator) || canViewAllPcrs(permissions, options.isCreator);
