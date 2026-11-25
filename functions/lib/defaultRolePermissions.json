@@ -1,6 +1,10 @@
 {
   "creator": {
     "viewEmsInventory": true,
+    "viewEmsEquipment": true,
+    "checkEmsEquipment": true,
+    "transferEmsEquipment": true,
+    "manageEmsEquipment": true,
     "useEmsSupplies": true,
     "manageEmsInventory": true,
     "approveEmsInventoryAdjustments": true,
@@ -176,6 +180,10 @@
   },
   "fireChief": {
     "viewEmsInventory": true,
+    "viewEmsEquipment": true,
+    "checkEmsEquipment": true,
+    "transferEmsEquipment": true,
+    "manageEmsEquipment": true,
     "useEmsSupplies": true,
     "manageEmsInventory": true,
     "approveEmsInventoryAdjustments": true,
@@ -342,6 +350,8 @@
   },
   "firefighter": {
     "viewEmsInventory": true,
+    "viewEmsEquipment": true,
+    "checkEmsEquipment": true,
     "useEmsSupplies": true,
     "viewPersonnel": false,
     "viewCertifications": true,
@@ -383,6 +393,9 @@
   },
   "companyOfficer": {
     "viewEmsInventory": true,
+    "viewEmsEquipment": true,
+    "checkEmsEquipment": true,
+    "transferEmsEquipment": true,
     "useEmsSupplies": true,
     "viewPersonnel": true,
     "viewCertifications": true,
@@ -440,6 +453,10 @@
   },
   "battalionChief": {
     "viewEmsInventory": true,
+    "viewEmsEquipment": true,
+    "checkEmsEquipment": true,
+    "transferEmsEquipment": true,
+    "manageEmsEquipment": true,
     "useEmsSupplies": true,
     "manageEmsInventory": true,
     "approveEmsInventoryAdjustments": true,
@@ -509,6 +526,7 @@
   },
   "readOnly": {
     "viewEmsInventory": true,
+    "viewEmsEquipment": true,
     "viewPersonnel": true,
     "viewCertifications": true,
     "viewTraining": true,
@@ -573,6 +591,7 @@
   },
   "itAdmin": {
     "viewEmsInventory": true,
+    "viewEmsEquipment": true,
     "manageEmsSettings": true,
     "viewEmsAudit": true,
     "approveCeCredits": false,
