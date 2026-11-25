@@ -394,8 +394,12 @@ describe("importing the classic Assets list", () => {
 
     // Importing again skips what's already in.
     const again = await eq.previewMigration(db, req("chief-a", { departmentId: A, stations }));
-    assert.equal(again.rows.find((r) => r.sourceId === "AST-1178").skip, "Already imported.");
+    assert.equal(again.rows.some((r) => r.sourceId === "AST-1178"), false, "imported rows are counted, not listed");
+    assert.equal(again.alreadyImportedCount, 2);
+    assert.equal(again.remainingCount, 2);
     assert.equal(again.rows.find((r) => r.sourceId === "AST-1307").skip, "");
+    const repeat = await eq.applyMigration(db, req("chief-a", { departmentId: A, stations, sourceIds: ["AST-1178"] }));
+    assert.deepEqual([repeat.createdCount, repeat.skipped[0]?.reason], [0, "Already imported."]);
 
     // The classic list is untouched.
     assert.deepEqual((await db.doc(`departments/${A}/lists/hlfd-rms-assets`).get()).data().items, rows);
@@ -410,6 +414,37 @@ describe("importing the classic Assets list", () => {
     const report = (await db.doc(`departments/${A}/emsEquipmentMigrations/${applied.batchId}`).get()).data();
     assert.equal(report.status, "partly_rolled_back");
     assert.ok((await audits()).some((a) => a.action === "ems.equipment.import_rolled_back"));
+  });
+
+  it("works through a list longer than one preview, 400 rows at a time", async () => {
+    await setup();
+    const long = Array.from({ length: 405 }, (_, i) => ({ id: `L-${i + 1}`, name: `Splint ${i + 1}`, category: "Medical", status: "Available" }));
+    await db.doc(`departments/${A}/lists/hlfd-rms-assets`).set({ items: long });
+    const first = await eq.previewMigration(db, req("chief-a", { departmentId: A }));
+    assert.deepEqual([first.rows.length, first.totalRows, first.remainingCount, first.alreadyImportedCount], [400, 405, 405, 0]);
+    await expectCode(eq.applyMigration(db, req("chief-a", { departmentId: A, sourceIds: long.map((r) => r.id) })), "invalid-argument", /at most 400/);
+    const applied = await eq.applyMigration(db, req("chief-a", { departmentId: A, sourceIds: first.rows.map((r) => r.sourceId) }));
+    assert.equal(applied.createdCount, 400);
+    const next = await eq.previewMigration(db, req("chief-a", { departmentId: A }));
+    assert.deepEqual(next.rows.map((r) => r.sourceId), ["L-401", "L-402", "L-403", "L-404", "L-405"]);
+    assert.equal(next.alreadyImportedCount, 400);
+    const rest = await eq.applyMigration(db, req("chief-a", { departmentId: A, sourceIds: next.rows.map((r) => r.sourceId) }));
+    assert.equal(rest.createdCount, 5);
+    assert.equal(await db.collection(`departments/${A}/emsEquipment`).count().get().then((c) => c.data().count), 406);
+  });
+
+  it("two imports of the same rows at once create each record once", async () => {
+    await setup();
+    await db.doc(`departments/${A}/lists/hlfd-rms-assets`).set({ items: rows.slice(0, 3) });
+    const sourceIds = ["AST-1178", "AST-1307", "AST-1362"];
+    const [one, two] = await Promise.all([
+      eq.applyMigration(db, req("chief-a", { departmentId: A, sourceIds })),
+      eq.applyMigration(db, req("chief-a", { departmentId: A, sourceIds })),
+    ]);
+    assert.equal(one.createdCount + two.createdCount, 3);
+    assert.equal(one.skippedCount + two.skippedCount, 3);
+    const numbers = (await db.collection(`departments/${A}/emsEquipment`).where("migration.sourceListKey", "==", "hlfd-rms-assets").get()).docs.map((d) => d.data().assetNumber).sort();
+    assert.deepEqual(numbers, sourceIds);
   });
 
   it("reads lists stored one record per document, and only managers import", async () => {

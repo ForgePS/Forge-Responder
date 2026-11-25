@@ -145,6 +145,8 @@ Full suite on this branch: lint, build, unit 793/793, rules 173/173, functions 2
 - **Import from the classic Assets list** (`lists/hlfd-rms-assets`):
   - Preview each row as it would be imported, including the vehicle it would be placed on.
   - Choose which rows to import. Rows already imported, or whose ID is already in use, are skipped.
+  - A preview shows up to 400 rows still to import. A longer list is imported in rounds: import, then preview again.
+  - Each imported record's id comes from its row, so two imports running at once can't create the same row twice.
   - The Assets list itself is not changed.
   - An import can be rolled back. Records nobody has changed since the import are deleted. Changed records are kept
     and listed.
@@ -205,13 +207,13 @@ move equipment.
 | Suite | New tests | Covers |
 |---|---|---|
 | `tests/unit/emsEquipment.test.mjs` | 21 | lifecycle and status rules, due dates, flags, mapping of Assets list rows, scan matching, client and server constants match |
-| `tests/functions/emsEquipment.test.mjs` | 24 | each action end to end with history and audit; permissions per role; a retry acts once; a reused request id is refused; two moves at once; missing and found; failed inspection; retire and dispose; files; another department refused; plan without the module; import preview, apply, skips and rollback; lists stored one record per document; event timestamps |
+| `tests/functions/emsEquipment.test.mjs` | 26 | each action end to end with history and audit; permissions per role; a retry acts once; a reused request id is refused; two moves at once; missing and found; failed inspection; retire and dispose; files; another department refused; plan without the module; import preview, apply, skips and rollback; lists over 400 rows; two imports at once; lists stored one record per document; event timestamps |
 | `tests/rules/emsEquipment.rules.test.mjs` | 6 | reads need an equipment permission; import reports need `manageEmsEquipment`; other departments and plans without the module refused; no browser writes |
 
 `tests/rules/firestore.rules.test.mjs` and `helpDesk.rules.test.mjs` used to connect to fixed ports 8080 and 9199.
 They now use the ports `emulators:exec` assigns, so a test run can't clear another emulator on the default ports.
 
-Full suite on this branch: lint, build, unit 842/842, rules 185/185, functions 253/253.
+Full suite on this branch: lint, build, unit 842/842, rules 185/185, functions 255/255.
 
 ### Known limits of E2
 

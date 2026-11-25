@@ -15,6 +15,7 @@ const IMPORT_STATUS = { applied: "Imported", rolled_back: "Rolled back", partly_
  */
 export default function EquipmentImportTab({ departmentId, stations, onMessage }) {
   const [rows, setRows] = useState(null);
+  const [counts, setCounts] = useState({ totalRows: 0, alreadyImportedCount: 0, remainingCount: 0 });
   const [chosen, setChosen] = useState(() => new Set());
   const [imports, setImports] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -28,6 +29,7 @@ export default function EquipmentImportTab({ departmentId, stations, onMessage }
     try {
       const result = await previewEquipmentImport(departmentId, stations);
       setRows(result.rows || []);
+      setCounts({ totalRows: result.totalRows || 0, alreadyImportedCount: result.alreadyImportedCount || 0, remainingCount: result.remainingCount || 0 });
       setChosen(new Set((result.rows || []).filter((r) => !r.skip).map((r) => r.sourceId)));
     } catch (e) {
       setError(describeError(e));
@@ -85,6 +87,12 @@ export default function EquipmentImportTab({ departmentId, stations, onMessage }
         </p>
         {rows ? (
           <>
+            {counts.alreadyImportedCount || counts.remainingCount > rows.length ? (
+              <p className="occupancy-muted">
+                {counts.alreadyImportedCount ? `${counts.alreadyImportedCount} of ${counts.totalRows} rows are already imported and not shown. ` : ""}
+                {counts.remainingCount > rows.length ? `Showing the first ${rows.length} of ${counts.remainingCount} rows left; import these, then preview again for the rest.` : ""}
+              </p>
+            ) : null}
             <div className="data-table-wrap">
               <table className="ems-table">
                 <thead>
@@ -116,7 +124,7 @@ export default function EquipmentImportTab({ departmentId, stations, onMessage }
                   ))}
                 </tbody>
               </table>
-              {!rows.length ? <div className="empty-table">The Assets list is empty.</div> : null}
+              {!rows.length ? <div className="empty-table">{counts.totalRows ? "Every row of the Assets list has been imported." : "The Assets list is empty."}</div> : null}
             </div>
             <div className="df-actions">
               <button type="button" className="primary-button" onClick={apply} disabled={busy || !chosen.size}>

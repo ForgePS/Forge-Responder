@@ -20,6 +20,7 @@
  * permissions and the plan are checked here and every path is built from the
  * verified department.
  */
+const crypto = require("node:crypto");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { readListItems } = require("../listStore");
 const {
@@ -37,7 +38,8 @@ const LEGACY_ASSETS_LIST = "hlfd-rms-assets";
 const MAX_FILES = 20;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_MIGRATION_ROWS = 400;
-const MIGRATION_CHUNK = 100;
+const MIGRATION_PARALLEL = 10;
+const ALREADY_IMPORTED = "Already imported.";
 
 const paths = {
   equipment: (d) => `departments/${d}/emsEquipment`,
@@ -570,6 +572,15 @@ async function removeFile(db, bucket, request) {
 
 // ---------------------------------------------------------------- import from the classic Assets list
 
+/** The equipment id for an imported row: fixed by the row's id, so a row can only be imported once. */
+function importedEquipmentId(sourceId) {
+  return `EQ-L${crypto.createHash("sha256").update(String(sourceId)).digest("hex").slice(0, 20).toUpperCase()}`;
+}
+
+function isAlreadyExists(error) {
+  return error?.code === 6 || error?.code === "already-exists" || /ALREADY_EXISTS/.test(String(error?.message || ""));
+}
+
 function cleanStations(value) {
   return (Array.isArray(value) ? value : []).map((s) => text(s, 120)).filter(Boolean).slice(0, 100);
 }
@@ -588,12 +599,12 @@ async function planMigration(db, caller, stations) {
   const imported = new Set(existingSnap.docs.map((d) => d.data().migration?.sourceId).filter(Boolean));
   const usedNumbers = new Set(existingSnap.docs.map((d) => d.data().assetNumberKey).filter(Boolean));
   const seen = new Set();
-  return (Array.isArray(rows) ? rows : []).slice(0, MAX_MIGRATION_ROWS).map((row, index) => {
+  return (Array.isArray(rows) ? rows : []).map((row, index) => {
     const sourceId = text(row?.id, 120) || `row-${index + 1}`;
     const { record, warnings } = logic.mapLegacyAsset(row || {}, { vehicles, stations });
     const key = logic.lookupKey(record.assetNumber);
     let skip = "";
-    if (imported.has(sourceId)) skip = "Already imported.";
+    if (imported.has(sourceId)) skip = ALREADY_IMPORTED;
     else if (key && (usedNumbers.has(key) || seen.has(key))) skip = "Another piece of equipment already has this equipment ID.";
     if (key) seen.add(key);
     return { sourceId, source: row, record, warnings, skip };
@@ -603,8 +614,14 @@ async function planMigration(db, caller, stations) {
 async function previewMigration(db, request) {
   const caller = await resolveCaller(db, request, [PERMISSIONS.manage]);
   const plan = await planMigration(db, caller, cleanStations(request.data?.stations));
+  // Rows already imported are counted, not listed, so a long list is worked
+  // through in rounds: each preview shows the next rows still to import.
+  const remaining = plan.filter((row) => row.skip !== ALREADY_IMPORTED);
   return {
-    rows: plan.map(({ sourceId, source, record, warnings, skip }) => ({
+    totalRows: plan.length,
+    alreadyImportedCount: plan.length - remaining.length,
+    remainingCount: remaining.length,
+    rows: remaining.slice(0, MAX_MIGRATION_ROWS).map(({ sourceId, source, record, warnings, skip }) => ({
       sourceId,
       source: { name: text(source?.name, 120), category: text(source?.category, 60), location: text(source?.location, 120), status: text(source?.status, 60) },
       record: { assetNumber: record.assetNumber, name: record.name, category: record.category, status: record.status, where: describeAssignment(record.assignment), nextInspectionDue: record.schedules.nextInspectionDue },
@@ -623,6 +640,7 @@ async function applyMigration(db, request) {
   const caller = await resolveCaller(db, request, [PERMISSIONS.manage]);
   const chosen = new Set((Array.isArray(request.data?.sourceIds) ? request.data.sourceIds : []).map((s) => text(s, 120)));
   if (!chosen.size) throw new HttpsError("invalid-argument", "Choose at least one row to import.");
+  if (chosen.size > MAX_MIGRATION_ROWS) throw new HttpsError("invalid-argument", `Import at most ${MAX_MIGRATION_ROWS} rows at a time.`);
   const plan = await planMigration(db, caller, cleanStations(request.data?.stations));
   const batchId = newId("MIG");
   const at = nowIso();
@@ -634,40 +652,58 @@ async function applyMigration(db, request) {
     if (row.skip) skipped.push({ sourceId: row.sourceId, reason: row.skip });
     else toCreate.push(row);
   }
-  for (let i = 0; i < toCreate.length; i += MIGRATION_CHUNK) {
-    const batch = db.batch();
-    for (const row of toCreate.slice(i, i + MIGRATION_CHUNK)) {
-      const ref = db.collection(paths.equipment(caller.departmentId)).doc(newId("EQ"));
-      const record = { ...row.record, assetNumber: row.record.assetNumber || ref.id };
-      batch.create(ref, {
-        id: ref.id,
-        ...record,
-        ...lookupFields(record),
-        statusBeforeHold: null,
-        statusBeforeMissing: null,
-        missingReport: null,
-        openProblem: null,
-        photos: [],
-        documents: [],
-        lastVerifiedAt: null,
-        lastVerifiedBy: "",
-        lastVerifiedByName: "",
-        migration: { batchId, sourceListKey: LEGACY_ASSETS_LIST, sourceId: row.sourceId, warnings: row.warnings },
-        version: 1,
-        createdAt: at,
-        createdBy: caller.uid,
-        createdByName: caller.name,
-        updatedAt: at,
-        updatedBy: caller.uid,
+  // Each record's id comes from its source row, and each is created in its own
+  // transaction with its import event. Two imports running at once therefore
+  // can't both create the same row: the second finds it exists and skips it.
+  const importOne = async (row) => {
+    const ref = db.doc(`${paths.equipment(caller.departmentId)}/${importedEquipmentId(row.sourceId)}`);
+    const record = { ...row.record, assetNumber: row.record.assetNumber || ref.id };
+    let skip = "";
+    try {
+      await db.runTransaction(async (tx) => {
+        skip = "";
+        if ((await tx.get(ref)).exists) { skip = ALREADY_IMPORTED; return; }
+        const key = logic.lookupKey(record.assetNumber);
+        if (key && !(await tx.get(db.collection(paths.equipment(caller.departmentId)).where("assetNumberKey", "==", key).limit(1))).empty) {
+          skip = "Another piece of equipment already has this equipment ID.";
+          return;
+        }
+        tx.create(ref, {
+          id: ref.id,
+          ...record,
+          ...lookupFields(record),
+          statusBeforeHold: null,
+          statusBeforeMissing: null,
+          missingReport: null,
+          openProblem: null,
+          photos: [],
+          documents: [],
+          lastVerifiedAt: null,
+          lastVerifiedBy: "",
+          lastVerifiedByName: "",
+          migration: { batchId, sourceListKey: LEGACY_ASSETS_LIST, sourceId: row.sourceId, warnings: row.warnings },
+          version: 1,
+          createdAt: at,
+          createdBy: caller.uid,
+          createdByName: caller.name,
+          updatedAt: at,
+          updatedBy: caller.uid,
+        });
+        tx.create(db.doc(`${paths.events(caller.departmentId)}/MIG-${batchId}-${ref.id}`), {
+          equipmentId: ref.id, equipmentName: record.name, assetNumber: record.assetNumber, type: "imported",
+          fromStatus: "", toStatus: record.status, at, actorUid: caller.uid, actorName: caller.name,
+          to: record.assignment, batchId, sourceId: row.sourceId, warnings: row.warnings,
+        });
       });
-      batch.create(db.collection(paths.events(caller.departmentId)).doc(`MIG-${batchId}-${ref.id}`), {
-        equipmentId: ref.id, equipmentName: record.name, assetNumber: record.assetNumber, type: "imported",
-        fromStatus: "", toStatus: record.status, at, actorUid: caller.uid, actorName: caller.name,
-        to: record.assignment, batchId, sourceId: row.sourceId, warnings: row.warnings,
-      });
-      created.push({ sourceId: row.sourceId, equipmentId: ref.id, name: record.name, warnings: row.warnings });
+    } catch (error) {
+      if (!isAlreadyExists(error)) throw error;
+      skip = ALREADY_IMPORTED;
     }
-    await batch.commit();
+    if (skip) skipped.push({ sourceId: row.sourceId, reason: skip });
+    else created.push({ sourceId: row.sourceId, equipmentId: ref.id, name: record.name, warnings: row.warnings });
+  };
+  for (let i = 0; i < toCreate.length; i += MIGRATION_PARALLEL) {
+    await Promise.all(toCreate.slice(i, i + MIGRATION_PARALLEL).map(importOne));
   }
   const report = {
     id: batchId, status: "applied", sourceListKey: LEGACY_ASSETS_LIST, createdAt: at, createdBy: caller.uid, createdByName: caller.name,

@@ -29,22 +29,22 @@ export default function EquipmentActionForm({
   departmentId, record, mode, stations, fleetAssets, locations, onCancel, onDone,
 }) {
   const [requestId] = useState(newRequestId);
-  const [form, setForm] = useState({
-    note: "", description: "", takeOutOfService: false, result: "pass", reason: "", cost: "", vendorName: "",
-    returnToService: true, status: MANUAL_STATUSES.find((s) => s !== record.status) || "",
-  });
-  const [to, setTo] = useState({ fleetAssetId: "", locationId: "", stationName: "" });
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const set = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
-  const name = record.name;
-
+  // The statuses this record may move to; the select starts on the first of them.
   const statusChoices = MANUAL_STATUSES.filter((s) => {
     if (s === record.status) return false;
     if (record.status === "missing") return s === "retired";
     if (s === "disposed") return record.status === "retired";
     return true;
   });
+  const [form, setForm] = useState({
+    note: "", description: "", takeOutOfService: false, result: "pass", reason: "", cost: "", vendorName: "",
+    returnToService: true, status: statusChoices[0] || "",
+  });
+  const [to, setTo] = useState({ fleetAssetId: "", locationId: "", stationName: "" });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const set = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
+  const name = record.name;
 
   async function save(event) {
     event.preventDefault();
