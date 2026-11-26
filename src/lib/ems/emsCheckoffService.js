@@ -5,7 +5,7 @@
  * Firestore rules let the browser read with a check-off permission.
  */
 import { httpsCallable } from "firebase/functions";
-import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { collection, doc, documentId, getDocs, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { getFirebaseFunctions, getFirestoreDb } from "../firebaseClient.js";
 
 async function call(name, payload, timeout = 60000) {
@@ -39,6 +39,24 @@ export const watchCheckoffAssignments = (departmentId, onChange, onError) =>
 export function watchCheckoffResults(departmentId, onChange, onError, max = 300) {
   const target = tenantCollection(departmentId, "emsCheckoffResults");
   return target ? watch(query(target, orderBy("recordedAt", "desc"), limit(max)), onChange, onError) : noop();
+}
+
+/** Every check-off waiting for sign-off, however old: the history list stops at `max`. */
+export function watchPendingCheckoffs(departmentId, onChange, onError) {
+  const target = tenantCollection(departmentId, "emsCheckoffResults");
+  return target ? watch(query(target, where("verification.status", "==", "pending")), onChange, onError) : noop();
+}
+
+/** Results for these check ids (for checks older than the history list), in batches of 30. */
+export async function loadCheckoffResults(departmentId, checkIds = []) {
+  const target = tenantCollection(departmentId, "emsCheckoffResults");
+  const ids = [...new Set(checkIds.filter(Boolean))];
+  if (!target || !ids.length) return [];
+  const out = [];
+  for (let i = 0; i < ids.length; i += 30) {
+    out.push(...await rows(query(target, where(documentId(), "in", ids.slice(i, i + 30)))));
+  }
+  return out;
 }
 
 export function watchCheckoffSettings(departmentId, onChange, onError) {

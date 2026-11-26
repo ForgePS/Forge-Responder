@@ -190,13 +190,16 @@ export function assignmentCovers(assignment = {}, asset = {}) {
 /**
  * Each assignment that covers the vehicle, with its schedule state and the last
  * finished check of that checklist on the vehicle. `checks` are fleetChecks.
+ * `openCheckId` is an unfinished check started by `operatorId`: only the member
+ * who started a check can record its EMS results, so nobody resumes another's.
  */
-export function unitAssignments(asset = {}, assignments = [], checks = [], today = localDate()) {
+export function unitAssignments(asset = {}, assignments = [], checks = [], today = localDate(), { operatorId = "" } = {}) {
   return assignments.filter((a) => assignmentCovers(a, asset)).map((assignment) => {
     const done = checks
       .filter((c) => c.fleetAssetId === asset.id && c.templateId === assignment.templateId && c.status === "completed" && c.completedAt)
       .sort((a, b) => String(b.completedAt).localeCompare(String(a.completedAt)));
-    const open = checks.find((c) => c.fleetAssetId === asset.id && c.templateId === assignment.templateId && ["draft", "in_progress"].includes(c.status));
+    const open = operatorId ? checks.find((c) => c.fleetAssetId === asset.id && c.templateId === assignment.templateId
+      && ["draft", "in_progress"].includes(c.status) && c.operatorId === operatorId) : null;
     const lastCheck = done[0] || null;
     const schedule = scheduleState(lastCheck ? localDate(lastCheck.completedAt) : "", assignment.frequency, today);
     return { assignment, lastCheck, openCheckId: open?.id || "", ...schedule };
@@ -267,13 +270,41 @@ export function evaluateUnitReadiness({
     if (!usable) add("requiredEquipmentMissing", `No usable ${category} equipment`);
   }
 
+  // Supply counts from each latest check-off. Recording a check-off never changes
+  // stock, so what the crew counted stands next to the ledger until the next check-off.
+  const counted = new Map();
+  for (const row of scheduled) {
+    const result = row.lastCheck ? resultsByCheckId[row.lastCheck.id] : null;
+    for (const supply of result?.supplies || []) {
+      const key = supply.balanceId || `${supply.locationId}__${supply.itemId}`;
+      const seen = counted.get(key);
+      if (!seen || String(result.recordedAt || "") > String(seen.recordedAt || "")) counted.set(key, { ...supply, recordedAt: result.recordedAt });
+    }
+  }
+
+  const balanceKeys = new Set();
   for (const balance of balances) {
-    const name = balance.itemName || balance.itemId;
+    const key = balance.id || `${balance.locationId}__${balance.itemId}`;
+    balanceKeys.add(key);
+    const count = counted.get(key);
+    const name = balance.itemName || count?.itemName || balance.itemId;
     const min = Number(balance.par?.min) || 0;
-    if (balance.outOfStock || (min > 0 && (Number(balance.onHand) || 0) <= 0)) add("suppliesOut", `${name}: none left${min ? ` (minimum ${min})` : ""}`);
+    const ledgerOut = balance.outOfStock || (min > 0 && (Number(balance.onHand) || 0) <= 0);
+    if (ledgerOut) add("suppliesOut", `${name}: none left${min ? ` (minimum ${min})` : ""}`);
+    else if (count?.out) add("suppliesOut", `${name}: none counted on the last check-off${min ? ` (minimum ${min})` : ""}`);
     else if (balance.lowStock) add("suppliesLow", `${name}: ${balance.onHand} on hand, minimum ${min}`);
+    else if (count?.short) add("suppliesLow", `${name}: ${count.count} counted on the last check-off, minimum ${count.parMin ?? min}`);
     const expired = (balance.lots || []).some((lot) => lot.expiration && lot.expiration < today && Number(lot.quantity) > 0);
     if (expired) add("suppliesExpired", `${name}: expired stock`);
+    else if (count?.expiredFound) add("suppliesExpired", `${name}: expired stock found on the last check-off`);
+  }
+  // Counted supplies whose balance this member can't read (or that has since gone).
+  for (const [key, count] of counted) {
+    if (balanceKeys.has(key)) continue;
+    const name = count.itemName || count.itemId;
+    if (count.out) add("suppliesOut", `${name}: none counted on the last check-off`);
+    else if (count.short) add("suppliesLow", `${name}: ${count.count} counted on the last check-off, minimum ${count.parMin}`);
+    if (count.expiredFound) add("suppliesExpired", `${name}: expired stock found on the last check-off`);
   }
 
   const status = reasons.some((r) => r.severity === "not_ready") ? "not_ready"

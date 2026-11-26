@@ -159,12 +159,19 @@ describe("schedules", () => {
       { id: "c1", fleetAssetId: "M1", templateId: "T", status: "completed", completedAt: "2026-11-20T15:00:00" },
       { id: "c2", fleetAssetId: "M1", templateId: "T", status: "completed", completedAt: "2026-11-26T08:00:00" },
       { id: "c3", fleetAssetId: "M1", templateId: "OTHER", status: "completed", completedAt: "2026-11-26T09:00:00" },
-      { id: "c4", fleetAssetId: "M1", templateId: "T", status: "in_progress" },
+      { id: "c4", fleetAssetId: "M1", templateId: "T", status: "in_progress", operatorId: "u1" },
     ];
-    const [row] = client.unitAssignments({ id: "M1" }, [assignment], checks, "2026-11-26");
+    const [row] = client.unitAssignments({ id: "M1" }, [assignment], checks, "2026-11-26", { operatorId: "u1" });
     assert.equal(row.lastCheck.id, "c2");
     assert.equal(row.state, "done");
     assert.equal(row.openCheckId, "c4");
+  });
+
+  it("only offers to resume a check the member started", () => {
+    const assignment = { id: "A1", templateId: "T", targetType: "vehicle", targetId: "M1", frequency: { kind: "daily" } };
+    const checks = [{ id: "c4", fleetAssetId: "M1", templateId: "T", status: "in_progress", operatorId: "u1" }];
+    assert.equal(client.unitAssignments({ id: "M1" }, [assignment], checks, "2026-11-26", { operatorId: "u2" })[0].openCheckId, "");
+    assert.equal(client.unitAssignments({ id: "M1" }, [assignment], checks, "2026-11-26")[0].openCheckId, "");
   });
 });
 
@@ -216,6 +223,25 @@ describe("unit readiness", () => {
     assert.equal(r.status, "not_ready");
     const relaxed = client.evaluateUnitReadiness({ balances, today, rules: { suppliesOut: "off", suppliesLow: "off", suppliesExpired: "off" } });
     assert.deepEqual(relaxed, { status: "ready", reasons: [] });
+  });
+
+  it("supplies counted on the latest check-off count even when the ledger looks fine", () => {
+    const balances = [
+      { id: "L__gauze", locationId: "L", itemId: "gauze", itemName: "Gauze", onHand: 10, par: { min: 4 }, lots: [] },
+      { id: "L__iv", locationId: "L", itemId: "iv", itemName: "IV kit", onHand: 6, par: { min: 4 }, lots: [] },
+      { id: "L__tape", locationId: "L", itemId: "tape", itemName: "Tape", onHand: 6, par: { min: 2 }, lots: [] },
+    ];
+    const result = { recordedAt: "2026-11-26T08:00:00Z", supplies: [
+      { balanceId: "L__gauze", itemName: "Gauze", count: 0, out: true, short: true, parMin: 4 },
+      { balanceId: "L__iv", itemName: "IV kit", count: 2, short: true, parMin: 4 },
+      { balanceId: "L__tape", itemName: "Tape", count: 6, expiredFound: true, parMin: 2 },
+      { balanceId: "L__hidden", itemName: "Splint", count: 0, out: true, parMin: 1 },
+    ] };
+    const scheduled = [row("done", { lastCheck: { id: "c1" } })];
+    const r = client.evaluateUnitReadiness({ scheduled, resultsByCheckId: { c1: result }, balances, today, rules: { checkFailed: "off" } });
+    assert.equal(r.status, "not_ready");
+    const rules = r.reasons.map((x) => `${x.rule}:${x.message.split(":")[0]}`).sort();
+    assert.deepEqual(rules, ["suppliesExpired:Tape", "suppliesLow:IV kit", "suppliesOut:Gauze", "suppliesOut:Splint"]);
   });
 
   it("a vehicle Fleet has out of service is always not ready", () => {

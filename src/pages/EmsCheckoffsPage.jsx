@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, ClipboardCheck, History, ListChecks, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
@@ -9,7 +9,8 @@ import {
   assignmentCovers, evaluateUnitReadiness, localDate, normalizeReadinessRules, templateHasEmsItems, unitAssignments,
 } from "../lib/ems/checkoffLogic.js";
 import {
-  describeError, vehicleLocationsFrom, watchCheckoffAssignments, watchCheckoffResults, watchCheckoffSettings,
+  describeError, loadCheckoffResults, vehicleLocationsFrom, watchCheckoffAssignments, watchCheckoffResults, watchCheckoffSettings,
+  watchPendingCheckoffs,
 } from "../lib/ems/emsCheckoffService.js";
 import { watchEquipment } from "../lib/ems/emsEquipmentService.js";
 import { watchInventoryBalances, watchInventoryItems, watchInventoryLocations } from "../lib/ems/emsInventoryService.js";
@@ -55,6 +56,9 @@ export default function EmsCheckoffsPage() {
   const [fleetClasses, setFleetClasses] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [results, setResults] = useState([]);
+  const [pendingResults, setPendingResults] = useState([]);
+  const [olderResults, setOlderResults] = useState([]);
+  const requestedResultIds = useRef(new Set());
   const [settings, setSettings] = useState(null);
   const [equipment, setEquipment] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -91,9 +95,12 @@ export default function EmsCheckoffsPage() {
   useEffect(() => {
     if (!ready) return undefined;
     const fail = (e) => setError(describeError(e));
+    setOlderResults([]);
+    requestedResultIds.current = new Set();
     const stops = [
       watchCheckoffAssignments(departmentId, setAssignments, fail),
       watchCheckoffResults(departmentId, setResults, fail),
+      watchPendingCheckoffs(departmentId, setPendingResults, fail),
       watchCheckoffSettings(departmentId, setSettings, fail),
     ];
     // Equipment and supplies feed readiness; a member who can't read them just doesn't see those reasons.
@@ -113,13 +120,34 @@ export default function EmsCheckoffsPage() {
   }, [message]);
 
   const rules = useMemo(() => normalizeReadinessRules(settings?.readinessRules || {}), [settings]);
-  const resultsByCheckId = useMemo(() => Object.fromEntries(results.map((r) => [r.checkId || r.id, r])), [results]);
+  // History is the latest results; pending sign-offs and each unit's latest check
+  // are loaded on their own so older ones still count.
+  const resultsByCheckId = useMemo(() => Object.fromEntries([...olderResults, ...pendingResults, ...results]
+    .map((r) => [r.checkId || r.id, r])), [olderResults, pendingResults, results]);
   const templatesById = useMemo(() => Object.fromEntries(templates.map((t) => [t.id, t])), [templates]);
   const activeAssignments = useMemo(() => assignments
     .filter((a) => a.active !== false)
     .map((a) => ({ ...a, templateName: templatesById[a.templateId]?.name || a.templateName })), [assignments, templatesById]);
 
   const today = localDate();
+
+  // Each unit's latest check-off result drives readiness; fetch the ones older than the history list.
+  useEffect(() => {
+    if (!ready) return;
+    const missing = [];
+    for (const asset of assets) {
+      for (const row of unitAssignments(asset, activeAssignments, checks, today)) {
+        const id = row.lastCheck?.id;
+        if (id && !resultsByCheckId[id] && !requestedResultIds.current.has(id)) missing.push(id);
+      }
+    }
+    if (!missing.length) return;
+    missing.forEach((id) => requestedResultIds.current.add(id));
+    loadCheckoffResults(departmentId, missing)
+      .then((found) => { if (found.length) setOlderResults((prev) => [...prev, ...found]); })
+      .catch(() => missing.forEach((id) => requestedResultIds.current.delete(id)));
+  }, [ready, departmentId, assets, activeAssignments, checks, today, resultsByCheckId]);
+
   const units = useMemo(() => {
     const itemsById = Object.fromEntries(items.map((item) => [item.id, item]));
     return assets
@@ -132,14 +160,14 @@ export default function EmsCheckoffsPage() {
         const unitBalances = balances
           .filter((b) => locationIds.has(b.locationId) && b.par)
           .map((b) => ({ ...b, itemName: itemsById[b.itemId]?.name || b.itemId }));
-        const scheduled = unitAssignments(asset, activeAssignments, checks, today);
+        const scheduled = unitAssignments(asset, activeAssignments, checks, today, { operatorId: uid });
         const readiness = evaluateUnitReadiness({ asset, scheduled, resultsByCheckId, equipment: unitEquipment, balances: unitBalances, rules, today });
         return { asset, scheduled, readiness, equipmentCount: unitEquipment.length, supplyCount: unitBalances.length };
       })
       .filter(Boolean)
       .sort((a, b) => String(a.asset.station || "").localeCompare(String(b.asset.station || ""))
         || String(a.asset.unitDesignation || a.asset.fleetNumber).localeCompare(String(b.asset.unitDesignation || b.asset.fleetNumber), undefined, { numeric: true }));
-  }, [assets, locations, equipment, activeAssignments, balances, items, checks, resultsByCheckId, rules, today]);
+  }, [assets, locations, equipment, activeAssignments, balances, items, checks, resultsByCheckId, rules, today, uid]);
 
   // Your finished check-offs whose EMS results weren't recorded (a dropped connection, say).
   const unrecorded = useMemo(() => {
@@ -150,7 +178,9 @@ export default function EmsCheckoffsPage() {
         || activeAssignments.some((a) => a.templateId === c.templateId && assignmentCovers(a, assets.find((x) => x.id === c.fleetAssetId) || {}))));
   }, [checks, uid, resultsByCheckId, activeAssignments, assets]);
 
-  const pending = results.filter((r) => r.verification?.status === "pending");
+  const pending = useMemo(() => Object.values(resultsByCheckId)
+    .filter((r) => r.verification?.status === "pending")
+    .sort((a, b) => String(b.recordedAt || "").localeCompare(String(a.recordedAt || ""))), [resultsByCheckId]);
   const summary = [
     ["EMS units", units.length, "info"],
     ["Ready", units.filter((u) => u.readiness.status === "ready").length, "success"],
@@ -168,7 +198,7 @@ export default function EmsCheckoffsPage() {
     { id: "rules", label: "Readiness rules", icon: SlidersHorizontal },
   ];
 
-  const openResult = openResultId ? results.find((r) => r.id === openResultId) : null;
+  const openResult = openResultId ? resultsByCheckId[openResultId] || null : null;
 
   if (running) {
     return (
