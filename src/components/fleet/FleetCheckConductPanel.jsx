@@ -18,10 +18,14 @@ import {
   checkProblems,
   checkProgress,
   choiceOptions,
+  fieldAnswered,
   isAnswered,
   passAnswer,
   readinessLabel,
 } from "../../lib/fleet/checkProgress.js";
+import EmsCheckItem from "../ems/checkoffs/EmsCheckItem.jsx";
+import { isEmsItemType, templateHasEmsItems } from "../../lib/ems/checkoffLogic.js";
+import { describeError, recordCheckoffResults } from "../../lib/ems/emsCheckoffService.js";
 
 function unitName(asset = {}) {
   return asset?.unitDesignation || asset?.fleetNumber || asset?.name || "Unit";
@@ -68,6 +72,11 @@ export default function FleetCheckConductPanel({
   allowConduct = false,
   autoStart = false,
   previewTemplate = null,
+  // Start with this checklist (EMS Check-offs opens a due check-off this way).
+  initialTemplateId = "",
+  // Record EMS results (equipment answers, supply counts, sign-off) when finished,
+  // even when the checklist has no EMS items. Checklists with EMS items always do.
+  recordEmsResults = false,
 }) {
   const preview = Boolean(previewTemplate);
   // The Employee Portal lets any member run a daily check on a unit.
@@ -85,6 +94,8 @@ export default function FleetCheckConductPanel({
   const [problem, setProblem] = useState("");
   const [highlightKeys, setHighlightKeys] = useState(() => new Set());
   const [savedAt, setSavedAt] = useState("");
+  const [emsOutcome, setEmsOutcome] = useState(null);
+  const [emsRecording, setEmsRecording] = useState(false);
   const autoStartedRef = useRef(false);
 
   useEffect(() => {
@@ -100,8 +111,9 @@ export default function FleetCheckConductPanel({
         const list = seeded.length ? seeded : await listChecklistTemplates(departmentId);
         if (cancelled) return;
         const usable = list.filter(isUsableChecklist);
-        setTemplates(usable);
-        setTemplateId(usable[0]?.id || "");
+        const chosen = initialTemplateId && usable.some((tpl) => tpl.id === initialTemplateId) ? [usable.find((tpl) => tpl.id === initialTemplateId)] : usable;
+        setTemplates(chosen);
+        setTemplateId(chosen[0]?.id || "");
       } catch (loadError) {
         onError?.(loadError?.message || "Unable to load checklists.");
       } finally {
@@ -190,7 +202,7 @@ export default function FleetCheckConductPanel({
       const next = { ...current };
       for (const field of section.fields || []) {
         const pass = passAnswer(field);
-        if (pass && !isAnswered(next[field.key])) next[field.key] = pass;
+        if (pass && !fieldAnswered(field, next[field.key])) next[field.key] = pass;
       }
       return next;
     });
@@ -260,6 +272,17 @@ export default function FleetCheckConductPanel({
     try {
       const completed = await completeFleetCheck(departmentId, check.id, { answers, failNotes }, actor);
       setCheck(completed);
+      if (recordEmsResults || templateHasEmsItems(completed.templateSnapshot)) {
+        setEmsRecording(true);
+        try {
+          const recorded = await recordCheckoffResults(departmentId, completed.id);
+          setEmsOutcome(recorded.recorded ? { result: recorded.result } : null);
+        } catch (recordError) {
+          setEmsOutcome({ error: `The check is saved, but its EMS results weren't recorded: ${describeError(recordError)} Open EMS Check-offs to try again.` });
+        } finally {
+          setEmsRecording(false);
+        }
+      }
       onCompleted?.(completed);
     } catch (completeError) {
       onError?.(completeError?.message || "Unable to complete check.");
@@ -270,6 +293,60 @@ export default function FleetCheckConductPanel({
 
   function renderField(field) {
     const value = answers[field.key] ?? "";
+    if (isEmsItemType(field.type)) {
+      return (
+        <EmsCheckItem
+          field={field}
+          value={answers[field.key]}
+          onChange={(next) => setAnswer(field.key, next)}
+          locked={locked}
+          departmentId={departmentId}
+          fleetAssetId={asset?.assetId || asset?.id}
+          preview={preview}
+        />
+      );
+    }
+    if (field.type === "dropdown") {
+      return (
+        <select value={value} disabled={locked} onChange={(e) => setAnswer(field.key, e.target.value)}>
+          <option value="">Choose…</option>
+          {(field.options || []).map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      );
+    }
+    if (field.type === "multi_select") {
+      const picked = Array.isArray(value) ? value : [];
+      return (
+        <div className="check-multi" role="group" aria-label={field.label}>
+          {(field.options || []).map((option) => (
+            <label key={option} className="inline-check">
+              <input
+                type="checkbox"
+                checked={picked.includes(option)}
+                disabled={locked}
+                onChange={(e) => setAnswer(field.key, e.target.checked ? [...picked, option] : picked.filter((p) => p !== option))}
+              />
+              {option}
+            </label>
+          ))}
+        </div>
+      );
+    }
+    if (field.type === "date") {
+      return <input type="date" value={value} disabled={locked} onChange={(e) => setAnswer(field.key, e.target.value)} />;
+    }
+    if (field.type === "signature") {
+      return (
+        <input
+          type="text"
+          value={value}
+          disabled={locked}
+          autoComplete="name"
+          placeholder="Type your full name to sign"
+          onChange={(e) => setAnswer(field.key, e.target.value)}
+        />
+      );
+    }
     const options = choiceOptions(field);
     if (options) {
       const failed = ["fail", "no"].includes(String(value).toLowerCase());
@@ -356,6 +433,9 @@ export default function FleetCheckConductPanel({
   if (isDone) {
     const failed = check.failedItems?.length ? check.failedItems : failedPreview;
     const passed = !failed.length;
+    const fleetFailures = failed.filter((item) => !item.ems).length;
+    const emsFailures = failed.length - fleetFailures;
+    const signOff = emsOutcome?.result?.verification?.status;
     return (
       <section className={`panel fleet-check-conduct check-summary ${passed ? "is-passed" : "is-failed"}`}>
         <div className="panel-body">
@@ -376,9 +456,13 @@ export default function FleetCheckConductPanel({
                   </li>
                 ))}
               </ul>
-              <p className="occupancy-muted">Each failed item was sent to the fleet team as a defect to fix.</p>
+              {fleetFailures ? <p className="occupancy-muted">Each failed item was sent to the fleet team as a defect to fix.</p> : null}
+              {emsFailures && emsOutcome?.result ? <p className="occupancy-muted">Missing and damaged equipment was recorded on each piece, and short supplies are listed for restocking.</p> : null}
             </>
           ) : null}
+          {emsRecording ? <p className="occupancy-muted" role="status">Recording the equipment and supply answers…</p> : null}
+          {emsOutcome?.error ? <p className="form-error" role="alert">{emsOutcome.error}</p> : null}
+          {signOff === "pending" ? <p className="occupancy-muted">A supervisor needs to sign off this check-off.</p> : null}
           <div className="occupancy-detail-actions">
             <button className="primary-button" type="button" onClick={onClose}>Done</button>
           </div>
@@ -462,7 +546,7 @@ export default function FleetCheckConductPanel({
                         <div
                           key={field.id || field.key}
                           id={`check-item-${field.key}`}
-                          className={`config-field check-item${highlightKeys.has(field.key) ? " needs-attention" : ""}${isAnswered(answers[field.key]) ? " is-done" : ""}`}
+                          className={`config-field check-item${highlightKeys.has(field.key) ? " needs-attention" : ""}${fieldAnswered(field, answers[field.key]) ? " is-done" : ""}`}
                         >
                           <span>
                             {field.label}
@@ -478,12 +562,19 @@ export default function FleetCheckConductPanel({
               );
             })}
 
-            {failedPreview.length ? (
-              <p className="check-fail-warning">
-                <AlertTriangle size={14} aria-hidden="true" />
-                {failedPreview.length} failed item{failedPreview.length === 1 ? "" : "s"}. {preview ? "In a real check, each" : "When you finish, each"} one goes to the fleet team as a defect, and the unit may be marked restricted or out of service.
-              </p>
-            ) : null}
+            {failedPreview.length ? (() => {
+              const fleetCount = failedPreview.filter((item) => !item.ems).length;
+              const emsCount = failedPreview.length - fleetCount;
+              const when = preview ? "In a real check," : "When you finish,";
+              return (
+                <p className="check-fail-warning">
+                  <AlertTriangle size={14} aria-hidden="true" />
+                  {failedPreview.length} failed item{failedPreview.length === 1 ? "" : "s"}.{" "}
+                  {fleetCount ? `${when} ${fleetCount === 1 ? "it goes" : "each one goes"} to the fleet team as a defect, and the unit may be marked restricted or out of service.` : ""}
+                  {emsCount ? `${fleetCount ? " " : `${when} `}Missing or damaged equipment is recorded on each piece, and short supplies are reported for restocking.` : ""}
+                </p>
+              );
+            })() : null}
 
             {problem ? <p className="form-error" role="alert">{problem}</p> : null}
             {previewResult ? <p className="check-preview-result" role="status">{previewResult}</p> : null}

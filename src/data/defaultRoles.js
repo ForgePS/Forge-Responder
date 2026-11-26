@@ -6,6 +6,10 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsCheckoffs: true,
+      runEmsCheckoffs: true,
+      signOffEmsCheckoffs: true,
+      manageEmsCheckoffs: true,
       checkEmsEquipment: true,
       transferEmsEquipment: true,
       manageEmsEquipment: true,
@@ -190,6 +194,10 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsCheckoffs: true,
+      runEmsCheckoffs: true,
+      signOffEmsCheckoffs: true,
+      manageEmsCheckoffs: true,
       checkEmsEquipment: true,
       transferEmsEquipment: true,
       manageEmsEquipment: true,
@@ -365,6 +373,8 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsCheckoffs: true,
+      runEmsCheckoffs: true,
       checkEmsEquipment: true,
       useEmsSupplies: true,
       viewPersonnel: false,
@@ -413,6 +423,9 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsCheckoffs: true,
+      runEmsCheckoffs: true,
+      signOffEmsCheckoffs: true,
       checkEmsEquipment: true,
       transferEmsEquipment: true,
       useEmsSupplies: true,
@@ -478,6 +491,10 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsCheckoffs: true,
+      runEmsCheckoffs: true,
+      signOffEmsCheckoffs: true,
+      manageEmsCheckoffs: true,
       checkEmsEquipment: true,
       transferEmsEquipment: true,
       manageEmsEquipment: true,
@@ -556,6 +573,7 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsCheckoffs: true,
       viewPersonnel: true,
       viewCertifications: true,
       viewTraining: true,
@@ -626,6 +644,7 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsCheckoffs: true,
       manageEmsSettings: true,
       viewEmsAudit: true,
       approveCeCredits: false,

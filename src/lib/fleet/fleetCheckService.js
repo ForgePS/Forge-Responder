@@ -12,6 +12,7 @@ import { createDefectsFromCheckFailures } from "./fleetDefectService.js";
 import { applyFleetStatusDecision } from "./fleetStatusControlService.js";
 import { FLEET_CHECKS_COLLECTION } from "./paths.js";
 import { checkProblems } from "./checkProgress.js";
+import { describeProblems, emsItemProblems, isEmsItemType } from "../ems/checkoffLogic.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -222,6 +223,22 @@ export function evaluateCheckFailures(check = {}) {
     for (const field of section.fields || []) {
       if (["heading", "instruction"].includes(field.type)) continue;
       const answer = check.answers?.[field.key];
+      if (isEmsItemType(field.type)) {
+        // EMS items fail when a piece is missing or damaged, or a supply is short or expired.
+        // They're recorded on the equipment and supply records, not as Fleet defects.
+        const problems = emsItemProblems(field, answer);
+        if (problems.length) {
+          failed.push({
+            fieldKey: field.key,
+            label: field.label,
+            failAction: field.failAction || "continue",
+            note: describeProblems(problems),
+            noteRequiredOnFail: false,
+            ems: true,
+          });
+        }
+        continue;
+      }
       if (isFailAnswer(answer)) {
         failed.push({
           fieldKey: field.key,
@@ -325,8 +342,9 @@ export async function completeFleetCheck(departmentId, checkId, payload = {}, au
   await updateRecord(departmentId, FLEET_CHECKS_COLLECTION, checkId, completed);
   clearCheckOfflineDraft(departmentId, checkId);
 
-  const createdDefects = failedItems.length
-    ? await createDefectsFromCheckFailures(departmentId, completed, failedItems, audit)
+  const defectItems = failedItems.filter((item) => !item.ems);
+  const createdDefects = defectItems.length
+    ? await createDefectsFromCheckFailures(departmentId, completed, defectItems, audit)
     : [];
 
   // Apply fail handling via status decision records (Phase 5).

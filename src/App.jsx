@@ -79,6 +79,7 @@ import {
   MapPin,
   Menu,
   MonitorPlay,
+  ListChecks,
   Package,
   PackageSearch,
   Search,
@@ -156,6 +157,7 @@ const HeatZoneAnalyticsPage = lazyPage(() => import("./pages/HeatZoneAnalyticsPa
 const DigitalFormsPage = lazyPage(() => import("./pages/DigitalFormsPage.jsx"));
 const EmsSupplyInventoryPage = lazyPage(() => import("./pages/EmsSupplyInventoryPage.jsx"));
 const EmsEquipmentPage = lazyPage(() => import("./pages/EmsEquipmentPage.jsx"));
+const EmsCheckoffsPage = lazyPage(() => import("./pages/EmsCheckoffsPage.jsx"));
 const ForgeAiPage = lazyPage(() => import("./pages/ForgeAiPage.jsx"));
 import { FORGE_AI_OPEN_EVENT, FORGE_AI_PAGE } from "./lib/forgeAi/launch.js";
 import "./styles/forge-ai-shell.css";
@@ -255,7 +257,7 @@ const navGroups = [
     ["Vendor Portal", Store],
     ["Fleet Hardening", ShieldCheck],
   ] },
-  { label: "EMS", items: [["EMS Supply Inventory", Package], ["EMS Equipment", Stethoscope]] },
+  { label: "EMS", items: [["EMS Supply Inventory", Package], ["EMS Equipment", Stethoscope], ["EMS Check-offs", ListChecks]] },
   {
     label: "Prevention",
     tree: PREVENTION_NAV_TREE,
@@ -1935,6 +1937,10 @@ function AppShell() {
   ) : current === "EMS Equipment" ? (
     canAccessNavItem("EMS Equipment", permissions, { isCreator }) || isCreator ? (
       <EmsEquipmentPage />
+    ) : <AccessDeniedModule name={current} />
+  ) : current === "EMS Check-offs" ? (
+    canAccessNavItem("EMS Check-offs", permissions, { isCreator }) || isCreator ? (
+      <EmsCheckoffsPage />
     ) : <AccessDeniedModule name={current} />
   ) : current === "Digital Forms" ? (
     canAccessNavItem("Digital Forms", permissions, { isCreator }) || isCreator ? (

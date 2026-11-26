@@ -169,6 +169,13 @@ service cloud.firestore {
       return canAccessDepartment(departmentId) && emsModuleOn(departmentId)
         && memberCanAny(departmentId, emsEquipmentReadKeys());
     }
+    function emsCheckoffReadKeys() {
+      return ["viewEmsCheckoffs", "runEmsCheckoffs", "signOffEmsCheckoffs", "manageEmsCheckoffs"];
+    }
+    function canReadEmsCheckoffs(departmentId) {
+      return canAccessDepartment(departmentId) && emsModuleOn(departmentId)
+        && memberCanAny(departmentId, emsCheckoffReadKeys());
+    }
     // ---- Training module ----
     function trainingViewKeys() {
       return ["viewTraining", "editTraining", "approveTraining", "evaluateSkills", "manageTrainingConfig", "approveCeCredits"];
@@ -584,7 +591,10 @@ service cloud.firestore {
         "emsAuditEvents": "emsManagement",
         "emsEquipment": "emsManagement",
         "emsEquipmentEvents": "emsManagement",
-        "emsEquipmentMigrations": "emsManagement"
+        "emsEquipmentMigrations": "emsManagement",
+        "emsCheckoffAssignments": "emsManagement",
+        "emsCheckoffSettings": "emsManagement",
+        "emsCheckoffResults": "emsManagement"
       }.get(collection, "");
     }
     // END generated module maps
@@ -846,6 +856,7 @@ service cloud.firestore {
         "pcrs",
         "emsSettings", "emsInventoryItems", "emsInventoryLocations", "emsInventoryBalances", "emsInventoryTransactions", "emsInventoryCounts", "emsAuditEvents",
         "emsEquipment", "emsEquipmentEvents", "emsEquipmentMigrations",
+        "emsCheckoffAssignments", "emsCheckoffSettings", "emsCheckoffResults",
         "trainingRecords", "trainingTemplates", "trainingCourses", "trainingSessions", "trainingSkills",
         "trainingEvaluations", "trainingTaskBooks", "trainingTaskBookAssignments", "trainingRequirements",
         "trainingExemptions", "trainingComplianceSnapshots", "trainingCeRuleSets", "trainingCeAwards",
@@ -1160,6 +1171,21 @@ service cloud.firestore {
       }
       match /emsEquipmentEvents/{document} {
         allow read: if canReadEmsEquipment(departmentId);
+        allow write: if false;
+      }
+      // EMS check-offs (functions/lib/emsCheckoffs): assignments, readiness rules and
+      // recorded results are written by Cloud Functions only. The checks themselves
+      // are fleetChecks, under the Fleet rules.
+      match /emsCheckoffAssignments/{document} {
+        allow read: if canReadEmsCheckoffs(departmentId);
+        allow write: if false;
+      }
+      match /emsCheckoffSettings/{document} {
+        allow read: if canReadEmsCheckoffs(departmentId);
+        allow write: if false;
+      }
+      match /emsCheckoffResults/{document} {
+        allow read: if canReadEmsCheckoffs(departmentId);
         allow write: if false;
       }
       match /emsEquipmentMigrations/{document} {

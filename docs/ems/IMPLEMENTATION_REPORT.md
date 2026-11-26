@@ -6,8 +6,9 @@ only when it has server logic, rules, UI and passing tests.
 | Slice | Status |
 |---|---|
 | E1 Foundation: module, permissions, audit, supply inventory core | **Deployed** (PR #97, staging and production) |
-| E2 Equipment: records, lifecycle, moves, QR labels and scanning, import from Assets | **Built** (branch `feat/ems-equipment`, not deployed) |
-| E3 – E9 | Not started |
+| E2 Equipment: records, lifecycle, moves, QR labels and scanning, import from Assets | **Deployed** (staging and production) |
+| E3 Check-offs and readiness: EMS checklist items, assignments, schedules, sign-off, readiness rules | **Built** (branch `feat/ems-checkoffs`, not deployed) |
+| E4 – E9 | Not started |
 
 ---
 
@@ -233,3 +234,88 @@ Full suite on this branch: lint, build, unit 842/842, rules 185/185, functions 2
 3. Built-in roles get the new permissions automatically. Custom roles need them added in Admin.
 4. To roll back, redeploy the previous build. Without the UI nothing uses the new collections, and imports never
    change the Assets list.
+
+---
+
+## E3 — Check-offs and readiness
+
+### What a department can do
+
+- Build check-off checklists in **Apparatus Check Setup** with new item types: dropdown, multiple choice, date,
+  signature (typed name), **EMS equipment on the unit** and **EMS supplies on the unit**.
+- When a check starts, the EMS items fill in with the equipment assigned to that vehicle and the supply balances
+  at the vehicle's locations (and locations nested under them). Crews mark each piece present, damaged or missing
+  (optionally out of use), and count each supply, noting expired stock.
+- **Assign** a checklist to a vehicle, a fleet class or a station, daily, weekly, monthly or every N days, with or
+  without a supervisor sign-off. Each unit shows done, due or overdue.
+- **Sign off** a check-off, or send it back with a note. Nobody can sign off their own check-off.
+- **Readiness** on the Units tab: Ready, Ready with issues or Not ready, with the reasons. Ten rules can each be set
+  to Not ready, Warning or Off, plus equipment categories every unit must carry.
+- **History** of recorded check-offs, with each problem found.
+
+### How it is built
+
+- Check-offs run on the Fleet checklist engine (`fleetChecklistTemplates`, `fleetChecks`). The browser still
+  completes the check. EMS failures are marked `ems: true` and don't create Fleet defects.
+- After completion, `emsCheckoffsRecordResults` (only the check's operator) stores the result at
+  `emsCheckoffResults/{checkId}`, so a retry records once. Equipment answers go to E2 equipment history
+  (damaged or missing reports, out of use) with request ids derived from the check, so they also apply once.
+  Supply counts never change stock; they report short, out, expired and counts that differ from the ledger.
+- A completed check whose results weren't recorded (for example the connection dropped) shows under
+  "Finish recording your check-offs" for 7 days.
+- Readiness is worked out in the browser from assignments, results, equipment and balances. It doesn't change
+  the vehicle's Fleet status; a vehicle Fleet has out of service is always Not ready.
+- The field app hides checklists with EMS items for now; it renders the other new item types.
+
+### Data (under `departments/{id}/`, written only by the callables)
+
+| Collection | Holds |
+|---|---|
+| `emsCheckoffAssignments` | checklist, target, frequency, sign-off needed, active |
+| `emsCheckoffResults/{checkId}` | equipment and supply answers, problems, verification state, sign-off |
+| `emsCheckoffSettings/main` | readiness rule severities and required equipment categories |
+
+### Permissions (new)
+
+| Key | Allows | Built-in roles |
+|---|---|---|
+| `viewEmsCheckoffs` | see units, results, assignments and rules | all |
+| `runEmsCheckoffs` | run a check-off and record its results | Fire Chief, Battalion Chief, Company Officer, Firefighter |
+| `signOffEmsCheckoffs` | sign off or send back another member's check-off | Fire Chief, Battalion Chief, Company Officer |
+| `manageEmsCheckoffs` | assignments and readiness rules | Fire Chief, Battalion Chief |
+
+### Fix included: permissions added after a role was saved
+
+The browser used a department's saved role *instead of* the built-in defaults, while the server merges the
+defaults under the saved role. Any permission added since a role was last saved was missing in the browser, which
+is why **EMS Equipment** didn't show in the sidebar for saved roles. The browser now merges the same way as the
+server (`tests/unit/rolePermissionMerge.test.mjs`). `DEMO_SEED_VERSION` goes to 12 so the demo department
+re-seeds its roles.
+
+### Tests
+
+| Suite | New tests | Covers |
+|---|---|---|
+| `tests/unit/emsCheckoffs.test.mjs` | 23 | item answers and problems, schedules and month ends, assignment coverage, readiness rules |
+| `tests/functions/emsCheckoffs.test.mjs` | 13 | record once; only the operator; equipment history applied once; supply judging; sign-off rules; assignments; rules; permissions; other departments |
+| `tests/rules/emsCheckoffs.rules.test.mjs` | 4 | reads need a check-off key; no browser writes |
+| `tests/unit/rolePermissionMerge.test.mjs` | 2 | new default permissions reach saved roles |
+
+Full suite on this branch: lint, build, unit 867/867, rules 189/189, functions 268/268. Checked in the browser on
+local emulators: running a check-off, results and readiness, sign-off, assignments and rules.
+
+### Known limits of E3
+
+- Supply counts don't adjust stock; a count that differs from the ledger is reported for someone to fix in Supply
+  Inventory.
+- Signatures are a typed name, not a drawn signature.
+- EMS check-offs aren't in the field app yet.
+- No reminders for due or overdue check-offs yet (E8).
+
+### Deploying E3
+
+1. Deploy functions (in small groups on staging), rules and indexes, then hosting. Check the four new callables'
+   public access afterwards.
+2. Run `node scripts/sync-member-grants.mjs` (dry run, then `--apply`) on each project. Server grants are only
+   recomputed when a member or role changes, so without this the new E2 and E3 permissions can't read their data.
+3. Custom roles need the new permissions added in Admin.

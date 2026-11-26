@@ -350,10 +350,9 @@ async function transferEquipment(db, request) {
 
 // ---------------------------------------------------------------- verify presence
 
-async function verifyEquipment(db, request) {
-  const caller = await resolveCaller(db, request, [PERMISSIONS.check, PERMISSIONS.manage]);
-  const note = text(request.data?.note, 500);
-  return applyAction(db, caller, request, async (record, at) => {
+/** The verify step, shared with check-offs (functions/lib/emsCheckoffs). */
+function verifyAct(caller, note) {
+  return async (record, at) => {
     assertOpen(record, "verified");
     const found = record.status === "missing";
     const update = { lastVerifiedAt: at, lastVerifiedBy: caller.uid, lastVerifiedByName: caller.name };
@@ -371,19 +370,19 @@ async function verifyEquipment(db, request) {
       event: { type: found ? "found" : "verified", details: { note, place: describeAssignment(record.assignment) } },
       summary: found ? `found at ${describeAssignment(record.assignment)}` : `verified present at ${describeAssignment(record.assignment)}`,
     };
-  });
+  };
+}
+
+async function verifyEquipment(db, request) {
+  const caller = await resolveCaller(db, request, [PERMISSIONS.check, PERMISSIONS.manage]);
+  return applyAction(db, caller, request, verifyAct(caller, text(request.data?.note, 500)));
 }
 
 // ---------------------------------------------------------------- problems and maintenance requests
 
-async function reportProblem(db, request) {
-  const caller = await resolveCaller(db, request, [PERMISSIONS.check, PERMISSIONS.manage]);
-  const kind = text(request.data?.kind, 20);
-  if (!logic.PROBLEM_KINDS.includes(kind)) throw new HttpsError("invalid-argument", "Choose what's wrong.");
-  const description = text(request.data?.description, 1000);
-  if (!description) throw new HttpsError("invalid-argument", "Describe the problem.");
-  const takeOutOfService = request.data?.takeOutOfService === true;
-  return applyAction(db, caller, request, async (record, at) => {
+/** The report step, shared with check-offs. `kind` and `description` are already checked. */
+function reportAct(caller, kind, description, takeOutOfService) {
+  return async (record, at) => {
     assertOpen(record, "reported");
     if (record.status === "missing") {
       throw new HttpsError("failed-precondition", kind === "missing" ? "It's already reported missing." : "It's reported missing. Verify it where it was found first.");
@@ -409,7 +408,29 @@ async function reportProblem(db, request) {
       event: { type: kind === "missing" ? "reported_missing" : kind === "maintenance" ? "maintenance_requested" : "problem_reported", details: { description, takeOutOfService } },
       summary: `${label}: ${description}${next !== record.status ? ` (now ${STATUS_LABEL[next]})` : ""}`,
     };
-  });
+  };
+}
+
+async function reportProblem(db, request) {
+  const caller = await resolveCaller(db, request, [PERMISSIONS.check, PERMISSIONS.manage]);
+  const kind = text(request.data?.kind, 20);
+  if (!logic.PROBLEM_KINDS.includes(kind)) throw new HttpsError("invalid-argument", "Choose what's wrong.");
+  const description = text(request.data?.description, 1000);
+  if (!description) throw new HttpsError("invalid-argument", "Describe the problem.");
+  return applyAction(db, caller, request, reportAct(caller, kind, description, request.data?.takeOutOfService === true));
+}
+
+/**
+ * A check-off's answer for one piece of equipment: present → verified (or found),
+ * damaged → deficiency, missing → reported missing. The caller was checked by the
+ * check-off service; the request id comes from the check and the equipment, so
+ * recording a check's results twice acts once.
+ */
+function checkoffEquipmentAction(db, caller, { equipmentId, requestId, state, outOfUse = false, note = "", checkLabel = "" }) {
+  const request = { data: { equipmentId, requestId } };
+  if (state === "present") return applyAction(db, caller, request, verifyAct(caller, text(checkLabel, 200)));
+  const description = text(note, 800) || `${state === "missing" ? "Not found" : "Damaged"} during ${checkLabel || "a check-off"}`;
+  return applyAction(db, caller, request, reportAct(caller, state === "missing" ? "missing" : "damaged", description, state === "damaged" && outOfUse === true));
 }
 
 // ---------------------------------------------------------------- inspection and calibration
@@ -756,6 +777,7 @@ async function rollbackMigration(db, request) {
 }
 
 module.exports = {
+  checkoffEquipmentAction,
   PERMISSIONS,
   paths,
   LEGACY_ASSETS_LIST,

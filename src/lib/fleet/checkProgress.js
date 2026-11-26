@@ -1,5 +1,6 @@
 // Progress and completeness for an apparatus check, shared by the check screen and
 // completeFleetCheck (so a check can't be finished with required items blank).
+import { emsItemAnswered, isEmsItemType } from "../ems/checkoffLogic.js";
 
 const NON_ANSWER_TYPES = ["heading", "instruction"];
 
@@ -10,13 +11,20 @@ export function answerableFields(sections = []) {
 }
 
 export function isAnswered(value) {
+  if (Array.isArray(value)) return value.length > 0;
   return !(value === undefined || value === null || String(value).trim() === "");
+}
+
+/** Answered for this item: EMS items need every listed piece or supply answered. */
+export function fieldAnswered(field = {}, value) {
+  if (isEmsItemType(field.type)) return emsItemAnswered(field, value);
+  return isAnswered(value);
 }
 
 /** { answered, total, percent } across every answerable item. */
 export function checkProgress(sections = [], answers = {}) {
   const fields = answerableFields(sections);
-  const answered = fields.filter((field) => isAnswered(answers?.[field.key])).length;
+  const answered = fields.filter((field) => fieldAnswered(field, answers?.[field.key])).length;
   const total = fields.length;
   return { answered, total, percent: total ? Math.round((answered / total) * 100) : 0 };
 }
@@ -29,7 +37,7 @@ export function checkProblems(sections = [], answers = {}, failNotes = {}) {
   const missingNotes = [];
   for (const field of answerableFields(sections)) {
     const value = answers?.[field.key];
-    if (field.required && !isAnswered(value)) missing.push(field);
+    if (field.required && !fieldAnswered(field, value)) missing.push(field);
     if (field.noteRequiredOnFail && FAIL_VALUES.includes(String(value || "").toLowerCase())
       && !String(failNotes?.[field.key] || "").trim()) {
       missingNotes.push(field);

@@ -1821,6 +1821,17 @@ exports.emsEquipmentApplyImport = onCall({ memory: "512MiB", timeoutSeconds: 300
 exports.emsEquipmentRollbackImport = onCall({ memory: "256MiB", timeoutSeconds: 300 }, (request) =>
   emsEquipment.rollbackMigration(admin.firestore(), request));
 
+// ---- EMS Management: check-offs and readiness (functions/lib/emsCheckoffs) ----
+// Check-offs run on the Fleet checklist engine; these record a finished check's EMS
+// results (equipment answers into its history, supply counts against par), manage
+// assignments and readiness rules, and sign-off by someone other than the checker.
+const emsCheckoffs = require("./lib/emsCheckoffs/service");
+exports.emsCheckoffsSaveAssignment = emsInventoryCall(emsCheckoffs.saveAssignment);
+exports.emsCheckoffsSaveRules = emsInventoryCall(emsCheckoffs.saveReadinessRules);
+exports.emsCheckoffsRecordResults = onCall({ memory: "256MiB", timeoutSeconds: 120 }, (request) =>
+  emsCheckoffs.recordResults(admin.firestore(), request));
+exports.emsCheckoffsSignOff = emsInventoryCall(emsCheckoffs.signOff);
+
 // ---- Administrators delete an inspection or preplan, with a reason (functions/lib/recordDeletion.js) ----
 exports.deleteRecordWithReason = onCall({ memory: "256MiB", timeoutSeconds: 60 }, (request) =>
   require("./lib/recordDeletion").deleteRecordWithReason(admin.firestore(), request));
