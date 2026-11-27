@@ -170,19 +170,32 @@ function plainCodeLabel(text) {
   return m ? m[1].replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z])([A-Z][a-z])/g, "$1 $2") : text;
 }
 
-/** The charting sections that offer pertinent negatives: History (eHistory) and Assessment (eExam). */
+/**
+ * The charting sections that offer the "Not documented…" picker (pertinent negatives and not-values such as
+ * Not Applicable): History (eHistory) and Assessment (eExam). Elsewhere an empty Required field is exported as
+ * Not Recorded on its own (xmlExport fillNotRecorded).
+ */
 export const PERTINENT_NEGATIVE_CONTAINERS = Object.freeze(["eHistory", "eExam"]);
 
-/**
- * The pertinent negatives a crew can pick for a field: all of them in History and Assessment, none elsewhere.
- * A value already saved (`current`) stays listed so it shows and can be cleared. fieldInput keeps the full list,
- * which labels saved values everywhere (summaries, narrative facts).
- */
+function offersNotDocumented(field) {
+  return PERTINENT_NEGATIVE_CONTAINERS.includes(String(field?.el || "").split(".")[0]);
+}
+
+// All of `list` in History and Assessment; elsewhere only a value already saved (`current`), so it shows and can be
+// cleared. fieldInput keeps the full lists, which label saved values everywhere (summaries, narrative facts).
+function choicesFor(field, list, current) {
+  if (offersNotDocumented(field)) return list;
+  return current ? list.filter((o) => o.code === String(current)) : [];
+}
+
+/** The pertinent negatives a crew can pick for a field. */
 export function pertinentNegativeChoices(field, current = "") {
-  const container = String(field?.el || "").split(".")[0];
-  const all = field?.pn || [];
-  if (PERTINENT_NEGATIVE_CONTAINERS.includes(container)) return all;
-  return current ? all.filter((o) => o.code === String(current)) : [];
+  return choicesFor(field, field?.pn || [], current);
+}
+
+/** The not-values (Not Applicable, Not Recorded…) a crew can pick for a field. */
+export function notValueChoices(field, current = "") {
+  return choicesFor(field, field?.nv || [], current);
 }
 
 /**

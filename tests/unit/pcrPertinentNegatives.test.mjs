@@ -28,3 +28,20 @@ test("a pertinent negative already saved elsewhere still shows so it can be clea
   const saved = field.pn[0].code;
   assert.deepEqual(pertinentNegativeChoices(field, saved), [field.pn[0]]);
 });
+
+// The whole "Not documented…" picker (not-values too) is only offered in History and Assessment.
+test("not-values (Not Applicable, Not Recorded) only in History and Assessment", async () => {
+  const { notValueChoices } = await import("../../src/lib/nemsis/pcrModel.js");
+  for (const el of ["eHistory.01", "eExam.01"]) {
+    const field = fieldInput(schema, el);
+    assert.ok(field.nv.length, `${el} allows not-values in NEMSIS`);
+    assert.deepEqual(notValueChoices(field), field.nv);
+  }
+  for (const el of ["eResponse.04", "eResponse.08", "eMedications.03", "eVitals.06"]) {
+    const field = fieldInput(schema, el);
+    assert.ok(field.nv.length, `${el} allows not-values in NEMSIS`);
+    assert.deepEqual(notValueChoices(field), [], el);
+    const saved = field.nv[0].code;
+    assert.deepEqual(notValueChoices(field, saved), [field.nv[0]], "a saved not-value still shows so it can be cleared");
+  }
+});
