@@ -24,6 +24,7 @@ import {
   normalizeFloorPlan,
   validateForPublication,
   withoutRejected,
+  floorsInRevision,
 } from "./floorPlanModel.js";
 
 /** Revision statuses whose geometry may still change (matches firestore.rules). */
@@ -54,6 +55,9 @@ export function normalizeFloor(raw = {}) {
     level: Number.isFinite(Number(data.level)) ? Number(data.level) : 0,
     sortOrder: Number.isFinite(Number(data.sortOrder)) ? Number(data.sortOrder) : 0,
     archived: Boolean(data.archived),
+    // The draft revision the floor was removed in. Revisions published before
+    // that keep showing it; that draft and later revisions don't.
+    archivedFromRevisionId: data.archived ? String(data.archivedFromRevisionId || "") : "",
     createdAt: data.createdAt || "",
     updatedAt: data.updatedAt || "",
   };
@@ -64,7 +68,7 @@ export function sortFloors(floors = []) {
   return [...floors].sort((a, b) => (a.level - b.level) || (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name));
 }
 
-export async function listPreplanFloors(departmentId, preplanId, buildingId = "") {
+export async function listPreplanFloors(departmentId, preplanId, buildingId = "", { includeArchived = false } = {}) {
   if (!departmentId || !preplanId) return [];
   const db = getFirestoreDb();
   if (!db) return [];
@@ -74,7 +78,7 @@ export async function listPreplanFloors(departmentId, preplanId, buildingId = ""
   ));
   return sortFloors(snap.docs
     .map((item) => normalizeFloor({ id: item.id, ...item.data() }))
-    .filter((row) => !row.archived && (!buildingId || row.buildingId === buildingId)));
+    .filter((row) => (includeArchived || !row.archived) && (!buildingId || row.buildingId === buildingId)));
 }
 
 export async function savePreplanFloor(departmentId, payload = {}, audit = {}) {
@@ -180,9 +184,15 @@ export async function saveFloorPlan(departmentId, plan, options = {}) {
  */
 export async function copyFloorPlansToRevision(departmentId, { preplanId, fromRevisionId, toRevisionId, actorUid = "" }) {
   if (!fromRevisionId || !toRevisionId) return 0;
-  const plans = await listFloorPlansForRevision(departmentId, fromRevisionId);
+  const [plans, floors] = await Promise.all([
+    listFloorPlansForRevision(departmentId, fromRevisionId),
+    listPreplanFloors(departmentId, preplanId, "", { includeArchived: true }),
+  ]);
+  // A removed floor stays in the revisions published before it was removed, not in new ones.
+  const removed = new Set(floors.filter((row) => row.archived).map((row) => row.id));
   let copied = 0;
   for (const plan of plans) {
+    if (removed.has(plan.floorId)) continue;
     const next = normalizeFloorPlan({
       ...withoutRejected(plan),
       preplanId,
@@ -213,10 +223,13 @@ export async function checkRevisionFloorPlans(departmentId, revisionId, floors =
   return { ok: problems.length === 0, problems };
 }
 
-/** Floors of a preplan with their plan for a revision (for the response view and editor). */
+/** Floors of a preplan with their plan for a revision (for the response view). */
 export async function loadBuildingsWithFloors(departmentId, preplanId, revisionId, buildings = []) {
-  const floors = await listPreplanFloors(departmentId, preplanId);
-  const plans = revisionId ? await listFloorPlansForRevision(departmentId, revisionId) : [];
+  const [allFloors, plans] = await Promise.all([
+    listPreplanFloors(departmentId, preplanId, "", { includeArchived: true }),
+    revisionId ? listFloorPlansForRevision(departmentId, revisionId) : [],
+  ]);
+  const floors = floorsInRevision(allFloors, plans, revisionId);
   const planByFloor = new Map(plans.map((row) => [row.floorId, row]));
   return buildings.map((building) => ({
     ...building,
