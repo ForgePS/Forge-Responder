@@ -158,3 +158,16 @@
 .pcr-bar-value { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pcr-bar-value small { font-weight: 500; color: var(--nr-muted); }
 @media (max-width: 640px) { .pcr-analytics-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Billing documents (PcrBillingFiles) */
+.pcr-files { display: grid; gap: 12px; }
+.pcr-files-add { display: flex; flex-wrap: wrap; gap: 8px; }
+.pcr-files-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.pcr-file { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--nr-border); border-radius: 12px; background: var(--nr-surface); min-width: 0; }
+.pcr-file-thumb { flex-shrink: 0; width: 84px; height: 60px; display: grid; place-items: center; padding: 0; border: 1px solid var(--nr-border); border-radius: 8px; background: var(--nr-surface-2); color: var(--nr-muted); overflow: hidden; cursor: pointer; }
+.pcr-file-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pcr-file-meta { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.pcr-file-meta small { color: var(--nr-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcr-file-meta .nr-link { justify-self: start; display: inline-flex; align-items: center; gap: 4px; }
+.pcr-file-viewer { width: min(960px, 100%); }
+.pcr-file-viewer img { width: 100%; max-height: calc(100vh - 160px); object-fit: contain; border-radius: 8px; background: var(--nr-surface-2); }

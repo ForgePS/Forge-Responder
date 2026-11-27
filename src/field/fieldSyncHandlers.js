@@ -37,6 +37,10 @@ import { isDailyLogLocked, resolveAutoLockAt } from "../lib/dailyLogLock.js";
 import { NERIS_FORM_MODULES } from "../lib/nerisSchema.js";
 import { blobGet } from "./fieldDb.js";
 import { FieldConflictError, FieldRejectedError } from "./fieldErrors.js";
+import { pendingPcrPhotos, uploadPcrPhotos } from "./fieldPcrFiles.js";
+import { attachmentBlob, removeAttachment } from "./fieldRecords.js";
+import { pcrFileExists, pcrFileRecordExists, putPcrFileBytes, writePcrFileRecord } from "../lib/pcrFilesService.js";
+import { newPcrFileId } from "../lib/pcr/pcrFiles.js";
 import { PCR_COLLECTION, planPcrWrite } from "./fieldPcr.js";
 import { threeWayMerge, isSameOrNewerDate } from "./fieldMerge.js";
 import { refItems } from "./fieldRefData.js";
@@ -951,6 +955,19 @@ async function syncHydrantEdit(record, ctx) {
 async function syncPcr(record, ctx) {
   // The NEMSIS schema is large: load it only when a report is sent.
   const { nemsisSchema } = await import("../lib/nemsis/index.js");
+  // Billing photos go up before the chart: the server takes new files only while the report is a draft.
+  if (pendingPcrPhotos(record).length) {
+    const attachments = await uploadPcrPhotos(record, ctx, {
+      newId: () => newPcrFileId(),
+      readBlob: (attachment) => attachmentBlob(attachment, { scope: record.scope, localId: record.localId }),
+      putBytes: putPcrFileBytes,
+      fileExists: pcrFileExists,
+      recordExists: pcrFileRecordExists,
+      writeRecord: writePcrFileRecord,
+      dropLocal: removeAttachment,
+    });
+    record = { ...record, attachments };
+  }
   const db = getFirestoreDb();
   const ref = doc(db, "departments", ctx.departmentId, PCR_COLLECTION, record.data.id);
   let plan;

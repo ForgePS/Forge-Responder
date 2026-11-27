@@ -83,6 +83,25 @@ export async function openJson(key, sealed, aad = "") {
   }
 }
 
+/** Encrypt bytes (a photo of a patient's ID or insurance card). Same key and format as sealJson. */
+export async function sealBytes(key, bytes, aad = "") {
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+  const data = await subtle().encrypt({ name: ALGORITHM, iv, additionalData: new TextEncoder().encode(aad) }, key, bytes);
+  return { sealed: FORMAT_VERSION, iv, data: new Uint8Array(data) };
+}
+
+/** Decrypt bytes made by sealBytes. Throws (code "phi-locked") when the key is wrong/forgotten or the data was changed. */
+export async function openBytes(key, sealed, aad = "") {
+  try {
+    const plain = await subtle().decrypt({ name: ALGORITHM, iv: sealed.iv, additionalData: new TextEncoder().encode(aad) }, key, sealed.data);
+    return new Uint8Array(plain);
+  } catch {
+    const error = new Error("This photo can't be opened on this device (it was locked when you signed out).");
+    error.code = "phi-locked";
+    throw error;
+  }
+}
+
 /**
  * Record fields that can hold PHI: the chart, the server copy it merges against, and `attention`, where a sync
  * conflict keeps both sides of the conflicting sections and the merged report.

@@ -39,6 +39,7 @@ import { applyFormDefaults, customizeLayout, normalizePcrForm, visibleSections, 
 import { Banner, Field, PickerButton, PickerSheet, Screen, Section, TextArea, TextInput, cx, formatWhen } from "../ui.jsx";
 import { UnitField } from "./common.jsx";
 import SignaturePad from "./SignaturePad.jsx";
+import PcrBillingPhotos from "./PcrBillingPhotos.jsx";
 
 /** The NEMSIS schema is large (≈1 MB of JSON): load it when a report is opened, not with the app. */
 function useNemsisSchema() {
@@ -249,6 +250,10 @@ function PcrEditor({ schema, params, dispatch = null }) {
           </button>
         ) : null}
       </Section>
+
+      {sectionId === "payment" ? (
+        <PcrBillingPhotos localId={form.localId} attachments={form.attachments} addPhoto={form.addPhoto} removePhoto={form.removePhoto} readOnly={readOnly} />
+      ) : null}
 
       {nextSection ? (
         <button type="button" className="fa-btn fa-btn-secondary fa-btn-block" onClick={() => goTo(nextSection.id)}>

@@ -11,8 +11,8 @@
  *  attention - the server refused it or someone else changed the same record;
  *              kept on the device until the crew decides
  */
-import { blobDelete, blobPut, recordDelete, recordGet as rawRecordGet, recordPut as rawRecordPut, recordsForScope } from "./fieldDb.js";
-import { SEALED_KINDS, forgetDeviceKey, openRecordSafe, sealRecord } from "./fieldPhi.js";
+import { blobDelete, blobGet, blobPut, recordDelete, recordGet as rawRecordGet, recordPut as rawRecordPut, recordsForScope } from "./fieldDb.js";
+import { SEALED_KINDS, deviceKey, forgetDeviceKey, openBytes, openRecordSafe, sealBytes, sealRecord } from "./fieldPhi.js";
 
 // Patient care reports (SEALED_KINDS) are encrypted on the device: seal on every write, open on every read.
 async function recordGet(localId) {
@@ -157,6 +157,30 @@ export async function storeAttachment(blob, name = "photo.jpg") {
   const id = newLocalId("ph");
   await blobPut({ id, blob, name, type: blob.type || "image/jpeg", size: blob.size || 0, savedAt: new Date().toISOString() });
   return { id, name, type: blob.type || "image/jpeg", size: blob.size || 0 };
+}
+
+/**
+ * Save a photo that is PHI (a patient care report's billing documents) on the device, encrypted with the same
+ * device key as the report. `aad` ties it to its report, so it can't be moved into another one.
+ * @returns {Promise<object>} the attachment entry (no name from the phone: those can hold a patient's name)
+ */
+export async function storeSealedAttachment(blob, { scope, localId, kind = "other" }) {
+  const id = newLocalId("ph");
+  const type = blob.type || "image/jpeg";
+  const size = blob.size || 0;
+  const sealed = await sealBytes(await deviceKey(scope), new Uint8Array(await blob.arrayBuffer()), `${localId}:${id}`);
+  await blobPut({ id, sealed, type, size, savedAt: new Date().toISOString() });
+  return { id, name: kind, kind, type, size, sealed: true };
+}
+
+/** A stored attachment's bytes as a Blob (decrypted when sealed), or null when it isn't on the device. */
+export async function attachmentBlob(attachment, { scope, localId }) {
+  const stored = await blobGet(attachment.id);
+  if (!stored) return null;
+  if (stored.blob) return stored.blob;
+  if (!stored.sealed) return null;
+  const bytes = await openBytes(await deviceKey(scope), stored.sealed, `${localId}:${attachment.id}`);
+  return new Blob([bytes], { type: stored.type || attachment.type || "image/jpeg" });
 }
 
 export async function removeAttachment(id) {

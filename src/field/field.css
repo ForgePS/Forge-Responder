@@ -2745,3 +2745,51 @@ a.fa-tile:visited {
 .fa-sig-dialog { max-width: 640px; }
 .fa-sig-canvas { display: block; width: 100%; aspect-ratio: 3 / 1; background: #fff; border: 2px dashed var(--fa-border); border-radius: 12px; touch-action: none; cursor: crosshair; margin: 8px 0 14px; }
 .fa-sig-canvas.is-empty { background: #fff linear-gradient(transparent calc(75% - 1px), #c8ccd2 calc(75% - 1px), #c8ccd2 75%, transparent 75%); }
+
+/* ------------------------- ePCR billing documents ---------------------------- */
+
+.fa-pcr-docs {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.fa-pcr-doc {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  width: 96px;
+}
+
+.fa-pcr-doc .fa-thumb {
+  padding: 0;
+  cursor: pointer;
+}
+
+.fa-pcr-doc-label {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fa-pcr-doc-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.fa-pcr-doc-view {
+  display: grid;
+  gap: 12px;
+  width: min(720px, 100%);
+}
+
+.fa-pcr-doc-view img {
+  width: 100%;
+  max-height: calc(100vh - 140px);
+  object-fit: contain;
+  border-radius: 12px;
+  background: #000;
+}

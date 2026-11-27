@@ -189,6 +189,58 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // Billing documents on a patient care report (PHI): pcrFiles/{departmentId}/{pcrId}/{fileId}.{jpg|png|webp|pdf}.
+    // Same people as the report's files records in firestore.rules: readable by the report's crew and members who
+    // may read every report; added or removed by the crew (editPcrs) while it's a draft or by members who may
+    // unlock reports while it isn't posted. Before the report reaches the server, anyone who charts may add
+    // files and only the uploader reads or removes them. Never replaced. The app reads these with the signed-in
+    // user's credentials and never stores download links, so these rules always apply.
+    function pcrStoragePath(departmentId, pcrId) {
+      return /databases/(default)/documents/departments/$(departmentId)/pcrs/$(pcrId);
+    }
+    function emsGrants(departmentId) {
+      return firestore.exists(/databases/(default)/documents/departments/$(departmentId)/memberGrants/$(request.auth.uid))
+        ? firestore.get(/databases/(default)/documents/departments/$(departmentId)/memberGrants/$(request.auth.uid)).data.get("permissions", {}).keys()
+        : [];
+    }
+    function emsMemberCanAny(departmentId, keys) {
+      return isPlatformCreator()
+        || (isAuthenticated() && departmentId == "forge-demo" && request.auth.token.get("email", "") == "demo@forge.demo")
+        || isDepartmentAdmin(departmentId)
+        || (isDepartmentMember(departmentId) && emsGrants(departmentId).hasAny(keys));
+    }
+    function pcrStorageWritable(departmentId, pcrId) {
+      return canAccessDepartment(departmentId)
+        && emsMemberCanAny(departmentId, ["editPcrs", "unlockPcrs"])
+        && (!firestore.exists(pcrStoragePath(departmentId, pcrId))
+          || (firestore.get(pcrStoragePath(departmentId, pcrId)).data.get("status", "") != "posted"
+            && ((request.auth.uid in firestore.get(pcrStoragePath(departmentId, pcrId)).data.get("crewUids", [])
+                && emsMemberCanAny(departmentId, ["editPcrs"]))
+              || emsMemberCanAny(departmentId, ["unlockPcrs"]))));
+    }
+    match /pcrFiles/{departmentId}/{pcrId}/{fileName} {
+      allow read: if isAuthenticated() && canAccessDepartment(departmentId)
+        && ((firestore.exists(pcrStoragePath(departmentId, pcrId))
+            && (request.auth.uid in firestore.get(pcrStoragePath(departmentId, pcrId)).data.get("crewUids", [])
+              || emsMemberCanAny(departmentId, ["viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"])))
+          || (resource.metadata != null && resource.metadata.get("uploadedBy", "") == request.auth.uid));
+      // Not in the shared demo department: its login is public, and these are photos of real IDs.
+      allow create: if isAuthenticated()
+        && departmentId != "forge-demo"
+        && resource == null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType in ["image/jpeg", "image/png", "image/webp", "application/pdf"]
+        && fileName.matches("[A-Za-z0-9_-]{8,64}[.](jpg|png|webp|pdf)")
+        && request.resource.metadata != null
+        && request.resource.metadata.get("uploadedBy", "") == request.auth.uid
+        && pcrStorageWritable(departmentId, pcrId);
+      allow update: if false;
+      allow delete: if isAuthenticated()
+        && pcrStorageWritable(departmentId, pcrId)
+        && (firestore.exists(pcrStoragePath(departmentId, pcrId))
+          || (resource.metadata != null && resource.metadata.get("uploadedBy", "") == request.auth.uid));
+    }
+
     // Platform-wide branding (creator console logo uploads).
     match /platform/{allPaths=**} {
       allow read: if isAuthenticated();
