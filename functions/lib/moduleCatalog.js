@@ -94,6 +94,9 @@ const COLLECTION_MODULES = {
   emsEquipment: "emsManagement",
   emsEquipmentEvents: "emsManagement",
   emsEquipmentMigrations: "emsManagement",
+  emsCheckoffAssignments: "emsManagement",
+  emsCheckoffSettings: "emsManagement",
+  emsCheckoffResults: "emsManagement",
 };
 
 /** Name prefixes for the large families (fleet*, inspection*, fps*, preplan*). */

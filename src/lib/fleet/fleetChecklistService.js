@@ -30,6 +30,10 @@ function normalizeField(field = {}, index = 0) {
     failAction: field.failAction || "continue",
     noteRequiredOnFail: Boolean(field.noteRequiredOnFail),
     photoRequiredOnFail: Boolean(field.photoRequiredOnFail),
+    // Choices for dropdown and multi-select items.
+    options: Array.isArray(field.options)
+      ? field.options.map((option) => String(option || "").trim()).filter(Boolean).slice(0, 50)
+      : [],
   };
 }
 
