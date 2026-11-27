@@ -31,6 +31,7 @@ import {
   sectionProgress,
   setLeaf,
   toLocalInput,
+  notValueChoices,
   pertinentNegativeChoices,
 } from "../../lib/nemsis/pcrModel.js";
 import { readLeaf } from "../../lib/nemsis/schema.js";
@@ -440,9 +441,10 @@ function LeafEditor({ field, ctx, at }) {
         );
   }
 
-  // Pertinent negatives only in History and Assessment (pertinentNegativeChoices).
+  // The "Not documented…" picker only in History and Assessment (pcrModel notValueChoices / pertinentNegativeChoices).
+  const nvChoices = notValueChoices(field, notValue);
   const pnChoices = pertinentNegativeChoices(field, pertinentNegative);
-  const notOptions = [...field.nv.map((o) => ({ ...o, kind: "NV" })), ...pnChoices.map((o) => ({ ...o, kind: "PN" }))];
+  const notOptions = [...nvChoices.map((o) => ({ ...o, kind: "NV" })), ...pnChoices.map((o) => ({ ...o, kind: "PN" }))];
   const attrDefs = (field.attrs || []).filter((a) => a.codes?.length && !field.repeating);
   return (
     <Field label={`${field.label} (${field.el})`} required={field.usage === "Mandatory" || field.departmentRequired} error={error} hint={hint}>
