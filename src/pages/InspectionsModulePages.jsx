@@ -19,21 +19,25 @@ import {
   readPendingCodeCitation,
 } from "../lib/codeLibrary/pendingCitation.js";
 import ViolationsPage from "./ViolationsPage.jsx";
+import PreplanEntryPoints from "../components/preplans/PreplanEntryPoints.jsx";
 import InspectionNoticesPage from "./InspectionNoticesPage.jsx";
 import {
   approveInspection,
   archiveInspection,
   buildInspectionDashboardMetrics,
   canApproveInspections,
+  canApprovePreplans,
   canCreatePreplans,
   canEditInspectionEnforcement,
   canEditInspectionFees,
   canEditInspectionNotices,
   canEditInspectionsModule,
+  canEditPreplans,
   canManageInspectionConfig,
   canViewFireProtectionSystems,
   canViewInspectionDashboard,
   canViewInspectionsModule,
+  canViewPreplans,
   completeInspection,
   createInspection,
   createViolation,
@@ -220,6 +224,8 @@ function InspectionWorkspace({
   actor,
   occupancy = null,
   resultOptions = getInspectionResultOptions(),
+  preplanAccess = null,
+  onNavigate,
 }) {
   const [deleting, setDeleting] = useState(false);
   const [answers, setAnswers] = useState(() => answersWithOccupancy(record, occupancy));
@@ -235,6 +241,8 @@ function InspectionWorkspace({
   const [citationBusy, setCitationBusy] = useState(false);
   const [citationMessage, setCitationMessage] = useState("");
   const [violationsVersion, setViolationsVersion] = useState(0);
+  // Bumped when the embedded violations list changes, so the preplan link form reloads its findings.
+  const [findingsVersion, setFindingsVersion] = useState(0);
 
   // Reset local edits only when a different inspection is opened. Refreshes of the same
   // record (a violation added, a photo uploaded) must not wipe unsaved answers.
@@ -621,12 +629,27 @@ function InspectionWorkspace({
           </p>
         ) : null}
 
+        {preplanAccess?.canView && record.occupancyId ? (
+          <PreplanEntryPoints
+            key={`preplans-${record.id}`}
+            departmentId={departmentId}
+            occupancyId={record.occupancyId}
+            inspection={{ id: record.id, inspectionNumber: record.inspectionNumber || "" }}
+            canViewPreplans
+            canReport={preplanAccess.canReport}
+            canApprove={preplanAccess.canApprove}
+            findingsVersion={violationsVersion + findingsVersion}
+            actor={actor}
+            onNavigate={onNavigate}
+          />
+        ) : null}
+
         <section className="occupancy-section inspection-violations-embed">
           <ViolationsPage
             key={`${record.id}-${violationsVersion}`}
             inspectionId={record.id}
             embedded
-            onChanged={onViolationChanged}
+            onChanged={(...args) => { setFindingsVersion((value) => value + 1); return onViolationChanged?.(...args); }}
           />
         </section>
 
@@ -673,6 +696,12 @@ function InspectionsShellPage({
   const canScheduleReinspection = canEditInspectionEnforcement(permissions, isCreator);
   const canViewFps = canViewFireProtectionSystems(permissions, isCreator);
   const canEditFees = canEditInspectionFees(permissions, isCreator);
+  // Either module's workers may report alerts and link findings (matches firestore.rules).
+  const preplanAccess = {
+    canView: canViewPreplans(permissions, isCreator),
+    canReport: canEditPreplans(permissions, isCreator) || canEdit,
+    canApprove: canApprovePreplans(permissions, isCreator),
+  };
   const inspectorId = membership?.personnelId || user?.uid || "";
   const inspectorName = membership?.displayName || user?.displayName || user?.email || "Inspector";
 
@@ -920,6 +949,8 @@ function InspectionsShellPage({
             canScheduleReinspection={canScheduleReinspection}
             canViewFps={canViewFps}
             canEditFees={canEditFees}
+            preplanAccess={preplanAccess}
+            onNavigate={onNavigate}
             canDelete={canManageInspectionConfig(permissions, isCreator)}
             onDeleted={({ label, reason }) => {
               const id = activeRecord.id;

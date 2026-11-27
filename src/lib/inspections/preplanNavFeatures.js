@@ -18,6 +18,7 @@ export const PREPLAN_NAV_FEATURE_MAP = {
   Templates: "templateBuilder",
   "Nearby Preplans": "mapIntegration",
   "Target Hazards": "dashboard",
+  "Incident Preplans": "incidentIntegration",
   "Preplan Offline": "offlineAccess",
   "QR Scan": "qrCodes",
 };

@@ -68,6 +68,7 @@ const navPermissionMap = {
   "All Preplans": "viewPreplans",
   "Preplan Dashboard": "viewPreplans",
   "My Preplans": "viewPreplans",
+  "Field Surveys": "viewPreplans",
   "Draft Preplans": "viewPreplans",
   "Awaiting Review": "viewPreplans",
   "Approved Preplans": "viewPreplans",
@@ -75,6 +76,7 @@ const navPermissionMap = {
   "Preplan Reports": "viewPreplans",
   "Nearby Preplans": "viewPreplans",
   "Target Hazards": "viewPreplans",
+  "Incident Preplans": "viewPreplans",
   "Preplan Offline": "viewPreplans",
   "QR Scan": "viewPreplans",
   Preplans: "viewPreplans",
@@ -290,6 +292,7 @@ export function canAccessNavItem(itemName, permissions = {}, options = {}) {
       hasPermission(permissions, "viewInspections")
       || hasPermission(permissions, "editInspections")
       || hasPermission(permissions, "viewPreplans")
+      || hasPermission(permissions, "conductPreplanSurveys")
     )
   ) {
     return true;

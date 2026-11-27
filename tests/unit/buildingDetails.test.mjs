@@ -61,3 +61,11 @@ test("merge only fills blank or Unknown fields", () => {
   assert.equal(location.alarmStatus, "Monitored");
   assert.deepEqual(filled.sort(), ["alarmStatus", "sprinklerStatus"]);
 });
+
+test("never matches a different house number or a building with no address", () => {
+  const diner = { id: "OCC-1", name: "Main Street Diner", address: "214 Main St" };
+  const blank = { id: "OCC-0", name: "", address: "" };
+  assert.equal(matchBuilding("1214 Main St", [blank, diner]), null);
+  assert.equal(matchBuilding("214 Main Street, Riverside", [blank, diner])?.id, "OCC-1");
+  assert.equal(matchBuilding("Smoke at Main Street Diner", [blank, diner])?.id, "OCC-1");
+});

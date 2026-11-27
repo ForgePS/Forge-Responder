@@ -16,6 +16,7 @@ function emulatorAddress(name, fallbackPort) {
   return { host, port: Number(port) };
 }
 const STORAGE_RULES = readFileSync(new URL("../../storage.rules", import.meta.url), "utf8");
+
 const A = "dept-a";
 const B = "dept-b";
 

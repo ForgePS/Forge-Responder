@@ -23,6 +23,7 @@ function emulatorAddress(name, fallbackPort) {
 }
 const STORAGE_RULES = readFileSync(new URL("../../storage.rules", import.meta.url), "utf8");
 
+
 let env;
 
 const A = "dept-a";

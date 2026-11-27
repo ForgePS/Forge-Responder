@@ -177,6 +177,7 @@ const MyInspectionsPage = lazyPage(() => import("./pages/InspectionsModulePages.
 const AllPreplansPage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.AllPreplansPage })));
 const NewPreplanPage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.NewPreplanPage })));
 const PreplansPage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.PreplansPage })));
+const FieldSurveysPage = lazyPage(() => import("./pages/FieldSurveysPage.jsx"));
 const PreplansWorkQueuePage = lazyPage(() => import("./pages/PreplansModulePages.jsx").then((m) => ({ default: m.PreplansWorkQueuePage })));
 const PreplanOperationalPage = lazyPage(() => import("./pages/PreplanOperationalPage.jsx"));
 const OccupanciesMasterPage = lazyPage(() => import("./pages/OccupanciesMasterPage.jsx"));
@@ -259,14 +260,14 @@ const navGroups = [
     ["Vendor Portal", Store],
     ["Fleet Hardening", ShieldCheck],
   ] },
-  { label: "EMS", items: [["Patient Care Reports", Ambulance], ["EMS Supply Inventory", Package], ["EMS Medications", Pill], ["EMS Equipment", Stethoscope], ["EMS Check-offs", ListChecks]] },
+  { label: "EMS", items: [["Patient Care Reports", Ambulance], ["EMS Protocols", BookOpen], ["EMS Supply Inventory", Package], ["EMS Medications", Pill], ["EMS Equipment", Stethoscope], ["EMS Check-offs", ListChecks]] },
   {
     label: "Prevention",
     tree: PREVENTION_NAV_TREE,
     items: [],
   },
-  { label: "Reporting", items: [["NERIS Fire Reports", FileText], ["NERIS Analytics", BarChart3], ["Heat Zone Analytics", Flame]] },
-  { label: "Documents", items: [["SOGs / Policies", FileText], ["EMS Protocols", Ambulance], ["Forms", FileText], ["Digital Forms", ClipboardList], ["Uploads", Upload]] },
+  { label: "FIRE", items: [["NERIS Fire Reports", FileText], ["NERIS Analytics", BarChart3], ["Heat Zone Analytics", Flame]] },
+  { label: "Documents", items: [["SOGs / Policies", FileText], ["Forms", FileText], ["Digital Forms", ClipboardList], ["Uploads", Upload]] },
   { label: "Communications", items: [["Messages", Mail], ["Digital Dashboard", MonitorPlay], ["Help Desk", LifeBuoy]] },
   { label: "", items: [["Analytics", BarChart3], ["Creator Console", ShieldCheck], ["System Admin", Settings]] },
 ];
@@ -569,7 +570,7 @@ function SideNav({ current, collapsed, setCollapsed, onNavigate, groups = navGro
   );
 }
 
-function NotificationBell({ departmentId, userId }) {
+function NotificationBell({ departmentId, userId, onNavigate }) {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
   const unread = notifications.filter((item) => item.status === "unread").length;
@@ -590,6 +591,28 @@ function NotificationBell({ departmentId, userId }) {
     );
   }
 
+  // A notification may name where it leads (openPage, plus a preplan to open).
+  async function handleOpen(item) {
+    await handleRead(item.id).catch(() => {});
+    if (!item.openPage || !onNavigate) return;
+    if (item.module === "Preplans" && item.surveyId) {
+      try {
+        window.sessionStorage.setItem("forge-open-survey-id", item.surveyId);
+      } catch {
+        // private mode: the page still opens
+      }
+    } else if (item.module === "Preplans" && item.recordId) {
+      try {
+        window.sessionStorage.setItem("forge-open-preplan-id", item.recordId);
+        if (item.openTab) window.sessionStorage.setItem("forge-open-preplan-tab", item.openTab);
+      } catch {
+        // private mode: the page still opens
+      }
+    }
+    setOpen(false);
+    onNavigate(item.openPage);
+  }
+
   return <div className="notification-wrap">
     <button className="icon-button notification-button" onClick={() => setOpen(!open)} type="button">
       <Bell size={17} />
@@ -600,7 +623,7 @@ function NotificationBell({ departmentId, userId }) {
         <header><strong>Notifications</strong><button onClick={() => setOpen(false)}><X size={14} /></button></header>
         <div className="notification-list">
           {notifications.map((item) => (
-            <button key={item.id} className={item.status === "unread" ? "notification-item unread" : "notification-item"} onClick={() => handleRead(item.id)}>
+            <button key={item.id} className={item.status === "unread" ? "notification-item unread" : "notification-item"} onClick={() => handleOpen(item)}>
               <strong>{item.title}</strong>
               <span>{item.message}</span>
               <small>{String(item.created_at || "").slice(0, 16)}</small>
@@ -650,7 +673,8 @@ function TopBar({
   isCreator,
   wideBrandLogo = false,
   tagline = "",
-  hideSearch = false
+  hideSearch = false,
+  onNavigate,
 }) {
   const initials = membershipInitials(membership, user);
   const displayName = membership?.displayName || user?.displayName || user?.email || "User";
@@ -682,7 +706,7 @@ function TopBar({
       <div className="command-time"><span><CalendarDays size={15} /> {dateLabel}</span><span><Clock3 size={15} /> {timeLabel}</span></div>
       {!hideSearch && <label className="global-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search personnel, apparatus, occupancies, training, inspections..." /></label>}
       <ThemeToggle compact className="icon-button top-bar-theme-toggle" />
-      <NotificationBell departmentId={departmentId} userId={user?.uid} />
+      <NotificationBell departmentId={departmentId} userId={user?.uid} onNavigate={onNavigate} />
       <AccountMenu initials={initials} displayName={displayName} roleLabel={roleLabel} onSignOut={onSignOut} />
     </div>
   </header>;
@@ -1815,6 +1839,10 @@ function AppShell() {
         return <InspectionConfigStudioPage />;
       })()
       : <AccessDeniedModule name={current} />
+  ) : current === "Field Surveys" ? (
+    hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || hasPermission(permissions, "conductPreplanSurveys") || isCreator
+      ? <FieldSurveysPage onNavigate={setCurrent} />
+      : <AccessDeniedModule name={current} />
   ) : current === "Nearby Preplans" ? (
     hasPermission(permissions, "viewPreplans") || hasPermission(permissions, "viewInspections") || isCreator
       ? (
@@ -1834,6 +1862,17 @@ function AppShell() {
           variant="targetHazards"
           title="Target Hazards"
           description="High-priority and target-hazard preplans."
+        />
+      )
+      : <AccessDeniedModule name={current} />
+  ) : current === "Incident Preplans" ? (
+    hasPermission(permissions, "viewPreplans") || isCreator
+      ? (
+        <PreplanOperationalPage
+          onNavigate={setCurrent}
+          variant="incidents"
+          title="Incident Preplans"
+          description="Dispatches matched to approved preplans, and which version was used on each call."
         />
       )
       : <AccessDeniedModule name={current} />
@@ -2053,6 +2092,7 @@ function AppShell() {
           isCreator={isCreator}
           wideBrandLogo={showPlatformBrand}
           tagline={headerTagline}
+          onNavigate={navigate}
         />
         <SideNav
           current={current}

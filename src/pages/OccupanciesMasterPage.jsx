@@ -16,8 +16,11 @@ import InspectionEmptyState from "../components/inspections/InspectionEmptyState
 import InspectionPermissionGate from "../components/inspections/InspectionPermissionGate.jsx";
 import InspectionStatusBadge from "../components/inspections/InspectionStatusBadge.jsx";
 import {
+  canApprovePreplans,
   canCreatePreplans,
   canEditInspectionsModule,
+  canEditPreplans,
+  canViewPreplans,
   canViewFireProtectionSystems,
   canViewInspectionFees,
   canViewInspectionsModule,
@@ -28,6 +31,7 @@ import {
   saveOccupancyRecord,
 } from "../lib/inspections/index.js";
 import { friendlyError } from "../lib/friendlyError.js";
+import PreplanEntryPoints from "../components/preplans/PreplanEntryPoints.jsx";
 
 const EMPTY_DRAFT = {
   name: "",
@@ -73,6 +77,10 @@ export default function OccupanciesMasterPage({
   const canCreatePreplan = canCreatePreplans(permissions, isCreator);
   const canViewFps = canViewFireProtectionSystems(permissions, isCreator);
   const canViewFees = canViewInspectionFees(permissions, isCreator);
+  const canSeePreplans = canViewPreplans(permissions, isCreator);
+  // Matches firestore.rules: either module's workers may report alerts and ask for reviews.
+  const canReportToPreplans = canEditPreplans(permissions, isCreator) || canEdit;
+  const canApprovePreplan = canApprovePreplans(permissions, isCreator);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -546,6 +554,19 @@ export default function OccupanciesMasterPage({
                       </div>
                     )}
                   </section>
+
+                  {draft.id && records.some((row) => row.id === draft.id) ? (
+                    <PreplanEntryPoints
+                      key={draft.id}
+                      departmentId={departmentId}
+                      occupancyId={draft.id}
+                      canViewPreplans={canSeePreplans}
+                      canReport={canReportToPreplans}
+                      canApprove={canApprovePreplan}
+                      actor={actor}
+                      onNavigate={onNavigate}
+                    />
+                  ) : null}
 
                   <section className="occupancy-section">
                     <header>

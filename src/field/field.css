@@ -2793,3 +2793,16 @@ a.fa-tile:visited {
   border-radius: 12px;
   background: #000;
 }
+
+/* Offline preplans */
+.fa-row-wrap { display: flex; align-items: center; gap: 6px; }
+.fa-row-wrap .fa-row { flex: 1; min-width: 0; }
+.fa-row-meta.is-warn { color: var(--fa-warn, #b45309); font-weight: 700; }
+
+/* Calls → preplan (PlanCallScreens.jsx) */
+.fa-call-plan { display: grid; gap: 6px; padding: 12px; margin-bottom: 10px; border: 1px solid var(--fa-border, #d8dee6); border-radius: 12px; background: var(--fa-surface, #fff); }
+.fa-call-plan.is-primary { border: 2px solid #16a34a; }
+.fa-call-plan.is-other { border-style: dashed; }
+.fa-call-plan small { color: var(--fa-muted, #5b6470); }
+.fa-call-plan ul { margin: 0; padding-left: 20px; font-size: 15px; }
+.fa-call-warn { display: flex; gap: 6px; align-items: center; margin: 0; color: #b45309; font-weight: 700; }

@@ -11,20 +11,33 @@
  * Pure functions (tested); buildingDetailsLoader.js reads the records from Firestore.
  */
 
+import { compareAddresses, parseAddress } from "../preplans/incidentMatch.js";
+
 const text = (value) => String(value ?? "").trim();
 const known = (value) => {
   const t = text(value);
   return t && !/^unknown$/i.test(t) ? t : "";
 };
 
-/** Same matching the report auto-fill uses: address or building name inside the incident address. */
+/**
+ * The building at an incident address (the report auto-fill uses it too): the same
+ * street address (house number and street, as preplans are matched to dispatches in
+ * src/lib/preplans/incidentMatch.js), else the building's name inside the incident text.
+ * Never a substring of another address: "1214 Main St" is not "214 Main St".
+ */
 export function matchBuilding(address = "", occupancies = []) {
-  const target = text(address).toLowerCase();
+  const target = text(address);
   if (!target) return null;
+  const parsed = parseAddress(target);
+  if (parsed.key) {
+    const byAddress = occupancies.find((occ) => text(occ.address) && compareAddresses(parsed, text(occ.address)) === "exact");
+    if (byAddress) return byAddress;
+  }
+  const words = (value) => ` ${String(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
+  const haystack = words(target);
   return occupancies.find((occ) => {
-    const occAddr = text(occ.address).toLowerCase();
-    const occName = text(occ.name).toLowerCase();
-    return (occAddr && (target.includes(occAddr) || occAddr.includes(target))) || (occName && target.includes(occName));
+    const name = words(text(occ.name));
+    return name.trim().length >= 4 && haystack.includes(name);
   }) || null;
 }
 
