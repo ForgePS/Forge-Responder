@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CheckSquare,
   CirclePlus,
+  ClipboardList,
   Map,
   Save,
   ShieldCheck,
@@ -14,6 +15,8 @@ import InspectionPermissionGate from "../components/inspections/InspectionPermis
 import InspectionStatusBadge from "../components/inspections/InspectionStatusBadge.jsx";
 import InspectionsModuleLayout from "../components/inspections/InspectionsModuleLayout.jsx";
 import PreplanWorkspacePanels from "../components/inspections/PreplanWorkspacePanels.jsx";
+import InteractivePreplanWorkspace from "../components/preplans/InteractivePreplanWorkspace.jsx";
+import { getDepartmentPreplanFeatures, isPreplanFeatureEnabled } from "../lib/inspections/preplanFeatures.js";
 import DeleteRecordDialog from "../components/DeleteRecordDialog.jsx";
 import {
   approvePreplan,
@@ -63,6 +66,7 @@ const PREPLAN_TABS = [
   { id: "workQueue", label: "Preplan Work Queue", navName: "Preplan Work Queue" },
   { id: "all", label: "All Preplans", navName: "All Preplans" },
   { id: "new", label: "New Preplan", navName: "New Preplan" },
+  { id: "surveys", label: "Field Surveys", navName: "Field Surveys" },
 ];
 
 function Field({ label, children, wide = false }) {
@@ -293,8 +297,17 @@ function PreplanDetailWorkspace({
   onUpdateLinks,
   onMessage,
   onError,
+  onAssignSurvey,
 }) {
   const [deleting, setDeleting] = useState(false);
+  const [floorPlansOn, setFloorPlansOn] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getDepartmentPreplanFeatures(departmentId)
+      .then((features) => { if (active) setFloorPlansOn(isPreplanFeatureEnabled(features, "floorPlans")); })
+      .catch(() => { if (active) setFloorPlansOn(true); });
+    return () => { active = false; };
+  }, [departmentId]);
   const [answers, setAnswers] = useState(revision?.sectionAnswers || {});
   const [dispatchSummary, setDispatchSummary] = useState(revision?.dispatchSummary || "");
   const [notes, setNotes] = useState(revision?.notes || "");
@@ -486,9 +499,26 @@ function PreplanDetailWorkspace({
               <UploadCloud size={14} /> Publish
             </button>
           ) : null}
+          {canApprove && preplan.status === "approved" ? (
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={saving}
+              onClick={() => {
+                if (window.confirm("Return this approved revision for changes? It will need approval again.")) onReturn("Returned after approval for changes.");
+              }}
+            >
+              Return for changes
+            </button>
+          ) : null}
           {canEdit && ["operational", "published", "verification_due", "verification_overdue"].includes(preplan.status) ? (
             <button className="secondary-button" type="button" disabled={saving} onClick={onNewRevision}>
               New revision
+            </button>
+          ) : null}
+          {canEdit && onAssignSurvey && !["archived", "cancelled"].includes(preplan.status) ? (
+            <button className="secondary-button" type="button" disabled={saving} onClick={onAssignSurvey}>
+              <ClipboardList size={14} /> Assign field survey
             </button>
           ) : null}
           {canEdit && ["operational", "published", "verification_due", "verification_overdue"].includes(preplan.status) ? (
@@ -687,6 +717,20 @@ function PreplanDetailWorkspace({
           onMessage={onMessage}
           onError={onError}
         />
+
+        {floorPlansOn ? (
+          <InteractivePreplanWorkspace
+            departmentId={departmentId}
+            preplan={preplan}
+            revision={revision}
+            canEdit={canEdit}
+            canApprove={Boolean(canApprove)}
+            canUpload={canUpload}
+            actor={actor}
+            onMessage={onMessage}
+            onError={onError}
+          />
+        ) : null}
       </div>
     </section>
   );
@@ -1025,6 +1069,10 @@ function PreplansShell({
             onClose={() => setActiveId("")}
             onMessage={setMessage}
             onError={setError}
+            onAssignSurvey={() => {
+              try { window.sessionStorage.setItem("forge-survey-assign-preplan-id", active.id); } catch { /* private mode */ }
+              onNavigate?.("Field Surveys");
+            }}
             onSaveRevision={(payload) => runAction(
               () => updatePreplanRevision(departmentId, revision.id, payload, actor, restrictedOptions).then(async (rev) => {
                 const next = await getPreplan(departmentId, active.id);

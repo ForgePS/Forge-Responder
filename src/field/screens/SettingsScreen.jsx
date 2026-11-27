@@ -11,6 +11,7 @@ import { canPromptInstall, isIos, isStandalone, promptInstall, subscribeInstall 
 import { readThemePref, saveThemePref } from "../fieldTheme.js";
 import { rmsPathFromFieldPath } from "../fieldPaths.js";
 import { Banner, Confirm, Screen, Section, Segmented, formatWhen } from "../ui.jsx";
+import { wipePackages } from "../fieldPreplanPackages.js";
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes)) return "";
@@ -117,7 +118,7 @@ export default function SettingsScreen() {
           unsent - unsentPcrs > 0
             ? `${unsent - unsentPcrs} other record${unsent - unsentPcrs === 1 ? " hasn't" : "s haven't"} been sent yet. They stay on this device and send after you sign in again with this account.`
             : "",
-          "Patient care reports are removed from this device when you sign out.",
+          "Patient care reports and offline preplans are removed from this device when you sign out.",
           !unsent ? "You'll need a connection to sign back in." : "",
         ].filter(Boolean).join(" ")}
         confirmLabel={unsentPcrs ? "Delete unsent reports and sign out" : "Sign out"}
@@ -125,6 +126,7 @@ export default function SettingsScreen() {
         onConfirm={async () => {
           setConfirmSignOut(false);
           await wipeSealedRecords(snapshot.departmentId, snapshot.uid).catch(() => null);
+          await wipePackages(snapshot.departmentId, snapshot.uid).catch(() => null);
           await signOut();
         }}
       />

@@ -1,7 +1,7 @@
 /** Pre-fire plans: find (search / nearest), view offline, edit (permitted roles) or send an update. */
 import { useEffect, useMemo, useState } from "react";
 import {
-  Building, CloudDownload, FileText, KeyRound, LocateFixed, Loader2, MapPin, MessageSquarePlus, Pencil, Plus, Search, Shield, X,
+  Building, CloudDownload, FileText, KeyRound, LocateFixed, Loader2, MapPin, MessageSquarePlus, Pencil, Plus, Radio, Search, Shield, X,
 } from "lucide-react";
 import { useField, useRecordForm } from "../fieldContext.jsx";
 import { refItems } from "../fieldRefData.js";
@@ -9,6 +9,8 @@ import { distanceMeters, formatDistance } from "../fieldHydrants.js";
 import { getSavedPlanFile, isImageFile, openPlanFile, savePlanFileOffline } from "../fieldPlanFiles.js";
 import { Banner, ErrorSummary, Field, PhotoStrip, Screen, Section, Segmented, TextArea, TextInput, cx, formatWhen } from "../ui.jsx";
 import { STARTER_PREPLAN_TEMPLATE_SECTIONS } from "../../lib/inspections/preplanDefaults.js";
+import { OfflinePlanCard } from "./PlanOfflineScreens.jsx";
+import { useCallPreplansEnabled } from "./PlanCallScreens.jsx";
 import { isPreplanFieldShown, withPreplanFollowUps } from "../../lib/inspections/preplanFollowUps.js";
 
 /** Which FORGE FIELD setting controls a template section (by its title). */
@@ -71,6 +73,7 @@ function planCoords(plan) {
 export function PlansScreen() {
   const { caps, navigate, back } = useField();
   const plans = usePlans();
+  const callsEnabled = useCallPreplansEnabled();
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState(null);
   const [locating, setLocating] = useState(false);
@@ -120,6 +123,16 @@ export function PlansScreen() {
         </button>
       </div>
       {!plans.length ? <Banner tone="info" icon={<Building size={22} />} title="No pre-fire plans on this device">Connect and tap Update on the home screen.</Banner> : null}
+      {callsEnabled ? (
+        <button type="button" className="fa-btn fa-btn-primary fa-btn-block" onClick={() => navigate("calls")}>
+          <Radio size={20} /> Calls: find the preplan
+        </button>
+      ) : null}
+      {plans.some((plan) => plan.source === "preplan") ? (
+        <button type="button" className="fa-btn fa-btn-secondary fa-btn-block" onClick={() => navigate("offlinePlans")}>
+          <CloudDownload size={20} /> Offline preplans
+        </button>
+      ) : null}
       <div className="fa-list">
         {rows.map((plan) => (
           <button key={`${plan.source}:${plan.id}`} type="button" className="fa-row" onClick={() => navigate("planView", { source: plan.source, planId: plan.id })}>
@@ -209,6 +222,8 @@ export function PlanViewScreen({ params = {} }) {
         <div><span>Updated</span><strong>{plan.updatedAt ? formatWhen(plan.updatedAt) : "—"}</strong></div>
       </div>
       {plan.narrative?.dispatchSummary ? <Banner tone="info" icon={<KeyRound size={22} />} title="Dispatch summary">{plan.narrative.dispatchSummary}</Banner> : null}
+
+      {plan.source === "preplan" ? <OfflinePlanCard plan={plan} /> : null}
 
       {plan.source === "preplan" ? (
         withPreplanFollowUps(plan.sections || []).map((section) => {

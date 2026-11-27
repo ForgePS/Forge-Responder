@@ -1,4 +1,6 @@
 import { getPersonDisplayName } from "../personnelSchema.js";
+import { compareAddresses } from "../preplans/incidentMatch.js";
+import { matchBuilding } from "./buildingDetails.js";
 
 /**
  * @typedef {{
@@ -22,7 +24,7 @@ export function autoPopulateReport(report = {}, sources = {}) {
   const autoPopulateSources = { ...(report.autoPopulateSources || {}) };
   const address = String(report.incidentAddress || "").toLowerCase();
 
-  const occupancy = matchOccupancy(address, sources.occupancies || []);
+  const occupancy = matchBuilding(report.incidentAddress || "", sources.occupancies || []);
   if (occupancy) {
     workspace.location = {
       ...(workspace.location || {}),
@@ -38,7 +40,9 @@ export function autoPopulateReport(report = {}, sources = {}) {
     };
     autoPopulateSources["workspace.location"] = "occupancy";
 
-    const preplan = (sources.preplans || []).find((p) => p.occupancyId === occupancy.id);
+    // The approved (published) preplan first; a draft only says a preplan exists.
+    const forOccupancy = (sources.preplans || []).filter((p) => p.occupancyId === occupancy.id);
+    const preplan = forOccupancy.find((p) => p.publishedRevisionId) || forOccupancy[0];
     if (preplan) {
       workspace.location.preplanId = preplan.id;
       workspace.location.preplanStatus = preplan.status;
@@ -95,24 +99,13 @@ export function autoPopulateReport(report = {}, sources = {}) {
   };
 }
 
-/** @param {string} address @param {Array<Record<string, unknown>>} occupancies */
-function matchOccupancy(address, occupancies) {
-  if (!address) return null;
-  return occupancies.find((occ) => {
-    const occAddr = String(occ.address || "").toLowerCase();
-    const occName = String(occ.name || "").toLowerCase();
-    return address.includes(occAddr) || occAddr.includes(address)
-      || address.includes(occName);
-  }) || null;
-}
-
 /** @param {string} address @param {Array<Record<string, unknown>>} hydrants */
 function matchNearbyHydrants(address, hydrants) {
   if (!address || !hydrants.length) return [];
   // Only hydrants recorded at the same street address.
   return hydrants.filter((h) => {
-    const at = String(h.address || h.location || "").toLowerCase().trim();
-    return at && (address.includes(at) || at.includes(address));
+    const at = String(h.address || h.location || "").trim();
+    return at && compareAddresses(address, at) === "exact";
   }).slice(0, 10);
 }
 

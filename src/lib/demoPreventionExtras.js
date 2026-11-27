@@ -8,8 +8,20 @@ import { createRecord, deleteRecord, listRecords } from "./firestoreService.js";
 import {
   FIRE_PROTECTION_SYSTEMS_COLLECTION,
   PREPLANS_COLLECTION,
+  PREPLAN_ALERTS_COLLECTION,
+  PREPLAN_BUILDINGS_COLLECTION,
+  PREPLAN_CONVERSIONS_COLLECTION,
   PREPLAN_DIAGRAMS_COLLECTION,
+  PREPLAN_FILES_COLLECTION,
+  PREPLAN_FINDING_LINKS_COLLECTION,
+  PREPLAN_FLOORS_COLLECTION,
+  PREPLAN_FLOOR_PLANS_COLLECTION,
+  PREPLAN_REVIEW_TASKS_COLLECTION,
   PREPLAN_REVISIONS_COLLECTION,
+  PREPLAN_SITE_MAPS_COLLECTION,
+  PREPLAN_OFFLINE_DEVICES_COLLECTION,
+  PREPLAN_INCIDENT_LINKS_COLLECTION,
+  PREPLAN_SURVEYS_COLLECTION,
   VIOLATIONS_COLLECTION,
 } from "./inspections/paths.js";
 import { PREPLAN_RESTRICTED_COLLECTION } from "./inspections/preplanRestricted.js";
@@ -130,8 +142,16 @@ export async function refreshDemoPreventionExtras(now = new Date()) {
   const year = now.getFullYear();
 
   // Clear what's there (visitors' edits, earlier runs).
+  // Demo preplans reuse their ids (PP-DEMO-1…), so everything keyed by preplanId
+  // (buildings, floors, plans, site maps, alerts, links, tasks, conversions, surveys) goes too,
+  // or a visitor's floors would reattach to the fresh preplans.
+  // firestore.rules allows these deletes in the demo department only.
   const collections = [PREPLANS_COLLECTION, PREPLAN_REVISIONS_COLLECTION, PREPLAN_DIAGRAMS_COLLECTION,
-    PREPLAN_RESTRICTED_COLLECTION, FIRE_PROTECTION_SYSTEMS_COLLECTION, VIOLATIONS_COLLECTION];
+    PREPLAN_RESTRICTED_COLLECTION, FIRE_PROTECTION_SYSTEMS_COLLECTION, VIOLATIONS_COLLECTION,
+    PREPLAN_BUILDINGS_COLLECTION, PREPLAN_FLOORS_COLLECTION, PREPLAN_FLOOR_PLANS_COLLECTION, PREPLAN_SITE_MAPS_COLLECTION,
+    PREPLAN_ALERTS_COLLECTION, PREPLAN_FINDING_LINKS_COLLECTION, PREPLAN_REVIEW_TASKS_COLLECTION,
+    PREPLAN_CONVERSIONS_COLLECTION, PREPLAN_FILES_COLLECTION, PREPLAN_SURVEYS_COLLECTION, PREPLAN_OFFLINE_DEVICES_COLLECTION,
+    PREPLAN_INCIDENT_LINKS_COLLECTION];
   const existing = await Promise.all(collections.map((name) => listRecords(departmentId, name).catch(() => [])));
   await Promise.all(collections.flatMap((name, i) => existing[i].map((row) => deleteRecord(departmentId, name, row.id))));
 

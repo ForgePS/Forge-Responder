@@ -17,6 +17,7 @@ export const INSPECTION_PERMISSION_KEYS = {
   approvePreplans: "approvePreplans",
   managePreplanConfig: "managePreplanConfig",
   submitPreplans: "submitPreplans",
+  conductPreplanSurveys: "conductPreplanSurveys",
   reviewPreplans: "reviewPreplans",
   rejectPreplans: "rejectPreplans",
   archivePreplans: "archivePreplans",
@@ -200,6 +201,11 @@ export function canManagePreplanConfig(permissions = {}, isCreator = false) {
     || hasPermission(permissions, INSPECTION_PERMISSION_KEYS.manageConfig)
     || hasPermission(permissions, "manageSystemSettings")
   );
+}
+
+/** Go out and record preplan field surveys assigned to you or your station. */
+export function canConductPreplanSurveys(permissions = {}, isCreator = false) {
+  return Boolean(isCreator || hasPermission(permissions, INSPECTION_PERMISSION_KEYS.conductPreplanSurveys));
 }
 
 export function canSubmitPreplans(permissions = {}, isCreator = false) {

@@ -43,6 +43,9 @@ import PcrFormScreen from "./screens/PcrFormScreen.jsx";
 import { CheckoffFormScreen, CheckoffListsScreen } from "./screens/CheckoffScreens.jsx";
 import { InspectionFormScreen, InspectionNewScreen, InspectionsScreen } from "./screens/InspectionScreens.jsx";
 import { PlanEditScreen, PlanUpdateScreen, PlanViewScreen, PlansScreen } from "./screens/PlanScreens.jsx";
+import { OfflinePlansScreen, PlanOfflineScreen } from "./screens/PlanOfflineScreens.jsx";
+import { CallPlanScreen, CallsScreen } from "./screens/PlanCallScreens.jsx";
+import { syncPackages } from "./fieldPreplanPackages.js";
 import HydrantEditScreen from "./screens/HydrantEditScreen.jsx";
 
 const SCREENS = {
@@ -76,6 +79,10 @@ const SCREENS = {
   planView: PlanViewScreen,
   planEdit: PlanEditScreen,
   planUpdate: PlanUpdateScreen,
+  planOffline: PlanOfflineScreen,
+  offlinePlans: OfflinePlansScreen,
+  calls: CallsScreen,
+  callPlan: CallPlanScreen,
   hydrantEdit: HydrantEditScreen,
 };
 
@@ -238,12 +245,19 @@ export default function FieldShell({ snapshot, online, accessLive }) {
       setRefData(data);
       if (failed.length) setRefError(`Some data didn't update (${failed.join(", ")}). The saved copy is used.`);
       else if (!quiet) toast("Field data updated");
+      // Saved offline preplans: check this device may still hold them, then bring them up to date.
+      syncPackages({ departmentId: snapshot.departmentId, uid: snapshot.uid, actor, caps: capsRef.current })
+        .then((result) => {
+          if (result.wiped) toast(`Offline preplans removed from this device. ${result.wiped}`, "warn");
+          else if (result.removed.length) toast(`${result.removed.length} offline preplan${result.removed.length === 1 ? " was" : "s were"} removed: ${result.removed[0].reason}`, "warn");
+        })
+        .catch(() => null);
     } catch (error) {
       setRefError(error?.message || "Couldn't update field data.");
     } finally {
       setRefLoading(false);
     }
-  }, [snapshot.departmentId, actor, toast]);
+  }, [snapshot.departmentId, snapshot.uid, actor, toast]);
 
   // Refresh when access is confirmed online, when the connection returns, and periodically.
   useEffect(() => {

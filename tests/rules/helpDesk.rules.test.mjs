@@ -9,6 +9,13 @@ import { getBytes, ref, uploadString } from "firebase/storage";
 const PROJECT_ID = "demo-forge-rms";
 const FIRESTORE_RULES = readFileSync(new URL("../../firestore.rules", import.meta.url), "utf8");
 const STORAGE_RULES = readFileSync(new URL("../../storage.rules", import.meta.url), "utf8");
+// The emulators that `firebase emulators:exec` started (it sets these variables), so a run on other
+// ports never reaches, and clears, emulators someone else is using on the default ones.
+function emulatorAddress(variable, fallbackPort) {
+  const [host, port] = String(process.env[variable] || `127.0.0.1:${fallbackPort}`).split(":");
+  return { host, port: Number(port) };
+}
+
 const A = "dept-a";
 const B = "dept-b";
 
@@ -32,8 +39,8 @@ const ticket = (id, departmentId, requesterUid) => ({
 before(async () => {
   env = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { rules: FIRESTORE_RULES, host: "127.0.0.1", port: 8080 },
-    storage: { rules: STORAGE_RULES, host: "127.0.0.1", port: 9199 },
+    firestore: { rules: FIRESTORE_RULES, ...emulatorAddress("FIRESTORE_EMULATOR_HOST", 8080) },
+    storage: { rules: STORAGE_RULES, ...emulatorAddress("FIREBASE_STORAGE_EMULATOR_HOST", 9199) },
   });
 });
 

@@ -4,7 +4,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { normalizeTableRows } from "../lib/tableRows.js";
-import { buildDashboardMetrics, buildDashboardStaffingRows } from "../utils/dashboardMetrics.js";
+import { buildDashboardMetrics, buildDashboardStaffingRows, onDutyNote } from "../utils/dashboardMetrics.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { resolveEmployeePerson } from "../lib/employeePortalUtils.js";
 import { acknowledgementKeys } from "../lib/documentAcknowledgement.js";
@@ -122,7 +122,7 @@ export default function CommandDashboard({
   });
 
   const kpis = [
-    ["Personnel On Duty", metrics.onDuty ?? "—", metrics.onDuty === null ? "Roster not set up" : `of ${metrics.minimum} needed this shift`, "info", Users, "Scheduling"],
+    ["Personnel On Duty", metrics.onDuty ?? "—", onDutyNote(metrics.onDuty, metrics.minimum), "info", Users, "Scheduling"],
     ["Staffing Deficit", metrics.staffingDeficit ?? "—", metrics.staffingDeficit === null ? "Roster not set up" : metrics.staffingDeficit ? `${metrics.staffingDeficit} short this shift` : "Fully staffed", metrics.staffingDeficit ? "critical" : "success", Users, "Scheduling"],
     ["Certifications Expiring", metrics.certsExpiring90, "Next 90 Days", "warning", FileCheck2, "Certifications"],
     ["Training Compliance", `${metrics.trainingCompliance}%`, "Department-wide", metrics.trainingCompliance >= 85 ? "success" : "warning", GraduationCap, "Training"],

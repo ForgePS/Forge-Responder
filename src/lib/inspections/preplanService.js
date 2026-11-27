@@ -44,6 +44,14 @@ import {
   PREPLAN_TEMPLATE_VERSIONS_COLLECTION,
   PREPLAN_VERIFICATIONS_COLLECTION,
 } from "./paths.js";
+import {
+  checkRevisionFloorPlans,
+  copyFloorPlansToRevision,
+  listPreplanFloors,
+} from "../preplans/floorPlanService.js";
+import { copySiteMapToRevision, getSiteMap } from "../preplans/siteMapService.js";
+import { siteMapPublicationProblems } from "../preplans/siteMapModel.js";
+import { addDaysKey, localDateKey } from "../preplans/localDate.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -53,10 +61,9 @@ function newId(prefix = "PP") {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
 }
 
+// Local calendar date: toISOString() would give the UTC date, a day ahead in the evening (US).
 function addDaysIso(days = DEFAULT_VERIFICATION_CYCLE_DAYS) {
-  const date = new Date();
-  date.setDate(date.getDate() + Number(days || 0));
-  return date.toISOString().slice(0, 10);
+  return addDaysKey(days);
 }
 
 function emptySectionAnswers(sections = []) {
@@ -702,7 +709,7 @@ export async function createOrUpdatePreplanFromInspection(departmentId, inspecti
       sourceInspectionIds: sourceIds,
       notes: [
         revision?.notes || "",
-        `Updated from inspection ${inspection.inspectionNumber || inspectionId} (${stamp.slice(0, 10)}).`,
+        `Updated from inspection ${inspection.inspectionNumber || inspectionId} (${localDateKey(new Date(stamp))}).`,
         payload.notes || "",
       ].filter(Boolean).join("\n"),
       sectionAnswers: {
@@ -868,9 +875,29 @@ export async function returnPreplanForRevision(departmentId, preplanId, notes = 
   return updatePreplan(departmentId, preplanId, { status: "returned_for_revision" }, audit);
 }
 
+/**
+ * Floor plans must have no unaccepted SmartPlan proposals and every critical
+ * feature verified. Checked at approval (geometry locks then) and again at publish.
+ */
+async function assertFloorPlansPublishable(departmentId, preplanId, revisionId, verb, symbolCatalog) {
+  const floors = await listPreplanFloors(departmentId, preplanId);
+  const [floorCheck, siteMap] = await Promise.all([
+    checkRevisionFloorPlans(departmentId, revisionId, floors, symbolCatalog),
+    getSiteMap(departmentId, revisionId),
+  ]);
+  const problems = [...floorCheck.problems, ...siteMapPublicationProblems(siteMap).map((row) => `Site map: ${row}`)];
+  if (!problems.length) return;
+  // Plain message (no `code`), so friendlyError shows it as-is; keep it short.
+  const extra = problems.length > 1 ? ` (+${problems.length - 1} more)` : "";
+  const error = new Error(`Can't ${verb} yet. ${problems[0]}${extra}`.slice(0, 290));
+  error.problems = problems;
+  throw error;
+}
+
 export async function approvePreplan(departmentId, preplanId, audit = {}) {
   const preplan = await getPreplan(departmentId, preplanId);
   if (!preplan) throw new Error("Preplan not found.");
+  await assertFloorPlansPublishable(departmentId, preplanId, preplan.currentRevisionId, "approve");
   const stamp = nowIso();
   await updatePreplanRevision(departmentId, preplan.currentRevisionId, {
     status: "approved",
@@ -890,6 +917,8 @@ export async function publishPreplanRevision(departmentId, preplanId, audit = {}
   const revision = await getPreplanRevision(departmentId, preplan.currentRevisionId);
   if (!revision) throw new Error("Revision not found.");
 
+  await assertFloorPlansPublishable(departmentId, preplanId, revision.id, "publish", options.symbolCatalog);
+
   const stamp = nowIso();
   const published = await updatePreplanRevision(departmentId, revision.id, {
     status: "published",
@@ -907,7 +936,7 @@ export async function publishPreplanRevision(departmentId, preplanId, audit = {}
     publicationStatus: "published",
     publishedRevisionId: published.id,
     publishedRevisionNumber: published.revisionNumber,
-    lastVerifiedAt: stamp.slice(0, 10),
+    lastVerifiedAt: localDateKey(new Date(stamp)),
     verificationDueAt,
     missingCriticalFields: computeMissingCritical(published, preplan),
   }, audit);
@@ -998,6 +1027,20 @@ export async function startPreplanRevision(departmentId, preplanId, audit = {}, 
     });
   }
   await createRecord(departmentId, PREPLAN_REVISIONS_COLLECTION, revisionId, revision);
+  if (current?.id) {
+    await copyFloorPlansToRevision(departmentId, {
+      preplanId,
+      fromRevisionId: current.id,
+      toRevisionId: revisionId,
+      actorUid: audit.actorUid || "",
+    });
+    await copySiteMapToRevision(departmentId, {
+      preplanId,
+      fromRevisionId: current.id,
+      toRevisionId: revisionId,
+      actorUid: audit.actorUid || "",
+    });
+  }
 
   if (current?.id && current.status === "published") {
     await updatePreplanRevision(departmentId, current.id, { status: "superseded" }, audit);
@@ -1055,7 +1098,7 @@ export async function recordPreplanVerification(departmentId, preplanId, payload
   const next = await updatePreplan(departmentId, preplanId, {
     status: "operational",
     operationalValidity: "current",
-    lastVerifiedAt: stamp.slice(0, 10),
+    lastVerifiedAt: localDateKey(new Date(stamp)),
     verificationDueAt: nextDueAt,
   }, audit);
 
@@ -1246,6 +1289,8 @@ export async function registerPreplanFile(departmentId, payload = {}, audit = {}
     departmentId,
     preplanId: payload.preplanId || "",
     buildingId: payload.buildingId || "",
+    floorId: payload.floorId || "",
+    objectId: payload.objectId || "",
     category: payload.category || "other",
     fileName: payload.fileName || "",
     mimeType: payload.mimeType || "",

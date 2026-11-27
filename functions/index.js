@@ -1801,3 +1801,27 @@ exports.deleteRecordWithReason = onCall({ memory: "256MiB", timeoutSeconds: 60 }
 // ---- Inspections: email a completed inspection report (functions/lib/inspectionEmail.js) ----
 exports.emailInspectionReport = onCall({ secrets: EMAIL_SECRETS, memory: "512MiB", timeoutSeconds: 60 }, (request) =>
   require("./lib/inspectionEmail").emailInspectionReport(admin.firestore(), request));
+
+// ---- Preplans: review tasks when an occupancy or inspection finding changes (functions/lib/preplanReviewTasks.js) ----
+// retry: task ids are deterministic and written with create(), so a redelivery is a no-op.
+// The task handlers only write preplanReviewTasks; the notify handler only writes
+// notifications. No trigger watches notifications, so nothing loops.
+exports.preplanReviewOnOccupancy = onDocumentWritten(
+  { document: "departments/{departmentId}/occupancies/{occupancyId}", retry: true },
+  (event) => require("./lib/preplanReviewTasks").handleOccupancyWritten(admin.firestore(), event),
+);
+exports.preplanReviewOnViolation = onDocumentWritten(
+  { document: "departments/{departmentId}/violations/{violationId}", retry: true },
+  (event) => require("./lib/preplanReviewTasks").handleViolationWritten(admin.firestore(), event),
+);
+exports.preplanReviewTaskNotify = onDocumentCreated(
+  { document: "departments/{departmentId}/preplanReviewTasks/{taskId}", retry: true },
+  (event) => require("./lib/preplanReviewTasks").handleReviewTaskCreated(admin.firestore(), event),
+);
+
+// Preplan field surveys: notify surveyors, reviewers and inspection schedulers.
+// Writes notifications only; nothing watches notifications, so nothing loops.
+exports.preplanSurveyNotify = onDocumentWritten(
+  { document: "departments/{departmentId}/preplanSurveys/{surveyId}", retry: true },
+  (event) => require("./lib/preplanSurveys").handleSurveyWritten(admin.firestore(), event),
+);
