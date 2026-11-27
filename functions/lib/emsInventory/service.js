@@ -78,6 +78,58 @@ async function readHeldKeys(tx, db, departmentId, itemId) {
   return new Set(snap.docs.map((doc) => doc.data().key));
 }
 
+/**
+ * Open recalls covering medication lots about to be added (received, found in a count,
+ * or put back by a reversal), with the hold docs to write. Reads only: call before writes.
+ * `lots` is [{ key, lot, expiration }]; covered keys are added to `heldKeys`.
+ */
+async function readRecallHolds(tx, db, departmentId, item, lots, heldKeys) {
+  if (item.itemClass !== "medication" || !lots.length) return [];
+  const recalls = (await tx.get(db.collection(paths.recalls(departmentId)).where("itemIds", "array-contains", item.id)))
+    .docs.map((doc) => doc.data());
+  if (!recalls.length) return [];
+  const byKey = new Map();
+  for (const l of lots) {
+    if (byKey.has(l.key)) continue;
+    const covering = recalls.filter((r) => logic.recallCovers(r, item.id, l.lot));
+    if (covering.length) byKey.set(l.key, { ...l, recalls: covering });
+  }
+  const found = [...byKey.values()];
+  const refs = found.map((h) => db.collection(paths.holds(departmentId)).doc(logic.holdId(item.id, h.key)));
+  const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
+  return found.map((h, i) => {
+    heldKeys.add(h.key);
+    return { ...h, ref: refs[i], before: snaps[i].exists ? snaps[i].data() : null };
+  });
+}
+
+/** Write the holds found by readRecallHolds, keeping any recalls or manual reason already on them. */
+function writeRecallHolds(tx, db, caller, item, holds, at, when) {
+  for (const h of holds) {
+    const active = h.before?.status === "active";
+    const recallIds = [...new Set([...(active ? h.before.recallIds || [] : []), ...h.recalls.map((r) => r.id)])];
+    if (active && recallIds.length === (h.before.recallIds || []).length) continue;
+    tx.set(h.ref, {
+      id: h.ref.id, itemId: item.id, itemName: item.name, key: h.key, lot: h.lot || "", expiration: h.expiration || "",
+      status: "active", recallIds,
+      manual: active ? h.before.manual || null : null,
+      placedAt: active ? h.before.placedAt : at,
+      placedBy: active ? h.before.placedBy : caller.uid,
+      updatedAt: at,
+    });
+    auditEvent(db, tx, caller, {
+      action: "ems.hold.placed", recordType: "hold", recordId: h.ref.id,
+      summary: `Put ${item.name} lot ${h.lot} on hold ${when}: recall ${h.recalls.map((r) => r.reference || r.id).join(", ")}`,
+    });
+  }
+}
+
+function assertNotControlled(item) {
+  if (item.controlledSchedule) {
+    throw new HttpsError("failed-precondition", `${item.name} is a Schedule ${item.controlledSchedule} controlled substance. Controlled substances aren't tracked in this inventory.`);
+  }
+}
+
 function ruleError(error) {
   if (error instanceof logic.InventoryRuleError) return new HttpsError("failed-precondition", error.message);
   return error;
@@ -428,9 +480,7 @@ async function postTransaction(db, request) {
       if (!itemSnap.exists) throw new HttpsError("not-found", "That item wasn't found.");
       const item = { id: itemSnap.id, ...itemSnap.data() };
       assertItemAccess(caller, item, rule.access);
-      if (item.controlledSchedule) {
-        throw new HttpsError("failed-precondition", `${item.name} is a Schedule ${item.controlledSchedule} controlled substance. Controlled substances aren't tracked in this inventory.`);
-      }
+      assertNotControlled(item);
       if (item.active === false && rule.direction !== "out") throw new HttpsError("failed-precondition", `${item.name} is turned off in the catalog.`);
       for (const snap of locationSnaps) {
         if (!snap.exists) throw new HttpsError("not-found", "That location wasn't found.");
@@ -449,39 +499,16 @@ async function postTransaction(db, request) {
       const balances = Object.fromEntries(locationIds.map((id, i) => [id, balanceSnaps[i].exists ? balanceSnaps[i].data() : null]));
 
       // A medication lot received while a recall covers it goes straight on hold.
-      let recallHold = null;
-      if (type === "receive" && item.itemClass === "medication") {
-        const recalls = await tx.get(db.collection(paths.recalls(d)).where("itemIds", "array-contains", itemId));
-        const covering = recalls.docs.map((doc) => doc.data()).filter((r) => logic.recallCovers(r, itemId, lot));
-        if (covering.length) {
-          const key = logic.lotKey(lot, expiration);
-          const holdRef = db.collection(paths.holds(d)).doc(logic.holdId(itemId, key));
-          const holdSnap = await tx.get(holdRef);
-          recallHold = { ref: holdRef, before: holdSnap.exists ? holdSnap.data() : null, key, recalls: covering };
-          heldKeys.add(key);
-        }
-      }
+      const recallHolds = type === "receive"
+        ? await readRecallHolds(tx, db, d, item, [{ key: logic.lotKey(lot, expiration), lot, expiration }], heldKeys)
+        : [];
 
       const lines = logic.linesFor(type, {
         quantity, fromLocationId, toLocationId, fromBalance: balances[fromLocationId],
         lot, expiration, lotKey: chosenLot, policy: settings.rotationPolicy, today, at, heldKeys,
       });
       const onHand = writeBalances(tx, db, d, itemId, balances, lines, transactionId, at, heldKeys);
-      if (recallHold) {
-        const recallIds = [...new Set([...(recallHold.before?.status === "active" ? recallHold.before.recallIds || [] : []), ...recallHold.recalls.map((r) => r.id)])];
-        tx.set(recallHold.ref, {
-          id: recallHold.ref.id, itemId, itemName: item.name, key: recallHold.key, lot, expiration,
-          status: "active", recallIds,
-          manual: recallHold.before?.status === "active" ? recallHold.before.manual || null : null,
-          placedAt: recallHold.before?.status === "active" ? recallHold.before.placedAt : at,
-          placedBy: recallHold.before?.status === "active" ? recallHold.before.placedBy : caller.uid,
-          updatedAt: at,
-        });
-        auditEvent(db, tx, caller, {
-          action: "ems.hold.placed", recordType: "hold", recordId: recallHold.ref.id,
-          summary: `Put ${item.name} lot ${lot} on hold when received: recall ${recallHold.recalls.map((r) => r.reference || r.id).join(", ")}`,
-        });
-      }
+      writeRecallHolds(tx, db, caller, item, recallHolds, at, "when received");
       tx.create(txRef, ledgerRecord(caller, {
         id: transactionId, type, item, quantity, fromLocationId, toLocationId, lines, at,
         reason,
@@ -500,7 +527,7 @@ async function postTransaction(db, request) {
       return {
         transactionId, replayed: false, quantity, onHand,
         lines: lines.map((l) => ({ locationId: l.locationId, lot: l.lot, expiration: l.expiration, delta: l.delta })),
-        ...(recallHold ? { heldForRecall: recallHold.recalls.map((r) => ({ id: r.id, reference: r.reference || "" })) } : {}),
+        ...(recallHolds.length ? { heldForRecall: recallHolds[0].recalls.map((r) => ({ id: r.id, reference: r.reference || "" })) } : {}),
       };
     });
   } catch (error) {
@@ -539,9 +566,13 @@ async function reverseTransaction(db, request) {
         ...locationIds.map((id) => tx.get(db.collection(paths.balances(d)).doc(logic.balanceId(id, orig.itemId)))),
       ]);
       const balances = Object.fromEntries(locationIds.map((id, i) => [id, snaps[i].exists ? snaps[i].data() : null]));
+      const item = { id: orig.itemId, name: orig.itemName, unitOfMeasure: orig.unitOfMeasure, itemClass: orig.itemClass };
+      // Stock put back by a reversal is held if an open recall covers its lot now.
+      const recallHolds = await readRecallHolds(tx, db, d, item, lines.filter((l) => l.delta > 0), heldKeys);
       writeBalances(tx, db, d, orig.itemId, balances, lines, reversalId, at, heldKeys);
+      writeRecallHolds(tx, db, caller, item, recallHolds, at, "when a reversal put it back");
       tx.create(reversalRef, ledgerRecord(caller, {
-        id: reversalId, type: "reversal", item: { id: orig.itemId, name: orig.itemName, unitOfMeasure: orig.unitOfMeasure, itemClass: orig.itemClass },
+        id: reversalId, type: "reversal", item,
         quantity: orig.quantity, fromLocationId: orig.toLocationId || "", toLocationId: orig.fromLocationId || "", lines, at,
         reason, reversesTransactionId: originalId, reversesType: orig.type,
       }));
@@ -576,6 +607,7 @@ async function startCount(db, request) {
   for (const doc of balances.docs) {
     const balance = doc.data();
     const item = items[balance.itemId] || { name: balance.itemId };
+    if (item.controlledSchedule) continue;
     const lots = (balance.lots || []).filter((lot) => lot.quantity > 0);
     if (!lots.length && balance.par) {
       rows.push({ rowId: `${balance.itemId}-none`, itemId: balance.itemId, itemName: item.name, unitOfMeasure: item.unitOfMeasure || "each",
@@ -636,6 +668,7 @@ function mergeCountRows(rows, input = {}, items = {}) {
     const itemId = cleanDocId(add?.itemId, "Item");
     const item = items[itemId];
     if (!item) throw new HttpsError("not-found", "That item wasn't found.");
+    assertNotControlled(item);
     const lot = text(add.lot, 60);
     const expiration = text(add.expiration, 10);
     if (expiration && !logic.isValidDate(expiration)) throw new HttpsError("invalid-argument", "Expiration must be a date (YYYY-MM-DD).");
@@ -744,6 +777,19 @@ async function approveCount(db, request) {
         if (!heldByItem.has(hold.itemId)) heldByItem.set(hold.itemId, new Set());
         heldByItem.get(hold.itemId).add(hold.key);
       }
+      const items = itemIds.map((itemId, i) => {
+        const rows = byItem.get(itemId);
+        const item = { id: itemId, name: rows[0].itemName, unitOfMeasure: rows[0].unitOfMeasure, ...(itemSnaps[i].exists ? itemSnaps[i].data() : {}) };
+        if (!item.itemClass) item.itemClass = "supply";
+        assertNotControlled(item);
+        return item;
+      });
+      // Found stock of a recalled lot goes on hold, like stock received while the recall is open.
+      const recallHolds = await Promise.all(items.map((item) => {
+        if (!heldByItem.has(item.id)) heldByItem.set(item.id, new Set());
+        const added = byItem.get(item.id).filter((row) => row.counted > row.expected).map((row) => ({ key: row.key, lot: row.lot, expiration: row.expiration }));
+        return readRecallHolds(tx, db, d, item, added, heldByItem.get(item.id));
+      }));
       const transactionIds = [];
       itemIds.forEach((itemId, i) => {
         const rows = byItem.get(itemId);
@@ -759,10 +805,11 @@ async function approveCount(db, request) {
           }
           throw error;
         }
+        writeRecallHolds(tx, db, caller, items[i], recallHolds[i], at, "when a count found it");
         const quantity = lines.reduce((sum, l) => sum + Math.abs(l.delta), 0);
         tx.create(db.collection(paths.transactions(d)).doc(transactionId), ledgerRecord(caller, {
           id: transactionId, type: "countAdjustment",
-          item: { id: itemId, name: rows[0].itemName, unitOfMeasure: rows[0].unitOfMeasure, itemClass: itemSnaps[i].exists ? itemSnaps[i].data().itemClass : "supply" },
+          item: { id: itemId, name: rows[0].itemName, unitOfMeasure: rows[0].unitOfMeasure, itemClass: items[i].itemClass },
           quantity, toLocationId: count.locationId, lines, at,
           countId, reason: rows.map((r) => r.reason).filter(Boolean).join("; ").slice(0, 500),
           countedBy: count.submittedBy, approvedBy: caller.uid,

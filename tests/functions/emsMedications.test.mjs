@@ -225,4 +225,57 @@ describe("recalls and holds", () => {
     assert.equal(after.onHand, 3);
     assert.equal(after.heldQuantity, 3);
   });
+
+  it("reversing a removal of a recalled lot puts the stock back on hold", async () => {
+    const ctx = await setup();
+    await receive(ctx, 2, "REV-1", "2027-08-01");
+    const used = await post("ff-a", { type: "usage", itemId: ctx.itemId, fromLocationId: ctx.supply, quantity: 2 });
+    const { heldLots } = await meds.createRecall(db, req("chief-a", { departmentId: A, recall: { itemIds: [ctx.itemId], lotNumbers: ["REV-1"], reason: "Wrong strength", reference: "R-7" } }));
+    assert.equal(heldLots, 0, "nothing on hand when the recall was recorded");
+    await inv.reverseTransaction(db, req("chief-a", { departmentId: A, transactionId: used.transactionId, reason: "Entered on the wrong unit" }));
+    const after = await balance(ctx.supply, ctx.itemId);
+    assert.equal(after.onHand, 2);
+    assert.equal(after.heldQuantity, 2);
+    const [hold] = await holds();
+    assert.equal(hold.status, "active");
+    assert.equal(hold.recallIds.length, 1);
+    await expectCode(post("ff-a", { type: "usage", itemId: ctx.itemId, fromLocationId: ctx.supply, quantity: 1 }), "failed-precondition", /on hold/);
+  });
+
+  it("a count that finds a recalled lot puts it on hold", async () => {
+    const ctx = await setup();
+    await receive(ctx, 1, "OK-1", "2027-08-01");
+    await meds.createRecall(db, req("chief-a", { departmentId: A, recall: { itemIds: [ctx.itemId], lotNumbers: ["FOUND-7"], reason: "Contamination", reference: "R-8" } }));
+    const { countId } = await inv.startCount(db, req("officer-a", { departmentId: A, locationId: ctx.supply, requestId: rid() }));
+    await inv.saveCount(db, req("officer-a", { departmentId: A, countId, addRows: [{ itemId: ctx.itemId, lot: "FOUND-7", expiration: "2027-09-01" }] }));
+    const count = (await db.doc(`departments/${A}/emsInventoryCounts/${countId}`).get()).data();
+    const rows = count.rows.map((r) => (r.added ? { ...r, counted: 3, reason: "Found in a drawer" } : { ...r, counted: r.expected }));
+    await inv.submitCount(db, req("officer-a", { departmentId: A, countId, rows }));
+    await inv.approveCount(db, req("chief-a", { departmentId: A, countId }));
+    const after = await balance(ctx.supply, ctx.itemId);
+    assert.equal(after.onHand, 4);
+    assert.equal(after.heldQuantity, 3);
+    const [hold] = await holds();
+    assert.equal(hold.key, lotKey("FOUND-7", "2027-09-01"));
+    assert.equal(hold.status, "active");
+  });
+
+  it("counts can't add or adjust a controlled substance", async () => {
+    const ctx = await setup();
+    const { itemId: fentanyl } = await inv.saveItem(db, req("chief-a", { departmentId: A, item: { ...EPI, name: "Fentanyl 100 mcg/2 mL", genericName: "Fentanyl", controlledSchedule: "II", ndc: "" } }));
+    await receive(ctx, 1, "OK-1", "2027-08-01");
+    // A balance written before the item was marked controlled stays off the count sheet.
+    await db.doc(`departments/${A}/emsInventoryBalances/${ctx.supply}__${fentanyl}`).set({ itemId: fentanyl, locationId: ctx.supply, onHand: 2,
+      lots: [{ key: lotKey("F-1", "2027-01-01"), lot: "F-1", expiration: "2027-01-01", quantity: 2 }] });
+    const { countId } = await inv.startCount(db, req("officer-a", { departmentId: A, locationId: ctx.supply, requestId: rid() }));
+    const count = (await db.doc(`departments/${A}/emsInventoryCounts/${countId}`).get()).data();
+    assert.ok(count.rows.every((r) => r.itemId !== fentanyl));
+    await expectCode(inv.saveCount(db, req("officer-a", { departmentId: A, countId, addRows: [{ itemId: fentanyl, lot: "F-2", expiration: "2027-01-01" }] })), "failed-precondition", /controlled substance/i);
+
+    // Even a count that already holds such a row can't be approved.
+    const ref = db.doc(`departments/${A}/emsInventoryCounts/${countId}`);
+    await ref.update({ status: "submitted", submittedBy: "officer-a", rows: [...count.rows.map((r) => ({ ...r, counted: r.expected })),
+      { rowId: `${fentanyl}-x`, itemId: fentanyl, itemName: "Fentanyl", unitOfMeasure: "each", key: lotKey("F-1", "2027-01-01"), lot: "F-1", expiration: "2027-01-01", expected: 2, counted: 5, reason: "x", added: false }] });
+    await expectCode(inv.approveCount(db, req("chief-a", { departmentId: A, countId })), "failed-precondition", /controlled substance/i);
+  });
 });

@@ -340,7 +340,7 @@ local emulators: running a check-off, results and readiness, sign-off, assignmen
   - a CSV export.
 - Record a **recall** for one or more medications and lot numbers (or every lot), with reason, class, source, reference and issue date:
   - every matching lot on hand is put **on hold** everywhere it's stocked;
-  - a lot received later while the recall is open is held when received;
+  - a lot added later while the recall is open (received, found in a count, or put back by a reversal) is held;
   - the recall shows the recalled stock by location, with a button to return it to the vendor;
   - a recall closes as **completed** once no recalled stock is left, or as **withdrawn** (with a note), which releases its holds.
 - Put a lot **on hold** by hand (a temperature excursion, say) and release it with a note. A hold can't be released while an open recall covers the lot.
@@ -356,7 +356,7 @@ local emulators: running a check-off, results and readiness, sign-off, assignmen
 
 ### Controlled substances
 
-A medication can be marked Schedule II–V, but its stock isn't tracked here: the ledger refuses it, and the stock screens leave it out. E5 adds the separate controlled-substance ledger with witnesses and seals.
+A medication can be marked Schedule II–V, but its stock isn't tracked here: the ledger and physical counts refuse it, and the stock screens leave it out. E5 adds the separate controlled-substance ledger with witnesses and seals.
 
 ### Data (under `departments/{id}/`, written only by the callables)
 
@@ -384,10 +384,10 @@ Supply permissions no longer allow anything on medications, and medication permi
 | Suite | New tests | Covers |
 |---|---|---|
 | `tests/unit/emsMedications.test.mjs` | 10 | NDC forms; recall lot matching; held lots in picking, par flags and ledger lines; client constants match the server; the expiration and lot lists |
-| `tests/functions/emsMedications.test.mjs` | 11 | catalog fields and permissions; lot and expiration required; ledger item class; supply-only members refused; controlled substances refused; recall holds across locations; use refused, quarantine transfer, return, close completed; recalled lot held on receipt; withdraw releases; manual holds; recalls take only medications and stay in the department; count approval keeps holds |
+| `tests/functions/emsMedications.test.mjs` | 14 | catalog fields and permissions; lot and expiration required; ledger item class; supply-only members refused; controlled substances refused; recall holds across locations; use refused, quarantine transfer, return, close completed; recalled lot held on receipt; withdraw releases; manual holds; recalls take only medications and stay in the department; count approval keeps holds; reversals and found stock of a recalled lot are held; counts refuse controlled substances |
 | `tests/rules/emsMedications.rules.test.mjs` | 4 | holds, recalls and medications readable with a medication or inventory key; others and other departments refused; plan without the module refused; no browser writes |
 
-Full suite on this branch: lint, build, unit 882/882, rules 193/193, functions 280/280.
+Full suite on this branch: lint, build, unit 882/882, rules 193/193, functions 283/283.
 
 Checked in the browser on local emulators:
 - **Stock:** held lots and "All on hold" show; nothing on hold offers "Record use"; a recalled unit counts as out of stock.
