@@ -38,16 +38,19 @@ function usePhotoUrl(attachment, where) {
 function PhotoTile({ attachment, where, onRemove, onOpen }) {
   const url = usePhotoUrl(attachment, where);
   const sent = Boolean(attachment.uploaded?.recorded);
+  // Once sending has started (a file id is given) the photo may already be on the server: the next send finishes it,
+  // and it's removed in the RMS after that. Removing it here would leave the uploaded file behind.
+  const sending = !sent && Boolean(attachment.fileId);
   return (
     <li className="fa-pcr-doc">
       <button type="button" className="fa-thumb" disabled={!url} onClick={() => onOpen(url, attachment)} aria-label={`View ${pcrFileKindLabel(attachment.kind)}`}>
         {url ? <img src={url} alt="" /> : sent ? <CheckCircle2 size={22} /> : <CircleDashed size={22} />}
       </button>
-      {onRemove && !sent ? (
+      {onRemove && !sent && !sending ? (
         <button type="button" className="fa-thumb-x" onClick={() => onRemove(attachment.id)} aria-label={`Remove ${pcrFileKindLabel(attachment.kind)}`}><X size={16} /></button>
       ) : null}
       <span className="fa-pcr-doc-label">{pcrFileKindLabel(attachment.kind)}</span>
-      <small className="fa-hint">{sent ? "Sent" : "On this phone"}</small>
+      <small className="fa-hint">{sent ? "Sent" : sending ? "Sending" : "On this phone"}</small>
     </li>
   );
 }

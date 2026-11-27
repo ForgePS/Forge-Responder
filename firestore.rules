@@ -995,7 +995,7 @@ service cloud.firestore {
             && ((pcrExists(departmentId, pcrId)
                 && (request.auth.uid in pcrDoc(departmentId, pcrId).data.get("crewUids", [])
                   || memberCanAny(departmentId, pcrReadAllKeys())))
-              || (resource != null && resource.data.get("createdByUid", "") == request.auth.uid));
+              || (!pcrExists(departmentId, pcrId) && resource != null && resource.data.get("createdByUid", "") == request.auth.uid));
           // Not in the shared demo department: its login is public, and these are photos of real IDs.
           allow create: if pcrFilesWritable(departmentId, pcrId)
             && !isDemoDepartment(departmentId)

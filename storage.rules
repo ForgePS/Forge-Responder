@@ -223,7 +223,8 @@ service firebase.storage {
         && ((firestore.exists(pcrStoragePath(departmentId, pcrId))
             && (request.auth.uid in firestore.get(pcrStoragePath(departmentId, pcrId)).data.get("crewUids", [])
               || emsMemberCanAny(departmentId, ["viewAllPcrs", "unlockPcrs", "exportPcrs", "reviewPcrs"])))
-          || (resource.metadata != null && resource.metadata.get("uploadedBy", "") == request.auth.uid));
+          || (!firestore.exists(pcrStoragePath(departmentId, pcrId))
+            && resource.metadata != null && resource.metadata.get("uploadedBy", "") == request.auth.uid));
       // Not in the shared demo department: its login is public, and these are photos of real IDs.
       allow create: if isAuthenticated()
         && departmentId != "forge-demo"

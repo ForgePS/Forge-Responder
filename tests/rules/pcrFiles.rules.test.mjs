@@ -106,6 +106,17 @@ describe("billing documents: reading", () => {
   });
 });
 
+describe("billing documents: after the report arrives", () => {
+  it("an uploader taken off the crew no longer reads them", async () => {
+    await seedFile("charter", "fileid0001", "pcr-1");
+    await assertSucceeds(getBytes(ref(st("charter"), storagePath())));
+    await assertSucceeds(getDoc(doc(fs("charter"), recordPath())));
+    await seedReport();
+    await assertFails(getBytes(ref(st("charter"), storagePath())));
+    await assertFails(getDoc(doc(fs("charter"), recordPath())));
+  });
+});
+
 describe("billing documents: adding", () => {
   it("the crew adds them to a draft; members who may unlock reports do too", async () => {
     await seedReport();

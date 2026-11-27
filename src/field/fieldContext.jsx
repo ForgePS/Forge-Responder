@@ -124,6 +124,8 @@ export function useRecordForm({ kind, localId: initialLocalId, initialData, desc
   }, [toast, kind, localId, snapshot.departmentId, snapshot.uid]);
 
   const removePhoto = useCallback(async (id) => {
+    // A photo whose upload has started (fileId) may be on the server already; keep it so the next send finishes it.
+    if (latest.current.attachments.find((attachment) => attachment.id === id)?.fileId) return;
     dirtyRef.current = true;
     setAttachments((current) => current.filter((attachment) => attachment.id !== id));
     await removeAttachment(id);
