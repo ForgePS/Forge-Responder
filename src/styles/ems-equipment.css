@@ -1,0 +1,65 @@
+/* EMS Equipment (src/pages/EmsEquipmentPage.jsx). Builds on ems-inventory.css and the
+   shared panel, table, badge and form styles; only equipment specifics live here. */
+.ems-equipment-page .fleet-summary { margin-bottom: 16px; }
+
+.ems-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.ems-open { padding: 0; font: inherit; }
+.ems-inline-check { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.ems-subhead { display: flex; align-items: center; gap: 6px; font-size: 15px; margin: 18px 0 8px; color: var(--rms-text-strong); }
+.ems-hint { margin: 0 0 8px; font-size: 13px; }
+.ems-pre { white-space: pre-wrap; }
+
+.ems-equipment-detail { display: grid; gap: 4px; }
+.ems-equipment-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
+.ems-equipment-summary { display: grid; gap: 6px; min-width: 0; }
+.ems-equipment-summary p { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ems-where { font-size: 16px; font-weight: 600; color: var(--rms-text-strong); }
+.ems-problem {
+  display: flex; gap: 6px; align-items: flex-start; padding: 8px 10px; border-radius: 6px;
+  background: color-mix(in srgb, var(--rms-warning) 12%, transparent); color: var(--rms-text-strong);
+}
+.ems-qr { margin: 0; display: grid; gap: 6px; justify-items: center; flex: none; }
+.ems-qr img { background: #fff; border-radius: 4px; padding: 4px; }
+
+.ems-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+.ems-actions button { min-height: 40px; }
+.ems-action-form { margin-top: 8px; padding: 12px; border: 1px solid var(--rms-border); border-radius: 8px; background: var(--rms-bg-surface-2); }
+.ems-radio-row { display: flex; gap: 18px; border: 0; padding: 0; margin: 0; }
+.ems-radio-row legend { font-size: 13px; color: var(--rms-text-muted); margin-bottom: 6px; }
+.ems-radio-row label { display: inline-flex; gap: 6px; align-items: center; min-height: 36px; }
+
+.ems-details {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 14px 0 0;
+}
+.ems-detail { min-width: 0; }
+.ems-detail dt { font-size: 12px; color: var(--rms-text-muted); }
+.ems-detail dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+
+.ems-files-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ems-files { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.ems-files li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+.ems-files li .link-button { overflow-wrap: anywhere; text-align: left; }
+.ems-upload { position: relative; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.ems-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+
+.ems-history { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ems-history li { display: grid; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--rms-border); }
+.ems-history li:last-child { border-bottom: 0; }
+
+.ems-scan { display: grid; gap: 12px; max-width: 560px; }
+.ems-scan-camera { display: grid; gap: 8px; justify-items: start; }
+.ems-scan-start { min-height: 52px; font-size: 16px; padding: 0 20px; }
+.ems-scan-video { width: 100%; max-width: 480px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: #000; }
+.ems-scan-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.ems-scan-form .config-field { flex: 1 1 260px; }
+.ems-scan-form input { min-height: 44px; font-size: 16px; }
+.ems-scan-form button { min-height: 44px; }
+.ems-scan-results ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+
+@media (max-width: 640px) {
+  .ems-equipment-head { flex-direction: column-reverse; align-items: stretch; }
+  .ems-qr { justify-items: start; grid-auto-flow: column; align-items: center; justify-content: start; }
+  .ems-details, .ems-files-grid { grid-template-columns: minmax(0, 1fr); }
+  .ems-actions button { flex: 1 1 calc(50% - 8px); min-height: 44px; justify-content: center; }
+  .ems-scan-start { width: 100%; justify-content: center; }
+}

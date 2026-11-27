@@ -94,7 +94,7 @@ function CountEditor({ departmentId, uid, count, items, canApprove, onBack, onMe
             <strong>Found stock that isn't listed?</strong>
             <select value={found.itemId} onChange={(e) => setFound((p) => ({ ...p, itemId: e.target.value }))} aria-label="Found item">
               <option value="">Choose an item</option>
-              {[...items].filter((i) => i.active !== false).sort((a, b) => a.name.localeCompare(b.name)).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+              {[...items].filter((i) => i.active !== false && !i.controlledSchedule).sort((a, b) => a.name.localeCompare(b.name)).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
             </select>
             <input placeholder="Lot" value={found.lot} maxLength={60} onChange={(e) => setFound((p) => ({ ...p, lot: e.target.value }))} aria-label="Found lot" />
             <input type="date" value={found.expiration} onChange={(e) => setFound((p) => ({ ...p, expiration: e.target.value }))} aria-label="Found expiration" />

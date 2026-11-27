@@ -5,8 +5,11 @@ only when it has server logic, rules, UI and passing tests.
 
 | Slice | Status |
 |---|---|
-| E1 Foundation: module, permissions, audit, supply inventory core | **Built** (branch `feat/ems-inventory-foundation`, not deployed) |
-| E2 – E9 | Not started |
+| E1 Foundation: module, permissions, audit, supply inventory core | **Deployed** (PR #97, staging and production) |
+| E2 Equipment: records, lifecycle, moves, QR labels and scanning, import from Assets | **Deployed** (staging and production) |
+| E3 Check-offs and readiness: EMS checklist items, assignments, schedules, sign-off, readiness rules | **Deployed** (PR #104, staging and production) |
+| E4 Medications: medication catalog, medication stock, expirations, recalls and lot holds | **Built** (branch `feat/ems-e4`, not deployed) |
+| E5 – E9 | Not started |
 
 ---
 
@@ -105,3 +108,307 @@ Full suite on this branch: lint, build, unit 793/793, rules 173/173, functions 2
    need `emsManagement` added in the Creator Console.
 4. Rollback: redeploy the previous hosting build and functions. The new collections are inert without the UI; nothing
    existing was changed.
+
+---
+
+## E2 — Equipment
+
+### What a department can do
+
+- **Register equipment.** Monitors, AEDs, suction units, stretchers, ventilators and the rest of the spec's 15
+  categories, plus categories the department adds. Each record holds:
+  - name, category and equipment ID (unique in the department; one is made if left blank)
+  - make, model, serial number and barcode
+  - purchase date and cost, vendor, warranty end
+  - condition and notes
+  - inspection, calibration and maintenance schedules (an interval in days, or a set next date)
+- **Where it is.** Each item is either on a Fleet vehicle (status Assigned) or at an EMS storage location from E1
+  (status Available). The record copies the name and station of its vehicle or location.
+- **Statuses**: Available, Assigned, In Service, Inspection Due, Maintenance Required, Out of Service, Missing,
+  Retired, Disposed. Inspection Due is worked out from the due dates when shown, not stored, so it is always current.
+- **Actions.** The history records each one: who, when, and the status before and after.
+  - Verify the item is there. If it was marked missing, this marks it found and puts back its earlier status.
+  - Report damage or a deficiency. The item either stays in use or is taken out of use until repaired.
+  - Request maintenance, or report the item missing.
+  - Record an inspection or calibration. A pass sets the next due date from the interval. A fail needs notes and
+    holds the item for repair.
+  - Complete maintenance. This clears the problem and returns the item to use.
+  - Move it to another vehicle or storage location.
+  - Change its status by hand. Out of Service and Retired need a reason. Disposed can only follow Retired, and it
+    can't be changed afterwards.
+- **Photos and documents** on each record: up to 20 of each, 25 MB per file. Photos must be images.
+- **QR labels.** Each record shows its QR code. Select records in the list to print a sheet of 66 mm labels, each
+  with the item's name, ID and QR code.
+- **Scan.** A phone's camera app opens the link in the QR code straight to the record
+  (`?page=ems-equipment&equipment=<id>`). The in-app **Scan** tab uses the browser's barcode reader if the browser has
+  one. Otherwise the code can be typed, or sent by a scanner that acts as a keyboard. A scan matches the QR link,
+  equipment ID, serial number or barcode.
+- **History tab** listing every equipment event, with filters.
+- **Import from the classic Assets list** (`lists/hlfd-rms-assets`):
+  - Preview each row as it would be imported, including the vehicle it would be placed on.
+  - Choose which rows to import. Rows already imported, or whose ID is already in use, are skipped.
+  - A preview shows up to 400 rows still to import. A longer list is imported in rounds: import, then preview again.
+  - Each imported record's id comes from its row, so two imports running at once can't create the same row twice.
+  - The Assets list itself is not changed.
+  - An import can be rolled back. Records nobody has changed since the import are deleted. Changed records are kept
+    and listed.
+
+### How it is built
+
+| Piece | Where |
+|---|---|
+| Shared EMS helpers used by E1 and E2: caller checks, ids, audit | `functions/lib/emsCommon.js` |
+| Lifecycle rules, due dates, mapping of Assets list rows | `functions/lib/emsEquipment/logic.js` |
+| 12 callables: save, transfer, verify, report problem, record inspection, complete maintenance, set status, add file, remove file, preview import, apply import, roll back import | `functions/lib/emsEquipment/service.js`, exported in `functions/index.js` as `emsEquipment*` |
+| Client service, display helpers, labels | `src/lib/ems/emsEquipmentService.js`, `equipmentDisplay.js`, `equipmentLabels.js` |
+| Page and tabs | `src/pages/EmsEquipmentPage.jsx`, `src/components/ems/equipment/*`, `src/styles/ems-equipment.css` |
+| Navigation | **EMS** sidebar group → **EMS Equipment** |
+| Rules | Browsers can only read; reads need a key from `emsEquipmentReadKeys()` and the `emsManagement` module. Inventory or equipment readers can read storage locations. Files use the existing department storage rule. |
+| Index | `emsEquipmentEvents`: `equipmentId` ascending, `at` descending |
+
+Every action runs as one transaction that:
+
+1. Reads the record.
+2. Checks the caller's permission and the lifecycle rule.
+3. Updates the record and adds 1 to its version.
+4. Creates the history event.
+5. Writes the audit event.
+
+The history event's id comes from the browser's request id and is written with `create()`. So a retry or a double
+tap changes the record only once. A request id reused by a different person, or for a different record, is refused.
+If two people move the same item at the same moment, both moves are applied, one after the other, and both appear in
+the history.
+
+When a manager opens the page and Fleet has no vehicles yet, the page fills Fleet from the classic apparatus list,
+as the Fleet pages already do. That way equipment and imported rows can be placed on vehicles.
+
+### Data (under `departments/{id}/`, written only by the callables)
+
+| Collection | Holds |
+|---|---|
+| `emsEquipment` | each record: details, status, condition, `assignment` (vehicle or location, with its name and station), schedules and next due dates, open problem, missing report, photos and documents, lookup keys for ID / serial / barcode, the `migration` tag, `version` |
+| `emsEquipmentEvents` | history: type, status before and after, place before and after, notes, who, when |
+| `emsEquipmentMigrations` | one per import: rows imported, ids created, rows skipped and why, rollback result |
+
+Files are stored in Storage under `departments/{id}/emsEquipment/{equipmentId}/`.
+
+### Permissions (new)
+
+| Key | Lets a member | Built-in roles |
+|---|---|---|
+| `viewEmsEquipment` | see equipment, history and labels; scan | every built-in role |
+| `checkEmsEquipment` | verify; report damage, maintenance needed or missing; record inspections | Fire Chief, Battalion Chief, Company Officer, Firefighter |
+| `transferEmsEquipment` | move equipment between vehicles and storage | Fire Chief, Battalion Chief, Company Officer |
+| `manageEmsEquipment` | register and edit; add and remove files; change status; complete maintenance; import and roll back | Fire Chief, Battalion Chief |
+
+The server refuses a move from anyone without `transferEmsEquipment`, so opening a scanned link doesn't let anyone
+move equipment.
+
+### Tests
+
+| Suite | New tests | Covers |
+|---|---|---|
+| `tests/unit/emsEquipment.test.mjs` | 21 | lifecycle and status rules, due dates, flags, mapping of Assets list rows, scan matching, client and server constants match |
+| `tests/functions/emsEquipment.test.mjs` | 26 | each action end to end with history and audit; permissions per role; a retry acts once; a reused request id is refused; two moves at once; missing and found; failed inspection; retire and dispose; files; another department refused; plan without the module; import preview, apply, skips and rollback; lists over 400 rows; two imports at once; lists stored one record per document; event timestamps |
+| `tests/rules/emsEquipment.rules.test.mjs` | 6 | reads need an equipment permission; import reports need `manageEmsEquipment`; other departments and plans without the module refused; no browser writes |
+
+`tests/rules/firestore.rules.test.mjs` and `helpDesk.rules.test.mjs` used to connect to fixed ports 8080 and 9199.
+They now use the ports `emulators:exec` assigns, so a test run can't clear another emulator on the default ports.
+
+Full suite on this branch: lint, build, unit 842/842, rules 185/185, functions 255/255.
+
+### Known limits of E2
+
+- Inspection is pass or fail with notes. Checklists for each equipment type come with the checklist engine (E3).
+- The in-app camera scanner needs a browser with a barcode reader (for example Chrome and Edge on Android). It has
+  not been tested on a device yet. Phones can always scan the QR label with their camera app instead.
+- No reminders or notifications for due inspections yet (E8). The list and summary show what is due.
+- Crews can move or check any equipment, not only their own unit's. Limiting them to their unit comes with
+  "My Assigned Unit" (E3/E8).
+- The list loads every equipment record live, which is fine at the size of one department's equipment.
+
+### Deploying E2
+
+1. Run `firebase deploy --only functions,firestore:rules,firestore:indexes --project staging`, then deploy hosting.
+   Storage rules are unchanged.
+2. Wait for the `emsEquipmentEvents` index to finish building before opening equipment history.
+3. Built-in roles get the new permissions automatically. Custom roles need them added in Admin.
+4. To roll back, redeploy the previous build. Without the UI nothing uses the new collections, and imports never
+   change the Assets list.
+
+---
+
+## E3 — Check-offs and readiness
+
+### What a department can do
+
+- Build check-off checklists in **Apparatus Check Setup** with new item types: dropdown, multiple choice, date,
+  signature (typed name), **EMS equipment on the unit** and **EMS supplies on the unit**.
+- When a check starts, the EMS items fill in with the equipment assigned to that vehicle and the supply balances
+  at the vehicle's locations (and locations nested under them). Crews mark each piece present, damaged or missing
+  (optionally out of use), and count each supply, noting expired stock.
+- **Assign** a checklist to a vehicle, a fleet class or a station, daily, weekly, monthly or every N days, with or
+  without a supervisor sign-off. Each unit shows done, due or overdue.
+- **Sign off** a check-off, or send it back with a note. Nobody can sign off their own check-off.
+- **Readiness** on the Units tab: Ready, Ready with issues or Not ready, with the reasons. Ten rules can each be set
+  to Not ready, Warning or Off, plus equipment categories every unit must carry.
+- **History** of recorded check-offs, with each problem found.
+
+### How it is built
+
+- Check-offs run on the Fleet checklist engine (`fleetChecklistTemplates`, `fleetChecks`). The browser still
+  completes the check. EMS failures are marked `ems: true` and don't create Fleet defects.
+- After completion, `emsCheckoffsRecordResults` (only the check's operator) stores the result at
+  `emsCheckoffResults/{checkId}`, so a retry records once. Equipment answers go to E2 equipment history
+  (damaged or missing reports, out of use) with request ids derived from the check, so they also apply once.
+  Supply counts never change stock; they report short, out, expired and counts that differ from the ledger.
+- A completed check whose results weren't recorded (for example the connection dropped) shows under
+  "Finish recording your check-offs" for 7 days.
+- Readiness is worked out in the browser from assignments, results, equipment and balances. It doesn't change
+  the vehicle's Fleet status; a vehicle Fleet has out of service is always Not ready.
+- The field app hides checklists with EMS items for now; it renders the other new item types.
+
+### Data (under `departments/{id}/`, written only by the callables)
+
+| Collection | Holds |
+|---|---|
+| `emsCheckoffAssignments` | checklist, target, frequency, sign-off needed, active |
+| `emsCheckoffResults/{checkId}` | equipment and supply answers, problems, verification state, sign-off |
+| `emsCheckoffSettings/main` | readiness rule severities and required equipment categories |
+
+### Permissions (new)
+
+| Key | Allows | Built-in roles |
+|---|---|---|
+| `viewEmsCheckoffs` | see units, results, assignments and rules | all |
+| `runEmsCheckoffs` | run a check-off and record its results | Fire Chief, Battalion Chief, Company Officer, Firefighter |
+| `signOffEmsCheckoffs` | sign off or send back another member's check-off | Fire Chief, Battalion Chief, Company Officer |
+| `manageEmsCheckoffs` | assignments and readiness rules | Fire Chief, Battalion Chief |
+
+### Fix included: permissions added after a role was saved
+
+The browser used a department's saved role *instead of* the built-in defaults, while the server merges the
+defaults under the saved role. Any permission added since a role was last saved was missing in the browser, which
+is why **EMS Equipment** didn't show in the sidebar for saved roles. The browser now merges the same way as the
+server (`tests/unit/rolePermissionMerge.test.mjs`). `DEMO_SEED_VERSION` goes to 12 so the demo department
+re-seeds its roles.
+
+### Tests
+
+| Suite | New tests | Covers |
+|---|---|---|
+| `tests/unit/emsCheckoffs.test.mjs` | 23 | item answers and problems, schedules and month ends, assignment coverage, readiness rules |
+| `tests/functions/emsCheckoffs.test.mjs` | 13 | record once; only the operator; equipment history applied once; supply judging; sign-off rules; assignments; rules; permissions; other departments |
+| `tests/rules/emsCheckoffs.rules.test.mjs` | 4 | reads need a check-off key; no browser writes |
+| `tests/unit/rolePermissionMerge.test.mjs` | 2 | new default permissions reach saved roles |
+
+Full suite on this branch: lint, build, unit 867/867, rules 189/189, functions 268/268. Checked in the browser on
+local emulators: running a check-off, results and readiness, sign-off, assignments and rules.
+
+### Known limits of E3
+
+- Supply counts don't adjust stock; a count that differs from the ledger is reported for someone to fix in Supply
+  Inventory.
+- Signatures are a typed name, not a drawn signature.
+- EMS check-offs aren't in the field app yet.
+- No reminders for due or overdue check-offs yet (E8).
+
+### Deploying E3
+
+1. Deploy functions (in small groups on staging), rules and indexes, then hosting. Check the four new callables'
+   public access afterwards.
+2. Run `node scripts/sync-member-grants.mjs` (dry run, then `--apply`) on each project. Server grants are only
+   recomputed when a member or role changes, so without this the new E2 and E3 permissions can't read their data.
+3. Custom roles need the new permissions added in Admin.
+
+---
+
+## E4 — Medications
+
+### What a department can do
+
+- Keep a **medication catalog** in the new **EMS Medications** page. Each medication records:
+  - generic and brand name, strength, concentration, dosage form and routes;
+  - NDC (checked, and stored in 11-digit 5-4-2 form too) and RxNorm code;
+  - storage (room temperature, refrigerated, frozen) and protect from light;
+  - DEA schedule, high-alert flag and a look-alike / sound-alike warning.
+
+  Every medication needs a lot number and an expiration date when received.
+- Track **medication stock** by location and lot with the E1 ledger: receive, use, transfer, remove expired or damaged, waste, return to vendor. Stock rotates by FEFO. History and reversals work the same as for supplies, with the department's own medication permissions.
+- See **expirations** by the department's warning windows (7, 14, 30, 60, 90 days by default):
+  - expired stock still on hand, removable from the list in one click;
+  - a CSV export.
+- Record a **recall** for one or more medications and lot numbers (or every lot), with reason, class, source, reference and issue date:
+  - every matching lot on hand is put **on hold** everywhere it's stocked;
+  - a lot added later while the recall is open (received, found in a count, or put back by a reversal) is held;
+  - the recall shows the recalled stock by location, with a button to return it to the vendor;
+  - a recall closes as **completed** once no recalled stock is left, or as **withdrawn** (with a note), which releases its holds.
+- Put a lot **on hold** by hand (a temperature excursion, say) and release it with a note. A hold can't be released while an open recall covers the lot.
+
+### How holds work
+
+- A hold is department-wide for one lot of one item (`emsLotHolds/{itemId}__{lotKey}`). Each balance's lots carry a `held` flag and the balance keeps `heldQuantity`. Every write rewrites these from the active holds: transactions, reversals, count approvals, and placing or releasing a hold.
+- What each kind of transaction can do with held stock:
+  - **Use:** never takes held stock, even when the lot is chosen by hand.
+  - **Transfer:** moves a held lot only when it's chosen (to a quarantine area, say), and the lot stays held.
+  - **Removals** (expired, damaged, waste, return to vendor): may take held stock.
+- Low stock and out of stock count only stock that isn't held. A unit whose only naloxone is recalled is out of stock, so E3 readiness flags it.
+
+### Controlled substances
+
+A medication can be marked Schedule II–V, but its stock isn't tracked here: the ledger and physical counts refuse it, and the stock screens leave it out. E5 adds the separate controlled-substance ledger with witnesses and seals.
+
+### Data (under `departments/{id}/`, written only by the callables)
+
+| Collection | Holds |
+|---|---|
+| `emsInventoryItems` | medications too: `itemClass: "medication"` and the medication fields. An item's class never changes |
+| `emsInventoryTransactions` | records now carry `itemClass`, so the medication history queries only medications |
+| `emsLotHolds/{itemId}__{lotKey}` | active or released; the open recalls and/or manual reason behind it |
+| `emsMedicationRecalls/{id}` | medications, lot numbers, reason, class, source, reference, the lots held when recorded; open → closed (completed or withdrawn) |
+
+New callables: `emsMedicationsCreateRecall`, `emsMedicationsCloseRecall`, `emsMedicationsPlaceHold`, `emsMedicationsReleaseHold`. New indexes on `emsInventoryTransactions`: `itemClass` + `createdAt`, and `itemClass` + `locationIds` + `createdAt`.
+
+### Permissions (new)
+
+| Key | Allows | Built-in roles |
+|---|---|---|
+| `viewEmsMedications` | see medications, stock, expirations, recalls and holds | all |
+| `useEmsMedications` | record use, transfers, expired and damaged removals | Fire Chief, Battalion Chief, Company Officer, Firefighter |
+| `manageEmsMedications` | catalog, receiving, par levels, waste and returns, recalls and holds | Fire Chief, Battalion Chief |
+
+Supply permissions no longer allow anything on medications, and medication permissions don't allow anything on supplies. Medication readers can read the shared inventory collections (locations, balances, the ledger), because medications live in them. Counts, settings and locations stay in EMS Supply Inventory, and a count of a location counts everything at it.
+
+### Tests
+
+| Suite | New tests | Covers |
+|---|---|---|
+| `tests/unit/emsMedications.test.mjs` | 10 | NDC forms; recall lot matching; held lots in picking, par flags and ledger lines; client constants match the server; the expiration and lot lists |
+| `tests/functions/emsMedications.test.mjs` | 14 | catalog fields and permissions; lot and expiration required; ledger item class; supply-only members refused; controlled substances refused; recall holds across locations; use refused, quarantine transfer, return, close completed; recalled lot held on receipt; withdraw releases; manual holds; recalls take only medications and stay in the department; count approval keeps holds; reversals and found stock of a recalled lot are held; counts refuse controlled substances |
+| `tests/rules/emsMedications.rules.test.mjs` | 4 | holds, recalls and medications readable with a medication or inventory key; others and other departments refused; plan without the module refused; no browser writes |
+
+Full suite on this branch: lint, build, unit 882/882, rules 193/193, functions 283/283.
+
+Checked in the browser on local emulators:
+- **Stock:** held lots and "All on hold" show; nothing on hold offers "Record use"; a recalled unit counts as out of stock.
+- **Recalls:**
+  - the recall lists its stock by location;
+  - returning it from the recall updates "Held now";
+  - closing as completed is blocked while stock remains;
+  - withdrawing needs a note.
+- **Expirations:** grouped by window, with Remove only on expired stock.
+- **Other pages and roles:** Supply Inventory no longer lists medications. A Captain sees Record use but not Receive or recall management.
+
+### Known limits of E4
+
+- No reminders for expiring or recalled stock yet (E8). The Expirations tab and the stock summary show them.
+- Recalls are entered by hand. There's no feed from FDA or vendor recall notices.
+- The crew (firefighter) menu doesn't list the EMS pages; that was already true for Supply Inventory and Check-offs.
+- RxNorm codes are typed in; picking from a list comes with the ePCR medication work (E6).
+
+### Deploying E4
+
+1. Deploy indexes and rules, then the functions (in small groups on staging; every function loads the role defaults), then hosting. Check the four new callables' public access afterwards.
+2. Wait for the two new `emsInventoryTransactions` indexes before opening the medication history.
+3. Run `node scripts/sync-member-grants.mjs` (dry run, then `--apply`) on each project, so existing members' server grants include the medication permissions.
+4. Custom roles need the medication permissions added in Admin.

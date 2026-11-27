@@ -153,7 +153,9 @@ service cloud.firestore {
     }
     // ---- EMS Management (supply inventory) ----
     function emsInventoryReadKeys() {
-      return ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments"];
+      // Medications (E4) share the catalog, balances and ledger with supplies.
+      return ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments",
+        "viewEmsMedications", "useEmsMedications", "manageEmsMedications"];
     }
     function emsModuleOn(departmentId) {
       return isPlatformCreator() || moduleOn(departmentId, "emsManagement");
@@ -161,6 +163,20 @@ service cloud.firestore {
     function canReadEmsInventory(departmentId) {
       return canAccessDepartment(departmentId) && emsModuleOn(departmentId)
         && memberCanAny(departmentId, emsInventoryReadKeys());
+    }
+    function emsEquipmentReadKeys() {
+      return ["viewEmsEquipment", "checkEmsEquipment", "transferEmsEquipment", "manageEmsEquipment"];
+    }
+    function canReadEmsEquipment(departmentId) {
+      return canAccessDepartment(departmentId) && emsModuleOn(departmentId)
+        && memberCanAny(departmentId, emsEquipmentReadKeys());
+    }
+    function emsCheckoffReadKeys() {
+      return ["viewEmsCheckoffs", "runEmsCheckoffs", "signOffEmsCheckoffs", "manageEmsCheckoffs"];
+    }
+    function canReadEmsCheckoffs(departmentId) {
+      return canAccessDepartment(departmentId) && emsModuleOn(departmentId)
+        && memberCanAny(departmentId, emsCheckoffReadKeys());
     }
     // ---- Training module ----
     function trainingViewKeys() {
@@ -583,7 +599,15 @@ service cloud.firestore {
         "emsInventoryBalances": "emsManagement",
         "emsInventoryTransactions": "emsManagement",
         "emsInventoryCounts": "emsManagement",
-        "emsAuditEvents": "emsManagement"
+        "emsAuditEvents": "emsManagement",
+        "emsEquipment": "emsManagement",
+        "emsEquipmentEvents": "emsManagement",
+        "emsEquipmentMigrations": "emsManagement",
+        "emsCheckoffAssignments": "emsManagement",
+        "emsCheckoffSettings": "emsManagement",
+        "emsCheckoffResults": "emsManagement",
+        "emsLotHolds": "emsManagement",
+        "emsMedicationRecalls": "emsManagement"
       }.get(collection, "");
     }
     // END generated module maps
@@ -846,6 +870,9 @@ service cloud.firestore {
         "formImports", "formSubmissions", "formTemplateVersions", "formTemplates",
         "pcrs",
         "emsSettings", "emsInventoryItems", "emsInventoryLocations", "emsInventoryBalances", "emsInventoryTransactions", "emsInventoryCounts", "emsAuditEvents",
+        "emsEquipment", "emsEquipmentEvents", "emsEquipmentMigrations",
+        "emsCheckoffAssignments", "emsCheckoffSettings", "emsCheckoffResults",
+        "emsLotHolds", "emsMedicationRecalls",
         "trainingRecords", "trainingTemplates", "trainingCourses", "trainingSessions", "trainingSkills",
         "trainingEvaluations", "trainingTaskBooks", "trainingTaskBookAssignments", "trainingRequirements",
         "trainingExemptions", "trainingComplianceSnapshots", "trainingCeRuleSets", "trainingCeAwards",
@@ -1135,7 +1162,8 @@ service cloud.firestore {
         allow write: if false;
       }
       match /emsInventoryLocations/{document} {
-        allow read: if canReadEmsInventory(departmentId);
+        // Equipment is stored at these locations too, so equipment readers see them.
+        allow read: if canReadEmsInventory(departmentId) || canReadEmsEquipment(departmentId);
         allow write: if false;
       }
       match /emsInventoryBalances/{document} {
@@ -1148,6 +1176,47 @@ service cloud.firestore {
       }
       match /emsInventoryCounts/{document} {
         allow read: if canReadEmsInventory(departmentId);
+        allow write: if false;
+      }
+      // EMS equipment (functions/lib/emsEquipment): records, their history and
+      // classic-list imports are written by Cloud Functions only; browsers read
+      // with an equipment permission and the emsManagement module on the plan.
+      match /emsEquipment/{document} {
+        allow read: if canReadEmsEquipment(departmentId);
+        allow write: if false;
+      }
+      match /emsEquipmentEvents/{document} {
+        allow read: if canReadEmsEquipment(departmentId);
+        allow write: if false;
+      }
+      // EMS check-offs (functions/lib/emsCheckoffs): assignments, readiness rules and
+      // recorded results are written by Cloud Functions only. The checks themselves
+      // are fleetChecks, under the Fleet rules.
+      match /emsCheckoffAssignments/{document} {
+        allow read: if canReadEmsCheckoffs(departmentId);
+        allow write: if false;
+      }
+      match /emsCheckoffSettings/{document} {
+        allow read: if canReadEmsCheckoffs(departmentId);
+        allow write: if false;
+      }
+      match /emsCheckoffResults/{document} {
+        allow read: if canReadEmsCheckoffs(departmentId);
+        allow write: if false;
+      }
+      // Medication recalls and lot holds (functions/lib/emsMedications): written by
+      // Cloud Functions only; read with an inventory or medication permission.
+      match /emsLotHolds/{document} {
+        allow read: if canReadEmsInventory(departmentId);
+        allow write: if false;
+      }
+      match /emsMedicationRecalls/{document} {
+        allow read: if canReadEmsInventory(departmentId);
+        allow write: if false;
+      }
+      match /emsEquipmentMigrations/{document} {
+        allow read: if canAccessDepartment(departmentId) && emsModuleOn(departmentId)
+          && memberCanAny(departmentId, ["manageEmsEquipment"]);
         allow write: if false;
       }
       match /emsAuditEvents/{document} {

@@ -138,9 +138,13 @@ export function mergeRolePermissions(roleIds = [], rolesById = {}) {
   }
   const merged = {};
   for (const roleId of roleIds) {
-    const role = rolesById[roleId] || defaultRolesById[roleId];
-    if (!role?.permissions) continue;
-    Object.assign(merged, role.permissions);
+    // Built-in defaults first, then the department's saved role on top, like the
+    // server (functions/lib/memberGrants.js). A permission added after the role
+    // was saved gets its default instead of being missing.
+    const defaults = defaultRolesById[roleId]?.permissions;
+    const stored = rolesById[roleId]?.permissions;
+    if (defaults) Object.assign(merged, defaults);
+    if (stored) Object.assign(merged, stored);
   }
   return merged;
 }
@@ -226,6 +230,21 @@ export function canAccessNavItem(itemName, permissions = {}, options = {}) {
   if (itemName === "EMS Supply Inventory") {
     return Boolean(options.isCreator)
       || ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments", "manageEmsSettings", "viewEmsAudit"]
+        .some((key) => hasPermission(permissions, key));
+  }
+  if (itemName === "EMS Equipment") {
+    return Boolean(options.isCreator)
+      || ["viewEmsEquipment", "checkEmsEquipment", "transferEmsEquipment", "manageEmsEquipment"]
+        .some((key) => hasPermission(permissions, key));
+  }
+  if (itemName === "EMS Medications") {
+    return Boolean(options.isCreator)
+      || ["viewEmsMedications", "useEmsMedications", "manageEmsMedications"]
+        .some((key) => hasPermission(permissions, key));
+  }
+  if (itemName === "EMS Check-offs") {
+    return Boolean(options.isCreator)
+      || ["viewEmsCheckoffs", "runEmsCheckoffs", "signOffEmsCheckoffs", "manageEmsCheckoffs"]
         .some((key) => hasPermission(permissions, key));
   }
   // Crews see the reports they charted; supervisors with a read-all permission see every report.

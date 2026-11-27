@@ -171,6 +171,34 @@ function plainCodeLabel(text) {
 }
 
 /**
+ * The charting sections that offer the "Not documented…" picker (pertinent negatives and not-values such as
+ * Not Applicable): History (eHistory) and Assessment (eExam). Elsewhere an empty Required field is exported as
+ * Not Recorded on its own (xmlExport fillNotRecorded).
+ */
+export const PERTINENT_NEGATIVE_CONTAINERS = Object.freeze(["eHistory", "eExam"]);
+
+function offersNotDocumented(field) {
+  return PERTINENT_NEGATIVE_CONTAINERS.includes(String(field?.el || "").split(".")[0]);
+}
+
+// All of `list` in History and Assessment; elsewhere only a value already saved (`current`), so it shows and can be
+// cleared. fieldInput keeps the full lists, which label saved values everywhere (summaries, narrative facts).
+function choicesFor(field, list, current) {
+  if (offersNotDocumented(field)) return list;
+  return current ? list.filter((o) => o.code === String(current)) : [];
+}
+
+/** The pertinent negatives a crew can pick for a field. */
+export function pertinentNegativeChoices(field, current = "") {
+  return choicesFor(field, field?.pn || [], current);
+}
+
+/** The not-values (Not Applicable, Not Recorded…) a crew can pick for a field. */
+export function notValueChoices(field, current = "") {
+  return choicesFor(field, field?.nv || [], current);
+}
+
+/**
  * Everything a screen needs to render one NEMSIS field.
  * @returns {{ el: string, label: string, definition: string, usage: string, national: boolean, required: boolean,
  *   kind: string, repeating: boolean, options: {code: string, label: string}[]|null, nv: {code,label}[], pn: {code,label}[],

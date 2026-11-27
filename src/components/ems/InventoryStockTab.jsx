@@ -83,6 +83,7 @@ function AddParModal({ departmentId, items, locations, onClose, onDone }) {
 /** Every item at every location, with lots, par and expiration state. */
 export default function InventoryStockTab({
   departmentId, items, locations, balances, settings, canUse, canManage, onRecord, onMessage,
+  title = "Stock on hand", emptyText = "",
 }) {
   const [filters, setFilters] = useState({ locationId: "", category: "", search: "", show: "all" });
   const [parFor, setParFor] = useState(null);
@@ -106,7 +107,8 @@ export default function InventoryStockTab({
   const filtered = rows.filter(({ balance, item, location, path, stock, expiration }) => {
     if (filters.locationId && location.id !== filters.locationId && !(location.ancestorIds || []).includes(filters.locationId)) return false;
     if (filters.category && item.category !== filters.category) return false;
-    if (filters.search && !`${item.name} ${item.barcode || ""} ${item.manufacturerPartNumber || ""} ${path}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    if (filters.search && !`${item.name} ${item.genericName || ""} ${item.brandName || ""} ${item.ndc || ""} ${item.barcode || ""} ${item.manufacturerPartNumber || ""} ${path}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    if (filters.show === "held" && !(balance.heldQuantity > 0)) return false;
     if (filters.show === "low" && !["low", "out"].includes(stock.key)) return false;
     if (filters.show === "expiring" && !["warning", "soon", "expired"].includes(expiration.level)) return false;
     if (filters.show === "expired" && expiration.level !== "expired") return false;
@@ -129,7 +131,7 @@ export default function InventoryStockTab({
     <>
       <FleetSummary items={summary} />
       <Panel
-        title="Stock on hand"
+        title={title}
         icon={Boxes}
         action={(
           <div className="df-card-actions">
@@ -154,9 +156,10 @@ export default function InventoryStockTab({
             <option value="low">Low or out of stock</option>
             <option value="expiring">Expiring or expired</option>
             <option value="expired">Expired only</option>
+            {balances.some((b) => b.heldQuantity > 0) ? <option value="held">On hold</option> : null}
           </select>
         </div>
-        {!items.length ? <p className="occupancy-muted">The catalog is empty. {canManage ? "Add items on the Catalog tab and locations on the Locations tab, then receive stock." : "An inventory manager needs to set it up."}</p> : null}
+        {!items.length ? <p className="occupancy-muted">{emptyText || `The catalog is empty. ${canManage ? "Add items on the Catalog tab and locations on the Locations tab, then receive stock." : "An inventory manager needs to set it up."}`}</p> : null}
         <div className="data-table-wrap">
           <table className="ems-table">
             <thead>
@@ -167,7 +170,10 @@ export default function InventoryStockTab({
                 <tr key={balance.id}>
                   <td><strong>{item.name}</strong><small className="occupancy-muted ems-block">{item.category}</small></td>
                   <td>{path}</td>
-                  <td className="ems-num">{balance.onHand || 0} <small className="occupancy-muted">{item.unitOfMeasure || "each"}</small></td>
+                  <td className="ems-num">
+                    {balance.onHand || 0} <small className="occupancy-muted">{item.unitOfMeasure || "each"}</small>
+                    {balance.heldQuantity > 0 ? <small className="ems-block ems-held-text">{balance.heldQuantity} on hold</small> : null}
+                  </td>
                   <td>{balance.par ? `${balance.par.min ?? "–"} / ${balance.par.max ?? "–"} / ${balance.par.reorderPoint ?? "–"}` : <span className="occupancy-muted">None</span>}</td>
                   <td>
                     {(balance.lots || []).length ? (
@@ -178,6 +184,7 @@ export default function InventoryStockTab({
                             <li key={lot.key}>
                               <span>{lot.quantity} × {lot.lot || "no lot"}</span>
                               {lot.expiration ? <Badge tone={EXPIRATION_TONES[status.level]}>{status.level === "expired" ? `Expired ${formatDate(lot.expiration)}` : `Exp ${formatDate(lot.expiration)}`}</Badge> : null}
+                              {lot.held ? <Badge tone="critical">On hold</Badge> : null}
                             </li>
                           );
                         })}
@@ -190,7 +197,7 @@ export default function InventoryStockTab({
                   </td>
                   <td>
                     <div className="ems-row-actions">
-                      {(canUse || canManage) && balance.onHand > 0 ? (
+                      {(canUse || canManage) && balance.onHand > (balance.heldQuantity || 0) ? (
                         <>
                           <button type="button" className="secondary-button" onClick={() => onRecord({ type: "usage", itemId: item.id, fromLocationId: location.id })} title="Record use"><MinusCircle size={14} /><span className="sr-only">Record use of {item.name}</span></button>
                           <button type="button" className="secondary-button" onClick={() => onRecord({ type: "transfer", itemId: item.id, fromLocationId: location.id })} title="Transfer"><ArrowRightLeft size={14} /><span className="sr-only">Transfer {item.name}</span></button>

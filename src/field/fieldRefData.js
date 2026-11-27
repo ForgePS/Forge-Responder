@@ -26,6 +26,7 @@ import { listPreplanFiles, listPreplans } from "../lib/inspections/preplanServic
 import { listInspectionTemplates, listInspectionTypes, listTemplateVersions } from "../lib/inspections/inspectionConfigService.js";
 import { listOccupancyRecords } from "../lib/inspections/occupancyService.js";
 import { resolveInspectionTemplate } from "../lib/inspections/inspectionWorkflow.js";
+import { templateHasEmsItems } from "../lib/ems/checkoffLogic.js";
 import { loadPlatformDefaultForm } from "../lib/inspections/platformDefaultFormService.js";
 import { startableInspectionTypes, startableOccupancies } from "./inspectionStart.js";
 import { fieldCapabilities } from "./fieldSession.js";
@@ -294,7 +295,9 @@ const PART_LOADERS = {
     const snapshots = [];
     for (const template of usable) {
       const snapshot = await getPublishedChecklistSnapshot(departmentId, template.id);
-      if (snapshot?.sections?.length) {
+      // Checklists with EMS items list the unit's equipment and supplies live, so they
+      // aren't offered offline; crews do them from EMS Check-offs.
+      if (snapshot?.sections?.length && !templateHasEmsItems(snapshot)) {
         snapshots.push({ ...snapshot, appliesTo: template.appliesTo || template.assetTypes || [] });
       }
     }

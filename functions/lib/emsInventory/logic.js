@@ -3,9 +3,13 @@
  * reads documents, calls these, and writes the results in one transaction.
  *
  * Balance document (departments/<id>/emsInventoryBalances/<locationId>__<itemId>):
- *   { itemId, locationId, onHand, lots: [{ key, lot, expiration, quantity, receivedAt }],
+ *   { itemId, locationId, onHand, lots: [{ key, lot, expiration, quantity, receivedAt, held }],
  *     earliestExpiration, par: { min, max, reorderPoint, reorderQuantity } | null,
- *     lowStock, outOfStock, lastTransactionId, updatedAt }
+ *     heldQuantity, lowStock, outOfStock, lastTransactionId, updatedAt }
+ *
+ * A lot can be on hold (quarantined, for example by a medication recall): an
+ * emsLotHolds document for the item and lot key. Held stock stays on hand but
+ * can't be used, and low / out of stock count only what isn't held.
  *
  * The ledger (emsInventoryTransactions) is the record of truth; a balance is the
  * running total of every ledger line for that item at that location. Quantities
@@ -37,20 +41,82 @@ const DEFAULT_SUPPLY_CATEGORIES = [
  *   move: removes from `fromLocationId`, adds the same lots at `toLocationId`
  * `stock` decides which lots may be picked automatically for an out/move.
  */
+// `held`: how lots on hold are treated. exclude = never taken; explicit = only when
+// that lot is chosen (moving held stock to a quarantine area); include = may be taken.
 const TRANSACTION_TYPES = Object.freeze({
   receive: { label: "Received", direction: "in", access: "manage" },
-  usage: { label: "Used", direction: "out", access: "use", stock: "unexpired" },
-  transfer: { label: "Transferred", direction: "move", access: "use", stock: "unexpired" },
-  expired: { label: "Removed: expired", direction: "out", access: "use", stock: "expired" },
-  damaged: { label: "Removed: damaged", direction: "out", access: "use", stock: "any" },
-  waste: { label: "Wasted", direction: "out", access: "manage", stock: "any" },
-  returnToVendor: { label: "Returned to vendor", direction: "out", access: "manage", stock: "any" },
+  usage: { label: "Used", direction: "out", access: "use", stock: "unexpired", held: "exclude" },
+  transfer: { label: "Transferred", direction: "move", access: "use", stock: "unexpired", held: "explicit" },
+  expired: { label: "Removed: expired", direction: "out", access: "use", stock: "expired", held: "include" },
+  damaged: { label: "Removed: damaged", direction: "out", access: "use", stock: "any", held: "include" },
+  waste: { label: "Wasted", direction: "out", access: "manage", stock: "any", held: "include" },
+  returnToVendor: { label: "Returned to vendor", direction: "out", access: "manage", stock: "any", held: "include" },
 });
 
 const INTERNAL_TYPES = Object.freeze({
   countAdjustment: { label: "Count adjustment" },
   reversal: { label: "Reversal" },
 });
+
+// ---------------------------------------------------------------- medications (E4)
+
+const ITEM_CLASSES = ["supply", "medication"];
+const DOSAGE_FORMS = [
+  "Vial", "Ampule", "Prefilled syringe", "Autoinjector", "IV bag", "Tablet", "Chewable tablet",
+  "Orally dissolving tablet", "Oral solution", "Oral gel", "Nebulizer solution", "Metered-dose inhaler",
+  "Nasal spray", "Topical", "Compressed gas", "Other",
+];
+const ROUTES = ["IV", "IO", "IM", "SC", "IN", "PO", "SL", "Buccal", "Inhaled", "ET", "Topical", "PR"];
+const CONTROLLED_SCHEDULES = ["", "II", "III", "IV", "V"];
+const STORAGE_CONDITIONS = ["room", "refrigerated", "frozen"];
+const RECALL_CLASSES = ["", "I", "II", "III"];
+const DEFAULT_MEDICATION_CATEGORIES = [
+  "Cardiac", "Respiratory", "Analgesics", "Antiemetics", "Anticonvulsants", "Sedation", "Antidotes",
+  "Allergy and anaphylaxis", "Diabetic", "IV fluids", "Electrolytes", "Obstetric", "Other medications",
+];
+
+/**
+ * An NDC as entered (10 digits in 4-4-2, 5-3-2 or 5-4-1 form, or 11 digits in 5-4-2
+ * form) and its 11-digit 5-4-2 form. Returns null when it isn't an NDC.
+ */
+function normalizeNdc(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return { ndc: "", ndc11: "" };
+  const parts = raw.split("-");
+  const digits = raw.replace(/-/g, "");
+  if (!/^\d+$/.test(digits)) return null;
+  let segments;
+  if (parts.length === 3) {
+    const shape = parts.map((p) => p.length).join("-");
+    if (shape === "4-4-2") segments = [`0${parts[0]}`, parts[1], parts[2]];
+    else if (shape === "5-3-2") segments = [parts[0], `0${parts[1]}`, parts[2]];
+    else if (shape === "5-4-1") segments = [parts[0], parts[1], `0${parts[2]}`];
+    else if (shape === "5-4-2") segments = parts;
+    else return null;
+  } else if (parts.length === 1 && digits.length === 11) {
+    segments = [digits.slice(0, 5), digits.slice(5, 9), digits.slice(9)];
+  } else {
+    return null; // 10 digits without dashes are ambiguous
+  }
+  return { ndc: raw, ndc11: segments.join("-") };
+}
+
+/** Lot numbers compare without case, spaces or dashes ("AB-123" = "ab123"). */
+function sameLotNumber(a = "", b = "") {
+  const clean = (v) => String(v || "").toUpperCase().replace(/[\s-]/g, "");
+  return Boolean(clean(a)) && clean(a) === clean(b);
+}
+
+/** Does an open recall cover this lot of this item? An empty lot list means every lot. */
+function recallCovers(recall = {}, itemId = "", lotNumber = "") {
+  if (recall.status !== "open" || !(recall.itemIds || []).includes(itemId)) return false;
+  const lots = recall.lotNumbers || [];
+  return !lots.length || lots.some((l) => sameLotNumber(l, lotNumber));
+}
+
+function holdId(itemId, key) {
+  return `${itemId}__${key}`;
+}
 
 class InventoryRuleError extends Error {
   constructor(message) {
@@ -113,28 +179,35 @@ function orderLots(lots = [], policy = "fefo") {
  * @param {{policy?: string, today: string, stock?: "unexpired"|"expired"|"any", lotKey?: string}} options
  * @returns {{key: string, lot: string, expiration: string, receivedAt: string, take: number}[]}
  */
-function pickLots(lots, quantity, { policy = "fefo", today, stock = "any", lotKey: chosen = "" } = {}) {
-  const held = (lots || []).filter((lot) => lot.quantity > 0);
+function pickLots(lots, quantity, { policy = "fefo", today, stock = "any", lotKey: chosen = "", heldKeys = new Set(), held: heldRule = "include" } = {}) {
+  const inStock = (lots || []).filter((lot) => lot.quantity > 0);
+  const isHeld = (lot) => heldKeys.has(lot.key);
   let candidates;
   if (chosen) {
-    candidates = held.filter((lot) => lot.key === chosen);
+    candidates = inStock.filter((lot) => lot.key === chosen);
     if (!candidates.length) throw new InventoryRuleError("That lot isn't in stock at this location.");
+    if (heldRule === "exclude" && isHeld(candidates[0])) {
+      throw new InventoryRuleError(`Lot ${candidates[0].lot || "(no lot)"} is on hold and can't be used.`);
+    }
     if (stock === "unexpired" && isExpired(candidates[0], today)) {
       throw new InventoryRuleError(`Lot ${candidates[0].lot || "(no lot)"} expired on ${candidates[0].expiration}. Remove it as expired instead.`);
     }
     if (stock === "expired" && !isExpired(candidates[0], today)) {
       throw new InventoryRuleError(`Lot ${candidates[0].lot || "(no lot)"} hasn't expired. Remove it as damaged or waste, with a reason, instead.`);
     }
-  } else if (stock === "unexpired") {
-    candidates = held.filter((lot) => !isExpired(lot, today));
-  } else if (stock === "expired") {
-    candidates = held.filter((lot) => isExpired(lot, today));
   } else {
-    candidates = held;
+    const pickable = heldRule === "include" ? inStock : inStock.filter((lot) => !isHeld(lot));
+    if (stock === "unexpired") candidates = pickable.filter((lot) => !isExpired(lot, today));
+    else if (stock === "expired") candidates = pickable.filter((lot) => isExpired(lot, today));
+    else candidates = pickable;
   }
   const available = candidates.reduce((sum, lot) => sum + lot.quantity, 0);
   if (available < quantity) {
-    const total = held.reduce((sum, lot) => sum + lot.quantity, 0);
+    const total = inStock.reduce((sum, lot) => sum + lot.quantity, 0);
+    const onHold = inStock.filter(isHeld).reduce((sum, lot) => sum + lot.quantity, 0);
+    if (!chosen && heldRule !== "include" && onHold > 0 && total >= quantity) {
+      throw new InventoryRuleError(`Only ${available} usable on hand; ${onHold} ${onHold === 1 ? "is" : "are"} on hold.`);
+    }
     if (stock === "unexpired" && total >= quantity) {
       throw new InventoryRuleError(`Only ${available} usable on hand; the rest is expired. Remove expired stock first.`);
     }
@@ -152,17 +225,26 @@ function pickLots(lots, quantity, { policy = "fefo", today, stock = "any", lotKe
   return picks;
 }
 
-/** Flags kept on the balance so lists can filter without recomputing. */
+/** Flags kept on the balance so lists can filter without recomputing. Held stock isn't usable. */
 function balanceFlags(onHand, par, lots = []) {
   const reorderPoint = par && Number.isFinite(par.reorderPoint) ? par.reorderPoint : null;
   const min = par && Number.isFinite(par.min) ? par.min : null;
   const threshold = reorderPoint ?? min;
   const expirations = lots.filter((lot) => lot.quantity > 0 && lot.expiration).map((lot) => lot.expiration).sort();
+  const heldQuantity = lots.filter((lot) => lot.held && lot.quantity > 0).reduce((sum, lot) => sum + lot.quantity, 0);
+  const usable = onHand - heldQuantity;
   return {
-    lowStock: threshold !== null && onHand <= threshold,
-    outOfStock: Boolean(par) && onHand === 0,
+    heldQuantity,
+    lowStock: threshold !== null && usable <= threshold,
+    outOfStock: Boolean(par) && usable === 0,
     earliestExpiration: expirations[0] || "",
   };
+}
+
+/** A balance with each lot's hold flag set from `heldKeys`, and the flags recomputed. */
+function withHolds(balance, heldKeys = new Set()) {
+  const lots = (balance.lots || []).map((lot) => ({ ...lot, held: heldKeys.has(lot.key) }));
+  return { ...balance, lots, ...balanceFlags(balance.onHand || 0, balance.par || null, lots) };
 }
 
 /**
@@ -171,7 +253,7 @@ function balanceFlags(onHand, par, lots = []) {
  * @param {object|null} balance current balance doc (null = none yet)
  * @param {{key: string, lot: string, expiration: string, receivedAt: string, delta: number}[]} lines
  */
-function applyLines(balance, lines, { itemId, locationId, transactionId, at }) {
+function applyLines(balance, lines, { itemId, locationId, transactionId, at, heldKeys = new Set() }) {
   const lots = (balance?.lots || []).map((lot) => ({ ...lot }));
   for (const line of lines) {
     let lot = lots.find((l) => l.key === line.key);
@@ -185,7 +267,7 @@ function applyLines(balance, lines, { itemId, locationId, transactionId, at }) {
       throw new InventoryRuleError(`That would leave less than zero of lot ${lot.lot || "(no lot)"} at this location.`);
     }
   }
-  const kept = lots.filter((lot) => lot.quantity > 0);
+  const kept = lots.filter((lot) => lot.quantity > 0).map((lot) => ({ ...lot, held: heldKeys.has(lot.key) }));
   const onHand = kept.reduce((sum, lot) => sum + lot.quantity, 0);
   const par = balance?.par || null;
   return {
@@ -206,14 +288,14 @@ function applyLines(balance, lines, { itemId, locationId, transactionId, at }) {
  * Ledger lines for a posted transaction: one per lot per location (negative = out).
  * @returns {{locationId: string, key: string, lot: string, expiration: string, receivedAt: string, delta: number}[]}
  */
-function linesFor(type, { quantity, fromLocationId, toLocationId, fromBalance, lot, expiration, lotKey: chosen, policy, today, at }) {
+function linesFor(type, { quantity, fromLocationId, toLocationId, fromBalance, lot, expiration, lotKey: chosen, policy, today, at, heldKeys }) {
   const rule = TRANSACTION_TYPES[type];
   if (!rule) throw new InventoryRuleError("Unknown transaction type.");
   if (rule.direction === "in") {
     const key = lotKey(lot, expiration);
     return [{ locationId: toLocationId, key, lot, expiration, receivedAt: at, delta: quantity }];
   }
-  const picks = pickLots(fromBalance?.lots || [], quantity, { policy, today, stock: rule.stock, lotKey: chosen });
+  const picks = pickLots(fromBalance?.lots || [], quantity, { policy, today, stock: rule.stock, lotKey: chosen, heldKeys, held: rule.held });
   const out = picks.map((p) => ({ locationId: fromLocationId, key: p.key, lot: p.lot, expiration: p.expiration, receivedAt: p.receivedAt, delta: -p.take }));
   if (rule.direction === "out") return out;
   return [...out, ...picks.map((p) => ({ locationId: toLocationId, key: p.key, lot: p.lot, expiration: p.expiration, receivedAt: p.receivedAt, delta: p.take }))];
@@ -254,6 +336,18 @@ function daysUntil(expiration, today) {
 }
 
 module.exports = {
+  CONTROLLED_SCHEDULES,
+  DEFAULT_MEDICATION_CATEGORIES,
+  DOSAGE_FORMS,
+  ITEM_CLASSES,
+  RECALL_CLASSES,
+  ROUTES,
+  STORAGE_CONDITIONS,
+  holdId,
+  normalizeNdc,
+  recallCovers,
+  sameLotNumber,
+  withHolds,
   DEFAULT_SETTINGS,
   DEFAULT_SUPPLY_CATEGORIES,
   INTERNAL_TYPES,

@@ -28,8 +28,17 @@ const ITEM_TYPES = [
   { id: "number", label: "Number" },
   { id: "short_text", label: "Short answer" },
   { id: "long_text", label: "Notes" },
+  { id: "dropdown", label: "Pick one from a list" },
+  { id: "multi_select", label: "Pick any from a list" },
+  { id: "date", label: "Date" },
+  { id: "signature", label: "Signature (typed name)" },
+  { id: "ems_equipment", label: "EMS equipment on the unit (each piece present?)" },
+  { id: "ems_supplies", label: "EMS supplies on the unit (count against par)" },
   { id: "instruction", label: "Instructions (no answer)" },
 ];
+
+const OPTION_TYPES = ["dropdown", "multi_select"];
+const EMS_TYPES = ["ems_equipment", "ems_supplies"];
 
 const FAIL_ACTIONS = [
   { id: "continue", label: "Report it (unit stays in service)" },
@@ -511,7 +520,7 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
                         <input type="checkbox" checked={Boolean(field.required)} onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].required = e.target.checked; })} />
                         Required
                       </label>
-                      {PASS_TYPES.includes(field.type) ? (
+                      {PASS_TYPES.includes(field.type) || EMS_TYPES.includes(field.type) ? (
                         <>
                           <label className="check-builder-inline">
                             <span>If it fails</span>
@@ -519,13 +528,36 @@ function ChecklistsTab({ departmentId, actor, onMessage }) {
                               {FAIL_ACTIONS.map((action) => <option key={action.id} value={action.id}>{action.label}</option>)}
                             </select>
                           </label>
-                          <label className="inline-check check-builder-check">
-                            <input type="checkbox" checked={Boolean(field.noteRequiredOnFail)} onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].noteRequiredOnFail = e.target.checked; })} />
-                            Ask what's wrong
-                          </label>
+                          {PASS_TYPES.includes(field.type) ? (
+                            <label className="inline-check check-builder-check">
+                              <input type="checkbox" checked={Boolean(field.noteRequiredOnFail)} onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].noteRequiredOnFail = e.target.checked; })} />
+                              Ask what's wrong
+                            </label>
+                          ) : null}
                         </>
                       ) : null}
                     </div>
+                  ) : null}
+                  {OPTION_TYPES.includes(field.type) ? (
+                    <label className="check-builder-field check-builder-options">
+                      <span>Choices, one per line</span>
+                      <textarea
+                        value={(field.options || []).join("\n")}
+                        onChange={(e) => update((d) => { d.sections[sectionIndex].fields[fieldIndex].options = e.target.value.split("\n"); })}
+                        onBlur={() => update((d) => {
+                          const f = d.sections[sectionIndex].fields[fieldIndex];
+                          f.options = [...new Set((f.options || []).map((o) => String(o).trim()).filter(Boolean))];
+                        })}
+                        placeholder={"Full\nHalf\nEmpty"}
+                      />
+                    </label>
+                  ) : null}
+                  {EMS_TYPES.includes(field.type) ? (
+                    <p className="field-hint">
+                      {field.type === "ems_equipment"
+                        ? "Lists every piece of EMS equipment placed on the unit. Missing or damaged answers are recorded on the equipment's history. Needs the EMS Management module."
+                        : "Lists every supply with a par level at the unit's EMS locations. Counts below the minimum or expired stock are reported for restocking; stock levels don't change. Needs the EMS Management module."}
+                    </p>
                   ) : null}
                   <label className="check-builder-field">
                     <span>{field.type === "instruction" ? "Instructions" : "Hint for the member (optional)"}</span>

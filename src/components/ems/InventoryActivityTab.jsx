@@ -42,7 +42,7 @@ function ReverseModal({ departmentId, transaction, onClose, onDone }) {
 }
 
 /** The ledger, newest first. Records are never edited; mistakes are reversed. */
-export default function InventoryActivityTab({ departmentId, items, locations, canApprove, onMessage }) {
+export default function InventoryActivityTab({ departmentId, items, locations, canApprove, onMessage, itemClass = "", title = "Inventory history" }) {
   const [filter, setFilter] = useState({ itemId: "", locationId: "" });
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
@@ -51,14 +51,17 @@ export default function InventoryActivityTab({ departmentId, items, locations, c
 
   useEffect(() => {
     setError("");
-    return watchInventoryTransactions(departmentId, filter, setRows, (e) => setError(describeError(e)));
-  }, [departmentId, filter]);
+    // Medications query their own records; the supply history leaves medications out.
+    const options = itemClass === "medication" ? { ...filter, itemClass } : filter;
+    const keep = itemClass === "supply" ? (list) => setRows(list.filter((r) => r.itemClass !== "medication")) : setRows;
+    return watchInventoryTransactions(departmentId, options, keep, (e) => setError(describeError(e)));
+  }, [departmentId, filter, itemClass]);
 
   const reversedIds = new Set(rows.filter((r) => r.type === "reversal").map((r) => r.reversesTransactionId));
   const place = (id) => (id ? locationPath(locationsById[id], locationsById) || "(removed location)" : "");
 
   return (
-    <Panel title="Inventory history" icon={History}>
+    <Panel title={title} icon={History}>
       <div className="ems-filters">
         <select value={filter.itemId} onChange={(e) => setFilter({ itemId: e.target.value, locationId: "" })} aria-label="Item">
           <option value="">All items</option>

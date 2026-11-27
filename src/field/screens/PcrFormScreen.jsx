@@ -31,6 +31,8 @@ import {
   sectionProgress,
   setLeaf,
   toLocalInput,
+  notValueChoices,
+  pertinentNegativeChoices,
 } from "../../lib/nemsis/pcrModel.js";
 import { readLeaf } from "../../lib/nemsis/schema.js";
 import { applyFormDefaults, customizeLayout, normalizePcrForm, visibleSections, withDepartmentIssues } from "../../lib/pcr/pcrForm.js";
@@ -439,7 +441,10 @@ function LeafEditor({ field, ctx, at }) {
         );
   }
 
-  const notOptions = [...field.nv.map((o) => ({ ...o, kind: "NV" })), ...field.pn.map((o) => ({ ...o, kind: "PN" }))];
+  // The "Not documented…" picker only in History and Assessment (pcrModel notValueChoices / pertinentNegativeChoices).
+  const nvChoices = notValueChoices(field, notValue);
+  const pnChoices = pertinentNegativeChoices(field, pertinentNegative);
+  const notOptions = [...nvChoices.map((o) => ({ ...o, kind: "NV" })), ...pnChoices.map((o) => ({ ...o, kind: "PN" }))];
   const attrDefs = (field.attrs || []).filter((a) => a.codes?.length && !field.repeating);
   return (
     <Field label={`${field.label} (${field.el})`} required={field.usage === "Mandatory" || field.departmentRequired} error={error} hint={hint}>
@@ -456,11 +461,11 @@ function LeafEditor({ field, ctx, at }) {
       {notOptions.length && !readOnly ? (
         <select
           className="fa-input fa-pcr-not"
-          aria-label={`${field.label}: not recorded or pertinent negative`}
+          aria-label={pnChoices.length ? `${field.label}: not recorded or pertinent negative` : `${field.label}: not recorded`}
           value={notValue ? `NV:${notValue}` : pertinentNegative ? `PN:${pertinentNegative}` : ""}
           onChange={(event) => setNot(event.target.value)}
         >
-          <option value="">{notValue || pertinentNegative ? "Clear" : "Not documented / pertinent negative…"}</option>
+          <option value="">{notValue || pertinentNegative ? "Clear" : pnChoices.length ? "Not documented / pertinent negative…" : "Not documented…"}</option>
           {notOptions.map((o) => <option key={`${o.kind}:${o.code}`} value={`${o.kind}:${o.code}`}>{o.label}</option>)}
         </select>
       ) : null}

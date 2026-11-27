@@ -1,9 +1,14 @@
 const admin = require("firebase-admin");
 const { setGlobalOptions } = require("firebase-functions/v2");
 // Staging's Cloud Run quota is 20 vCPU per region and can't be raised yet (not enough usage history). By default
-// every function gets a whole vCPU, so a full deploy runs out. FUNCTIONS_SMALL_CPU=true (.env.forge-rms-staging)
-// gives each function a share sized to its memory (256 MiB ≈ 1/6 vCPU, one request at a time). Production is unchanged.
-if (process.env.FUNCTIONS_SMALL_CPU === "true") setGlobalOptions({ cpu: "gcf_gen1" });
+// every function gets a whole vCPU, so a full deploy runs out. On staging each function gets a share sized to its
+// memory (256 MiB ≈ 1/6 vCPU, one request at a time). Production is unchanged.
+// Keyed off the project id because the Firebase CLI reads these options without loading .env files (it only passes
+// GCLOUD_PROJECT and FIREBASE_CONFIG), so FUNCTIONS_SMALL_CPU alone never reached a deploy.
+const STAGING_PROJECT_ID = "forge-rms-staging";
+if (process.env.GCLOUD_PROJECT === STAGING_PROJECT_ID || process.env.FUNCTIONS_SMALL_CPU === "true") {
+  setGlobalOptions({ cpu: "gcf_gen1" });
+}
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const twilio = require("twilio");
@@ -1793,6 +1798,46 @@ exports.emsInventorySaveCount = emsInventoryCall(emsInventory.saveCount);
 exports.emsInventorySubmitCount = emsInventoryCall(emsInventory.submitCount);
 exports.emsInventoryApproveCount = emsInventoryCall(emsInventory.approveCount);
 exports.emsInventoryRejectCount = emsInventoryCall(emsInventory.rejectCount);
+
+// ---- EMS Management: equipment (functions/lib/emsEquipment) ----
+// Serialized equipment: registration, moves, verification, inspections,
+// problems, repairs, retirement, files and the classic Assets import. Each
+// action writes the record, its history event and the audit event together.
+const emsEquipment = require("./lib/emsEquipment/service");
+const emsEquipmentFileCall = (handler) => onCall({ memory: "256MiB", timeoutSeconds: 60 }, (request) =>
+  handler(admin.firestore(), admin.storage().bucket(), request));
+exports.emsEquipmentSave = emsInventoryCall(emsEquipment.saveEquipment);
+exports.emsEquipmentTransfer = emsInventoryCall(emsEquipment.transferEquipment);
+exports.emsEquipmentVerify = emsInventoryCall(emsEquipment.verifyEquipment);
+exports.emsEquipmentReportProblem = emsInventoryCall(emsEquipment.reportProblem);
+exports.emsEquipmentRecordInspection = emsInventoryCall(emsEquipment.recordInspection);
+exports.emsEquipmentCompleteMaintenance = emsInventoryCall(emsEquipment.completeMaintenance);
+exports.emsEquipmentSetStatus = emsInventoryCall(emsEquipment.setStatus);
+exports.emsEquipmentAddFile = emsEquipmentFileCall(emsEquipment.addFile);
+exports.emsEquipmentRemoveFile = emsEquipmentFileCall(emsEquipment.removeFile);
+exports.emsEquipmentPreviewImport = emsInventoryCall(emsEquipment.previewMigration);
+exports.emsEquipmentApplyImport = onCall({ memory: "512MiB", timeoutSeconds: 300 }, (request) =>
+  emsEquipment.applyMigration(admin.firestore(), request));
+exports.emsEquipmentRollbackImport = onCall({ memory: "256MiB", timeoutSeconds: 300 }, (request) =>
+  emsEquipment.rollbackMigration(admin.firestore(), request));
+
+// ---- EMS Management: check-offs and readiness (functions/lib/emsCheckoffs) ----
+// Check-offs run on the Fleet checklist engine; these record a finished check's EMS
+// results (equipment answers into its history, supply counts against par), manage
+// assignments and readiness rules, and sign-off by someone other than the checker.
+const emsCheckoffs = require("./lib/emsCheckoffs/service");
+exports.emsCheckoffsSaveAssignment = emsInventoryCall(emsCheckoffs.saveAssignment);
+exports.emsCheckoffsSaveRules = emsInventoryCall(emsCheckoffs.saveReadinessRules);
+exports.emsCheckoffsRecordResults = onCall({ memory: "256MiB", timeoutSeconds: 120 }, (request) =>
+  emsCheckoffs.recordResults(admin.firestore(), request));
+exports.emsCheckoffsSignOff = emsInventoryCall(emsCheckoffs.signOff);
+
+// ---- EMS Management: medication recalls and lot holds (functions/lib/emsMedications) ----
+const emsMedications = require("./lib/emsMedications/service");
+exports.emsMedicationsCreateRecall = emsInventoryCall(emsMedications.createRecall);
+exports.emsMedicationsCloseRecall = emsInventoryCall(emsMedications.closeRecall);
+exports.emsMedicationsPlaceHold = emsInventoryCall(emsMedications.placeHold);
+exports.emsMedicationsReleaseHold = emsInventoryCall(emsMedications.releaseHold);
 
 // ---- Administrators delete an inspection or preplan, with a reason (functions/lib/recordDeletion.js) ----
 exports.deleteRecordWithReason = onCall({ memory: "256MiB", timeoutSeconds: 60 }, (request) =>

@@ -11,6 +11,12 @@ export const FLEET_CHECK_FIELD_TYPES = [
   { id: "number", label: "Number" },
   { id: "meter_reading", label: "Meter reading" },
   { id: "fuel_level", label: "Fuel level" },
+  { id: "dropdown", label: "Pick one" },
+  { id: "multi_select", label: "Pick any" },
+  { id: "date", label: "Date" },
+  { id: "signature", label: "Signature (typed name)" },
+  { id: "ems_equipment", label: "EMS equipment on the unit" },
+  { id: "ems_supplies", label: "EMS supplies on the unit" },
 ];
 
 export const DEFAULT_READINESS_STATES = [

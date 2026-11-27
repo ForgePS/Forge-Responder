@@ -3,7 +3,7 @@ import { CheckCheck, CheckCircle2, ChevronRight, ClipboardCheck, OctagonAlert, T
 import { useField, useRecordForm } from "../fieldContext.jsx";
 import { refItems } from "../fieldRefData.js";
 import { checklistFields, isFailAnswer, localDate, validateTruckCheck } from "../fieldValidation.js";
-import { Banner, ErrorSummary, Field, Screen, Section, Segmented, TextArea, TextInput, cx, formatWhen } from "../ui.jsx";
+import { Banner, Chips, ErrorSummary, Field, Screen, Section, Segmented, TextArea, TextInput, cx, formatWhen } from "../ui.jsx";
 
 const EMPTY = {
   checkId: "",
@@ -267,6 +267,14 @@ export default function TruckCheckScreen({ params = {} }) {
                     </div>
                   ) : field.type === "meter_reading" || field.type === "number" ? (
                     <TextInput value={value} onChange={(next) => setAnswer(field.key, next.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder={field.unit || field.meterType || "Reading"} disabled={readOnly} />
+                  ) : field.type === "dropdown" ? (
+                    <Segmented value={value} options={(field.options || []).map((option) => ({ value: option, label: option }))} onChange={(next) => !readOnly && setAnswer(field.key, next)} ariaLabel={field.label} />
+                  ) : field.type === "multi_select" ? (
+                    <Chips values={Array.isArray(value) ? value : []} options={field.options || []} onChange={(next) => !readOnly && setAnswer(field.key, next)} ariaLabel={field.label} />
+                  ) : field.type === "date" ? (
+                    <TextInput type="date" value={value} onChange={(next) => setAnswer(field.key, next)} disabled={readOnly} />
+                  ) : field.type === "signature" ? (
+                    <TextInput value={value} onChange={(next) => setAnswer(field.key, next)} placeholder="Type your full name to sign" autoComplete="name" disabled={readOnly} />
                   ) : field.type === "long_text" ? (
                     <TextArea value={value} onChange={(next) => setAnswer(field.key, next)} disabled={readOnly} />
                   ) : (

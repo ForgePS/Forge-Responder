@@ -94,6 +94,9 @@ export const NAV_MODULE_MAP = {
   "NERIS Fire Reports": "nerisFireReports",
   "Patient Care Reports": "ems",
   "EMS Supply Inventory": "emsManagement",
+  "EMS Equipment": "emsManagement",
+  "EMS Check-offs": "emsManagement",
+  "EMS Medications": "emsManagement",
   "NERIS Analytics": "nerisFireReports",
   "Heat Zone Analytics": "analytics",
   "SOGs / Policies": "documents",
@@ -129,7 +132,7 @@ export const ADMIN_MODULE_OPTIONS = [
   { key: "internalEmail", label: "Messages (department inbox)" },
   { key: "digitalDashboard", label: "Digital Dashboard (signage)" },
   { key: "ems", label: "EMS Patient Care Reports" },
-  { key: "emsManagement", label: "EMS Management (supplies and inventory)" },
+  { key: "emsManagement", label: "EMS Management (supplies, inventory, equipment and check-offs)" },
   { key: "administration", label: "System Admin" }
 ];
 
@@ -283,6 +286,17 @@ export const ADMIN_PERMISSION_LABELS = {
   approveEmsInventoryAdjustments: "Approve physical count adjustments and reverse inventory transactions (never their own count)",
   manageEmsSettings: "Configure EMS Management (stock rotation, expiration warnings)",
   viewEmsAudit: "View the EMS Management audit history",
+  viewEmsEquipment: "View EMS equipment (records, where it is, status, history and QR labels)",
+  checkEmsEquipment: "Verify EMS equipment is present, record inspections, and report missing or damaged equipment",
+  transferEmsEquipment: "Move EMS equipment between units, stations and storage locations",
+  manageEmsEquipment: "Manage EMS equipment: register and edit, set schedules, complete repairs, retire and dispose, import",
+  viewEmsCheckoffs: "View EMS check-offs: which are due, unit readiness and past results",
+  runEmsCheckoffs: "Do EMS check-offs and record their equipment and supply answers",
+  signOffEmsCheckoffs: "Sign off or send back other members' EMS check-offs",
+  manageEmsCheckoffs: "Manage EMS check-offs: assign checklists to units, set schedules and readiness rules",
+  viewEmsMedications: "View EMS medications: stock, lots, expirations, recalls and holds",
+  useEmsMedications: "Record medication use, transfers and removal of expired or damaged medications",
+  manageEmsMedications: "Manage EMS medications: catalog, receiving, par levels, waste and returns, recalls and lot holds",
   viewHeatZoneAnalytics: "View Heat Zone Analytics",
   viewHeatZoneMarkers: "View individual incidents on the heat map",
   viewHeatZoneAllDistricts: "View Heat Zone analytics for all districts",
@@ -457,7 +471,7 @@ export const ADMIN_PERMISSION_GROUPS = [
   },
   {
     label: "EMS Management",
-    keys: ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments", "manageEmsSettings", "viewEmsAudit"]
+    keys: ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments", "manageEmsSettings", "viewEmsAudit", "viewEmsEquipment", "checkEmsEquipment", "transferEmsEquipment", "manageEmsEquipment", "viewEmsCheckoffs", "runEmsCheckoffs", "signOffEmsCheckoffs", "manageEmsCheckoffs", "viewEmsMedications", "useEmsMedications", "manageEmsMedications"]
   },
   {
     label: "Heat Zone Analytics",

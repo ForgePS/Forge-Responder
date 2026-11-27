@@ -1,0 +1,53 @@
+/* EMS check-offs (src/pages/EmsCheckoffsPage.jsx and the EMS items inside a Fleet
+   check). Builds on ems-inventory.css, check-builder styles and the shared panel,
+   badge and form styles. */
+.ems-check-rows { display: grid; gap: 8px; margin-top: 4px; }
+.ems-check-rows > .text-button { justify-self: start; display: inline-flex; gap: 6px; align-items: center; }
+.ems-check-row {
+  display: grid; gap: 6px; padding: 10px; border: 1px solid var(--rms-border); border-radius: 8px;
+  background: var(--rms-bg-surface);
+}
+.ems-check-row.is-problem { border-color: color-mix(in srgb, var(--rms-warning) 60%, var(--rms-border)); }
+.ems-check-row-name { display: grid; gap: 2px; min-width: 0; }
+.ems-check-row-name small { color: var(--rms-text-muted); overflow-wrap: anywhere; }
+.ems-check-row .check-number-field input { max-width: 120px; }
+
+.ems-checkoffs-page .fleet-summary { margin-bottom: 16px; }
+.ems-unit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.ems-unit-card {
+  display: grid; gap: 8px; align-content: start; padding: 14px; border: 1px solid var(--rms-border);
+  border-radius: 10px; background: var(--rms-bg-surface); min-width: 0;
+}
+.ems-unit-card.is-not_ready { border-left: 4px solid var(--rms-critical); }
+.ems-unit-card.is-issues { border-left: 4px solid var(--rms-warning); }
+.ems-unit-card.is-ready { border-left: 4px solid var(--rms-success); }
+.ems-unit-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.ems-unit-head h3 { margin: 0; font-size: 16px; }
+.ems-unit-head small { color: var(--rms-text-muted); }
+.ems-reasons { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13px; }
+.ems-reasons .is-not_ready { color: var(--rms-critical); }
+.ems-due-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ems-due-list li { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.ems-due-list li > span { display: grid; gap: 1px; min-width: 0; }
+.ems-due-list small { color: var(--rms-text-muted); }
+
+.ems-result-detail { display: grid; gap: 12px; }
+.ems-result-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ems-result-table th, .ems-result-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rms-border); vertical-align: top; }
+.ems-result-table th { font-size: 12px; color: var(--rms-text-muted); font-weight: 600; }
+.ems-table-wrap { overflow-x: auto; }
+
+.ems-rules-grid { display: grid; gap: 8px; }
+.ems-rule-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--rms-border); }
+.ems-rule-row select { min-width: 140px; }
+.ems-chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.ems-chip { display: inline-flex; gap: 6px; align-items: center; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rms-border); background: var(--rms-bg-surface-2); }
+.ems-chip input { margin: 0; }
+
+.check-builder-options { display: grid; gap: 6px; }
+.check-builder-options textarea { min-height: 70px; }
+.check-multi { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+
+@media (max-width: 640px) {
+  .ems-unit-grid { grid-template-columns: 1fr; }
+}
