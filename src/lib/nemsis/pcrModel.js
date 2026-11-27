@@ -170,6 +170,21 @@ function plainCodeLabel(text) {
   return m ? m[1].replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z])([A-Z][a-z])/g, "$1 $2") : text;
 }
 
+/** The charting sections that offer pertinent negatives: History (eHistory) and Assessment (eExam). */
+export const PERTINENT_NEGATIVE_CONTAINERS = Object.freeze(["eHistory", "eExam"]);
+
+/**
+ * The pertinent negatives a crew can pick for a field: all of them in History and Assessment, none elsewhere.
+ * A value already saved (`current`) stays listed so it shows and can be cleared. fieldInput keeps the full list,
+ * which labels saved values everywhere (summaries, narrative facts).
+ */
+export function pertinentNegativeChoices(field, current = "") {
+  const container = String(field?.el || "").split(".")[0];
+  const all = field?.pn || [];
+  if (PERTINENT_NEGATIVE_CONTAINERS.includes(container)) return all;
+  return current ? all.filter((o) => o.code === String(current)) : [];
+}
+
 /**
  * Everything a screen needs to render one NEMSIS field.
  * @returns {{ el: string, label: string, definition: string, usage: string, national: boolean, required: boolean,
