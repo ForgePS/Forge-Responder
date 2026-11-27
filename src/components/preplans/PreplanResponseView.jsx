@@ -34,7 +34,7 @@ function formatDate(value) {
  * package as `data`, with `offline` describing how fresh that copy is, and
  * `footer` for the package's photos and documents.
  */
-export default function PreplanResponseView({ departmentId, preplan, onClose, data = null, offline = null, footer = null }) {
+export default function PreplanResponseView({ departmentId, preplan, onClose, data = null, offline = null, footer = null, backgroundUrls = null }) {
   const [night, setNight] = useState(readNight);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,6 +45,7 @@ export default function PreplanResponseView({ departmentId, preplan, onClose, da
   const [hydrants, setHydrants] = useState([]);
   const [hydrantRows, setHydrantRows] = useState([]);
   const [siteMap, setSiteMap] = useState(null);
+  const [liveFailed, setLiveFailed] = useState([]);
   const [view, setView] = useState("plan"); // "map" | "plan"
   const [buildingId, setBuildingId] = useState("");
   const [floorId, setFloorId] = useState("");
@@ -58,8 +59,12 @@ export default function PreplanResponseView({ departmentId, preplan, onClose, da
       setError("");
       try {
         const loaded = data || await loadResponseData(departmentId, preplan);
-        const { revision: published, buildings: withFloors, catalog: nextCatalog, alerts: alertRows, siteMap: storedSiteMap, hydrantRows } = loaded;
+        const { revision: published, buildings: withFloors, catalog: nextCatalog, siteMap: storedSiteMap } = loaded;
+        // A read that failed is null: show that it failed, never "no alerts".
+        const alertRows = loaded.alerts || [];
+        const hydrantRows = loaded.hydrantRows || [];
         if (cancelled) return;
+        setLiveFailed(loaded.failed || []);
         const wanted = new Set(preplan.hydrantIds || []);
         setRevision(published);
         setBuildings(withFloors);
@@ -173,7 +178,12 @@ export default function PreplanResponseView({ departmentId, preplan, onClose, da
                 Current conditions, separate from the approved plan below. Each shows its source and status.
                 {offline ? ` As of ${offline.syncedAt ? new Date(offline.syncedAt).toLocaleString() : "the last update"}; alerts raised since then aren't shown.` : ""}
               </p>
-              {!alertCount ? <p className="prv-note">No current alerts on record.</p> : null}
+              {liveFailed.includes("alerts") ? (
+                <p className="prv-note prv-warn" role="alert">Current alerts couldn&apos;t be loaded. Don&apos;t assume there are none; reload to try again.</p>
+              ) : !alertCount ? <p className="prv-note">No current alerts on record.</p> : null}
+              {liveFailed.includes("hydrants") ? (
+                <p className="prv-note prv-warn" role="alert">Hydrants couldn&apos;t be loaded, so the map doesn&apos;t show them.</p>
+              ) : null}
               {grouped.verified.map((alert) => (
                 <article key={alert.id} className={`prv-alert sev-${alert.severity}`}>
                   <div className="prv-alert-head">
@@ -261,7 +271,12 @@ export default function PreplanResponseView({ departmentId, preplan, onClose, da
                       )}
                     </>
                   ) : floor?.plan ? (
-                    <FloorPlanEditor plan={floor.plan} catalog={catalog} readOnly />
+                    <FloorPlanEditor
+                      plan={floor.plan}
+                      catalog={catalog}
+                      backgroundUrl={floor.backgroundUrl || backgroundUrls?.[floor.plan.background?.fileId] || ""}
+                      readOnly
+                    />
                   ) : (
                     <p className="prv-note">No floor plan was approved for this floor.</p>
                   )}

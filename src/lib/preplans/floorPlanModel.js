@@ -626,3 +626,15 @@ export function summarizeFloorPlan(plan) {
   }
   return counts;
 }
+
+/**
+ * The floors that belong to a revision. A floor removed later still shows in a
+ * revision that has its plan (one published before the removal), but not in
+ * the draft it was removed in, nor in revisions started after (they don't copy
+ * its plan).
+ */
+export function floorsInRevision(floors = [], plans = [], revisionId = "") {
+  const planFloors = new Set(plans.map((row) => row.floorId));
+  return floors.filter((floor) => !floor.archived
+    || (planFloors.has(floor.id) && floor.archivedFromRevisionId !== revisionId));
+}

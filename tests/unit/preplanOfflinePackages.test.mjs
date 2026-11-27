@@ -8,7 +8,9 @@ import {
   canonicalJson,
   chooseOfflineFiles,
   deviceSummary,
+  chooseBackgroundFiles,
   deviceWipeReason,
+  packageHasRestricted,
   expiryFrom,
   generateDeviceKey,
   normalizeOfflineSettings,
@@ -143,5 +145,39 @@ describe("sealing", () => {
     await assert.rejects(openPackage(key, tampered, "forge-preplan:d:PP1"), PackageIntegrityError);
     await assert.rejects(openPackage(key, sealed, "forge-preplan:d:PP2"), PackageIntegrityError);
     await assert.rejects(openPackage(await generateDeviceKey(), sealed, "forge-preplan:d:PP1"), PackageIntegrityError);
+  });
+});
+
+describe("source drawings and restricted access", () => {
+  const buildings = [{ id: "B1", floors: [{ id: "F1", plan: { background: { fileId: "D1" } } }, { id: "F2", plan: null }] }];
+  const files = [
+    { id: "D1", category: "floor_plan", storagePath: "a/d1.png", mimeType: "image/png", fileSize: 900_000_000 },
+    { id: "D2", category: "floor_plan", storagePath: "a/d2.png", mimeType: "image/png", fileSize: 10 },
+  ];
+
+  it("carries the floor plans' source drawings whatever the size budget", () => {
+    const chosen = chooseBackgroundFiles(files, buildings);
+    assert.deepEqual(chosen.map((row) => [row.id, row.kind]), [["D1", "background"]]);
+  });
+
+  it("leaves out a restricted drawing for someone without restricted access", () => {
+    const restricted = [{ ...files[0], sensitive: true }];
+    assert.equal(chooseBackgroundFiles(restricted, buildings).length, 0);
+    assert.equal(chooseBackgroundFiles(restricted, buildings, { canSeeRestricted: true }).length, 1);
+  });
+
+  it("rebuilds instead of renewing when restricted access changes", () => {
+    const server = { id: "PP1", status: "operational", publishedRevisionId: "R1" };
+    const withRestricted = { revisionId: "R1", builtWithRestricted: true, content: { files: [] } };
+    const lost = packageSyncAction(withRestricted, server, { canSeeRestricted: false });
+    assert.equal(lost.action, "full");
+    assert.equal(lost.restrictedLost, true);
+    assert.equal(packageSyncAction(withRestricted, server, { canSeeRestricted: true }).action, "light");
+    const oldSensitiveFile = { revisionId: "R1", content: { files: [{ id: "x", sensitive: true }] } };
+    assert.equal(packageHasRestricted(oldSensitiveFile), true);
+    assert.equal(packageSyncAction(oldSensitiveFile, server, { canSeeRestricted: false }).action, "full");
+    const without = { revisionId: "R1", builtWithRestricted: false, content: { files: [] } };
+    assert.equal(packageSyncAction(without, server, { canSeeRestricted: false }).action, "light");
+    assert.equal(packageSyncAction(without, server, { canSeeRestricted: true }).action, "full");
   });
 });
