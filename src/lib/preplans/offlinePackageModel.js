@@ -248,12 +248,13 @@ export function packageSyncAction(local, serverPreplan, { canSeeRestricted = nul
   if (["archived", "cancelled", "deleted", "retired"].includes(status)) return { action: "remove", reason: "The preplan was archived." };
   if (status === "temporarily_unavailable") return { action: "remove", reason: "The preplan was withdrawn from operational use." };
   if (!serverPreplan.publishedRevisionId) return { action: "remove", reason: "The preplan no longer has an approved version." };
-  if (serverPreplan.publishedRevisionId !== local?.revisionId) return { action: "full", reason: "A newer approved version was published." };
   // Restricted details downloaded under earlier access must go when that access does:
-  // rebuild without them (or remove the copy if that fails), never renew it as is.
+  // rebuild without them (or remove the copy if that fails), never renew or keep it as is.
+  // Checked before a newer revision, so that rebuild is marked too.
   if (canSeeRestricted === false && packageHasRestricted(local)) {
     return { action: "full", reason: "You no longer have access to restricted details.", restrictedLost: true };
   }
+  if (serverPreplan.publishedRevisionId !== local?.revisionId) return { action: "full", reason: "A newer approved version was published." };
   if (canSeeRestricted === true && local?.builtWithRestricted === false) {
     return { action: "full", reason: "You now have access to restricted details." };
   }

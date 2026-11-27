@@ -10,7 +10,7 @@ import { refItems } from "../fieldRefData.js";
 import {
   OfflineNotAllowedError, downloadPackage, getPackage, getPackageFile, listPackages, removePackage, syncPackages,
 } from "../fieldPreplanPackages.js";
-import { packageFreshness } from "../../lib/preplans/offlinePackageModel.js";
+import { backgroundFileIds, packageFreshness } from "../../lib/preplans/offlinePackageModel.js";
 import PreplanResponseView from "../../components/preplans/PreplanResponseView.jsx";
 import { Banner, Confirm, Field, Screen, Section, cx, formatWhen } from "../ui.jsx";
 
@@ -151,7 +151,10 @@ function usePackageBackgrounds(dept, uid, pkg) {
   useEffect(() => {
     let cancelled = false;
     const made = [];
-    const backgrounds = (pkg?.content?.files || []).filter((row) => row.stored && row.kind === "background");
+    // By the floor plans' file ids: a drawing that is also one of the photos or
+    // documents is stored once, under that kind.
+    const wanted = backgroundFileIds(pkg?.content?.buildings || []);
+    const backgrounds = (pkg?.content?.files || []).filter((row) => row.stored && wanted.has(String(row.id)));
     (async () => {
       const next = {};
       for (const file of backgrounds) {

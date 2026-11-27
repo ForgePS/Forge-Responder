@@ -181,3 +181,12 @@ describe("source drawings and restricted access", () => {
     assert.equal(packageSyncAction(without, server, { canSeeRestricted: true }).action, "full");
   });
 });
+
+describe("restricted access lost and a newer version published", () => {
+  it("still marks the rebuild so a failed one removes the copy", () => {
+    const local = { revisionId: "R1", builtWithRestricted: true, content: { files: [] } };
+    const decision = packageSyncAction(local, { id: "PP1", status: "operational", publishedRevisionId: "R2" }, { canSeeRestricted: false });
+    assert.equal(decision.action, "full");
+    assert.equal(decision.restrictedLost, true);
+  });
+});
