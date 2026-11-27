@@ -9,6 +9,12 @@
  *   emsInventoryBalances/{loc__item}     running balance per item per location, by lot (a projection of the ledger)
  *   emsInventoryTransactions/{id}        the ledger: append-only, never edited or deleted
  *   emsInventoryCounts/{countId}         physical counts: open -> submitted -> approved | rejected
+ *   emsLotHolds/{itemId__lotKey}         lots on hold (E4): held stock can't be used
+ *   emsMedicationRecalls/{recallId}      medication recalls (E4, ../emsMedications/service.js)
+ *
+ * Medications (itemClass "medication", E4) share the catalog, balances and ledger,
+ * with their own permissions. Scheduled (controlled) medications are refused here:
+ * they get their own ledger (E5).
  *   emsAuditEvents/{id}                  who did what, written in the same transaction as the change
  *
  * Every stock change is one Firestore transaction that reads the balances,
@@ -34,7 +40,24 @@ const PERMISSIONS = Object.freeze({
   manage: "manageEmsInventory",
   approve: "approveEmsInventoryAdjustments",
   settings: "manageEmsSettings",
+  medView: "viewEmsMedications",
+  medUse: "useEmsMedications",
+  medManage: "manageEmsMedications",
 });
+
+/** The permissions that allow a `use` or `manage` action on an item of this class. */
+function accessKeys(itemClass, access) {
+  if (itemClass === "medication") return access === "use" ? [PERMISSIONS.medUse, PERMISSIONS.medManage] : [PERMISSIONS.medManage];
+  return access === "use" ? [PERMISSIONS.use, PERMISSIONS.manage] : [PERMISSIONS.manage];
+}
+
+function assertItemAccess(caller, item, access) {
+  if (!accessKeys(item.itemClass, access).some((key) => caller.permissions[key] === true)) {
+    throw new HttpsError("permission-denied", item.itemClass === "medication"
+      ? "You don't have permission to do that with medications."
+      : "You don't have permission to do that in EMS inventory.");
+  }
+}
 const MAX_COUNT_ROWS = 400;
 const MAX_ADJUSTED_ITEMS = 150;
 
@@ -45,7 +68,15 @@ const paths = {
   balances: (d) => `departments/${d}/emsInventoryBalances`,
   transactions: (d) => `departments/${d}/emsInventoryTransactions`,
   counts: (d) => `departments/${d}/emsInventoryCounts`,
+  holds: (d) => `departments/${d}/emsLotHolds`,
+  recalls: (d) => `departments/${d}/emsMedicationRecalls`,
 };
+
+/** Lot keys of an item that are on hold, read in the transaction. */
+async function readHeldKeys(tx, db, departmentId, itemId) {
+  const snap = await tx.get(db.collection(paths.holds(departmentId)).where("itemId", "==", itemId).where("status", "==", "active"));
+  return new Set(snap.docs.map((doc) => doc.data().key));
+}
 
 function ruleError(error) {
   if (error instanceof logic.InventoryRuleError) return new HttpsError("failed-precondition", error.message);
@@ -96,7 +127,46 @@ async function saveSettings(db, request) {
 
 // ---------------------------------------------------------------- catalog
 
-function cleanItem(input = {}) {
+function cleanList(values, allowed, max = 12) {
+  if (!Array.isArray(values)) return [];
+  return [...new Set(values.map((v) => text(v, 30)).filter((v) => allowed.includes(v)))].slice(0, max);
+}
+
+/** Medication fields (E4). Medications always need a lot number and an expiration. */
+function cleanMedication(input = {}) {
+  const genericName = text(input.genericName, 120);
+  if (!genericName) throw new HttpsError("invalid-argument", "Give the medication's generic name.");
+  const ndc = logic.normalizeNdc(input.ndc);
+  if (!ndc) throw new HttpsError("invalid-argument", "NDC must be 10 digits with dashes (4-4-2, 5-3-2 or 5-4-1) or 11 digits (5-4-2).");
+  const schedule = text(input.controlledSchedule, 4);
+  if (!logic.CONTROLLED_SCHEDULES.includes(schedule)) throw new HttpsError("invalid-argument", "Choose a DEA schedule, or none.");
+  const storage = text(input.storage, 20) || "room";
+  if (!logic.STORAGE_CONDITIONS.includes(storage)) throw new HttpsError("invalid-argument", "Choose how it is stored.");
+  const form = text(input.dosageForm, 40);
+  if (form && !logic.DOSAGE_FORMS.includes(form)) throw new HttpsError("invalid-argument", "Choose a dosage form from the list.");
+  const rxnorm = text(input.rxnormCode, 12);
+  if (rxnorm && !/^\d{1,10}$/.test(rxnorm)) throw new HttpsError("invalid-argument", "An RxNorm code is a number (RxCUI).");
+  return {
+    genericName,
+    brandName: text(input.brandName, 120),
+    strength: text(input.strength, 60),
+    concentration: text(input.concentration, 60),
+    dosageForm: form,
+    routes: cleanList(input.routes, logic.ROUTES),
+    ndc: ndc.ndc,
+    ndc11: ndc.ndc11,
+    rxnormCode: rxnorm,
+    controlledSchedule: schedule,
+    storage,
+    protectFromLight: input.protectFromLight === true,
+    highAlert: input.highAlert === true,
+    lookAlikeNote: text(input.lookAlikeNote, 200),
+    tracksLots: true,
+    tracksExpiration: true,
+  };
+}
+
+function cleanItem(input = {}, itemClass = "supply") {
   const name = text(input.name, 120);
   if (!name) throw new HttpsError("invalid-argument", "Give the item a name.");
   const category = text(input.category, 60);
@@ -119,22 +189,27 @@ function cleanItem(input = {}) {
     tracksLots: input.tracksLots === true,
     tracksExpiration: input.tracksExpiration === true,
     active: input.active !== false,
+    ...(itemClass === "medication" ? cleanMedication(input) : {}),
   };
 }
 
 async function saveItem(db, request) {
-  const caller = await resolveCaller(db, request, [PERMISSIONS.manage]);
-  const item = cleanItem(request.data?.item);
+  const caller = await resolveCaller(db, request, [PERMISSIONS.manage, PERMISSIONS.medManage]);
   const itemId = request.data?.item?.id ? cleanDocId(request.data.item.id, "Item") : newId("I");
   const ref = db.collection(paths.items(caller.departmentId)).doc(itemId);
   const at = nowIso();
+  let item;
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (request.data?.item?.id && !snap.exists) throw new HttpsError("not-found", "That item wasn't found.");
     const before = snap.exists ? snap.data() : null;
+    // An item's class is set when it's added and never changes.
+    const itemClass = before ? (before.itemClass || "supply") : (request.data?.item?.itemClass === "medication" ? "medication" : "supply");
+    assertItemAccess(caller, { itemClass }, "manage");
+    item = cleanItem(request.data?.item, itemClass);
     const record = snap.exists
       ? { ...item, updatedAt: at, updatedBy: caller.uid }
-      : { id: itemId, itemClass: "supply", ...item, createdAt: at, createdBy: caller.uid, updatedAt: at, updatedBy: caller.uid };
+      : { id: itemId, itemClass, ...item, createdAt: at, createdBy: caller.uid, updatedAt: at, updatedBy: caller.uid };
     tx.set(ref, record, { merge: true });
     auditEvent(db, tx, caller, {
       action: before ? "ems.item.updated" : "ems.item.created", recordType: "item", recordId: itemId,
@@ -227,7 +302,7 @@ function parNumber(value, label) {
 }
 
 async function setPar(db, request) {
-  const caller = await resolveCaller(db, request, [PERMISSIONS.manage]);
+  const caller = await resolveCaller(db, request, [PERMISSIONS.manage, PERMISSIONS.medManage]);
   const locationId = cleanDocId(request.data?.locationId, "Location");
   const itemId = cleanDocId(request.data?.itemId, "Item");
   const input = request.data?.par;
@@ -252,6 +327,7 @@ async function setPar(db, request) {
     ]);
     if (!location.exists) throw new HttpsError("not-found", "That location wasn't found.");
     if (!item.exists) throw new HttpsError("not-found", "That item wasn't found.");
+    assertItemAccess(caller, item.data(), "manage");
     const current = snap.exists ? snap.data() : { id: ref.id, itemId, locationId, onHand: 0, lots: [] };
     const next = { ...current, par, ...logic.balanceFlags(current.onHand || 0, par, current.lots || []), parUpdatedAt: at, parUpdatedBy: caller.uid };
     if (!snap.exists) next.updatedAt = at;
@@ -270,10 +346,10 @@ async function setPar(db, request) {
 // ---------------------------------------------------------------- transactions
 
 /** Write the new balances for every location the lines touch. Reads must already be done. */
-function writeBalances(tx, db, departmentId, itemId, balancesByLocation, lines, transactionId, at) {
+function writeBalances(tx, db, departmentId, itemId, balancesByLocation, lines, transactionId, at, heldKeys = new Set()) {
   const written = {};
   for (const [locationId, group] of logic.linesByLocation(lines)) {
-    const next = logic.applyLines(balancesByLocation[locationId], group, { itemId, locationId, transactionId, at });
+    const next = logic.applyLines(balancesByLocation[locationId], group, { itemId, locationId, transactionId, at, heldKeys });
     tx.set(db.collection(paths.balances(departmentId)).doc(logic.balanceId(locationId, itemId)), next);
     written[locationId] = next.onHand;
   }
@@ -287,6 +363,7 @@ function ledgerRecord(caller, { id, type, item, quantity, fromLocationId = "", t
     status: "posted",
     itemId: item.id,
     itemName: item.name,
+    itemClass: item.itemClass || "supply",
     unitOfMeasure: item.unitOfMeasure || "each",
     quantity,
     fromLocationId,
@@ -306,7 +383,7 @@ async function postTransaction(db, request) {
   const type = text(data.type, 30);
   const rule = logic.TRANSACTION_TYPES[type];
   if (!rule) throw new HttpsError("invalid-argument", "Choose what happened to the stock.");
-  const anyOf = rule.access === "use" ? [PERMISSIONS.use, PERMISSIONS.manage] : [PERMISSIONS.manage];
+  const anyOf = [...accessKeys("supply", rule.access), ...accessKeys("medication", rule.access)];
   const caller = await resolveCaller(db, request, anyOf);
   const requestId = cleanRequestId(data.requestId);
   const itemId = cleanDocId(data.itemId, "Item");
@@ -350,6 +427,10 @@ async function postTransaction(db, request) {
       ]);
       if (!itemSnap.exists) throw new HttpsError("not-found", "That item wasn't found.");
       const item = { id: itemSnap.id, ...itemSnap.data() };
+      assertItemAccess(caller, item, rule.access);
+      if (item.controlledSchedule) {
+        throw new HttpsError("failed-precondition", `${item.name} is a Schedule ${item.controlledSchedule} controlled substance. Controlled substances aren't tracked in this inventory.`);
+      }
       if (item.active === false && rule.direction !== "out") throw new HttpsError("failed-precondition", `${item.name} is turned off in the catalog.`);
       for (const snap of locationSnaps) {
         if (!snap.exists) throw new HttpsError("not-found", "That location wasn't found.");
@@ -361,15 +442,46 @@ async function postTransaction(db, request) {
         if (item.tracksExpiration && !expiration) throw new HttpsError("invalid-argument", `${item.name} needs an expiration date.`);
       }
 
-      const balanceSnaps = await Promise.all(locationIds.map((id) =>
-        tx.get(db.collection(paths.balances(d)).doc(logic.balanceId(id, itemId)))));
+      const [heldKeys, ...balanceSnaps] = await Promise.all([
+        readHeldKeys(tx, db, d, itemId),
+        ...locationIds.map((id) => tx.get(db.collection(paths.balances(d)).doc(logic.balanceId(id, itemId)))),
+      ]);
       const balances = Object.fromEntries(locationIds.map((id, i) => [id, balanceSnaps[i].exists ? balanceSnaps[i].data() : null]));
+
+      // A medication lot received while a recall covers it goes straight on hold.
+      let recallHold = null;
+      if (type === "receive" && item.itemClass === "medication") {
+        const recalls = await tx.get(db.collection(paths.recalls(d)).where("itemIds", "array-contains", itemId));
+        const covering = recalls.docs.map((doc) => doc.data()).filter((r) => logic.recallCovers(r, itemId, lot));
+        if (covering.length) {
+          const key = logic.lotKey(lot, expiration);
+          const holdRef = db.collection(paths.holds(d)).doc(logic.holdId(itemId, key));
+          const holdSnap = await tx.get(holdRef);
+          recallHold = { ref: holdRef, before: holdSnap.exists ? holdSnap.data() : null, key, recalls: covering };
+          heldKeys.add(key);
+        }
+      }
 
       const lines = logic.linesFor(type, {
         quantity, fromLocationId, toLocationId, fromBalance: balances[fromLocationId],
-        lot, expiration, lotKey: chosenLot, policy: settings.rotationPolicy, today, at,
+        lot, expiration, lotKey: chosenLot, policy: settings.rotationPolicy, today, at, heldKeys,
       });
-      const onHand = writeBalances(tx, db, d, itemId, balances, lines, transactionId, at);
+      const onHand = writeBalances(tx, db, d, itemId, balances, lines, transactionId, at, heldKeys);
+      if (recallHold) {
+        const recallIds = [...new Set([...(recallHold.before?.status === "active" ? recallHold.before.recallIds || [] : []), ...recallHold.recalls.map((r) => r.id)])];
+        tx.set(recallHold.ref, {
+          id: recallHold.ref.id, itemId, itemName: item.name, key: recallHold.key, lot, expiration,
+          status: "active", recallIds,
+          manual: recallHold.before?.status === "active" ? recallHold.before.manual || null : null,
+          placedAt: recallHold.before?.status === "active" ? recallHold.before.placedAt : at,
+          placedBy: recallHold.before?.status === "active" ? recallHold.before.placedBy : caller.uid,
+          updatedAt: at,
+        });
+        auditEvent(db, tx, caller, {
+          action: "ems.hold.placed", recordType: "hold", recordId: recallHold.ref.id,
+          summary: `Put ${item.name} lot ${lot} on hold when received: recall ${recallHold.recalls.map((r) => r.reference || r.id).join(", ")}`,
+        });
+      }
       tx.create(txRef, ledgerRecord(caller, {
         id: transactionId, type, item, quantity, fromLocationId, toLocationId, lines, at,
         reason,
@@ -385,7 +497,11 @@ async function postTransaction(db, request) {
         action: `ems.inventory.${type}`, recordType: "transaction", recordId: transactionId,
         summary: `${rule.label}: ${quantity} ${item.unitOfMeasure || "each"} ${item.name} (${where})`,
       });
-      return { transactionId, replayed: false, quantity, onHand, lines: lines.map((l) => ({ locationId: l.locationId, lot: l.lot, expiration: l.expiration, delta: l.delta })) };
+      return {
+        transactionId, replayed: false, quantity, onHand,
+        lines: lines.map((l) => ({ locationId: l.locationId, lot: l.lot, expiration: l.expiration, delta: l.delta })),
+        ...(recallHold ? { heldForRecall: recallHold.recalls.map((r) => ({ id: r.id, reference: r.reference || "" })) } : {}),
+      };
     });
   } catch (error) {
     // The same request sent twice at once: the copy that loses the race can fail at commit
@@ -418,11 +534,14 @@ async function reverseTransaction(db, request) {
       if (existing.exists) throw new HttpsError("already-exists", "That transaction was already reversed.");
       const lines = logic.reversedLines(orig.lines);
       const locationIds = [...new Set(lines.map((l) => l.locationId))];
-      const snaps = await Promise.all(locationIds.map((id) => tx.get(db.collection(paths.balances(d)).doc(logic.balanceId(id, orig.itemId)))));
+      const [heldKeys, ...snaps] = await Promise.all([
+        readHeldKeys(tx, db, d, orig.itemId),
+        ...locationIds.map((id) => tx.get(db.collection(paths.balances(d)).doc(logic.balanceId(id, orig.itemId)))),
+      ]);
       const balances = Object.fromEntries(locationIds.map((id, i) => [id, snaps[i].exists ? snaps[i].data() : null]));
-      writeBalances(tx, db, d, orig.itemId, balances, lines, reversalId, at);
+      writeBalances(tx, db, d, orig.itemId, balances, lines, reversalId, at, heldKeys);
       tx.create(reversalRef, ledgerRecord(caller, {
-        id: reversalId, type: "reversal", item: { id: orig.itemId, name: orig.itemName, unitOfMeasure: orig.unitOfMeasure },
+        id: reversalId, type: "reversal", item: { id: orig.itemId, name: orig.itemName, unitOfMeasure: orig.unitOfMeasure, itemClass: orig.itemClass },
         quantity: orig.quantity, fromLocationId: orig.toLocationId || "", toLocationId: orig.fromLocationId || "", lines, at,
         reason, reversesTransactionId: originalId, reversesType: orig.type,
       }));
@@ -614,8 +733,17 @@ async function approveCount(db, request) {
       }
       if (byItem.size > MAX_ADJUSTED_ITEMS) throw new HttpsError("failed-precondition", `More than ${MAX_ADJUSTED_ITEMS} items differ. Recount in smaller locations.`);
       const itemIds = [...byItem.keys()];
-      const balanceSnaps = await Promise.all(itemIds.map((itemId) =>
-        tx.get(db.collection(paths.balances(d)).doc(logic.balanceId(count.locationId, itemId)))));
+      const [balanceSnaps, itemSnaps, heldSnap] = await Promise.all([
+        Promise.all(itemIds.map((itemId) => tx.get(db.collection(paths.balances(d)).doc(logic.balanceId(count.locationId, itemId))))),
+        Promise.all(itemIds.map((itemId) => tx.get(db.collection(paths.items(d)).doc(itemId)))),
+        tx.get(db.collection(paths.holds(d)).where("status", "==", "active")),
+      ]);
+      const heldByItem = new Map();
+      for (const doc of heldSnap.docs) {
+        const hold = doc.data();
+        if (!heldByItem.has(hold.itemId)) heldByItem.set(hold.itemId, new Set());
+        heldByItem.get(hold.itemId).add(hold.key);
+      }
       const transactionIds = [];
       itemIds.forEach((itemId, i) => {
         const rows = byItem.get(itemId);
@@ -624,7 +752,7 @@ async function approveCount(db, request) {
         const lines = rows.map((row) => ({ locationId: count.locationId, key: row.key, lot: row.lot, expiration: row.expiration, receivedAt: count.expectedAt, delta: row.counted - row.expected }));
         const transactionId = `ADJ-${countId}-${i + 1}`;
         try {
-          writeBalances(tx, db, d, itemId, { [count.locationId]: balanceSnaps[i].exists ? balanceSnaps[i].data() : null }, lines, transactionId, at);
+          writeBalances(tx, db, d, itemId, { [count.locationId]: balanceSnaps[i].exists ? balanceSnaps[i].data() : null }, lines, transactionId, at, heldByItem.get(itemId));
         } catch (error) {
           if (error instanceof logic.InventoryRuleError) {
             throw new HttpsError("failed-precondition", `${rows[0].itemName}: stock was used after this count started, so the count no longer adds up. Reject it and count again.`);
@@ -633,7 +761,8 @@ async function approveCount(db, request) {
         }
         const quantity = lines.reduce((sum, l) => sum + Math.abs(l.delta), 0);
         tx.create(db.collection(paths.transactions(d)).doc(transactionId), ledgerRecord(caller, {
-          id: transactionId, type: "countAdjustment", item: { id: itemId, name: rows[0].itemName, unitOfMeasure: rows[0].unitOfMeasure },
+          id: transactionId, type: "countAdjustment",
+          item: { id: itemId, name: rows[0].itemName, unitOfMeasure: rows[0].unitOfMeasure, itemClass: itemSnaps[i].exists ? itemSnaps[i].data().itemClass : "supply" },
           quantity, toLocationId: count.locationId, lines, at,
           countId, reason: rows.map((r) => r.reason).filter(Boolean).join("; ").slice(0, 500),
           countedBy: count.submittedBy, approvedBy: caller.uid,
@@ -673,6 +802,10 @@ module.exports = {
   MODULE_KEY,
   PERMISSIONS,
   paths,
+  accessKeys,
+  assertItemAccess,
+  readHeldKeys,
+  resolveCaller,
   saveSettings,
   saveItem,
   saveLocation,

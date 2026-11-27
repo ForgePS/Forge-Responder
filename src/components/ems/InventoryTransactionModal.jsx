@@ -12,7 +12,7 @@ const AUTO_LOT = "";
  * so pressing Save again after a dropped connection can't move stock twice.
  */
 export default function InventoryTransactionModal({
-  departmentId, items, locations, balances, settings, canUse, canManage, preset = {}, onClose, onDone,
+  departmentId, items, locations, balances, settings, canUse, canManage, preset = {}, onClose, onDone, title = "Record inventory",
 }) {
   const allowedTypes = Object.entries(TRANSACTION_TYPES)
     .filter(([, rule]) => (rule.access === "use" ? canUse || canManage : canManage));
@@ -23,7 +23,7 @@ export default function InventoryTransactionModal({
     fromLocationId: preset.fromLocationId || "",
     toLocationId: preset.toLocationId || "",
     quantity: "",
-    lotKey: AUTO_LOT,
+    lotKey: preset.lotKey || AUTO_LOT,
     lot: "",
     expiration: "",
     unitCost: "",
@@ -40,7 +40,9 @@ export default function InventoryTransactionModal({
   const activeLocations = locations.filter((l) => l.active !== false)
     .map((l) => ({ ...l, path: locationPath(l, locationsById) }))
     .sort((a, b) => a.path.localeCompare(b.path));
-  const activeItems = items.filter((i) => i.active !== false || i.id === form.itemId).sort((a, b) => a.name.localeCompare(b.name));
+  // Controlled substances aren't tracked in this inventory (their own ledger comes in E5).
+  const activeItems = items.filter((i) => (i.active !== false || i.id === form.itemId) && !i.controlledSchedule)
+    .sort((a, b) => a.name.localeCompare(b.name));
   const item = items.find((i) => i.id === form.itemId);
   const fromBalance = balances.find((b) => b.itemId === form.itemId && b.locationId === form.fromLocationId);
   const today = todayIso();
@@ -50,6 +52,7 @@ export default function InventoryTransactionModal({
   const lotIsExpired = (lot) => expirationStatus(lot.expiration, warningDays, today).level === "expired";
   const lots = (fromBalance?.lots || []).filter((lot) => {
     if (!(lot.quantity > 0)) return false;
+    if (lot.held && rule.held === "exclude") return false;
     if (form.type === "expired") return lotIsExpired(lot);
     if (form.type === "usage" || form.type === "transfer") return !lotIsExpired(lot);
     return true;
@@ -80,7 +83,8 @@ export default function InventoryTransactionModal({
         incidentNumber: form.incidentNumber,
         note: form.note,
       });
-      onDone(`${TRANSACTION_TYPES[form.type].label}: ${form.quantity} ${item?.unitOfMeasure || ""} ${item?.name || ""}.${result.replayed ? " (Already saved earlier.)" : ""}`);
+      const recalled = (result.heldForRecall || []).map((r) => r.reference || r.id).join(", ");
+      onDone(`${TRANSACTION_TYPES[form.type].label}: ${form.quantity} ${item?.unitOfMeasure || ""} ${item?.name || ""}.${result.replayed ? " (Already saved earlier.)" : ""}${recalled ? ` This lot is recalled (${recalled}), so it was put on hold.` : ""}`);
     } catch (e) {
       setError(describeError(e));
     } finally {
@@ -99,7 +103,7 @@ export default function InventoryTransactionModal({
   );
 
   return (
-    <Modal title="Record inventory" onClose={onClose}>
+    <Modal title={title} onClose={onClose}>
       <form className="ems-form" onSubmit={save}>
         {error ? <div className="checklist-missing-alert" role="alert">{error}</div> : null}
         <div className="ems-form-grid">
@@ -146,12 +150,13 @@ export default function InventoryTransactionModal({
                   const status = expirationStatus(lot.expiration, warningDays, today);
                   return (
                     <option key={lot.key} value={lot.key}>
-                      {lot.lot || "No lot"} · {lot.expiration ? `exp ${formatDate(lot.expiration)}` : "no expiration"} · {lot.quantity} on hand{status.level === "expired" ? " · EXPIRED" : ""}
+                      {lot.lot || "No lot"} · {lot.expiration ? `exp ${formatDate(lot.expiration)}` : "no expiration"} · {lot.quantity} on hand{status.level === "expired" ? " · EXPIRED" : ""}{lot.held ? " · ON HOLD" : ""}
                     </option>
                   );
                 })}
               </select>
-              {form.fromLocationId && form.itemId && !lots.length ? <small className="occupancy-muted">None on hand at this location.</small> : null}
+              {form.fromLocationId && form.itemId && !lots.length ? <small className="occupancy-muted">None on hand at this location{fromBalance?.heldQuantity ? " that isn't on hold" : ""}.</small> : null}
+              {rule.held === "explicit" && lots.some((lot) => lot.held) ? <small className="occupancy-muted">Lots on hold move only when you choose them, for example to a quarantine area. They stay on hold.</small> : null}
             </label>
           )}
           {form.type === "usage" ? (

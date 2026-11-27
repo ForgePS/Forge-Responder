@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Boxes, Building2, ClipboardList, History, ListChecks, Package, ScrollText, Settings2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
@@ -72,6 +72,12 @@ export default function EmsSupplyInventoryPage() {
     ...(canAudit ? [{ id: "audit", label: "Audit", icon: ScrollText }] : []),
   ];
   const stations = stationNamesFromDetails(buildStationDetailsFromProfile(profile || {}));
+  // Medications share the inventory but have their own page (EMS Medications).
+  const supplyItems = useMemo(() => items.filter((i) => i.itemClass !== "medication"), [items]);
+  const supplyBalances = useMemo(() => {
+    const ids = new Set(supplyItems.map((i) => i.id));
+    return balances.filter((b) => ids.has(b.itemId));
+  }, [balances, supplyItems]);
 
   return (
     <div className="module-page ems-inventory-page">
@@ -101,15 +107,15 @@ export default function EmsSupplyInventoryPage() {
           {error ? <div className="checklist-missing-alert" role="alert">{error}</div> : null}
           {message ? <div className="df-success" role="status">{message}</div> : null}
           {tab === "stock" ? (
-            <InventoryStockTab departmentId={departmentId} items={items} locations={locations} balances={balances} settings={settings}
+            <InventoryStockTab departmentId={departmentId} items={supplyItems} locations={locations} balances={supplyBalances} settings={settings}
               canUse={canUse} canManage={canManage} onRecord={setRecording} onMessage={setMessage} />
           ) : null}
-          {tab === "activity" ? <InventoryActivityTab departmentId={departmentId} items={items} locations={locations} canApprove={canApprove} onMessage={setMessage} /> : null}
+          {tab === "activity" ? <InventoryActivityTab departmentId={departmentId} items={supplyItems} locations={locations} canApprove={canApprove} onMessage={setMessage} itemClass="supply" /> : null}
           {tab === "counts" ? (
             <InventoryCountsTab departmentId={departmentId} uid={user?.uid || ""} items={items} locations={locations}
               canCount={canUse} canApprove={canApprove} onMessage={setMessage} />
           ) : null}
-          {tab === "catalog" ? <InventoryCatalogTab departmentId={departmentId} items={items} canManage={canManage} onMessage={setMessage} /> : null}
+          {tab === "catalog" ? <InventoryCatalogTab departmentId={departmentId} items={supplyItems} canManage={canManage} onMessage={setMessage} /> : null}
           {tab === "locations" ? (
             <InventoryLocationsTab departmentId={departmentId} locations={locations} stations={stations} fleetAssets={fleetAssets}
               canManage={canManage} onMessage={setMessage} />
@@ -117,7 +123,7 @@ export default function EmsSupplyInventoryPage() {
           {tab === "settings" && canSettings ? <InventorySettingsTab departmentId={departmentId} settings={settings} onMessage={setMessage} /> : null}
           {tab === "audit" && canAudit ? <EmsAuditTab departmentId={departmentId} /> : null}
           {recording ? (
-            <InventoryTransactionModal departmentId={departmentId} items={items} locations={locations} balances={balances} settings={settings}
+            <InventoryTransactionModal departmentId={departmentId} items={supplyItems} locations={locations} balances={supplyBalances} settings={settings}
               canUse={canUse} canManage={canManage} preset={recording} onClose={() => setRecording(null)}
               onDone={(text) => { setRecording(null); setMessage(text); }} />
           ) : null}

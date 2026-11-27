@@ -7,8 +7,9 @@ only when it has server logic, rules, UI and passing tests.
 |---|---|
 | E1 Foundation: module, permissions, audit, supply inventory core | **Deployed** (PR #97, staging and production) |
 | E2 Equipment: records, lifecycle, moves, QR labels and scanning, import from Assets | **Deployed** (staging and production) |
-| E3 Check-offs and readiness: EMS checklist items, assignments, schedules, sign-off, readiness rules | **Built** (branch `feat/ems-checkoffs`, not deployed) |
-| E4 – E9 | Not started |
+| E3 Check-offs and readiness: EMS checklist items, assignments, schedules, sign-off, readiness rules | **Deployed** (PR #104, staging and production) |
+| E4 Medications: medication catalog, medication stock, expirations, recalls and lot holds | **Built** (branch `feat/ems-e4`, not deployed) |
+| E5 – E9 | Not started |
 
 ---
 
@@ -319,3 +320,95 @@ local emulators: running a check-off, results and readiness, sign-off, assignmen
 2. Run `node scripts/sync-member-grants.mjs` (dry run, then `--apply`) on each project. Server grants are only
    recomputed when a member or role changes, so without this the new E2 and E3 permissions can't read their data.
 3. Custom roles need the new permissions added in Admin.
+
+---
+
+## E4 — Medications
+
+### What a department can do
+
+- Keep a **medication catalog** in the new **EMS Medications** page. Each medication records:
+  - generic and brand name, strength, concentration, dosage form and routes;
+  - NDC (checked, and stored in 11-digit 5-4-2 form too) and RxNorm code;
+  - storage (room temperature, refrigerated, frozen) and protect from light;
+  - DEA schedule, high-alert flag and a look-alike / sound-alike warning.
+
+  Every medication needs a lot number and an expiration date when received.
+- Track **medication stock** by location and lot with the E1 ledger: receive, use, transfer, remove expired or damaged, waste, return to vendor. Stock rotates by FEFO. History and reversals work the same as for supplies, with the department's own medication permissions.
+- See **expirations** by the department's warning windows (7, 14, 30, 60, 90 days by default):
+  - expired stock still on hand, removable from the list in one click;
+  - a CSV export.
+- Record a **recall** for one or more medications and lot numbers (or every lot), with reason, class, source, reference and issue date:
+  - every matching lot on hand is put **on hold** everywhere it's stocked;
+  - a lot received later while the recall is open is held when received;
+  - the recall shows the recalled stock by location, with a button to return it to the vendor;
+  - a recall closes as **completed** once no recalled stock is left, or as **withdrawn** (with a note), which releases its holds.
+- Put a lot **on hold** by hand (a temperature excursion, say) and release it with a note. A hold can't be released while an open recall covers the lot.
+
+### How holds work
+
+- A hold is department-wide for one lot of one item (`emsLotHolds/{itemId}__{lotKey}`). Each balance's lots carry a `held` flag and the balance keeps `heldQuantity`. Every write rewrites these from the active holds: transactions, reversals, count approvals, and placing or releasing a hold.
+- What each kind of transaction can do with held stock:
+  - **Use:** never takes held stock, even when the lot is chosen by hand.
+  - **Transfer:** moves a held lot only when it's chosen (to a quarantine area, say), and the lot stays held.
+  - **Removals** (expired, damaged, waste, return to vendor): may take held stock.
+- Low stock and out of stock count only stock that isn't held. A unit whose only naloxone is recalled is out of stock, so E3 readiness flags it.
+
+### Controlled substances
+
+A medication can be marked Schedule II–V, but its stock isn't tracked here: the ledger refuses it, and the stock screens leave it out. E5 adds the separate controlled-substance ledger with witnesses and seals.
+
+### Data (under `departments/{id}/`, written only by the callables)
+
+| Collection | Holds |
+|---|---|
+| `emsInventoryItems` | medications too: `itemClass: "medication"` and the medication fields. An item's class never changes |
+| `emsInventoryTransactions` | records now carry `itemClass`, so the medication history queries only medications |
+| `emsLotHolds/{itemId}__{lotKey}` | active or released; the open recalls and/or manual reason behind it |
+| `emsMedicationRecalls/{id}` | medications, lot numbers, reason, class, source, reference, the lots held when recorded; open → closed (completed or withdrawn) |
+
+New callables: `emsMedicationsCreateRecall`, `emsMedicationsCloseRecall`, `emsMedicationsPlaceHold`, `emsMedicationsReleaseHold`. New indexes on `emsInventoryTransactions`: `itemClass` + `createdAt`, and `itemClass` + `locationIds` + `createdAt`.
+
+### Permissions (new)
+
+| Key | Allows | Built-in roles |
+|---|---|---|
+| `viewEmsMedications` | see medications, stock, expirations, recalls and holds | all |
+| `useEmsMedications` | record use, transfers, expired and damaged removals | Fire Chief, Battalion Chief, Company Officer, Firefighter |
+| `manageEmsMedications` | catalog, receiving, par levels, waste and returns, recalls and holds | Fire Chief, Battalion Chief |
+
+Supply permissions no longer allow anything on medications, and medication permissions don't allow anything on supplies. Medication readers can read the shared inventory collections (locations, balances, the ledger), because medications live in them. Counts, settings and locations stay in EMS Supply Inventory, and a count of a location counts everything at it.
+
+### Tests
+
+| Suite | New tests | Covers |
+|---|---|---|
+| `tests/unit/emsMedications.test.mjs` | 10 | NDC forms; recall lot matching; held lots in picking, par flags and ledger lines; client constants match the server; the expiration and lot lists |
+| `tests/functions/emsMedications.test.mjs` | 11 | catalog fields and permissions; lot and expiration required; ledger item class; supply-only members refused; controlled substances refused; recall holds across locations; use refused, quarantine transfer, return, close completed; recalled lot held on receipt; withdraw releases; manual holds; recalls take only medications and stay in the department; count approval keeps holds |
+| `tests/rules/emsMedications.rules.test.mjs` | 4 | holds, recalls and medications readable with a medication or inventory key; others and other departments refused; plan without the module refused; no browser writes |
+
+Full suite on this branch: lint, build, unit 882/882, rules 193/193, functions 280/280.
+
+Checked in the browser on local emulators:
+- **Stock:** held lots and "All on hold" show; nothing on hold offers "Record use"; a recalled unit counts as out of stock.
+- **Recalls:**
+  - the recall lists its stock by location;
+  - returning it from the recall updates "Held now";
+  - closing as completed is blocked while stock remains;
+  - withdrawing needs a note.
+- **Expirations:** grouped by window, with Remove only on expired stock.
+- **Other pages and roles:** Supply Inventory no longer lists medications. A Captain sees Record use but not Receive or recall management.
+
+### Known limits of E4
+
+- No reminders for expiring or recalled stock yet (E8). The Expirations tab and the stock summary show them.
+- Recalls are entered by hand. There's no feed from FDA or vendor recall notices.
+- The crew (firefighter) menu doesn't list the EMS pages; that was already true for Supply Inventory and Check-offs.
+- RxNorm codes are typed in; picking from a list comes with the ePCR medication work (E6).
+
+### Deploying E4
+
+1. Deploy indexes and rules, then the functions (in small groups on staging; every function loads the role defaults), then hosting. Check the four new callables' public access afterwards.
+2. Wait for the two new `emsInventoryTransactions` indexes before opening the medication history.
+3. Run `node scripts/sync-member-grants.mjs` (dry run, then `--apply`) on each project, so existing members' server grants include the medication permissions.
+4. Custom roles need the medication permissions added in Admin.

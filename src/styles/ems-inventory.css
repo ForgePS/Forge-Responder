@@ -53,3 +53,15 @@
   .ems-filters input, .ems-filters select { max-width: none; }
   .ems-row-actions .secondary-button { min-width: 44px; min-height: 44px; }
 }
+
+/* ---- EMS medications (E4) ---- */
+.ems-held-text { color: var(--rms-danger-text); font-weight: 600; }
+.ems-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.ems-fieldset legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+.ems-chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.ems-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--rms-border); border-radius: 999px; font-size: 0.85rem; cursor: pointer; }
+.ems-detail-list { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0 0 12px; }
+.ems-detail-list dt { font-weight: 600; color: var(--rms-text-muted); }
+.ems-detail-list dd { margin: 0; }
+.ems-recall-places { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.ems-recall-places li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }

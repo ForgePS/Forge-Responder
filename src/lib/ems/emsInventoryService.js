@@ -35,6 +35,12 @@ export const submitInventoryCount = (departmentId, countId, rows) => call("emsIn
 export const approveInventoryCount = (departmentId, countId, note) => call("emsInventoryApproveCount", { departmentId, countId, note });
 export const rejectInventoryCount = (departmentId, countId, note) => call("emsInventoryRejectCount", { departmentId, countId, note });
 
+// Medication recalls and lot holds (E4, functions/lib/emsMedications)
+export const createMedicationRecall = (departmentId, recall) => call("emsMedicationsCreateRecall", { departmentId, recall });
+export const closeMedicationRecall = (departmentId, recallId, outcome, note) => call("emsMedicationsCloseRecall", { departmentId, recallId, outcome, note });
+export const placeLotHold = (departmentId, itemId, lotKey, reason) => call("emsMedicationsPlaceHold", { departmentId, itemId, lotKey, reason });
+export const releaseLotHold = (departmentId, holdId, note) => call("emsMedicationsReleaseHold", { departmentId, holdId, note });
+
 function tenantCollection(departmentId, name) {
   const db = getFirestoreDb();
   if (!db || !departmentId) return null;
@@ -52,14 +58,29 @@ export const watchInventoryItems = (departmentId, onChange, onError) => watch(te
 export const watchInventoryLocations = (departmentId, onChange, onError) => watch(tenantCollection(departmentId, "emsInventoryLocations"), onChange, onError);
 export const watchInventoryBalances = (departmentId, onChange, onError) => watch(tenantCollection(departmentId, "emsInventoryBalances"), onChange, onError);
 
-/** Newest ledger records, optionally for one item or one location. */
-export function watchInventoryTransactions(departmentId, { itemId = "", locationId = "", max = 200 } = {}, onChange, onError) {
+/** Newest ledger records, optionally for one item, one location, or one item class ("medication"). */
+export function watchInventoryTransactions(departmentId, { itemId = "", locationId = "", itemClass = "", max = 200 } = {}, onChange, onError) {
   const target = tenantCollection(departmentId, "emsInventoryTransactions");
   if (!target) return noop();
   const filters = [];
   if (itemId) filters.push(where("itemId", "==", itemId));
-  else if (locationId) filters.push(where("locationIds", "array-contains", locationId));
+  else {
+    if (itemClass) filters.push(where("itemClass", "==", itemClass));
+    if (locationId) filters.push(where("locationIds", "array-contains", locationId));
+  }
   return watch(query(target, ...filters, orderBy("createdAt", "desc"), limit(max)), onChange, onError);
+}
+
+/** Lots on hold now. */
+export function watchLotHolds(departmentId, onChange, onError) {
+  const target = tenantCollection(departmentId, "emsLotHolds");
+  return target ? watch(query(target, where("status", "==", "active")), onChange, onError) : noop();
+}
+
+/** Medication recalls, newest first. */
+export function watchMedicationRecalls(departmentId, onChange, onError) {
+  const target = tenantCollection(departmentId, "emsMedicationRecalls");
+  return target ? watch(query(target, orderBy("createdAt", "desc"), limit(200)), onChange, onError) : noop();
 }
 
 export function watchInventoryCounts(departmentId, onChange, onError) {

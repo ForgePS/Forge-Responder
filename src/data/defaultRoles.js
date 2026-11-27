@@ -6,6 +6,9 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsMedications: true,
+      useEmsMedications: true,
+      manageEmsMedications: true,
       viewEmsCheckoffs: true,
       runEmsCheckoffs: true,
       signOffEmsCheckoffs: true,
@@ -194,6 +197,9 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsMedications: true,
+      useEmsMedications: true,
+      manageEmsMedications: true,
       viewEmsCheckoffs: true,
       runEmsCheckoffs: true,
       signOffEmsCheckoffs: true,
@@ -373,6 +379,8 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsMedications: true,
+      useEmsMedications: true,
       viewEmsCheckoffs: true,
       runEmsCheckoffs: true,
       checkEmsEquipment: true,
@@ -423,6 +431,8 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsMedications: true,
+      useEmsMedications: true,
       viewEmsCheckoffs: true,
       runEmsCheckoffs: true,
       signOffEmsCheckoffs: true,
@@ -491,6 +501,9 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsMedications: true,
+      useEmsMedications: true,
+      manageEmsMedications: true,
       viewEmsCheckoffs: true,
       runEmsCheckoffs: true,
       signOffEmsCheckoffs: true,
@@ -573,6 +586,7 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsMedications: true,
       viewEmsCheckoffs: true,
       viewPersonnel: true,
       viewCertifications: true,
@@ -644,6 +658,7 @@ export const defaultRoles = [
     permissions: {
       viewEmsInventory: true,
       viewEmsEquipment: true,
+      viewEmsMedications: true,
       viewEmsCheckoffs: true,
       manageEmsSettings: true,
       viewEmsAudit: true,

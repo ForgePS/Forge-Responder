@@ -94,6 +94,7 @@ export const NAV_MODULE_MAP = {
   "EMS Supply Inventory": "emsManagement",
   "EMS Equipment": "emsManagement",
   "EMS Check-offs": "emsManagement",
+  "EMS Medications": "emsManagement",
   "NERIS Analytics": "nerisFireReports",
   "Heat Zone Analytics": "analytics",
   "SOGs / Policies": "documents",
@@ -290,6 +291,9 @@ export const ADMIN_PERMISSION_LABELS = {
   runEmsCheckoffs: "Do EMS check-offs and record their equipment and supply answers",
   signOffEmsCheckoffs: "Sign off or send back other members' EMS check-offs",
   manageEmsCheckoffs: "Manage EMS check-offs: assign checklists to units, set schedules and readiness rules",
+  viewEmsMedications: "View EMS medications: stock, lots, expirations, recalls and holds",
+  useEmsMedications: "Record medication use, transfers and removal of expired or damaged medications",
+  manageEmsMedications: "Manage EMS medications: catalog, receiving, par levels, waste and returns, recalls and lot holds",
   viewHeatZoneAnalytics: "View Heat Zone Analytics",
   viewHeatZoneMarkers: "View individual incidents on the heat map",
   viewHeatZoneAllDistricts: "View Heat Zone analytics for all districts",
@@ -463,7 +467,7 @@ export const ADMIN_PERMISSION_GROUPS = [
   },
   {
     label: "EMS Management",
-    keys: ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments", "manageEmsSettings", "viewEmsAudit", "viewEmsEquipment", "checkEmsEquipment", "transferEmsEquipment", "manageEmsEquipment", "viewEmsCheckoffs", "runEmsCheckoffs", "signOffEmsCheckoffs", "manageEmsCheckoffs"]
+    keys: ["viewEmsInventory", "useEmsSupplies", "manageEmsInventory", "approveEmsInventoryAdjustments", "manageEmsSettings", "viewEmsAudit", "viewEmsEquipment", "checkEmsEquipment", "transferEmsEquipment", "manageEmsEquipment", "viewEmsCheckoffs", "runEmsCheckoffs", "signOffEmsCheckoffs", "manageEmsCheckoffs", "viewEmsMedications", "useEmsMedications", "manageEmsMedications"]
   },
   {
     label: "Heat Zone Analytics",
