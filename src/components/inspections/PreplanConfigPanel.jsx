@@ -17,6 +17,8 @@ import {
   defaultPreplanFeatures,
 } from "../../lib/inspections/index.js";
 import PreplanSectionsEditor from "./PreplanSectionsEditor.jsx";
+import PreplanReviewRulesPanel from "../preplans/PreplanReviewRulesPanel.jsx";
+import PreplanSurveySettingsPanel from "../preplans/PreplanSurveySettingsPanel.jsx";
 import { useTenant } from "../../context/TenantContext.jsx";
 
 function Field({ label, children, wide = false }) {
@@ -32,6 +34,8 @@ const SUB_TABS = [
   { id: "templates", label: "Templates" },
   { id: "dropdowns", label: "Dropdowns" },
   { id: "features", label: "Features" },
+  { id: "reviewRules", label: "Review rules" },
+  { id: "surveys", label: "Field surveys" },
 ];
 
 /**
@@ -422,6 +426,13 @@ export default function PreplanConfigPanel({
             ) : null}
           </div>
         </section>
+      ) : null}
+
+      {subTab === "surveys" ? (
+        <PreplanSurveySettingsPanel departmentId={departmentId} templates={templates} actor={actor} canManage={canManage} />
+      ) : null}
+      {subTab === "reviewRules" ? (
+        <PreplanReviewRulesPanel departmentId={departmentId} actor={actor} canManage={canManage} />
       ) : null}
     </div>
   );

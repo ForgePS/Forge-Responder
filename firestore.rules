@@ -256,6 +256,15 @@ service cloud.firestore {
     function preplanConfigKeys() {
       return ["managePreplanConfig", "manageInspectionConfig", "manageSystemSettings"];
     }
+    // A preplan revision whose floor plans / site map may still change.
+    function preplanRevisionEditable(departmentId, revisionId) {
+      return exists(/databases/$(database)/documents/departments/$(departmentId)/preplanRevisions/$(revisionId))
+        && get(/databases/$(database)/documents/departments/$(departmentId)/preplanRevisions/$(revisionId)).data.get("status", "")
+          in ["draft", "in_review", "returned"];
+    }
+    function preplanRevisionOf(departmentId, revisionId) {
+      return get(/databases/$(database)/documents/departments/$(departmentId)/preplanRevisions/$(revisionId)).data.get("preplanId", "");
+    }
     function preplanRestrictedReadKeys() {
       return ["viewPreplanSensitive", "viewPreplanKnox", "viewPreplanUtilities", "viewPreplanHazmat",
         "approvePreplans", "managePreplanConfig", "editPreplans", "createPreplans"];
@@ -852,6 +861,8 @@ service cloud.firestore {
         "users", "violationCatalog", "violations", "waterCompanies",
         "waterCompanyContacts", "waterDistricts",
         "fieldCheckoffLists", "fieldCheckoffs", "fieldPlanUpdates",
+        "preplanAlerts", "preplanConversions", "preplanFindingLinks", "preplanFloorPlans", "preplanFloors",
+        "preplanIncidentLinks", "preplanOfflineDevices", "preplanReviewTasks", "preplanSettings", "preplanSurveys", "preplanSiteMaps",
         "hydrants", "hydrantInspections", "hydrantFlowTests", "dailyActivity",
         "heatZoneAccess", "heatZoneCalls", "heatZoneEvents", "heatZoneGeocodes", "heatZoneMeta", "heatZoneSettings", "heatZoneZones",
         "forgeAiBriefings", "forgeAiConversations", "forgeAiFeedback", "forgeAiMessageSources", "forgeAiMessages",
@@ -1376,7 +1387,9 @@ service cloud.firestore {
         allow create, update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
           && (!movesToStatus(["approved", "published"]) || memberCanAny(departmentId, preplanApproveKeys()));
         // Deleting goes through the deleteRecordWithReason function (reason + audit).
-        allow delete: if false;
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId)
+          && canManageModule(departmentId, "preplans", preplanWorkKeys());
       }
       // Restricted preplan answers (gate codes, utility shutoffs, hazmat).
       match /preplanRestricted/{revisionId} {
@@ -1389,7 +1402,9 @@ service cloud.firestore {
         allow read: if canAccessDepartment(departmentId);
         allow create, update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
           && !request.resource.data.get("sectionAnswers", {}).keys().hasAny(["gatesCodes", "gas", "electric", "hazmat"]);
-        allow delete: if false;
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId)
+          && canManageModule(departmentId, "preplans", preplanWorkKeys());
       }
       // Copies of deleted inspections and preplans with who deleted them and why
       // (functions/lib/recordDeletion.js). Administrators only; written by the server.
@@ -1402,6 +1417,11 @@ service cloud.firestore {
             && memberCanAny(departmentId, ["manageSystemSettings", "managePreplanConfig"]);
           allow write: if false;
         }
+      }
+      // Department rules for automatic review tasks (functions/lib/preplanReviewTasks.js reads them).
+      match /preplanSettings/{settingId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow write: if canManageModule(departmentId, "preplans", preplanConfigKeys());
       }
       match /preplanTemplates/{templateId} {
         allow read: if canAccessDepartment(departmentId);
@@ -1447,6 +1467,187 @@ service cloud.firestore {
       match /preplanQrTokens/{tokenId} {
         allow read: if canAccessDepartment(departmentId);
         allow create, update, delete: if canManageModule(departmentId, "preplans", preplanWorkKeys());
+      }
+      // Interactive preplans (src/lib/preplans/). Floors are archived, never deleted.
+      match /preplanFloors/{floorId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create, update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
+          && request.resource.data.get("preplanId", "") != ""
+          && (resource == null || resource.data.get("preplanId", "") == request.resource.data.get("preplanId", ""));
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId)
+          && canManageModule(departmentId, "preplans", preplanWorkKeys());
+      }
+      // Structured floor geometry, one doc per revision and floor ({revisionId}__{floorId}).
+      // Only while the revision is a draft / in review / returned: published geometry is immutable.
+      match /preplanFloorPlans/{planId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create, update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
+          && planId == request.resource.data.get("revisionId", "") + "__" + request.resource.data.get("floorId", "")
+          && preplanRevisionEditable(departmentId, request.resource.data.revisionId)
+          && preplanRevisionOf(departmentId, request.resource.data.revisionId) == request.resource.data.get("preplanId", "")
+          && request.resource.data.get("version", 0) is int
+          && (resource == null || request.resource.data.version == resource.data.get("version", 0) + 1);
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId)
+          && canManageModule(departmentId, "preplans", preplanWorkKeys());
+      }
+      // Geographic site features for one revision (doc id = revision id). Same lock as floor plans.
+      match /preplanSiteMaps/{revisionId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create, update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
+          && request.resource.data.get("revisionId", "") == revisionId
+          && preplanRevisionEditable(departmentId, revisionId)
+          && preplanRevisionOf(departmentId, revisionId) == request.resource.data.get("preplanId", "")
+          && request.resource.data.get("version", 0) is int
+          && (resource == null || request.resource.data.version == resource.data.get("version", 0) + 1);
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId)
+          && canManageModule(departmentId, "preplans", preplanWorkKeys());
+      }
+      // Operational alerts. Preplan staff and inspectors report them; only approvers verify,
+      // resolve or reject. Never deleted (audit history).
+      match /preplanAlerts/{alertId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if (canManageModule(departmentId, "preplans", preplanWorkKeys())
+            || canManageModule(departmentId, "inspections", inspectionWorkKeys()))
+          && (request.resource.data.get("verificationStatus", "") == "reported"
+            || memberCanAny(departmentId, preplanApproveKeys()));
+        allow update: if (memberCanAny(departmentId, preplanApproveKeys())
+            && canWriteModule(departmentId, "preplans"))
+          || ((canManageModule(departmentId, "preplans", preplanWorkKeys())
+              || canManageModule(departmentId, "inspections", inspectionWorkKeys()))
+            && resource.data.get("verificationStatus", "") == "reported"
+            && request.resource.data.get("verificationStatus", "") == "reported"
+            && request.resource.data.get("resolutionStatus", "") == resource.data.get("resolutionStatus", ""));
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId)
+          && canManageModule(departmentId, "preplans", preplanWorkKeys());
+      }
+      // Preplan field surveys (src/lib/preplans/surveyService.js). Preplan staff assign,
+      // review and cancel. A surveyor (named on the survey, or on its station and shift)
+      // records results while it is open and sends it for review; they can add
+      // themselves to a station survey but not change who else is on it, its checklist
+      // or its review. A survey never edits a preplan: accepting it starts a new revision.
+      function myMembership(departmentId) {
+        return get(/databases/$(database)/documents/departments/$(departmentId)/users/$(request.auth.uid)).data;
+      }
+      function surveyIsMine(departmentId, data) {
+        return data.get("assignedUserIds", []).hasAny([request.auth.uid])
+          || (data.get("assignedStation", "") != ""
+            && myMembership(departmentId).get("assignedStation", "") == data.get("assignedStation", "")
+            && (data.get("assignedShift", "") == ""
+              || myMembership(departmentId).get("assignedShift", "") == data.get("assignedShift", "")));
+      }
+      function surveyorEdit(departmentId) {
+        let before = resource.data;
+        let after = request.resource.data;
+        return canManageModule(departmentId, "preplans", ["conductPreplanSurveys"])
+          && surveyIsMine(departmentId, before)
+          && before.get("status", "") in ["assigned", "in_progress", "returned"]
+          && (after.get("status", "") in ["in_progress", "submitted"]
+            || (after.get("status", "") == "returned" && before.get("status", "") == "returned"))
+          && after.diff(before).affectedKeys().hasOnly([
+            "status", "results", "proposedAnswers", "observations", "photos", "referrals", "notes",
+            "startedAt", "startedBy", "submittedAt", "submittedBy", "submittedByName",
+            "assignedUserIds", "assignedUserNames", "updatedAt", "version"])
+          && after.get("assignedUserIds", []).toSet().difference(before.get("assignedUserIds", []).toSet()).hasOnly([request.auth.uid])
+          && before.get("assignedUserIds", []).toSet().difference(after.get("assignedUserIds", []).toSet()).size() == 0
+          && after.get("version", 0) == before.get("version", 0) + 1;
+      }
+      match /preplanSurveys/{surveyId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if canManageModule(departmentId, "preplans", preplanWorkKeys())
+          && request.resource.data.get("status", "") == "assigned";
+        allow update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
+          || surveyorEdit(departmentId);
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId)
+          && canManageModule(departmentId, "preplans", preplanWorkKeys());
+      }
+      // Devices holding offline preplan packages (FORGE FIELD). A device registers itself
+      // and reports what it holds; preplan managers see every device and can revoke one.
+      // Revoked is final: a device can't make itself active again. The packages are on the
+      // device, so revocation takes effect when it next connects (the app wipes them then).
+      function offlineDeviceManager(departmentId) {
+        return canManageModule(departmentId, "preplans", preplanConfigKeys());
+      }
+      function offlineDeviceOwner() {
+        return resource.data.get("uid", "") == request.auth.uid;
+      }
+      match /preplanOfflineDevices/{deviceId} {
+        // A device checks its own record before it first registers: reading a missing one reveals nothing.
+        allow read: if canAccessDepartment(departmentId)
+          && (resource == null || offlineDeviceOwner() || offlineDeviceManager(departmentId));
+        allow create: if canManageModule(departmentId, "preplans", ["viewPreplans", "conductPreplanSurveys", "editPreplans", "createPreplans", "approvePreplans", "managePreplanConfig"])
+          && request.resource.data.get("uid", "") == request.auth.uid
+          && request.resource.data.get("status", "") == "active"
+          && request.resource.data.get("id", "") == deviceId
+          && request.resource.data.get("packages", []).size() <= 200;
+        allow update: if canWriteModule(departmentId, "preplans") && (
+          // The device reporting what it holds.
+          (offlineDeviceOwner() && resource.data.get("status", "") == "active"
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["packages", "lastSyncAt", "label", "updatedAt"])
+            && request.resource.data.get("packages", []).size() <= 200)
+          // Revoking: the owner (their own device) or a preplan manager.
+          || ((offlineDeviceOwner() || offlineDeviceManager(departmentId))
+            && resource.data.get("status", "") == "active"
+            && request.resource.data.get("status", "") == "revoked"
+            && request.resource.data.get("revokedBy", "") == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "revokedAt", "revokedBy", "revokedByName", "revokeReason", "updatedAt"]))
+        );
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId) && offlineDeviceManager(departmentId);
+      }
+      // Incident ↔ preplan links: which approved preplan version was used on a call. A link
+      // is a historical record: created once, never edited. It may only name an approved
+      // version of that preplan (published, or superseded once a newer one was started): a
+      // crew offline may have used the version approved before a revision.
+      match /preplanIncidentLinks/{linkId} {
+        allow read: if canAccessDepartment(departmentId)
+          && memberCanAny(departmentId, ["viewPreplans", "conductPreplanSurveys", "editPreplans", "createPreplans", "approvePreplans", "managePreplanConfig"]);
+        allow create: if canManageModule(departmentId, "preplans", ["viewPreplans", "conductPreplanSurveys", "editPreplans", "createPreplans", "approvePreplans", "managePreplanConfig"])
+          && request.resource.data.get("linkedBy", "") == request.auth.uid
+          && request.resource.data.get("preplanId", "") is string
+          && request.resource.data.get("revisionId", "") is string
+          && request.resource.data.get("revisionId", "") != ""
+          && exists(/databases/$(database)/documents/departments/$(departmentId)/preplanRevisions/$(request.resource.data.revisionId))
+          && get(/databases/$(database)/documents/departments/$(departmentId)/preplanRevisions/$(request.resource.data.revisionId)).data.get("preplanId", "") == request.resource.data.preplanId
+          && get(/databases/$(database)/documents/departments/$(departmentId)/preplanRevisions/$(request.resource.data.revisionId)).data.get("status", "") in ["published", "superseded"];
+        allow update: if false;
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId) && canManageModule(departmentId, "preplans", preplanConfigKeys());
+      }
+      // Inspection finding ↔ preplan object links (the inspection stays authoritative).
+      match /preplanFindingLinks/{linkId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create, update, delete: if canManageModule(departmentId, "inspections", inspectionWorkKeys())
+          || canManageModule(departmentId, "preplans", preplanWorkKeys());
+      }
+      // Review tasks from occupancy / inspection changes and field observations.
+      // Inspectors can open one; preplan staff work them. Triggers write with the Admin SDK.
+      match /preplanReviewTasks/{taskId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create: if (canManageModule(departmentId, "preplans", preplanWorkKeys())
+            || canManageModule(departmentId, "inspections", inspectionWorkKeys()))
+          && request.resource.data.get("status", "") == "open";
+        allow update: if canManageModule(departmentId, "preplans", preplanWorkKeys());
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId)
+          && canManageModule(departmentId, "preplans", preplanWorkKeys());
+      }
+      // SmartPlan conversion jobs. The AI step is server-side (Admin SDK); the browser records
+      // its own deterministic imports (vector files, line detection, overlays).
+      match /preplanConversions/{conversionId} {
+        allow read: if canAccessDepartment(departmentId);
+        allow create, update: if canManageModule(departmentId, "preplans", preplanWorkKeys())
+          && request.resource.data.get("method", "") in ["overlay", "vector_import", "line_detection", "ai_vision"]
+          && (request.resource.data.get("method", "") != "ai_vision"
+            || (resource != null && resource.data.get("method", "") == "ai_vision"
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "reviewStatus", "updatedAt", "reviewedBy", "reviewedAt"])));
+        // Only the demo's reset (src/lib/demoPreventionExtras.js) deletes from the app.
+        allow delete: if isDemoDepartment(departmentId)
+          && canManageModule(departmentId, "preplans", preplanWorkKeys());
       }
       match /inspectionDocumentTemplates/{templateId} {
         allow read: if canAccessDepartment(departmentId);

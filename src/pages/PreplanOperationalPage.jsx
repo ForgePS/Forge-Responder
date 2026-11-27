@@ -3,6 +3,7 @@ import { MapPin, Radio, ShieldAlert } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import {
+  canManagePreplanConfig,
   canViewPreplans,
   getDepartmentPreplanFeatures,
   getPreplanOfflineFlushPlan,
@@ -13,6 +14,9 @@ import {
 import InspectionPermissionGate from "../components/inspections/InspectionPermissionGate.jsx";
 import InspectionsModuleLayout from "../components/inspections/InspectionsModuleLayout.jsx";
 import InspectionEmptyState from "../components/inspections/InspectionEmptyState.jsx";
+import PreplanOfflinePanel from "../components/preplans/PreplanOfflinePanel.jsx";
+import IncidentPreplanPanel from "../components/preplans/IncidentPreplanPanel.jsx";
+import "../theme/preplan-editor.css";
 
 /**
  * Operational preplan lists — Target Hazards / Offline.
@@ -28,7 +32,11 @@ export default function PreplanOperationalPage({
   description = "Field-facing preplan summary for response.",
 }) {
   const { departmentId } = useTenant();
-  const { permissions, isCreator } = useAuth();
+  const { permissions, isCreator, user, membership } = useAuth();
+  const actor = useMemo(() => ({
+    actorUid: user?.uid || "",
+    actorName: membership?.displayName || user?.displayName || user?.email || "User",
+  }), [user?.uid, user?.displayName, user?.email, membership?.displayName]);
   const notBuilt = NOT_BUILT_VARIANTS.has(variant);
   const allowed = canViewPreplans(permissions, isCreator);
   const [loading, setLoading] = useState(true);
@@ -82,6 +90,7 @@ export default function PreplanOperationalPage({
   }, [records, variant]);
 
   const offlineEnabled = isPreplanFeatureEnabled(features || {}, "offlineAccess");
+  const incidentsEnabled = isPreplanFeatureEnabled(features || {}, "incidentIntegration");
 
   return (
     <InspectionPermissionGate allowed={allowed} title={title}>
@@ -100,17 +109,31 @@ export default function PreplanOperationalPage({
               <div><Radio size={15} /><strong>Offline sync</strong></div>
             </header>
             <div className="panel-body">
-              {!offlineEnabled ? (
-                <p className="occupancy-muted">Offline access is disabled for this department.</p>
-              ) : (
-                <>
-                  <p className="occupancy-muted">
-                    Changes waiting to sync: {flushPlan?.queued || 0} · Drafts saved on this device: {flushPlan?.drafts || 0}
-                  </p>
-                </>
-              )}
+              <p className="occupancy-muted">
+                In this browser: changes waiting to sync {flushPlan?.queued || 0} · drafts saved {flushPlan?.drafts || 0}
+              </p>
             </div>
           </section>
+        ) : null}
+
+        {!loading && variant === "offline" ? (
+          <PreplanOfflinePanel
+            departmentId={departmentId}
+            actor={actor}
+            canManage={canManagePreplanConfig(permissions, isCreator)}
+            offlineEnabled={offlineEnabled}
+            preplanNames={Object.fromEntries(records.map((row) => [row.id, `${row.preplanNumber || ""} ${row.facilityName || row.occupancyName || row.address || ""}`.trim()]))}
+          />
+        ) : null}
+
+        {!loading && variant === "incidents" && !incidentsEnabled ? (
+          <InspectionEmptyState
+            title="Incident integration is turned off"
+            description="Turn on Incident Integration in Config Studio → Preplans → features to match dispatches to preplans."
+          />
+        ) : null}
+        {!loading && variant === "incidents" && incidentsEnabled ? (
+          <IncidentPreplanPanel departmentId={departmentId} actor={actor} preplans={records} />
         ) : null}
 
         {notBuilt ? (
@@ -120,7 +143,7 @@ export default function PreplanOperationalPage({
           />
         ) : null}
 
-        {!loading && !notBuilt ? (
+        {!loading && !notBuilt && variant !== "incidents" ? (
           <section className="panel">
             <header>
               <div>

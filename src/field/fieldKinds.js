@@ -19,6 +19,7 @@ export const FORM_FOR_KIND = {
 };
 
 export const KIND_LABELS = {
+  preplanIncidentLink: "Preplan used on a call",
   truckCheck: "Truck check",
   hoseTest: "Hose test",
   hydrantInspection: "Hydrant inspection",

@@ -36,7 +36,7 @@ test("Damage Reports and Water Utilities are third-level branches", () => {
   const utilities = hydrants.children.find((n) => n.id === "prevention-water-utilities");
   assert.ok(isNavBranch(damage));
   assert.ok(isNavBranch(utilities));
-  assert.ok(damage.children.some((c) => c.name === "Open Damage Reports" && c.label === "Open Reports"));
+  assert.ok(damage.children.some((c) => c.name === "Open Damage Reports" && c.label === "Not Sent Yet"));
   assert.ok(utilities.children.some((c) => c.name === "Water Districts"));
 });
 

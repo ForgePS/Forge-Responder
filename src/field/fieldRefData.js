@@ -36,6 +36,8 @@ import { localDate } from "./fieldValidation.js";
 import { isObjectVisibleInActiveList } from "../lib/objectLifecycle.js";
 import { referenceKind } from "./fieldReference.js";
 import { recentDispatches } from "./fieldDispatch.js";
+import { DEMO_DEPARTMENT_ID } from "../lib/tenantPaths.js";
+import { getDepartmentPreplanFeatures, isPreplanFeatureEnabled } from "../lib/inspections/preplanFeatures.js";
 
 
 const OPEN_INSPECTION_STATUSES = new Set(["draft", "scheduled", "in_progress", "overdue", "awaiting_approval"]);
@@ -346,6 +348,36 @@ const PART_LOADERS = {
     if (!caps.pcr) return [];
     const list = await readTenantList(getFirestoreDb(), departmentId, LIST_KEYS.active911Alerts).catch(() => ({ items: [] }));
     return recentDispatches(list.items || [], { hours: 48, limit: 40 });
+  },
+
+  // Recent calls for "Calls → preplan" (PlanCallScreens.jsx): Active911 dispatches and, in the demo
+  // department, its sample CAD runs. { enabled, dispatches }; enabled follows the department's
+  // "Incident Integration" preplan feature.
+  async callPreplans({ departmentId, caps }) {
+    if (!caps.preFirePlans || !caps.preplanModule) return { enabled: false, dispatches: [] };
+    const features = await getDepartmentPreplanFeatures(departmentId).catch(() => ({}));
+    if (!isPreplanFeatureEnabled(features, "incidentIntegration")) return { enabled: false, dispatches: [] };
+    const list = await readTenantList(getFirestoreDb(), departmentId, LIST_KEYS.active911Alerts).catch(() => ({ items: [] }));
+    const dispatches = recentDispatches(list.items || [], { hours: 24, limit: 30 });
+    if (departmentId === DEMO_DEPARTMENT_ID) {
+      const [{ buildDemoCadRuns }, { parseCadPayload }, { cadRecordFromPayload }] = await Promise.all([
+        import("../data/demoCadRuns.js"), import("../lib/neris/cadImport.js"), import("../lib/pcr/pcrCad.js"),
+      ]);
+      for (const run of buildDemoCadRuns({ stage: "initial" })) {
+        const parsed = parseCadPayload(JSON.stringify(run));
+        if (!parsed.ok || !parsed.payload) continue;
+        const record = cadRecordFromPayload(parsed.payload, { source: "demo-cad" });
+        const [lat, lng] = String(record.gps || "").split(",");
+        dispatches.push({
+          id: record.id, source: "demo-cad", incidentNumber: record.incidentNumber, sentAt: record.sentAt,
+          description: record.description || "Dispatch", address: record.address, city: "", state: "", crossStreet: "",
+          units: (record.units || []).map((unit) => unit.id).join(", "), cadCode: "",
+          latitude: lat ? Number(lat) : null, longitude: lng ? Number(lng) : null,
+        });
+      }
+    }
+    dispatches.sort((a, b) => (Date.parse(b.sentAt) || 0) - (Date.parse(a.sentAt) || 0));
+    return { enabled: true, dispatches };
   },
 
   async incidents({ departmentId, caps }) {

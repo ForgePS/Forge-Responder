@@ -38,6 +38,7 @@ import { NERIS_FORM_MODULES } from "../lib/nerisSchema.js";
 import { blobGet } from "./fieldDb.js";
 import { FieldConflictError, FieldRejectedError } from "./fieldErrors.js";
 import { PCR_COLLECTION, planPcrWrite } from "./fieldPcr.js";
+import { linkIncidentToPreplan } from "../lib/preplans/incidentLinkService.js";
 import { threeWayMerge, isSameOrNewerDate } from "./fieldMerge.js";
 import { refItems } from "./fieldRefData.js";
 import { summarizeCheckoff } from "./checkoffModel.js";
@@ -988,7 +989,30 @@ async function syncPcr(record, ctx) {
   return { serverIds: { pcrId: record.data.id, reportNumber: record.data.number }, base: plan.base, data: plan.data };
 }
 
+/**
+ * A preplan opened for a call: record which approved version the crew used
+ * (src/lib/preplans/incidentLinkService.js). Sent from the device's queue, so it
+ * also works when the call was worked offline from a saved copy.
+ */
+async function syncPreplanIncidentLink(record, ctx) {
+  const data = record.data;
+  try {
+    const link = await linkIncidentToPreplan(ctx.departmentId, {
+      incident: data.incident,
+      preplanId: data.preplanId,
+      revisionId: data.revisionId || "",
+      method: data.method,
+      actor: ctx.actor,
+    });
+    return { serverIds: { linkId: link.id } };
+  } catch (error) {
+    if (/approved version|no longer exists|can't be found/i.test(error?.message || "")) throw new FieldRejectedError(error.message);
+    throw error;
+  }
+}
+
 export const SYNC_HANDLERS = {
+  preplanIncidentLink: syncPreplanIncidentLink,
   pcr: syncPcr,
   hydrantEdit: syncHydrantEdit,
   planUpdate: syncPlanUpdate,

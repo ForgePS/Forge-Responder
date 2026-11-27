@@ -81,6 +81,7 @@ export const CREATOR_PERMISSIONS = {
   approvePreplans: true,
   managePreplanConfig: true,
   submitPreplans: true,
+  conductPreplanSurveys: true,
   reviewPreplans: true,
   rejectPreplans: true,
   archivePreplans: true,

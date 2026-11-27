@@ -143,3 +143,12 @@ export function exportCsv(filename, rows) {
   link.click();
   URL.revokeObjectURL(link.href);
 }
+
+/** The line under "Personnel On Duty": how today's count compares with the shift minimum. */
+export function onDutyNote(onDuty, minimum) {
+  if (onDuty === null || onDuty === undefined) return "Roster not set up";
+  if (!minimum) return "No minimum set for this shift";
+  if (onDuty > minimum) return `${onDuty - minimum} over the ${minimum} needed`;
+  if (onDuty === minimum) return `Exactly the ${minimum} needed`;
+  return `${minimum} needed this shift`;
+}

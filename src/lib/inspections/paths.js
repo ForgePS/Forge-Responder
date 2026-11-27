@@ -26,6 +26,18 @@ export const PREPLAN_DROPDOWN_OPTIONS_COLLECTION = "preplanDropdownOptions";
 export const PREPLAN_BUILDINGS_COLLECTION = "preplanBuildings";
 export const PREPLAN_FILES_COLLECTION = "preplanFiles";
 export const PREPLAN_QR_TOKENS_COLLECTION = "preplanQrTokens";
+// Interactive preplans (src/lib/preplans/). Floor plans and site maps belong to a revision.
+export const PREPLAN_FLOORS_COLLECTION = "preplanFloors";
+export const PREPLAN_FLOOR_PLANS_COLLECTION = "preplanFloorPlans";
+export const PREPLAN_SITE_MAPS_COLLECTION = "preplanSiteMaps";
+export const PREPLAN_ALERTS_COLLECTION = "preplanAlerts";
+export const PREPLAN_FINDING_LINKS_COLLECTION = "preplanFindingLinks";
+export const PREPLAN_REVIEW_TASKS_COLLECTION = "preplanReviewTasks";
+export const PREPLAN_CONVERSIONS_COLLECTION = "preplanConversions";
+export const PREPLAN_SURVEYS_COLLECTION = "preplanSurveys";
+/** Devices holding offline preplan packages (FORGE FIELD), so a department can see and revoke them. */
+export const PREPLAN_OFFLINE_DEVICES_COLLECTION = "preplanOfflineDevices";
+export const PREPLAN_INCIDENT_LINKS_COLLECTION = "preplanIncidentLinks";
 export const INSPECTION_DOCUMENT_TEMPLATES_COLLECTION = "inspectionDocumentTemplates";
 export const INSPECTION_NOTICES_COLLECTION = "inspectionNotices";
 export const INSPECTION_CERTIFICATES_COLLECTION = "inspectionCertificates";
