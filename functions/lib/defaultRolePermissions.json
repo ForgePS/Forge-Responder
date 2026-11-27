@@ -2,6 +2,9 @@
   "creator": {
     "viewEmsInventory": true,
     "viewEmsEquipment": true,
+    "viewEmsMedications": true,
+    "useEmsMedications": true,
+    "manageEmsMedications": true,
     "viewEmsCheckoffs": true,
     "runEmsCheckoffs": true,
     "signOffEmsCheckoffs": true,
@@ -185,6 +188,9 @@
   "fireChief": {
     "viewEmsInventory": true,
     "viewEmsEquipment": true,
+    "viewEmsMedications": true,
+    "useEmsMedications": true,
+    "manageEmsMedications": true,
     "viewEmsCheckoffs": true,
     "runEmsCheckoffs": true,
     "signOffEmsCheckoffs": true,
@@ -359,6 +365,8 @@
   "firefighter": {
     "viewEmsInventory": true,
     "viewEmsEquipment": true,
+    "viewEmsMedications": true,
+    "useEmsMedications": true,
     "viewEmsCheckoffs": true,
     "runEmsCheckoffs": true,
     "checkEmsEquipment": true,
@@ -404,6 +412,8 @@
   "companyOfficer": {
     "viewEmsInventory": true,
     "viewEmsEquipment": true,
+    "viewEmsMedications": true,
+    "useEmsMedications": true,
     "viewEmsCheckoffs": true,
     "runEmsCheckoffs": true,
     "signOffEmsCheckoffs": true,
@@ -467,6 +477,9 @@
   "battalionChief": {
     "viewEmsInventory": true,
     "viewEmsEquipment": true,
+    "viewEmsMedications": true,
+    "useEmsMedications": true,
+    "manageEmsMedications": true,
     "viewEmsCheckoffs": true,
     "runEmsCheckoffs": true,
     "signOffEmsCheckoffs": true,
@@ -544,6 +557,7 @@
   "readOnly": {
     "viewEmsInventory": true,
     "viewEmsEquipment": true,
+    "viewEmsMedications": true,
     "viewEmsCheckoffs": true,
     "viewPersonnel": true,
     "viewCertifications": true,
@@ -610,6 +624,7 @@
   "itAdmin": {
     "viewEmsInventory": true,
     "viewEmsEquipment": true,
+    "viewEmsMedications": true,
     "viewEmsCheckoffs": true,
     "manageEmsSettings": true,
     "viewEmsAudit": true,

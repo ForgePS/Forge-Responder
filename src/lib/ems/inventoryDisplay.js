@@ -26,16 +26,44 @@ export const DEFAULT_SUPPLY_CATEGORIES = [
   "Patient care supplies", "General medical consumables",
 ];
 
-/** Types a member can post, with who may post them (`use` = useEmsSupplies, `manage` = manageEmsInventory). */
+/**
+ * Types a member can post, with who may post them (`use` = useEmsSupplies or useEmsMedications,
+ * `manage` = manageEmsInventory or manageEmsMedications) and how lots on hold are treated
+ * (exclude: never; explicit: only when that lot is chosen; include: may be taken).
+ */
 export const TRANSACTION_TYPES = {
   receive: { label: "Received", direction: "in", access: "manage" },
-  usage: { label: "Used", direction: "out", access: "use" },
-  transfer: { label: "Transferred", direction: "move", access: "use" },
-  expired: { label: "Removed: expired", direction: "out", access: "use" },
-  damaged: { label: "Removed: damaged", direction: "out", access: "use" },
-  waste: { label: "Wasted", direction: "out", access: "manage" },
-  returnToVendor: { label: "Returned to vendor", direction: "out", access: "manage" },
+  usage: { label: "Used", direction: "out", access: "use", held: "exclude" },
+  transfer: { label: "Transferred", direction: "move", access: "use", held: "explicit" },
+  expired: { label: "Removed: expired", direction: "out", access: "use", held: "include" },
+  damaged: { label: "Removed: damaged", direction: "out", access: "use", held: "include" },
+  waste: { label: "Wasted", direction: "out", access: "manage", held: "include" },
+  returnToVendor: { label: "Returned to vendor", direction: "out", access: "manage", held: "include" },
 };
+
+// ---------------------------------------------------------------- medications (E4)
+
+export const DOSAGE_FORMS = [
+  "Vial", "Ampule", "Prefilled syringe", "Autoinjector", "IV bag", "Tablet", "Chewable tablet",
+  "Orally dissolving tablet", "Oral solution", "Oral gel", "Nebulizer solution", "Metered-dose inhaler",
+  "Nasal spray", "Topical", "Compressed gas", "Other",
+];
+export const ROUTES = ["IV", "IO", "IM", "SC", "IN", "PO", "SL", "Buccal", "Inhaled", "ET", "Topical", "PR"];
+export const CONTROLLED_SCHEDULES = ["", "II", "III", "IV", "V"];
+export const STORAGE_CONDITIONS = ["room", "refrigerated", "frozen"];
+export const STORAGE_LABELS = { room: "Room temperature", refrigerated: "Refrigerated", frozen: "Frozen" };
+export const RECALL_CLASSES = ["", "I", "II", "III"];
+export const DEFAULT_MEDICATION_CATEGORIES = [
+  "Cardiac", "Respiratory", "Analgesics", "Antiemetics", "Anticonvulsants", "Sedation", "Antidotes",
+  "Allergy and anaphylaxis", "Diabetic", "IV fluids", "Electrolytes", "Obstetric", "Other medications",
+];
+
+export const isMedication = (item) => item?.itemClass === "medication";
+
+/** "Epinephrine 1 mg/10 mL Prefilled syringe" */
+export function medicationLabel(item = {}) {
+  return [item.name, item.strength, item.dosageForm].filter(Boolean).join(" · ");
+}
 
 export const TRANSACTION_LABELS = {
   ...Object.fromEntries(Object.entries(TRANSACTION_TYPES).map(([key, value]) => [key, value.label])),
@@ -82,6 +110,7 @@ export const EXPIRATION_TONES = { none: "neutral", ok: "neutral", warning: "warn
 export function stockStatus(balance = {}) {
   if (balance.outOfStock) return { key: "out", label: "Out of stock", tone: "critical" };
   if (balance.lowStock) return { key: "low", label: "Low stock", tone: "warning" };
+  if (balance.heldQuantity > 0 && balance.heldQuantity >= (balance.onHand || 0)) return { key: "held", label: "All on hold", tone: "critical" };
   if (balance.par?.max !== null && balance.par?.max !== undefined && balance.onHand > balance.par.max) {
     return { key: "over", label: "Over max", tone: "info" };
   }

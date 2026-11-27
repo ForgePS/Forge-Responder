@@ -97,6 +97,8 @@ const COLLECTION_MODULES = {
   emsCheckoffAssignments: "emsManagement",
   emsCheckoffSettings: "emsManagement",
   emsCheckoffResults: "emsManagement",
+  emsLotHolds: "emsManagement",
+  emsMedicationRecalls: "emsManagement",
 };
 
 /** Name prefixes for the large families (fleet*, inspection*, fps*, preplan*). */

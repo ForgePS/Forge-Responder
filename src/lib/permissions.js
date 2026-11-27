@@ -235,6 +235,11 @@ export function canAccessNavItem(itemName, permissions = {}, options = {}) {
       || ["viewEmsEquipment", "checkEmsEquipment", "transferEmsEquipment", "manageEmsEquipment"]
         .some((key) => hasPermission(permissions, key));
   }
+  if (itemName === "EMS Medications") {
+    return Boolean(options.isCreator)
+      || ["viewEmsMedications", "useEmsMedications", "manageEmsMedications"]
+        .some((key) => hasPermission(permissions, key));
+  }
   if (itemName === "EMS Check-offs") {
     return Boolean(options.isCreator)
       || ["viewEmsCheckoffs", "runEmsCheckoffs", "signOffEmsCheckoffs", "manageEmsCheckoffs"]

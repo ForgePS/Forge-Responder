@@ -1832,6 +1832,13 @@ exports.emsCheckoffsRecordResults = onCall({ memory: "256MiB", timeoutSeconds: 1
   emsCheckoffs.recordResults(admin.firestore(), request));
 exports.emsCheckoffsSignOff = emsInventoryCall(emsCheckoffs.signOff);
 
+// ---- EMS Management: medication recalls and lot holds (functions/lib/emsMedications) ----
+const emsMedications = require("./lib/emsMedications/service");
+exports.emsMedicationsCreateRecall = emsInventoryCall(emsMedications.createRecall);
+exports.emsMedicationsCloseRecall = emsInventoryCall(emsMedications.closeRecall);
+exports.emsMedicationsPlaceHold = emsInventoryCall(emsMedications.placeHold);
+exports.emsMedicationsReleaseHold = emsInventoryCall(emsMedications.releaseHold);
+
 // ---- Administrators delete an inspection or preplan, with a reason (functions/lib/recordDeletion.js) ----
 exports.deleteRecordWithReason = onCall({ memory: "256MiB", timeoutSeconds: 60 }, (request) =>
   require("./lib/recordDeletion").deleteRecordWithReason(admin.firestore(), request));
