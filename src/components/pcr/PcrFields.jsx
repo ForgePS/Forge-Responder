@@ -20,6 +20,7 @@ import {
   setLeaf,
   signatureImage,
   toLocalInput,
+  pertinentNegativeChoices,
 } from "../../lib/nemsis/pcrModel.js";
 import { readLeaf } from "../../lib/nemsis/schema.js";
 import { countHidden } from "../../lib/pcr/pcrEditing.js";
@@ -216,7 +217,9 @@ function LeafEditor({ field, ctx, at }) {
       );
   }
 
-  const notOptions = [...field.nv.map((o) => ({ ...o, kind: "NV" })), ...field.pn.map((o) => ({ ...o, kind: "PN" }))];
+  // Pertinent negatives only in History and Assessment (pertinentNegativeChoices).
+  const pnChoices = pertinentNegativeChoices(field, pertinentNegative);
+  const notOptions = [...field.nv.map((o) => ({ ...o, kind: "NV" })), ...pnChoices.map((o) => ({ ...o, kind: "PN" }))];
   const attrDefs = (field.attrs || []).filter((a) => a.codes?.length && !field.repeating);
   const nemsisRequired = field.usage === "Mandatory" || field.usage === "Required";
   const help = error || field.help || (field.definition && field.definition.length < 170 ? field.definition : "");
@@ -242,11 +245,11 @@ function LeafEditor({ field, ctx, at }) {
       {notOptions.length && !readOnly ? (
         <select
           className="nr-input pcr-not"
-          aria-label={`${field.label}: not recorded or pertinent negative`}
+          aria-label={pnChoices.length ? `${field.label}: not recorded or pertinent negative` : `${field.label}: not recorded`}
           value={notValue ? `NV:${notValue}` : pertinentNegative ? `PN:${pertinentNegative}` : ""}
           onChange={(event) => setNot(event.target.value)}
         >
-          <option value="">{notValue || pertinentNegative ? "Clear" : "Not documented / pertinent negative…"}</option>
+          <option value="">{notValue || pertinentNegative ? "Clear" : pnChoices.length ? "Not documented / pertinent negative…" : "Not documented…"}</option>
           {notOptions.map((o) => <option key={`${o.kind}:${o.code}`} value={`${o.kind}:${o.code}`}>{o.label}</option>)}
         </select>
       ) : readOnly && (notValue || pertinentNegative) ? (
