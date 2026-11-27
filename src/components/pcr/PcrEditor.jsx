@@ -7,7 +7,7 @@
  * places is shown as a conflict to resolve. Posting is blocked until NEMSIS and the department's required fields
  * pass. CAD: import a call, and refresh when CAD has newer times (hand edits are kept).
  */
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertTriangle, Ambulance, ArrowLeft, ArrowRight, Check, CheckCircle2, ClipboardCheck, Clock, Download,
   HeartPulse, Lightbulb, Loader2, Lock, MapPin, Radio, RefreshCw, ShieldCheck, Sparkles, Stethoscope, Syringe, TriangleAlert, User,
@@ -19,6 +19,7 @@ import PcrNarrativePanel from "./PcrNarrativePanel.jsx";
 import PcrReview, { formatWhen, friendlyError } from "./PcrReview.jsx";
 import { PcrCadImportDialog } from "./PcrCadDialogs.jsx";
 import PcrVitalsTrend from "./PcrVitalsTrend.jsx";
+import PcrBillingFiles from "./PcrBillingFiles.jsx";
 import { documentationSuggestions, openSuggestions } from "../../lib/pcr/pcrQuality.js";
 import { qaStatus, reportStatus, submissionStatus } from "../../lib/pcr/pcrLifecycle.js";
 import { fieldPath, getValue, postCheck, sectionForPath, sectionLayout, sectionProgress, setLeaf } from "../../lib/nemsis/pcrModel.js";
@@ -365,8 +366,16 @@ export default function PcrEditor({
             <>
               {step.id === "vitals" ? <PcrVitalsTrend schema={schema} pcr={report.nemsis || {}} /> : null}
               {stepSections.map((section) => (
-              <PcrSectionCard key={section.id} section={section} layout={layouts[section.id]} ctx={ctx} icon={SECTION_ICONS[section.id]} blocking={blockingBySection[section.id] || 0} />
+              <Fragment key={section.id}>
+                <PcrSectionCard section={section} layout={layouts[section.id]} ctx={ctx} icon={SECTION_ICONS[section.id]} blocking={blockingBySection[section.id] || 0} />
+                {section.id === "payment" ? (
+                  <PcrBillingFiles departmentId={departmentId} report={report} editable={editable} online={online} actor={actor} onMessage={onMessage} onError={onError} />
+                ) : null}
+              </Fragment>
               ))}
+              {step.id === "disposition" && !stepSections.some((section) => section.id === "payment") ? (
+                <PcrBillingFiles departmentId={departmentId} report={report} editable={editable} online={online} actor={actor} onMessage={onMessage} onError={onError} />
+              ) : null}
             </>
           )}
 

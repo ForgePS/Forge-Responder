@@ -1,6 +1,7 @@
 /** Shared state for field screens, and the form hook that saves as you type. */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { getRecord, newLocalId, removeAttachment, saveFieldRecord, storeAttachment } from "./fieldRecords.js";
+import { getRecord, newLocalId, removeAttachment, saveFieldRecord, scopeKey, storeAttachment, storeSealedAttachment } from "./fieldRecords.js";
+import { SEALED_KINDS } from "./fieldPhi.js";
 import { rememberRecent } from "./fieldRefData.js";
 import { syncNow } from "./fieldSync.js";
 import { compressPhoto } from "./fieldPhotos.js";
@@ -106,10 +107,13 @@ export function useRecordForm({ kind, localId: initialLocalId, initialData, desc
     });
   }, []);
 
-  const addPhoto = useCallback(async (file) => {
+  /** Add a photo. Reports with PHI (SEALED_KINDS) keep it encrypted on the device; `extra` is saved on the entry. */
+  const addPhoto = useCallback(async (file, extra = {}) => {
     try {
       const blob = await compressPhoto(file);
-      const attachment = await storeAttachment(blob, file.name || "photo.jpg");
+      const attachment = SEALED_KINDS.has(kind)
+        ? { ...(await storeSealedAttachment(blob, { scope: scopeKey(snapshot.departmentId, snapshot.uid), localId, kind: extra.kind })), ...extra }
+        : { ...(await storeAttachment(blob, file.name || "photo.jpg")), ...extra };
       dirtyRef.current = true;
       setAttachments((current) => [...current, attachment]);
       return attachment;
@@ -117,9 +121,11 @@ export function useRecordForm({ kind, localId: initialLocalId, initialData, desc
       toast(error?.message || "That photo couldn't be saved on this device.", "warn");
       return null;
     }
-  }, [toast]);
+  }, [toast, kind, localId, snapshot.departmentId, snapshot.uid]);
 
   const removePhoto = useCallback(async (id) => {
+    // A photo whose upload has started (fileId) may be on the server already; keep it so the next send finishes it.
+    if (latest.current.attachments.find((attachment) => attachment.id === id)?.fileId) return;
     dirtyRef.current = true;
     setAttachments((current) => current.filter((attachment) => attachment.id !== id));
     await removeAttachment(id);
