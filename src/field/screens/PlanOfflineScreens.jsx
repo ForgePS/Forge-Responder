@@ -10,7 +10,7 @@ import { refItems } from "../fieldRefData.js";
 import {
   OfflineNotAllowedError, downloadPackage, getPackage, getPackageFile, listPackages, removePackage, syncPackages,
 } from "../fieldPreplanPackages.js";
-import { packageFreshness } from "../../lib/preplans/offlinePackageModel.js";
+import { backgroundFileIds, packageFreshness } from "../../lib/preplans/offlinePackageModel.js";
 import PreplanResponseView from "../../components/preplans/PreplanResponseView.jsx";
 import { Banner, Confirm, Field, Screen, Section, cx, formatWhen } from "../ui.jsx";
 
@@ -94,7 +94,7 @@ export function OfflinePlanCard({ plan }) {
 function PackageFiles({ dept, uid, preplanId, files }) {
   const [urls, setUrls] = useState({});
   const [problem, setProblem] = useState("");
-  const stored = files.filter((row) => row.stored);
+  const stored = files.filter((row) => row.stored && row.kind !== "background");
   useEffect(() => {
     let cancelled = false;
     const made = [];
@@ -145,6 +145,29 @@ function PackageFiles({ dept, uid, preplanId, files }) {
   );
 }
 
+/** Object URLs for the source drawings saved with a package, by file id. */
+function usePackageBackgrounds(dept, uid, pkg) {
+  const [urls, setUrls] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    const made = [];
+    // By the floor plans' file ids: a drawing that is also one of the photos or
+    // documents is stored once, under that kind.
+    const wanted = backgroundFileIds(pkg?.content?.buildings || []);
+    const backgrounds = (pkg?.content?.files || []).filter((row) => row.stored && wanted.has(String(row.id)));
+    (async () => {
+      const next = {};
+      for (const file of backgrounds) {
+        const blob = await getPackageFile(dept, uid, pkg.preplanId, file).catch(() => null);
+        if (blob) { const url = URL.createObjectURL(blob); made.push(url); next[file.id] = url; }
+      }
+      if (!cancelled) setUrls(next);
+    })();
+    return () => { cancelled = true; made.forEach((url) => URL.revokeObjectURL(url)); };
+  }, [dept, uid, pkg]);
+  return urls;
+}
+
 /** The saved package, in the response view. Works with no signal. */
 export function PlanOfflineScreen({ params = {} }) {
   const { snapshot, back } = useField();
@@ -168,6 +191,8 @@ export function PlanOfflineScreen({ params = {} }) {
     };
   }, [state.pkg]);
 
+  const backgroundUrls = usePackageBackgrounds(snapshot.departmentId, snapshot.uid, state.pkg);
+
   if (state.loading) return <Screen title="Offline copy" onBack={back}><p className="fa-muted">Opening…</p></Screen>;
   if (!state.pkg) return <Screen title="Offline copy" onBack={back}><Banner tone="warn" title="Can't open the offline copy">{state.error}</Banner></Screen>;
   const fresh = packageFreshness(state.pkg, new Date(), { staleHours: state.pkg.staleHours || 24 });
@@ -176,6 +201,7 @@ export function PlanOfflineScreen({ params = {} }) {
       departmentId={snapshot.departmentId}
       preplan={state.pkg.content.preplan}
       data={data}
+      backgroundUrls={backgroundUrls}
       offline={{ ...fresh, syncedAt: state.pkg.syncedAt, expiresAt: state.pkg.expiresAt }}
       onClose={back}
       footer={<PackageFiles dept={snapshot.departmentId} uid={snapshot.uid} preplanId={state.pkg.preplanId} files={state.pkg.content.files || []} />}

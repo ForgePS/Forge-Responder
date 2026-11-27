@@ -119,6 +119,48 @@ export function chooseOfflineFiles(files = [], { settings = OFFLINE_DEFAULTS, ca
   return { files: chosen, leftOut, bytes: used };
 }
 
+/** The source drawings under the package's floor plans, as file ids. */
+export function backgroundFileIds(buildings = []) {
+  const ids = new Set();
+  for (const building of buildings) {
+    for (const floor of building?.floors || []) {
+      const id = floor?.plan?.background?.fileId;
+      if (id) ids.add(String(id));
+    }
+  }
+  return ids;
+}
+
+/**
+ * The source drawings the floor plans are drawn over. They go in every package
+ * (whatever the photo and document settings and size budget), because a floor
+ * plan without its drawing is markers on an empty page. Restricted ones only for
+ * people who may see restricted items.
+ */
+export function chooseBackgroundFiles(files = [], buildings = [], { canSeeRestricted = false } = {}) {
+  const wanted = backgroundFileIds(buildings);
+  return files
+    .filter((file) => file && wanted.has(String(file.id)) && !file.deleted && file.storagePath)
+    .filter((file) => canSeeRestricted || !file.sensitive)
+    .map((file) => ({
+      id: String(file.id),
+      name: String(file.fileName || file.description || "Source drawing").slice(0, 200),
+      type: String(file.mimeType || ""),
+      size: Number(file.fileSize || file.size) || 0,
+      kind: "background",
+      category: String(file.category || ""),
+      description: String(file.description || "").slice(0, 300),
+      storagePath: String(file.storagePath || ""),
+      sensitive: Boolean(file.sensitive),
+    }));
+}
+
+/** Whether a package was built with restricted details (answers or files) in it. */
+export function packageHasRestricted(pkg = {}) {
+  return Boolean(pkg?.builtWithRestricted || pkg?.restrictedIncluded
+    || (pkg?.content?.files || []).some((file) => file?.sensitive));
+}
+
 /**
  * The package's content from what the response view loads. `hydrantIdsToKeep`
  * is the set the response map would show (linked plus nearby), so the device
@@ -197,14 +239,25 @@ export function expiryFrom(when, settings = OFFLINE_DEFAULTS) {
  *  - full:   a different revision is published (download it again)
  *  - light:  same revision; refresh the parts that change on their own
  *            (alerts, hydrants, verification dates)
+ * Pass `canSeeRestricted` (the person's access now) so a change in restricted
+ * access rebuilds the package instead of renewing it.
  */
-export function packageSyncAction(local, serverPreplan) {
+export function packageSyncAction(local, serverPreplan, { canSeeRestricted = null } = {}) {
   if (!serverPreplan) return { action: "remove", reason: "The preplan no longer exists." };
   const status = String(serverPreplan.status || "").toLowerCase();
   if (["archived", "cancelled", "deleted", "retired"].includes(status)) return { action: "remove", reason: "The preplan was archived." };
   if (status === "temporarily_unavailable") return { action: "remove", reason: "The preplan was withdrawn from operational use." };
   if (!serverPreplan.publishedRevisionId) return { action: "remove", reason: "The preplan no longer has an approved version." };
+  // Restricted details downloaded under earlier access must go when that access does:
+  // rebuild without them (or remove the copy if that fails), never renew or keep it as is.
+  // Checked before a newer revision, so that rebuild is marked too.
+  if (canSeeRestricted === false && packageHasRestricted(local)) {
+    return { action: "full", reason: "You no longer have access to restricted details.", restrictedLost: true };
+  }
   if (serverPreplan.publishedRevisionId !== local?.revisionId) return { action: "full", reason: "A newer approved version was published." };
+  if (canSeeRestricted === true && local?.builtWithRestricted === false) {
+    return { action: "full", reason: "You now have access to restricted details." };
+  }
   return { action: "light", reason: "" };
 }
 

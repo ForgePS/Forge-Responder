@@ -19,12 +19,13 @@ import { blobDelete, blobGet, blobPut, kvDelete, kvGet, kvSet, requestPersistent
 import { getFirebaseStorage } from "../lib/firebaseClient.js";
 import { getPreplan, listPreplanFiles } from "../lib/inspections/preplanService.js";
 import { getDepartmentPreplanFeatures, isPreplanFeatureEnabled } from "../lib/inspections/preplanFeatures.js";
-import { loadLiveResponseParts, loadResponseData } from "../lib/preplans/responseData.js";
+import { LiveDataError, loadLiveResponseParts, loadResponseData } from "../lib/preplans/responseData.js";
 import { buildResponseMap } from "../lib/preplans/responseMapModel.js";
 import {
   PACKAGE_SCHEMA_VERSION,
   PackageIntegrityError,
   buildPackageContent,
+  chooseBackgroundFiles,
   chooseOfflineFiles,
   decryptBytes,
   deviceWipeReason,
@@ -47,7 +48,10 @@ const keyName = (dept, uid) => `pkgkey:${dept}:${uid}`;
 const indexName = (dept, uid) => `pkgindex:${dept}:${uid}`;
 const packageName = (dept, uid, preplanId) => `pkg:${dept}:${uid}:${preplanId}`;
 const fileName = (dept, uid, preplanId, fileId) => `pkgfile:${dept}:${uid}:${preplanId}:${fileId}`;
-const deviceName = (dept) => `pkgdevice:${dept}`;
+// One registration per person on a device, so the next crew member on a shared
+// tablet registers their own instead of being refused as "someone else".
+const deviceName = (dept, uid) => `pkgdevice:${dept}:${uid}`;
+const legacyDeviceName = (dept) => `pkgdevice:${dept}`;
 const label = (dept, preplanId) => `forge-preplan:${dept}:${preplanId}`;
 
 export class OfflineNotAllowedError extends Error {
@@ -76,12 +80,23 @@ async function writeIndex(dept, uid, rows) {
   await kvSet(indexName(dept, uid), rows);
 }
 
-/** This device's id for the department (random; created on first download). */
-async function deviceId(dept, { create = false } = {}) {
-  const existing = await kvGet(deviceName(dept)).catch(() => null);
-  if (existing || !create) return existing || "";
+/**
+ * This person's device id for the department (random; created on first download).
+ * An id saved before ids were per person goes to whoever still has packages on
+ * the device (sign-out wipes them, so that is the person who registered it).
+ */
+async function deviceId(dept, uid, { create = false } = {}) {
+  const existing = await kvGet(deviceName(dept, uid)).catch(() => null);
+  if (existing) return existing;
+  const legacy = await kvGet(legacyDeviceName(dept)).catch(() => null);
+  if (legacy && (await readIndex(dept, uid)).length) {
+    await kvSet(deviceName(dept, uid), legacy);
+    await kvDelete(legacyDeviceName(dept)).catch(() => null);
+    return legacy;
+  }
+  if (!create) return "";
   const id = `PPD-${globalThis.crypto.randomUUID()}`;
-  await kvSet(deviceName(dept), id);
+  await kvSet(deviceName(dept, uid), id);
   return id;
 }
 
@@ -192,7 +207,7 @@ async function writePackage(dept, uid, key, pkg) {
 
 /** Make sure this device is registered and not revoked. Returns its id. */
 async function ensureDevice(dept, actor) {
-  const id = await deviceId(dept, { create: true });
+  const id = await deviceId(dept, actor.actorUid, { create: true });
   const record = await getOfflineDevice(dept, id).catch(() => null);
   if (record?.status === "revoked") throw new OfflineNotAllowedError("Offline preplans were revoked on this device by your department.");
   if (record && record.uid && record.uid !== actor.actorUid) throw new OfflineNotAllowedError("This device is registered to someone else for offline preplans.");
@@ -228,9 +243,14 @@ export async function downloadPackage({ departmentId: dept, uid, actor, caps, pr
   const key = await deviceKey(dept, uid, { create: true });
   const canSeeRestricted = Boolean(caps.preplanSensitive);
   const data = await loadResponseData(dept, preplan, { withRestricted: canSeeRestricted });
+  // Don't save a copy that says "no alerts" because the alerts couldn't be read.
+  if (data.failed?.length) throw new LiveDataError(data.failed);
   const previous = await getPackage(dept, uid, preplanId).catch(() => null);
-  const chosen = chooseOfflineFiles(await listPreplanFiles(dept, preplanId), { settings, canSeeRestricted });
-  const files = await storeFiles({ dept, uid, preplanId, key, files: chosen.files, previous: previous?.content?.files || [] });
+  const allFiles = await listPreplanFiles(dept, preplanId);
+  const chosen = chooseOfflineFiles(allFiles, { settings, canSeeRestricted });
+  const chosenIds = new Set(chosen.files.map((row) => row.id));
+  const backgrounds = chooseBackgroundFiles(allFiles, data.buildings, { canSeeRestricted }).filter((row) => !chosenIds.has(row.id));
+  const files = await storeFiles({ dept, uid, preplanId, key, files: [...chosen.files, ...backgrounds], previous: previous?.content?.files || [] });
   const now = new Date().toISOString();
   const content = buildPackageContent({
     preplan,
@@ -254,8 +274,10 @@ export async function downloadPackage({ departmentId: dept, uid, actor, caps, pr
     expiresAt: expiryFrom(now, settings),
     staleHours: settings.staleHours,
     builtBy: uid,
+    builtWithRestricted: canSeeRestricted,
     restrictedIncluded: canSeeRestricted && Boolean(data.revision.restrictedLoaded),
-    filesLeftOut: chosen.leftOut + files.filter((row) => !row.stored).length,
+    filesLeftOut: chosen.leftOut + files.filter((row) => !row.stored && row.kind !== "background").length,
+    backgroundsMissing: files.filter((row) => !row.stored && row.kind === "background").length,
     content,
   };
   const summary = await writePackage(dept, uid, key, pkg);
@@ -267,6 +289,9 @@ export async function downloadPackage({ departmentId: dept, uid, actor, caps, pr
 /** Same approved revision: refresh alerts, hydrants and verification dates only. */
 async function refreshLive(dept, uid, key, pkg, serverPreplan, settings) {
   const live = await loadLiveResponseParts(dept, serverPreplan);
+  // A failed read keeps the saved alerts and hydrants and their freshness: the copy
+  // stays marked as of its last good update instead of claiming there are none.
+  if (live.failed.length) throw new LiveDataError(live.failed);
   const now = new Date().toISOString();
   const preplan = { ...pkg.content.preplan };
   for (const field of ["lastVerifiedAt", "verificationDueAt", "status", "hydrantIds", "facilityName", "address", "riskLevel", "responsibleStation"]) {
@@ -311,7 +336,7 @@ export async function wipePackages(dept, uid) {
 }
 
 async function report(dept, uid) {
-  const id = await deviceId(dept);
+  const id = await deviceId(dept, uid);
   if (!id) return;
   const rows = (await listPackages(dept, uid)).filter((row) => !row.damaged);
   await reportOfflineDevice(dept, id, rows);
@@ -329,7 +354,7 @@ export async function syncPackages({ departmentId: dept, uid, actor, caps }) {
 
   // Is this device still allowed to hold them?
   const features = await getDepartmentPreplanFeatures(dept);
-  const id = await deviceId(dept);
+  const id = await deviceId(dept, uid);
   const device = id ? await getOfflineDevice(dept, id).catch(() => null) : null;
   const wipe = deviceWipeReason({
     device,
@@ -357,7 +382,9 @@ export async function syncPackages({ departmentId: dept, uid, actor, caps }) {
     let decision = null;
     try {
       server = await getPreplan(dept, row.preplanId);
-      decision = pkg ? packageSyncAction(pkg, server) : (server?.publishedRevisionId ? { action: "full" } : { action: "remove", reason: "It has no approved version." });
+      decision = pkg
+        ? packageSyncAction(pkg, server, { canSeeRestricted: Boolean(caps?.preplanSensitive) })
+        : (server?.publishedRevisionId ? { action: "full" } : { action: "remove", reason: "It has no approved version." });
       if (decision.action === "remove") {
         await removePackage(dept, uid, row.preplanId);
         summary.removed.push({ name, reason: decision.reason });
@@ -369,6 +396,12 @@ export async function syncPackages({ departmentId: dept, uid, actor, caps }) {
         summary.updated += 1;
       }
     } catch (error) {
+      // Restricted details from earlier access can't stay if the rebuild without them failed.
+      if (decision?.restrictedLost) {
+        await removePackage(dept, uid, row.preplanId).catch(() => null);
+        summary.removed.push({ name, reason: `${decision.reason} Save it again to get a copy without them.` });
+        continue;
+      }
       summary.failed.push({ name, reason: error?.message || "Couldn't update." });
       // A newer approved version exists but couldn't be downloaded: say so on the saved copy.
       if (decision?.action === "full" && pkg && server?.publishedRevisionId && !pkg.newerRevisionId) {

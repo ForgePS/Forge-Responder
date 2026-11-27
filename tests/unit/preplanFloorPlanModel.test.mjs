@@ -2,6 +2,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  floorsInRevision,
   addObject,
   alignObjects,
   calibrateScale,
@@ -219,5 +220,21 @@ describe("symbol catalog", () => {
     assert.deepEqual(searchSymbols("shutoff").map((row) => row.id), ["gas_shutoff", "water_shutoff"]);
     assert.equal(searchSymbols("FDC")[0].id, "fdc");
     assert.ok(searchSymbols("utilities").some((row) => row.id === "generator"));
+  });
+});
+
+describe("floors in a revision", () => {
+  const floors = [
+    { id: "F1", archived: false },
+    { id: "F2", archived: true, archivedFromRevisionId: "R2" },
+    { id: "F3", archived: true, archivedFromRevisionId: "" },
+  ];
+  it("a published revision keeps a floor removed later in a draft", () => {
+    const published = [{ floorId: "F1" }, { floorId: "F2" }, { floorId: "F3" }];
+    assert.deepEqual(floorsInRevision(floors, published, "R1").map((row) => row.id), ["F1", "F2", "F3"]);
+  });
+  it("the draft it was removed in, and later revisions without its plan, don't", () => {
+    assert.deepEqual(floorsInRevision(floors, [{ floorId: "F1" }, { floorId: "F2" }], "R2").map((row) => row.id), ["F1"]);
+    assert.deepEqual(floorsInRevision(floors, [{ floorId: "F1" }], "R3").map((row) => row.id), ["F1"]);
   });
 });

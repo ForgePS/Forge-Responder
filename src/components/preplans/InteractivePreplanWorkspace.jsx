@@ -188,7 +188,7 @@ export default function InteractivePreplanWorkspace({
     if (!floor) return;
     if (!window.confirm(`Remove ${floor.name} from this preplan? Published revisions keep their copy.`)) return;
     try {
-      await savePreplanFloor(departmentId, { ...floor, archived: true }, actor);
+      await savePreplanFloor(departmentId, { ...floor, archived: true, archivedFromRevisionId: editableRevision ? revision.id : "" }, actor);
       await reload();
     } catch (error) {
       onError?.(error?.message || "Couldn't remove the floor.");
